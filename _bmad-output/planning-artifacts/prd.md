@@ -1,5 +1,5 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-02b-vision', 'step-02c-executive-summary', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish']
 inputDocuments: ['_bmad-output/brainstorming/brainstorming-session-2026-03-30-001.md']
 workflowType: 'prd'
 documentCounts:
@@ -27,15 +27,17 @@ A plataforma opera em dois eixos complementares que nenhum concorrente une: **nu
 
 ### O Que Torna Este Produto Especial
 
-**Automação que elimina burocracia:** O profissional preenche o checklist no celular durante a visita e o relatório sai pronto — fotos, áudios, anotações e geolocalização se compilam automaticamente num dossiê digital. Atualizar o preço de um ingrediente recalcula em cascata todas as receitas, fichas técnicas, cardápios e listas de compras.
+**Automação que elimina burocracia:** O profissional preenche o checklist no celular durante a visita e o relatório sai pronto — fotos, anotações e geolocalização se compilam automaticamente num dossiê digital. Atualizar o preço de um ingrediente recalcula em cascata todas as receitas, fichas técnicas e listas de compras.
 
-**Conhecimento regulatório embutido:** O sistema já contém os checklists por portaria e estado, com campos obrigatórios pré-configurados. O profissional não precisa memorizar legislação — a plataforma guia. Alertas com countdown avisam quando prazos regulatórios estão vencendo. Para o proprietário do estabelecimento sem formação técnica, o painel de semáforos traduz conformidade complexa em status simples: verde, amarelo, vermelho.
+**Ficha técnica com custo real:** Cada receita é documentada com ingredientes por peso, custo de matéria-prima, fator de correção/cocção, impostos e margem de venda — o preço por porção sai automaticamente. Alterar um ingrediente propaga para todas as fichas afetadas.
+
+**Conhecimento regulatório embutido:** O sistema já contém os checklists por portaria e estado, com campos obrigatórios pré-configurados. O profissional não precisa memorizar legislação — a plataforma guia. Alertas com countdown avisam quando prazos regulatórios estão vencendo.
 
 **Organização multi-cliente com isolamento de dados:** Um profissional gerencia todos os seus estabelecimentos e pacientes numa única plataforma, cada um com seus dados completamente separados e organizados. Visão unificada do profissional, visão isolada por cliente.
 
 **Ponte entre técnico e leigo:** O mesmo dado é apresentado em camadas — profundidade técnica para o nutricionista, indicadores visuais para o gestor hospitalar, resumos acessíveis para o familiar do paciente. Portal unificado de acesso externo com permissões granulares.
 
-**Modo offline real:** Trabalha no campo sem internet (mobile e PWA), com sincronização automática ao reconectar. Essencial para cozinhas de escolas e hospitais onde Wi-Fi é instável.
+**Visão completa (roadmap):** Modo offline real para trabalho de campo sem internet (Etapa 2), app mobile nativo (Etapa 2), ciclo financeiro completo com gateway de pagamento (Etapa 2), teleconsulta e IA avançada (Etapa 2).
 
 ## Classificação do Projeto
 
@@ -48,35 +50,40 @@ A plataforma opera em dois eixos complementares que nenhum concorrente une: **nu
 
 ## Critérios de Sucesso
 
-### Sucesso do Usuário
+### Sucesso do Usuário (MVP)
 
 - **Redução drástica de tempo burocrático:** O profissional gera relatório de visita completo (checklist + fotos + anotações + dossiê) em menos de 2 minutos após finalizar a visita, versus processo manual atual (baseline a ser mensurado)
 - **Organização multi-cliente sem fricção:** O profissional navega entre estabelecimentos e pacientes em no máximo 2 toques, com dados completamente isolados e contextualizados
 - **Conformidade regulatória sem memorização:** O sistema guia 100% dos campos obrigatórios por portaria; alertas de countdown eliminam visitas atrasadas; o profissional não precisa consultar legislação externamente
-- **Atualização de custos em cascata:** Alterar o preço de um ingrediente recalcula automaticamente todas as receitas, fichas técnicas e listas de compras em menos de 5 segundos
+- **Atualização de custos em cascata:** Alterar o preço de um ingrediente recalcula automaticamente todas as fichas técnicas afetadas em menos de 10 segundos
+- **Ficha técnica com custo real:** Profissional obtém preço por porção considerando ingredientes, fatores de correção/cocção, impostos e margem — sem planilha
+
+### Sucesso do Usuário (Etapa 2)
+
 - **Trabalho de campo sem interrupção:** Modo offline funcional com zero perda de dados e sincronização transparente ao reconectar
+- **Inteligência artificial:** Transcrição de áudio, preenchimento preditivo, geração de cardápio, OCR de rótulos
 
 ### Sucesso de Negócio
 
 - **Aquisição inicial:** 50 nutricionistas assinantes ativos nos primeiros 6 meses pós-lançamento
 - **Retenção:** Churn mensal abaixo de 5% após os primeiros 3 meses de operação
 - **Ativação:** 70%+ dos usuários em trial completam o onboarding guiado e realizam pelo menos 1 visita ou cadastram 1 cliente na primeira semana
-- **Marketplace:** Catálogo de fornecedores ativo no lançamento como feature de valor; monetização via destaque pago a partir de 100+ assinantes
-- **Add-ons:** Funcionalidades WhatsApp como add-on pago contribuindo para ARPU a partir do mês 3
+- **Marketplace:** Catálogo de fornecedores ativo na Etapa 1.5; monetização via destaque pago a partir de 100+ assinantes
+- **Add-ons:** Funcionalidades WhatsApp como add-on pago contribuindo para ARPU a partir da Etapa 2
 
 ### Sucesso Técnico
 
 - **Disponibilidade:** 99.5%+ de uptime mensal
-- **Performance:** Tempo de carregamento de telas < 2 segundos; sincronização offline < 30 segundos para visitas completas (checklist + fotos + áudios)
+- **Performance:** Carregamento de telas < 2 segundos; geração de relatório < 5 segundos; recálculo em cascata < 10 segundos
 - **Segurança:** Zero incidentes de vazamento de dados de saúde; criptografia em repouso ativa desde o dia 1
 - **Escalabilidade:** Arquitetura suporta crescimento de 50 para 5.000 profissionais sem redesign de infraestrutura
 - **Multi-tenant:** Isolamento de dados por tenant verificado e auditável; nenhum dado cruza entre profissionais
 
 ### Resultados Mensuráveis
 
-| Métrica | Baseline (atual) | Meta MVP (6 meses) | Meta Etapa 2 (12 meses) |
+| Métrica | Baseline (atual) | Meta MVP (2 meses) | Meta Etapa 2 (8 meses) |
 |---|---|---|---|
-| Nutricionistas assinantes | 0 | 50 | 200 |
+| Nutricionistas em validação | 0 | 3-5 (beta fechado) | 50 assinantes |
 | Churn mensal | — | < 5% | < 3% |
 | Tempo para gerar relatório | A mensurar | < 2 min | < 30 seg (com IA) |
 | Conversão trial → pago | — | > 20% | > 30% |
@@ -180,47 +187,53 @@ Features que completam a experiência mas não são bloqueantes para validação
 
 ### Jornada 1: Maria — Dia de Visita Técnica (Jornada Primária)
 
+> **Nota de escopo:** Esta jornada descreve a experiência completa (visão futura). No MVP: sem modo offline (requer conexão), sem gravação de áudio (só foto + texto), sem sincronização local. Funcionalidades marcadas com ⭐ são MVP; com 🔮 são Etapa 1.5/2.
+
 **Persona:** Maria, 32 anos, nutricionista autônoma. CRN ativo, 4 clientes institucionais (2 escolas, 1 hospital, 1 lar de idosos) e 12 pacientes particulares. Vive no carro entre visitas, celular é sua principal ferramenta.
 
 **Cena de Abertura — 7h da manhã:**
-Maria acorda e recebe a notificação push matinal: "Bom dia Maria! Hoje: 2 visitas técnicas, 1 consulta particular. Atenção: checklist da Escola B vence em 3 dias. Pagamento da Escola A: R$800 pendente há 10 dias." Ela abre o app e vê o dashboard separado por tópicos — Pacientes à esquerda, Financeiro à direita, tudo por ordem de urgência. Em 30 segundos sabe exatamente como será seu dia.
+Maria acorda e recebe a notificação push matinal: "Bom dia Maria! Hoje: 2 visitas técnicas, 1 consulta particular. Atenção: checklist da Escola B vence em 3 dias. Pagamento da Escola A: R$800 pendente há 10 dias." Ela abre o app e vê o dashboard separado por tópicos — Pacientes à esquerda, Financeiro à direita, tudo por ordem de urgência. Em 30 segundos sabe exatamente como será seu dia. ⭐
 
 **Ação Crescente — 9h, Escola B:**
-Maria chega na cozinha da escola. O Wi-Fi é péssimo. Ela abre o app e inicia a visita — o sistema já pré-carregou o checklist da portaria estadual aplicável à Escola B, com os itens pendentes da última visita destacados em amarelo. Maria vai marcando item a item. No item 4.3 (piso da cozinha), encontra não-conformidade. Com um toque no botão flutuante, tira foto — o sistema vincula automaticamente ao item 4.3 com geolocalização e timestamp. Ela grava um áudio rápido: "Piso molhado próximo à bancada de preparo, risco de queda. Terceira vez que registro isso." A anotação fica vinculada ao item. O indicador de sync mostra "⏳ 5 itens aguardando" — tudo salvo localmente.
+Maria chega na cozinha da escola. Ela abre o app e inicia a visita — o sistema já pré-carregou o checklist da portaria estadual aplicável à Escola B, com os itens pendentes da última visita destacados em amarelo ⭐. Maria vai marcando item a item. No item 4.3 (piso da cozinha), encontra não-conformidade. Com um toque, tira foto — o sistema vincula automaticamente ao item 4.3 com geolocalização e timestamp ⭐. Ela registra uma anotação: "Piso molhado próximo à bancada de preparo, risco de queda. Terceira vez que registro isso." ⭐ (🔮 Na Etapa 2, poderá gravar áudio com transcrição automática.)
 
-O sistema destaca: "⚠️ Item 4.3 foi não-conforme nas últimas 2 visitas. Ação corretiva anterior não implementada." Maria anota recomendação de ação urgente.
+O sistema destaca: "⚠️ Item 4.3 foi não-conforme nas últimas 2 visitas. Ação corretiva anterior não implementada." ⭐ Maria anota recomendação de ação urgente.
 
 **Clímax — 10h30, finalizando a visita:**
-Maria clica "Finalizar Visita". Em 3 segundos, o sistema apresenta o dossiê completo: checklist preenchido, 4 fotos vinculadas, 2 áudios, 6 anotações, horário de entrada e saída, geolocalização. Tudo compilado num relatório formatado. Maria revisa a prévia, ajusta uma observação no item 7.1, aprova. O sistema salva o relatório, gera PDF. Quando o Wi-Fi reconecta no estacionamento: "✅ Todos os itens sincronizados." O relatório é enviado automaticamente para Dona Margarida (diretora da escola), conforme configuração.
+Maria clica "Finalizar Visita". Em segundos, o sistema apresenta o dossiê completo: checklist preenchido, 4 fotos vinculadas, 6 anotações, horário de entrada e saída ⭐. Tudo compilado num relatório formatado. Maria revisa a prévia, ajusta uma observação no item 7.1, aprova ⭐. O sistema salva o relatório, gera PDF e envia automaticamente por email para Dona Margarida (diretora da escola), conforme configuração ⭐.
 
 **Resolução — 10h35, no carro:**
-O sistema exibe: "Próxima visita: Hospital Santa Clara — 14h. Resumo: 1 não-conformidade pendente, checklist da Portaria X a aplicar, Seu Antônio com reavaliação prevista." Maria também grava uma nota rápida de voz pelo botão flutuante: "Lembrar de sugerir troca de fornecedor de legumes da Escola B." O sistema vincula a nota à visita recém-finalizada.
+Maria consulta a agenda: "Próxima visita: Hospital Santa Clara — 14h. 1 não-conformidade pendente, checklist da Portaria X a aplicar." ⭐
 
 **Antes vs Depois:**
 - Antes: 2h montando relatório no computador à noite, risco de esquecer detalhes, fotos soltas no celular sem contexto
-- Depois: Relatório pronto em 3 segundos, zero retrabalho, evidências vinculadas automaticamente, próximo cliente já briefado
+- Depois: Relatório pronto em segundos, zero retrabalho, evidências vinculadas automaticamente
 
 ### Jornada 2: Maria — Onboarding e Primeiro Uso (Jornada de Ativação)
+
+> **Nota de escopo:** Sandbox de demonstração é Etapa 1.5. No MVP: wizard + importação CSV + cadastro direto.
 
 **Persona:** Mesma Maria, mas no momento de descoberta da plataforma. Ela usa Excel e WhatsApp há 5 anos. Está frustrada com a desorganização mas cética sobre mudar de ferramenta.
 
 **Cena de Abertura — Descoberta:**
-Maria encontra a plataforma por indicação de uma colega. Acessa o site, vê a proposta de valor. Clica "Iniciar teste grátis". Em 30 segundos criou a conta.
+Maria encontra a plataforma por indicação de uma colega. Acessa o site, vê a proposta de valor. Clica "Iniciar teste grátis". Em 30 segundos criou a conta. ⭐
 
 **Ação Crescente — Wizard de onboarding:**
-O sistema pergunta: "Como você trabalha? (a) Consultoria institucional (b) Atendimento clínico particular (c) Ambos." Maria seleciona "Ambos". O dashboard se configura automaticamente com módulos relevantes. O wizard guia: "Passo 1: cadastre seu primeiro cliente." Maria cadastra a Escola B — seleciona tipo "Escola", estado "SP", e o sistema já sugere as portarias aplicáveis.
+O sistema pergunta: "Como você trabalha? (a) Consultoria institucional (b) Atendimento clínico particular (c) Ambos." Maria seleciona "Ambos". O dashboard se configura automaticamente com módulos relevantes ⭐. O wizard guia: "Passo 1: cadastre seu primeiro cliente." Maria cadastra a Escola B — seleciona tipo "Escola", estado "SP", e o sistema já sugere as portarias aplicáveis ⭐.
 
-**Clímax — Ambiente sandbox:**
-Antes de cadastrar dados reais, Maria explora o sandbox: um hospital fictício com pacientes, checklists preenchidos, relatórios gerados, fichas técnicas de receitas. Ela navega pelo dossiê de visita automático, vê os gráficos de evolução de conformidade, abre uma ficha técnica com cálculo nutricional automático. Pensa: "Isso é o que eu faço em 2 horas no Excel, pronto em segundos."
+**Clímax — Importação e primeiro valor:**
+Maria importa sua planilha de clientes via wizard de importação CSV ⭐. Os 4 estabelecimentos e 12 pacientes estão no sistema. Ela abre uma ficha técnica, cadastra uma receita com ingredientes — o sistema calcula custo por porção automaticamente com TACO ⭐. Pensa: "Isso é o que eu faço em 2 horas no Excel, pronto em segundos." (🔮 Na Etapa 1.5, poderá explorar sandbox com dados fictícios antes de cadastrar dados reais.)
 
-**Resolução — Primeiros dados reais:**
-Maria importa sua planilha de clientes via wizard de importação. Os 4 estabelecimentos e 12 pacientes estão no sistema. Ela agenda a primeira visita para amanhã. O sistema já preparou o checklist regulatório. Maria fecha o notebook pensando: "Por que não descobri isso antes?"
+**Resolução — Primeira visita agendada:**
+Maria agenda a primeira visita para amanhã. O sistema já preparou o checklist regulatório ⭐. Maria fecha o notebook pensando: "Por que não descobri isso antes?"
 
 **Antes vs Depois:**
 - Antes: Medo de perder tempo aprendendo ferramenta nova, dados espalhados em 5 planilhas diferentes
 - Depois: Em 15 minutos, todo o histórico migrado, primeira visita agendada com checklist pré-carregado
 
-### Jornada 3: Dona Margarida e Carlos — Portal do Cliente PJ (Jornada Secundária)
+### Jornada 3: Dona Margarida e Carlos — Portal do Cliente PJ (Etapa 1.5)
+
+> **Nota de escopo:** Portal Cliente PJ completo é Etapa 1.5. No MVP: profissional envia relatório PDF diretamente por email. Esta jornada documenta a experiência-alvo para a Etapa 1.5.
 
 **Persona A:** Dona Margarida, 58 anos, diretora da Escola B. Não entende nutrição. Precisa prestar contas à Secretaria de Educação e aos pais.
 
@@ -264,12 +277,15 @@ Diego verifica o painel de infraestrutura: uso de storage (fotos e áudios cresc
 
 ### Resumo de Requisitos Revelados pelas Jornadas
 
-| Jornada | Capacidades Reveladas |
-|---|---|
-| Maria — Visita Técnica | Modo offline, dossiê automático, foto com geolocalização, áudio, alertas regulatórios, briefing do próximo cliente, relatório com preview, sincronização, quick actions |
-| Maria — Onboarding | Wizard por perfil, sandbox demo, importação de dados, configuração automática por tipo de trabalho, sugestão de portarias por estado |
-| Dona Margarida/Carlos — Portal PJ | Dashboard de métricas simplificado, download de relatórios, semáforo de compliance, pacote para fiscalização, evolução de indicadores, alertas de vencimento |
-| Diego — Admin | Dashboard SaaS, CRUD regulatório com versionamento, gestão de fornecedores, monitoramento de infraestrutura, gestão multi-tenant, sinais de churn |
+| Jornada | Capacidades Reveladas | Fase |
+|---|---|---|
+| Maria — Visita Técnica | Dossiê automático, foto com geolocalização, alertas regulatórios, relatório com preview, envio por email | MVP |
+| Maria — Visita (evolução) | Modo offline, gravação de áudio, transcrição IA, sincronização, quick actions | Etapa 1.5/2 |
+| Maria — Onboarding | Wizard por perfil, importação CSV, configuração automática por tipo de trabalho, sugestão de portarias por estado | MVP |
+| Maria — Onboarding (evolução) | Sandbox demo | Etapa 1.5 |
+| Dona Margarida/Carlos — Portal PJ | Dashboard de métricas simplificado, download de relatórios, semáforo de compliance, pacote para fiscalização, evolução de indicadores | Etapa 1.5 |
+| Diego — Admin | Dashboard SaaS, CRUD regulatório com versionamento, gestão de tenants | MVP |
+| Diego — Admin (evolução) | Gestão de fornecedores (marketplace), monitoramento de infraestrutura, sinais de churn | Etapa 1.5/2 |
 
 ## Requisitos Específicos de Domínio
 
@@ -301,64 +317,54 @@ Diego verifica o painel de infraestrutura: uso de storage (fotos e áudios cresc
 - Resolução CFN nº 772/2024 estabelece CIP digital como padrão
 - MVP: prescrições incluem identificação CRN automaticamente, formato imprimível. Assinatura eletrônica formal na Etapa 2
 
-### Restrições Técnicas
+### Privacidade e Retenção de Dados
 
-**Segurança de dados de saúde:**
-- Criptografia em repouso (AES-256) para todos os dados de pacientes
-- Criptografia em trânsito (TLS 1.2+) obrigatória
-- RBAC com Row Level Security (Supabase)
-- 2FA obrigatório para profissionais que acessam dados de saúde
-- Log de auditoria imutável (quem acessou o quê, quando, de onde)
-
-**Privacidade e retenção:**
 - Isolamento multi-tenant rigoroso — dados de um profissional jamais visíveis por outro
 - Política de retenção: 5 anos após encerramento de contrato (conforme práticas de saúde)
 - Direito de exclusão (LGPD Art. 18): exclusão respeitando obrigações legais de retenção
 - Anonimização irreversível para dados usados em treinamento de IA e insights agregados
-
-**Modo offline e integridade:**
-- Dados locais criptografados no dispositivo
-- Conflitos de sincronização: política "última escrita vence" + log de conflito para revisão
-- Fotos e áudios com hash de integridade (não alterados pós-captura)
+- Exportação completa de dados a qualquer momento (Data Portability — LGPD Art. 18)
 
 ### Segurança de Aplicação e Infraestrutura
 
+> Critérios mensuráveis de segurança estão na seção de Requisitos Não-Funcionais. Esta seção documenta a estratégia e as técnicas de mitigação.
+
 **Proteção contra ataques:**
-- DDoS: Rate limiting por IP e por tenant, CDN com proteção DDoS (Cloudflare ou equivalente), auto-scaling no Kubernetes
-- Brute force: Bloqueio progressivo após 5 tentativas (lockout 15min → 1h → 24h), CAPTCHA após 3 falhas, notificação ao usuário
+- DDoS: Rate limiting por IP e por tenant, CDN com proteção DDoS, auto-scaling no Kubernetes
+- Brute force: CAPTCHA após 3 falhas, rate limit 20 req/min por IP, atraso exponencial na resposta (1s→2s→4s→8s), notificação por email após 5 falhas, Magic Link como fallback. **Nunca bloquear a conta**
 - Bot protection: User-agent validation, honeypot fields, fingerprinting de dispositivo
 
 **Validação e sanitização de entrada:**
-- SQL Injection: Queries parametrizadas obrigatórias (Supabase PreparedStatements), zero concatenação de strings
+- SQL Injection: Queries parametrizadas obrigatórias, zero concatenação de strings
 - XSS: Sanitização de todo input, Content Security Policy (CSP) headers restritivos
 - CSRF: Tokens anti-CSRF em todas as mutações, SameSite cookies
 - Input validation: Limite de tamanho em todos os campos, validação de tipo/formato no frontend E backend, rejeição de payloads malformados
-- File upload: Validação de MIME type real, limite de tamanho (fotos: 10MB, áudios: 50MB), scan de malware, armazenamento em bucket separado
+- File upload: Validação de MIME type real, limite de tamanho (fotos: 10MB), scan de malware, armazenamento em bucket separado
 
 **Row Level Security (RLS) — Supabase:**
 - Políticas RLS ativas em todas as tabelas com dados de tenant
 - Regra base: `auth.uid() = user_id` — nenhum usuário acessa dados de outro
 - Acesso externo: policy vinculada a tabela de permissões explícitas
 - Admin: policy separada com role `service_role`, nunca exposta ao frontend
-- Teste automatizado: suite que verifica isolamento cross-tenant a cada deploy (retorna vazio, não erro)
-
-**Segurança de API:**
-- JWT com expiração curta (15min access token + refresh token)
-- Rate limiting por endpoint: leitura (100 req/min), escrita (30 req/min), upload (10 req/min)
-- API versioning, validação de schema em todas as requisições
-- Logging com campos sensíveis mascarados
+- Teste automatizado: suite que verifica isolamento cross-tenant a cada deploy
 
 **Segurança de infraestrutura:**
 - Secrets via vault (não hardcoded)
 - Containers Docker com imagem mínima (distroless/alpine), sem root
-- Network policies no Kubernetes: comunicação via service mesh, zero acesso público direto
-- Scan de vulnerabilidades (npm audit / Snyk) no CI/CD
+- Network policies no Kubernetes: zero acesso público direto aos microserviços
+- Scan de vulnerabilidades no CI/CD a cada merge
 - Pen-test antes do lançamento e anualmente
 
 **Monitoramento de segurança:**
 - Alertas para: picos anormais, login falhado em massa, queries RLS inesperadas, uploads suspeitos
-- Log centralizado com retenção 12 meses
+- Log centralizado com retenção 12 meses, campos sensíveis mascarados
 - Plano de resposta a incidentes documentado antes do lançamento
+
+### Modo Offline e Integridade (Etapa 2)
+
+- Dados locais criptografados no dispositivo
+- Conflitos de sincronização: política "última escrita vence" + log de conflito para revisão
+- Fotos e áudios com hash de integridade (não alterados pós-captura)
 
 ### Requisitos de Integração
 
@@ -409,7 +415,7 @@ Componente único que adapta profundidade ao perfil do visualizador. Progressive
 | Aspecto | Concorrentes | Esta Plataforma |
 |---|---|---|
 | Escopo | Clínico OU institucional | Ambos integrados |
-| Trabalho de campo | Online-first | Offline-first com sync |
+| Trabalho de campo | Online-first | Web responsiva MVP; Offline-first com sync (Etapa 2) |
 | Relatórios | Montagem manual pós-visita | Geração automática na visita |
 | Compliance | Checklists genéricos | Portarias embutidas por estado com countdown |
 | Custos de receitas | Cálculo isolado | Cascata automática ingrediente → cardápio |
@@ -516,3 +522,180 @@ Plataforma SaaS B2B multi-tenant com componente B2C (portal de acesso externo). 
 - **Onboarding personalizado:** Wizard que adapta o setup inicial baseado no plano e tipo de trabalho do profissional
 - **Data migration:** Wizard de importação CSV/Excel para migração de dados de outros sistemas
 - **Observabilidade:** Logging estruturado, métricas de negócio (MRR, churn, engagement), alertas operacionais
+
+## Requisitos Funcionais
+
+### 1. Gestão de Usuários e Autenticação
+
+- **FR1:** Profissional pode criar conta na plataforma com email e senha
+- **FR2:** Profissional pode autenticar via provedor OAuth social
+- **FR3:** Profissional pode ativar e gerenciar autenticação de dois fatores
+- **FR4:** Profissional pode cadastrar e manter seu perfil incluindo número de inscrição no CRN
+- **FR5:** Sistema insere identificação CRN automaticamente em todos os documentos e prescrições gerados
+
+### 2. Gestão de Clientes, Estabelecimentos e Pacientes
+
+- **FR6:** Profissional pode cadastrar clientes pessoa física ou jurídica
+- **FR7:** Profissional pode cadastrar estabelecimentos vinculados a clientes PJ, classificados por tipo (escola, hospital, clínica, lar de idosos, empresa)
+- **FR8:** Profissional pode cadastrar pacientes vinculados a estabelecimentos ou diretamente a clientes PF
+- **FR9:** Profissional pode registrar perfil completo do paciente com formulários de avaliação nutricional
+- **FR10:** Profissional pode visualizar histórico consolidado de um paciente atendido em múltiplos estabelecimentos
+- **FR11:** Profissional pode importar clientes, estabelecimentos e pacientes a partir de arquivo CSV/Excel
+
+### 3. Checklists e Compliance Regulatório
+
+- **FR12:** Sistema disponibiliza checklists pré-configurados por portaria sanitária estadual com campos obrigatórios identificados
+- **FR13:** Profissional pode preencher checklists regulatórios com validação de campos obrigatórios
+- **FR14:** Profissional pode criar checklists customizados com campos extras configuráveis
+- **FR15:** Admin pode criar, editar e versionar checklists regulatórios na plataforma
+- **FR16:** Sistema notifica profissionais afetados quando um checklist regulatório é atualizado pelo admin
+
+### 4. Visitas Técnicas e Dossiê
+
+- **FR17:** Profissional pode agendar visitas técnicas a estabelecimentos e pacientes cadastrados
+- **FR18:** Profissional pode iniciar e executar visita com preenchimento de checklist aplicável
+- **FR19:** Profissional pode registrar fotos vinculadas a itens específicos do checklist durante a visita
+- **FR20:** Profissional pode registrar anotações textuais vinculadas a itens do checklist
+- **FR21:** Sistema destaca itens com não-conformidade recorrente baseado no histórico de visitas anteriores ao mesmo estabelecimento
+- **FR22:** Sistema gera relatório/dossiê automaticamente ao profissional finalizar visita, compilando checklist preenchido, fotos e anotações
+- **FR23:** Profissional pode revisar, editar e aprovar o relatório gerado antes da finalização definitiva
+- **FR24:** Profissional pode exportar relatório de visita em PDF
+- **FR25:** Sistema pode enviar relatório de visita por email automaticamente conforme configuração do profissional
+
+### 5. Ficha Técnica e Receitas
+
+- **FR26:** Profissional pode cadastrar receitas com lista de ingredientes especificando peso/quantidade
+- **FR27:** Sistema vincula ingredientes à tabela TACO e calcula informação nutricional automaticamente
+- **FR28:** Profissional pode cadastrar matéria-prima com custo unitário de compra
+- **FR29:** Sistema aplica fator de correção e fator de cocção ao cálculo de custo e nutricional
+- **FR30:** Sistema calcula custo total da receita com base nos ingredientes, pesos e custos unitários
+- **FR31:** Profissional pode configurar impostos aplicáveis e margem de venda por receita
+- **FR32:** Sistema calcula preço de venda por porção considerando custo, impostos e margem
+- **FR33:** Sistema calcula informação nutricional por porção com base na tabela TACO
+- **FR34:** Profissional pode escalonar receita por regra de três ajustando rendimento desejado
+- **FR35:** Sistema recalcula em cascata todas as fichas técnicas afetadas quando o preço de um ingrediente é alterado
+- **FR36:** Profissional pode exportar ficha técnica completa em PDF
+
+### 6. Procedimentos Operacionais Padronizados (POPs)
+
+- **FR37:** Sistema disponibiliza templates de POP pré-configurados por tipo de estabelecimento
+- **FR38:** Profissional pode criar e customizar POPs vinculados a estabelecimentos
+- **FR39:** Sistema mantém versionamento de POPs com histórico de alterações
+- **FR40:** Profissional pode exportar POP em PDF
+
+### 7. Controle Financeiro
+
+- **FR41:** Profissional pode registrar e acompanhar status de pagamento por cliente
+- **FR42:** Profissional pode configurar recorrência de cobrança (mensal, anual, avulso) por cliente
+- **FR43:** Profissional pode definir datas de início e fim de contrato por cliente
+- **FR44:** Profissional pode gerar contratos a partir de modelos pré-preenchidos com dados do cliente
+- **FR45:** Sistema emite alertas de renovação e vencimento de contrato
+
+### 8. Portal de Acesso Externo
+
+- **FR46:** Profissional pode cadastrar usuários com acesso externo (familiar, médico, paciente)
+- **FR47:** Profissional pode configurar quais categorias de dados cada usuário externo pode visualizar por paciente
+- **FR48:** Usuário externo pode visualizar relatórios, medições, exames e plano nutricional do paciente conforme permissões concedidas
+- **FR49:** Sistema coleta consentimento LGPD do responsável legal ao cadastrar paciente menor de idade
+
+### 9. Dashboard e Organização
+
+- **FR50:** Profissional visualiza dashboard com agenda do dia organizada por prioridade e tipo
+- **FR51:** Sistema exibe alertas regulatórios com countdown de vencimento no dashboard
+- **FR52:** Profissional visualiza pendências financeiras no dashboard
+- **FR53:** Dashboard apresenta informações separadas por tópico (pacientes versus financeiro)
+- **FR54:** Sistema gera briefing com avisos da semana para o profissional se organizar
+
+### 10. Onboarding e Configuração
+
+- **FR55:** Sistema guia novo profissional por wizard de configuração inicial adaptado ao tipo de trabalho selecionado
+- **FR56:** Sistema sugere portarias aplicáveis baseado no estado e tipo de estabelecimento cadastrado
+
+### 11. Administração da Plataforma
+
+- **FR57:** Admin pode gerenciar tenants (profissionais) da plataforma
+- **FR58:** Admin pode configurar planos de assinatura, limites e add-ons
+- **FR59:** Admin pode visualizar métricas da plataforma (assinantes, conversão, churn)
+- **FR60:** Admin pode gerenciar catálogo de dados compartilhados (portarias, tabela TACO, templates)
+
+### 12. Segurança e Privacidade
+
+- **FR61:** Sistema isola completamente os dados entre profissionais — nenhum tenant acessa dados de outro
+- **FR62:** Sistema registra log de auditoria de todas as ações em dados de pacientes
+- **FR63:** Sistema coleta e registra consentimento digital do paciente/responsável para uso de dados
+- **FR64:** Sistema permite ao profissional gerar relatório de dados pessoais de um paciente para atendimento de direitos LGPD
+- **FR65:** Profissional pode exportar todos os seus dados da plataforma em formato aberto a qualquer momento (Data Portability)
+- **FR66:** Sistema envia notificações push/email ao profissional sobre eventos relevantes (agenda do dia, alertas regulatórios, pendências financeiras, atualizações de portarias)
+- **FR67:** Profissional pode encerrar sessão (logout) e sistema invalida tokens de acesso
+- **FR68:** Profissional pode recuperar acesso à conta via email (reset de senha / Magic Link)
+- **FR69:** Profissional pode solicitar exclusão completa da sua conta e dados pessoais conforme LGPD Art. 18, respeitando obrigações legais de retenção
+- **FR70:** Sistema preserva checklists preenchidos em visitas como registros imutáveis (evidência legal) — edições geram nova versão, não substituem o original
+
+## Requisitos Não-Funcionais
+
+### Performance
+
+| Critério | Meta | Contexto |
+|---|---|---|
+| Carregamento de telas | < 2 segundos | Qualquer tela navegável com conexão 4G |
+| Geração de relatório de visita | < 5 segundos | Dossiê completo com checklist + até 10 fotos |
+| Recálculo em cascata (preço de ingrediente) | < 10 segundos para até 100 fichas afetadas | Propagação de alteração de custo |
+| Geração de PDF (ficha técnica / relatório) | < 5 segundos | Documento com tabelas e imagens |
+| Busca de ingredientes na tabela TACO | < 1 segundo | Autocomplete durante cadastro de receita |
+| Dashboard load | < 3 segundos | Incluindo agenda, alertas e pendências financeiras |
+| Importação CSV | < 30 segundos para até 500 registros | Clientes + estabelecimentos + pacientes |
+| Usuários simultâneos | 500 profissionais concorrentes sem degradação | Meta para os primeiros 12 meses |
+
+### Segurança
+
+| Critério | Meta | Contexto |
+|---|---|---|
+| Criptografia em repouso | AES-256 para todos os dados de pacientes | Requisito LGPD para dados sensíveis de saúde |
+| Criptografia em trânsito | TLS 1.2+ em todas as conexões | Sem exceção |
+| Expiração de token | Access token 15min + refresh token 7 dias | Supabase Auth JWT |
+| Tentativas de login | CAPTCHA após 3 falhas, rate limit 20 req/min por IP, atraso exponencial (1s→2s→4s→8s), notificação por email após 5 falhas, Magic Link como fallback. **Nunca bloquear a conta** |
+| Rate limiting API | Leitura: 100 req/min, Escrita: 30 req/min, Upload: 10 req/min por usuário | Proteção contra abuso |
+| Isolamento multi-tenant | Zero vazamento cross-tenant verificado por testes automatizados a cada deploy | RLS + testes de regressão |
+| Log de auditoria | Retenção 12 meses, campos sensíveis mascarados | Compliance e investigação |
+| Scan de vulnerabilidades | Executado automaticamente no CI/CD a cada merge | npm audit / Snyk equivalente |
+| Pen-test | Antes do lançamento e anualmente | Contratação externa |
+
+### Escalabilidade
+
+| Critério | Meta | Contexto |
+|---|---|---|
+| Crescimento horizontal | De 50 para 5.000 profissionais sem redesign de infraestrutura | Containers stateless + auto-scaling |
+| Storage | Suportar crescimento de 15% ao mês em fotos/documentos | Monitoramento proativo |
+| Banco de dados | 100 tenants × 1.000 pacientes cada sem degradação de queries | Benchmark a ser validado no mês 1 |
+| Filas assíncronas | Processamento de 1.000 jobs/hora (PDF, email, sync) | Geração de relatórios e notificações |
+| Auto-scaling | Escalar containers automaticamente com base em CPU/memória > 70% | Kubernetes HPA |
+
+### Disponibilidade e Confiabilidade
+
+| Critério | Meta | Contexto |
+|---|---|---|
+| Uptime mensal | 99.5% (MVP) → 99.9% (Etapa 2) | Máximo ~3.6h de downtime/mês no MVP |
+| Deploy | Zero-downtime (rolling update) | Profissionais podem estar usando durante deploy |
+| Backup de dados | Automático diário, retenção 30 dias, testado mensalmente | Restauração verificável |
+| Recuperação de desastre | RTO < 4 horas, RPO < 1 hora | Tempo para restaurar serviço e perda máxima de dados |
+| Retenção de dados pós-contrato | 5 anos após encerramento | Práticas de saúde e obrigações legais |
+
+### Acessibilidade
+
+| Critério | Meta | Contexto |
+|---|---|---|
+| WCAG | Nível AA para fluxos principais | Portal externo usado por gestores e familiares de diversas idades |
+| Contraste | Mínimo 4.5:1 para texto, 3:1 para elementos gráficos | Legibilidade em dispositivos variados |
+| Navegação por teclado | Todos os fluxos principais acessíveis sem mouse | Profissionais com limitações motoras |
+| Responsividade | Funcional em telas de 375px (mobile) até 1920px (desktop) | Web responsiva como plataforma única no MVP |
+| Tamanho de fonte | Mínimo 16px para corpo de texto, redimensionável | Conforto de leitura em campo |
+
+### Integração
+
+| Critério | Meta | Contexto |
+|---|---|---|
+| Supabase Auth | Disponibilidade vinculada ao SLA do Supabase (99.9%) | Dependência crítica |
+| Email transacional | Entrega em < 60 segundos, taxa de bounce < 2% | Relatórios e alertas |
+| Tabela TACO | Dados pré-carregados, atualização manual pelo admin | Sem dependência de API externa |
+| Gateway de pagamento (Etapa 2) | Abstração via Strategy Pattern, failover entre provedores | Preparação arquitetural no MVP |
+| API pública | Versionada, documentada, rate-limited | Preparação para integrações futuras |

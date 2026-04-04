@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–4 concluídos** (épico 2 com story 2.7 em backlog); **épico 5 quase concluído** (5.1–5.2, 5.4–5.6 concluídas; **5.3** depende do épico 8); **épico 6 em curso** (6.1 concluída; 6.2–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml` (sincronizado em 2026-04-04).
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.2 concluídas; 6.3–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -225,7 +225,7 @@ Profissional vê agenda do dia, alertas com *countdown*, financeiro resumido, se
 ### Epic 6: Ficha técnica, TACO e custos
 Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.  
 **FRs:** FR26–FR36.
-**Implementação (épico):** Em curso (6.1 concluída; 6.2–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.2 concluídas; 6.3–6.8 em backlog).
 
 ### Epic 7: POPs
 Profissional usa templates, customiza POPs por estabelecimento, versiona e exporta PDF.  
@@ -814,7 +814,7 @@ So that vejo tendências (UX-DR16).
 
 ## Epic 6: Ficha técnica, TACO e custos
 
-**Implementação (épico):** Em curso (6.1 concluída; 6.2–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.2 concluídas; 6.3–6.8 em backlog).
 
 ### Story 6.1: Receitas e linhas de ingrediente
 
@@ -832,7 +832,7 @@ So that baseio custo e nutrição (FR26, UX-DR8).
 
 ### Story 6.2: Ligação TACO e informação nutricional
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-04: tabela `taco_reference_foods` com amostra MVP + RLS leitura para `authenticated`; `technical_recipe_lines.taco_food_id`; `searchTacoFoodsAction` com debounce na UI; `TacoLineLinker` no formulário de receita; painel «Nutrição estimada (TACO)» com `computeRecipeNutritionTotals` — g/kg/ml/l com aproximação água; `un` excluído do somatório.)
 
 As a profissional,  
 I want ingredientes ligados à TACO com cálculo automático,  

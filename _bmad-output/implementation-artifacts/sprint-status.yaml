@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-04T22:00:00Z"
+last_updated: "2026-04-04T23:30:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -73,7 +73,7 @@ development_status:
 
   epic-6: in-progress
   6-1-receitas-linhas-ingrediente: done
-  6-2-ligacao-taco-informacao-nutricional: backlog
+  6-2-ligacao-taco-informacao-nutricional: done
   6-3-materia-prima-custo-unitario: backlog
   6-4-fatores-correcao-coccao: backlog
   6-5-custo-total-impostos-margem-porcao: backlog

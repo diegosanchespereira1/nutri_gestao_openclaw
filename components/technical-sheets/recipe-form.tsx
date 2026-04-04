@@ -11,8 +11,10 @@ import {
   type RecipeLineUnit,
 } from "@/lib/constants/recipe-line-units";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
+import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
 import type { TechnicalRecipeWithLines } from "@/lib/types/technical-recipes";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
+import { computeRecipeNutritionTotals } from "@/lib/technical-recipes/recipe-nutrition";
 import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-totals";
 import { saveTechnicalRecipeDraftAction } from "@/lib/actions/technical-recipes";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -26,6 +28,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
 
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
@@ -36,6 +39,8 @@ type LineDraft = {
   quantity: string;
   unit: RecipeLineUnit;
   notes: string;
+  taco_food_id: string | null;
+  taco_food: TacoReferenceFoodRow | null;
 };
 
 function newLine(): LineDraft {
@@ -45,6 +50,8 @@ function newLine(): LineDraft {
     quantity: "",
     unit: "g",
     notes: "",
+    taco_food_id: null,
+    taco_food: null,
   };
 }
 
@@ -56,6 +63,8 @@ function linesFromRecipe(recipe: TechnicalRecipeWithLines): LineDraft[] {
     quantity: String(l.quantity),
     unit: l.unit,
     notes: l.notes ?? "",
+    taco_food_id: l.taco_food_id,
+    taco_food: l.taco_food,
   }));
 }
 
@@ -93,6 +102,24 @@ export function RecipeForm({ establishments, recipe }: Props) {
     [parsedForTotals],
   );
 
+  const nutritionPreview = useMemo(() => {
+    const parsed: Array<{
+      quantity: number;
+      unit: RecipeLineUnit;
+      taco: TacoReferenceFoodRow | null;
+    }> = [];
+    for (const l of lines) {
+      const q = parseFloat(l.quantity.replace(",", "."));
+      if (!Number.isFinite(q) || q <= 0) continue;
+      parsed.push({
+        quantity: q,
+        unit: l.unit,
+        taco: l.taco_food,
+      });
+    }
+    return computeRecipeNutritionTotals(parsed);
+  }, [lines]);
+
   const isEdit = Boolean(recipe);
 
   function updateLine(
@@ -122,6 +149,7 @@ export function RecipeForm({ establishments, recipe }: Props) {
       quantity: parseFloat(l.quantity.replace(",", ".")),
       unit: l.unit,
       notes: l.notes.trim() || undefined,
+      taco_food_id: l.taco_food_id,
     }));
 
     startTransition(async () => {
@@ -218,23 +246,82 @@ export function RecipeForm({ establishments, recipe }: Props) {
           </div>
         </div>
 
-        <Card className="border-dashed">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Validação de totais</CardTitle>
-            <CardDescription>
-              Só é possível somar automaticamente quando todas as linhas usam
-              apenas massa (g, kg) ou apenas volume (ml, l).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p className="text-foreground">{totalsPreview.label}</p>
-            {lastTotals ? (
-              <p className="text-muted-foreground border-t pt-2">
-                Último guardado: {lastTotals}
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card className="border-dashed">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Validação de totais</CardTitle>
+              <CardDescription>
+                Só é possível somar automaticamente quando todas as linhas usam
+                apenas massa (g, kg) ou apenas volume (ml, l).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-foreground">{totalsPreview.label}</p>
+              {lastTotals ? (
+                <p className="text-muted-foreground border-t pt-2">
+                  Último guardado: {lastTotals}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card className="border-dashed">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                Nutrição estimada (TACO)
+              </CardTitle>
+              <CardDescription>
+                Valores por 100 g do item ligado; ml/l assumem densidade tipo
+                água. Unidades (&quot;un&quot;) não entram no somatório.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+                <div>
+                  <dt className="text-muted-foreground">Energia</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.kcal} kcal
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Proteína</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.proteinG} g
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">H. de carbono</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.carbG} g
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Lípidos</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.lipidG} g
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Fibra</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.fiberG} g
+                  </dd>
+                </div>
+              </dl>
+              {nutritionPreview.unlinkedCount > 0 ||
+              nutritionPreview.skippedUnitCount > 0 ? (
+                <p className="text-muted-foreground border-border mt-2 border-t pt-2 text-xs">
+                  {nutritionPreview.unlinkedCount > 0
+                    ? `${nutritionPreview.unlinkedCount} linha(s) sem TACO. `
+                    : null}
+                  {nutritionPreview.skippedUnitCount > 0
+                    ? `${nutritionPreview.skippedUnitCount} linha(s) em unidades não convertidas para gramas.`
+                    : null}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -242,7 +329,8 @@ export function RecipeForm({ establishments, recipe }: Props) {
           <div>
             <h2 className="text-foreground font-medium">Ingredientes</h2>
             <p className="text-muted-foreground text-sm">
-              Quantidade e unidade por linha (rascunho guardado na sua conta).
+              Quantidade e unidade por linha; ligue cada ingrediente a um item
+              do catálogo de referência tipo TACO para cálculo nutricional.
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={addLine}>
@@ -333,6 +421,33 @@ export function RecipeForm({ establishments, recipe }: Props) {
                   placeholder="Observações sobre a linha"
                 />
               </div>
+              <TacoLineLinker
+                inputId={`taco-${line.key}`}
+                linked={line.taco_food}
+                onLinkedChange={(food, opts) => {
+                  setLines((prev) =>
+                    prev.map((row) => {
+                      if (row.key !== line.key) return row;
+                      if (!food) {
+                        return {
+                          ...row,
+                          taco_food: null,
+                          taco_food_id: null,
+                        };
+                      }
+                      return {
+                        ...row,
+                        taco_food: food,
+                        taco_food_id: food.id,
+                        ingredient_name:
+                          opts?.syncIngredientName === true
+                            ? food.name
+                            : row.ingredient_name,
+                      };
+                    }),
+                  );
+                }}
+              />
             </div>
           ))}
         </div>

@@ -11,9 +11,14 @@ import {
   type RecipeLineUnit,
 } from "@/lib/constants/recipe-line-units";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
+import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
 import type { TechnicalRecipeWithLines } from "@/lib/types/technical-recipes";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
+import {
+  lineRawMaterialCostBrl,
+  sumRecipeMaterialCostBrl,
+} from "@/lib/technical-recipes/recipe-material-cost";
 import { computeRecipeNutritionTotals } from "@/lib/technical-recipes/recipe-nutrition";
 import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-totals";
 import { saveTechnicalRecipeDraftAction } from "@/lib/actions/technical-recipes";
@@ -33,6 +38,13 @@ import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
+function formatBrl(value: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
 type LineDraft = {
   key: string;
   ingredient_name: string;
@@ -41,6 +53,8 @@ type LineDraft = {
   notes: string;
   taco_food_id: string | null;
   taco_food: TacoReferenceFoodRow | null;
+  raw_material_id: string | null;
+  raw_material: RawMaterialRow | null;
 };
 
 function newLine(): LineDraft {
@@ -52,6 +66,8 @@ function newLine(): LineDraft {
     notes: "",
     taco_food_id: null,
     taco_food: null,
+    raw_material_id: null,
+    raw_material: null,
   };
 }
 
@@ -65,15 +81,22 @@ function linesFromRecipe(recipe: TechnicalRecipeWithLines): LineDraft[] {
     notes: l.notes ?? "",
     taco_food_id: l.taco_food_id,
     taco_food: l.taco_food,
+    raw_material_id: l.raw_material_id,
+    raw_material: l.raw_material,
   }));
 }
 
 type Props = {
   establishments: EstablishmentWithClientNames[];
   recipe?: TechnicalRecipeWithLines | null;
+  rawMaterials?: RawMaterialRow[];
 };
 
-export function RecipeForm({ establishments, recipe }: Props) {
+export function RecipeForm({
+  establishments,
+  recipe,
+  rawMaterials = [],
+}: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +143,24 @@ export function RecipeForm({ establishments, recipe }: Props) {
     return computeRecipeNutritionTotals(parsed);
   }, [lines]);
 
+  const costPreview = useMemo(() => {
+    const parsed: Array<{
+      quantity: number;
+      unit: RecipeLineUnit;
+      raw_material: RawMaterialRow | null;
+    }> = [];
+    for (const l of lines) {
+      const q = parseFloat(l.quantity.replace(",", "."));
+      if (!Number.isFinite(q) || q <= 0) continue;
+      parsed.push({
+        quantity: q,
+        unit: l.unit,
+        raw_material: l.raw_material,
+      });
+    }
+    return sumRecipeMaterialCostBrl(parsed);
+  }, [lines]);
+
   const isEdit = Boolean(recipe);
 
   function updateLine(
@@ -150,6 +191,7 @@ export function RecipeForm({ establishments, recipe }: Props) {
       unit: l.unit,
       notes: l.notes.trim() || undefined,
       taco_food_id: l.taco_food_id,
+      raw_material_id: l.raw_material_id,
     }));
 
     startTransition(async () => {
@@ -321,6 +363,38 @@ export function RecipeForm({ establishments, recipe }: Props) {
               ) : null}
             </CardContent>
           </Card>
+
+          <Card className="border-dashed">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                Custo estimado (matéria-prima)
+              </CardTitle>
+              <CardDescription>
+                Soma das linhas ligadas a matérias-primas com a mesma dimensão
+                de unidade (massa, volume ou unidade).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-foreground text-lg font-semibold tabular-nums">
+                {formatBrl(costPreview.totalBrl)}
+              </p>
+              {costPreview.linesWithCost > 0 ? (
+                <p className="text-muted-foreground text-xs">
+                  {costPreview.linesWithCost} linha(s) com custo calculado.
+                </p>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  Ligue linhas a matérias-primas em «Matéria-prima (custo)».
+                </p>
+              )}
+              {costPreview.skippedDimension > 0 ? (
+                <p className="text-amber-700 dark:text-amber-400 text-xs">
+                  {costPreview.skippedDimension} linha(s) com unidade incompatível
+                  com o preço registado da matéria-prima.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
@@ -329,8 +403,14 @@ export function RecipeForm({ establishments, recipe }: Props) {
           <div>
             <h2 className="text-foreground font-medium">Ingredientes</h2>
             <p className="text-muted-foreground text-sm">
-              Quantidade e unidade por linha; ligue cada ingrediente a um item
-              do catálogo de referência tipo TACO para cálculo nutricional.
+              Quantidade e unidade; associe{" "}
+              <Link
+                href="/ficha-tecnica/materias-primas"
+                className="text-primary font-medium underline-offset-4 hover:underline"
+              >
+                matéria-prima
+              </Link>{" "}
+              para custo e TACO para nutrição.
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={addLine}>
@@ -420,6 +500,77 @@ export function RecipeForm({ establishments, recipe }: Props) {
                   }
                   placeholder="Observações sobre a linha"
                 />
+              </div>
+              <div className="space-y-1.5 sm:col-span-full">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label className="text-xs" htmlFor={`rm-${line.key}`}>
+                      Matéria-prima (custo)
+                    </Label>
+                    <select
+                      id={`rm-${line.key}`}
+                      className={selectClassName}
+                      value={line.raw_material_id ?? ""}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        const mat = id
+                          ? (rawMaterials.find((r) => r.id === id) ?? null)
+                          : null;
+                        updateLine(line.key, {
+                          raw_material_id: id.length > 0 ? id : null,
+                          raw_material: mat,
+                        });
+                      }}
+                    >
+                      <option value="">— Nenhuma —</option>
+                      {rawMaterials.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({formatBrl(m.unit_price_brl)} /{" "}
+                          {RECIPE_LINE_UNIT_LABELS[m.price_unit]})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {rawMaterials.length === 0 ? (
+                    <Link
+                      href="/ficha-tecnica/materias-primas/nova"
+                      className={buttonVariants({
+                        variant: "outline",
+                        size: "sm",
+                      })}
+                    >
+                      Criar matéria-prima
+                    </Link>
+                  ) : null}
+                </div>
+                {line.raw_material
+                  ? (() => {
+                      const q = parseFloat(line.quantity.replace(",", "."));
+                      if (!Number.isFinite(q) || q <= 0) return null;
+                      const r = lineRawMaterialCostBrl(
+                        q,
+                        line.unit,
+                        line.raw_material,
+                      );
+                      if (r.skipped && r.reason === "dimension_mismatch") {
+                        return (
+                          <p className="text-amber-700 dark:text-amber-400 text-xs">
+                            A unidade desta linha não coincide com a dimensão do
+                            preço da matéria-prima (ex.: g/kg vs ml/l).
+                          </p>
+                        );
+                      }
+                      if (r.skipped) return null;
+                      return (
+                        <p className="text-muted-foreground text-xs">
+                          Custo estimado da linha:{" "}
+                          <span className="text-foreground font-medium tabular-nums">
+                            {formatBrl(r.brl)}
+                          </span>
+                        </p>
+                      );
+                    })()
+                  : null}
               </div>
               <TacoLineLinker
                 inputId={`taco-${line.key}`}

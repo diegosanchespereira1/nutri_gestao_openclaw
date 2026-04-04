@@ -41,21 +41,28 @@ export default async function FichaTecnicaPage() {
             Ficha técnica
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Receitas com ingredientes e quantidades por estabelecimento. Os
-            rascunhos ficam na sua conta; ligação TACO, custos e PDF vêm nas
-            próximas stories.
+            Receitas com ingredientes, TACO e custo por matéria-prima. PDF e
+            impostos nas stories seguintes.
           </p>
         </div>
-        <Link
-          href="/ficha-tecnica/nova"
-          className={cn(
-            buttonVariants(),
-            establishments.length === 0 && "pointer-events-none opacity-50",
-          )}
-          aria-disabled={establishments.length === 0}
-        >
-          Nova receita
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/ficha-tecnica/materias-primas"
+            className={buttonVariants({ variant: "outline" })}
+          >
+            Matérias-primas
+          </Link>
+          <Link
+            href="/ficha-tecnica/nova"
+            className={cn(
+              buttonVariants(),
+              establishments.length === 0 && "pointer-events-none opacity-50",
+            )}
+            aria-disabled={establishments.length === 0}
+          >
+            Nova receita
+          </Link>
+        </div>
       </div>
 
       {establishments.length === 0 ? (

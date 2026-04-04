@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.2 concluídas; 6.3–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.3 concluídas; 6.4–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -225,7 +225,7 @@ Profissional vê agenda do dia, alertas com *countdown*, financeiro resumido, se
 ### Epic 6: Ficha técnica, TACO e custos
 Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.  
 **FRs:** FR26–FR36.
-**Implementação (épico):** Em curso (6.1–6.2 concluídas; 6.3–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.3 concluídas; 6.4–6.8 em backlog).
 
 ### Epic 7: POPs
 Profissional usa templates, customiza POPs por estabelecimento, versiona e exporta PDF.  
@@ -814,7 +814,7 @@ So that vejo tendências (UX-DR16).
 
 ## Epic 6: Ficha técnica, TACO e custos
 
-**Implementação (épico):** Em curso (6.1–6.2 concluídas; 6.3–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.3 concluídas; 6.4–6.8 em backlog).
 
 ### Story 6.1: Receitas e linhas de ingrediente
 
@@ -847,7 +847,7 @@ So that nutrição é consistente (FR27).
 
 ### Story 6.3: Matéria-prima e custo unitário
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-04: `professional_raw_materials` + RLS; `technical_recipe_lines.raw_material_id`; CRUD em `/ficha-tecnica/materias-primas`; formulário de receita com seleção por linha, custo por linha e painel total com `sumRecipeMaterialCostBrl` / compatibilidade massa·volume·un.)
 
 As a profissional,  
 I want registar custo de compra da matéria-prima,  

@@ -1,8 +1,12 @@
 import { RecipeForm } from "@/components/technical-sheets/recipe-form";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
+import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
 
 export default async function NovaReceitaPage() {
-  const { rows: establishments } = await loadEstablishmentsForOwner();
+  const [{ rows: establishments }, { rows: rawMaterials }] = await Promise.all([
+    loadEstablishmentsForOwner(),
+    loadRawMaterialsForOwner(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -15,7 +19,10 @@ export default async function NovaReceitaPage() {
           totais no painel ao lado.
         </p>
       </div>
-      <RecipeForm establishments={establishments} />
+      <RecipeForm
+        establishments={establishments}
+        rawMaterials={rawMaterials}
+      />
     </div>
   );
 }

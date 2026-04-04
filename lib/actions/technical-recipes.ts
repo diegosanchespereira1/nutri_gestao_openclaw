@@ -7,6 +7,7 @@ import { RECIPE_LINE_UNITS } from "@/lib/constants/recipe-line-units";
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
 import { createClient } from "@/lib/supabase/server";
 import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-totals";
+import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
 import type {
   TechnicalRecipeLineRow,
@@ -26,6 +27,7 @@ const lineSchema = z.object({
   unit: z.enum(RECIPE_LINE_UNITS),
   notes: z.string().max(1000).optional(),
   taco_food_id: tacoIdSchema,
+  raw_material_id: tacoIdSchema,
 });
 
 const saveDraftSchema = z.object({
@@ -51,6 +53,22 @@ function parseLineQuantity(raw: unknown): number {
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
+}
+
+function parseRawMaterialJoin(raw: unknown): RawMaterialRow | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  if (typeof o.id !== "string") return null;
+  return {
+    id: o.id,
+    owner_user_id: String(o.owner_user_id ?? ""),
+    name: String(o.name ?? ""),
+    price_unit: o.price_unit as RecipeLineUnit,
+    unit_price_brl: Number(o.unit_price_brl ?? 0),
+    notes: o.notes != null ? String(o.notes) : null,
+    created_at: String(o.created_at ?? ""),
+    updated_at: String(o.updated_at ?? ""),
+  };
 }
 
 function parseTacoFoodJoin(raw: unknown): TacoReferenceFoodRow | null {
@@ -79,11 +97,19 @@ function mapLineRow(row: {
   notes: string | null;
   taco_food_id?: string | null;
   taco_reference_foods?: unknown;
+  raw_material_id?: string | null;
+  professional_raw_materials?: unknown;
 }): TechnicalRecipeLineRow {
   const tacoFood = parseTacoFoodJoin(row.taco_reference_foods);
-  const colId =
+  const colTacoId =
     row.taco_food_id != null && String(row.taco_food_id).length > 0
       ? String(row.taco_food_id)
+      : null;
+
+  const rawMat = parseRawMaterialJoin(row.professional_raw_materials);
+  const colRmId =
+    row.raw_material_id != null && String(row.raw_material_id).length > 0
+      ? String(row.raw_material_id)
       : null;
 
   return {
@@ -94,8 +120,10 @@ function mapLineRow(row: {
     quantity: parseLineQuantity(row.quantity),
     unit: row.unit as RecipeLineUnit,
     notes: row.notes,
-    taco_food_id: colId ?? tacoFood?.id ?? null,
+    taco_food_id: colTacoId ?? tacoFood?.id ?? null,
     taco_food: tacoFood,
+    raw_material_id: colRmId ?? rawMat?.id ?? null,
+    raw_material: rawMat,
   };
 }
 
@@ -157,6 +185,16 @@ export async function loadTechnicalRecipeById(
         carb_g_per_100g,
         lipid_g_per_100g,
         fiber_g_per_100g
+      ),
+      professional_raw_materials (
+        id,
+        owner_user_id,
+        name,
+        price_unit,
+        unit_price_brl,
+        notes,
+        created_at,
+        updated_at
       )
     `,
     )
@@ -181,6 +219,8 @@ export async function loadTechnicalRecipeById(
             notes: string | null;
             taco_food_id?: string | null;
             taco_reference_foods?: unknown;
+            raw_material_id?: string | null;
+            professional_raw_materials?: unknown;
           },
         ),
       ),
@@ -212,7 +252,23 @@ export async function saveTechnicalRecipeDraftAction(
     ...l,
     notes: l.notes?.trim() ? l.notes.trim() : undefined,
     taco_food_id: l.taco_food_id ?? null,
+    raw_material_id: l.raw_material_id ?? null,
   }));
+
+  const rmIds = [...new Set(lines.map((l) => l.raw_material_id).filter(Boolean))] as string[];
+  if (rmIds.length > 0) {
+    const { data: rmRows, error: rmErr } = await supabase
+      .from("professional_raw_materials")
+      .select("id")
+      .eq("owner_user_id", user.id)
+      .in("id", rmIds);
+    if (rmErr || !rmRows || rmRows.length !== rmIds.length) {
+      return {
+        ok: false,
+        error: "Uma ou mais matérias-primas selecionadas são inválidas.",
+      };
+    }
+  }
 
   const tacoIds = [
     ...new Set(lines.map((l) => l.taco_food_id).filter(Boolean)),
@@ -327,6 +383,7 @@ export async function saveTechnicalRecipeDraftAction(
     unit: line.unit,
     notes: line.notes != null && line.notes.length > 0 ? line.notes : null,
     taco_food_id: line.taco_food_id,
+    raw_material_id: line.raw_material_id,
   }));
 
   const { error: insErr } = await supabase

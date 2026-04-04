@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { RecipeForm } from "@/components/technical-sheets/recipe-form";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
+import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
 import {
   loadTechnicalRecipeById,
 } from "@/lib/actions/technical-recipes";
@@ -12,10 +13,12 @@ export default async function EditarReceitaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [{ recipe }, { rows: establishments }] = await Promise.all([
-    loadTechnicalRecipeById(id),
-    loadEstablishmentsForOwner(),
-  ]);
+  const [{ recipe }, { rows: establishments }, { rows: rawMaterials }] =
+    await Promise.all([
+      loadTechnicalRecipeById(id),
+      loadEstablishmentsForOwner(),
+      loadRawMaterialsForOwner(),
+    ]);
 
   if (!recipe) notFound();
 
@@ -29,7 +32,11 @@ export default async function EditarReceitaPage({
           {recipe.name} — rascunho com linhas de ingrediente.
         </p>
       </div>
-      <RecipeForm establishments={establishments} recipe={recipe} />
+      <RecipeForm
+        establishments={establishments}
+        recipe={recipe}
+        rawMaterials={rawMaterials}
+      />
     </div>
   );
 }

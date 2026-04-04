@@ -1,4 +1,5 @@
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
+import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
 
 export type TechnicalRecipeStatus = "draft" | "published";
@@ -23,6 +24,9 @@ export type TechnicalRecipeLineRow = {
   taco_food_id: string | null;
   /** Preenchido quando a linha vem do servidor com join TACO. */
   taco_food: TacoReferenceFoodRow | null;
+  raw_material_id: string | null;
+  /** Join `professional_raw_materials` quando guardado. */
+  raw_material: RawMaterialRow | null;
 };
 
 export type TechnicalRecipeWithLines = TechnicalRecipeRow & {

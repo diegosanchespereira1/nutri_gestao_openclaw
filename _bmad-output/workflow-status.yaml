@@ -1,0 +1,38 @@
+# Rastreio de workflows BMad — Nutricao_stratosTech
+# Atualizar quando um workflow planeado for concluído ou reiniciado.
+
+workflows:
+  create-ux-design:
+    status: complete
+    output: _bmad-output/planning-artifacts/ux-design-specification.md
+    lastStep: 14
+    completedAt: "2026-03-31T23:59:59Z"
+    supportingAssets:
+      - path: _bmad-output/planning-artifacts/ux-design-directions.html
+        description: Showcase de direções visuais (Passo 9)
+      - path: _bmad-output/planning-artifacts/ux-color-themes.html
+        description: Visualizador de tokens semânticos de cor (Passo 14 / Passo 8)
+      - path: _bmad-output/planning-artifacts/theme-nutri-ref-a.css
+        description: HSL shadcn — Direção A coral/referência stakeholder
+      - path: _bmad-output/planning-artifacts/theme-nutri-teal.css
+        description: HSL shadcn — tema Teal (preferência produto; alinhado ao HTML)
+      - path: _bmad-output/planning-artifacts/ux-references/
+        description: Referências visuais PNG + README
+
+  create-epics-and-stories:
+    status: complete
+    output: _bmad-output/planning-artifacts/epics.md
+    completedAt: "2026-03-31T12:00:00Z"
+    notes: "11 épicos, 69 stories; PRD+Architecture+UX como input"
+
+  check-implementation-readiness:
+    status: complete
+    output: _bmad-output/planning-artifacts/implementation-readiness-report-2026-03-31.md
+    completedAt: "2026-03-31T12:00:00Z"
+    notes: "Substitui implementation-readiness-report-2026-03-30.md (só PRD)"
+
+  bmad-sprint-planning:
+    status: complete
+    output: _bmad-output/implementation-artifacts/sprint-status.yaml
+    completedAt: "2026-03-31T12:00:00Z"
+    notes: "69 stories + 11 épicos + retrospectives; story_location em implementation-artifacts/stories"

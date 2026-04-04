@@ -5,9 +5,15 @@ documentsAnalyzed:
   architecture: null
   epics: null
   ux: null
+  supersededBy: '_bmad-output/planning-artifacts/implementation-readiness-report-2026-03-31.md'
 ---
 
-# Implementation Readiness Assessment Report
+> **Este relatório está desatualizado.** Foi gerado quando só o PRD existia.  
+> **Use o relatório atual:** [`implementation-readiness-report-2026-03-31.md`](./implementation-readiness-report-2026-03-31.md)
+
+---
+
+# Implementation Readiness Assessment Report (histórico — 2026-03-30)
 
 **Date:** 2026-03-30
 **Project:** Nutricao_stratosTech

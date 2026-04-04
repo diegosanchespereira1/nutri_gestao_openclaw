@@ -552,7 +552,7 @@ Plataforma SaaS B2B multi-tenant com componente B2C (portal de acesso externo). 
 
 ### 4. Visitas Técnicas e Dossiê
 
-- **FR17:** Profissional pode agendar visitas técnicas a estabelecimentos e pacientes cadastrados
+- **FR17:** Profissional pode **agendar visitas** a estabelecimentos e pacientes cadastrados, com **tipo de visita** selecionável (ex.: visita clínica/paciente, técnica/conformidade, acompanhamento, auditoria, formação, outro), **atribuição opcional** a um membro da **equipe** cadastrada pelo titular (predefinição: o próprio titular), agenda semanal horária e **detalhe da visita em modal ao duplo clique** no compromisso. O titular pode **cadastrar e gerir a equipe** (nome, contactos, cargo, área nutrição vs. outra; **CRN obrigatório só** para perfis na área da nutrição). *(Modelo de dados: `visit_kind`, `assigned_team_member_id`, tabela `team_members`; ver artefacto de implementação.)*
 - **FR18:** Profissional pode iniciar e executar visita com preenchimento de checklist aplicável
 - **FR19:** Profissional pode registrar fotos vinculadas a itens específicos do checklist durante a visita
 - **FR20:** Profissional pode registrar anotações textuais vinculadas a itens do checklist

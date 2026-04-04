@@ -549,7 +549,7 @@ Nenhum bloqueador crítico identificado. Riscos residuais são de **execução**
 
 ### Implementation Handoff
 
-**Para agentes / equipa:** seguir este documento para decisões arquiteturais; respeitar limites (`service_role`); migrations só em `supabase/migrations/`.
+**Para agentes / equipe:** seguir este documento para decisões arquiteturais; respeitar limites (`service_role`); migrations só em `supabase/migrations/`.
 
 **Primeira prioridade de implementação:** `npx create-next-app@latest` (conforme starter) + `npm/pnpm install @supabase/supabase-js @supabase/ssr` + middleware de sessão + projeto Supabase ligado + primeira migration com `tenant` base e RLS stub.
 

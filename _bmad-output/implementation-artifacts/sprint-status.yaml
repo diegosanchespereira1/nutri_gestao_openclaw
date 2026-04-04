@@ -1,0 +1,125 @@
+# generated: 2026-03-31
+# last_updated: 2026-03-31
+# project: Nutricao_stratosTech
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts/stories
+#
+# Fonte: planning-artifacts/epics.md — 11 épicos, 69 stories.
+# Estados iniciais: backlog (sem ficheiros .md por story em stories/).
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic: backlog | in-progress | done
+# Story: backlog | ready-for-dev | in-progress | review | done
+# Retrospective: optional | done
+
+generated: "2026-03-31T12:00:00Z"
+last_updated: "2026-04-03T20:00:00Z"
+project: Nutricao_stratosTech
+project_key: NOKEY
+tracking_system: file-system
+story_location: "_bmad-output/implementation-artifacts/stories"
+
+development_status:
+  epic-1: done
+  1-1-scaffold-nextjs-supabase-ssr-e-ambiente: done
+  1-2-shadcn-ui-tema-teal-ref-a-opcional: done
+  1-3-shell-logado-sidebar-navegacao-mobile: done
+  1-4-login-registo-layout-duas-colunas-sem-social: done
+  1-5-registo-email-palavra-passe: done
+  1-6-sessao-logout-protecao-rotas: done
+  1-7-recuperacao-acesso-email: done
+  1-8-perfil-profissional-crn: done
+  1-9-autenticacao-dois-fatores: done
+  epic-1-retrospective: optional
+
+  epic-2: done
+  2-1-modelo-crud-clientes-pf-pj: done
+  2-2-estabelecimentos-cliente-pj-tipo: done
+  2-3-pacientes-vinculos-estabelecimento-pf: done
+  2-4-perfil-nutricional-formularios-avaliacao: done
+  2-5-historico-consolidado-multi-estabelecimento: done
+  2-6-importacao-csv-excel-mapeamento-erros: done
+  2-7-wizard-onboarding-sugestao-portarias: backlog
+  epic-2-retrospective: optional
+
+  epic-3: done
+  3-1-catalogo-checklists-portaria-campos-obrigatorios: done
+  3-2-preenchimento-validacao-obrigatorios: done
+  3-3-checklists-customizados-profissional: done
+  epic-3-retrospective: optional
+
+  epic-4: in-progress
+  4-1-agendamento-visitas: done
+  4-2-iniciar-visita-checklist-aplicavel: backlog
+  4-3-fotos-por-item-storage: backlog
+  4-4-anotacoes-textuais-por-item: backlog
+  4-5-destaque-nc-recorrente: backlog
+  4-6-compilar-dossie-ao-finalizar: backlog
+  4-7-revisar-editar-aprovar: backlog
+  4-8-pdf-assincrono-crn: backlog
+  4-9-envio-automatico-email: backlog
+  epic-4-retrospective: optional
+
+  epic-5: backlog
+  5-1-agenda-dia-prioridade: backlog
+  5-2-alertas-regulatorios-countdown: backlog
+  5-3-pendencias-financeiras-dashboard: backlog
+  5-4-separacao-pacientes-financeiro: backlog
+  5-5-briefing-semanal: backlog
+  5-6-graficos-tokens-tema: backlog
+  epic-5-retrospective: optional
+
+  epic-6: backlog
+  6-1-receitas-linhas-ingrediente: backlog
+  6-2-ligacao-taco-informacao-nutricional: backlog
+  6-3-materia-prima-custo-unitario: backlog
+  6-4-fatores-correcao-coccao: backlog
+  6-5-custo-total-impostos-margem-porcao: backlog
+  6-6-escalonamento-regra-de-tres: backlog
+  6-7-recalculo-em-cascata: backlog
+  6-8-exportar-ficha-tecnica-pdf: backlog
+  epic-6-retrospective: optional
+
+  epic-7: backlog
+  7-1-templates-pop-tipo-estabelecimento: backlog
+  7-2-criar-editar-pop-estabelecimento: backlog
+  7-3-versionamento-pop: backlog
+  7-4-exportar-pop-pdf: backlog
+  epic-7-retrospective: optional
+
+  epic-8: backlog
+  8-1-status-pagamento-cliente: backlog
+  8-2-recorrencia-cobranca: backlog
+  8-3-datas-contrato: backlog
+  8-4-contratos-modelos: backlog
+  8-5-alertas-renovacao-vencimento: backlog
+  epic-8-retrospective: optional
+
+  epic-9: backlog
+  9-1-cadastro-utilizadores-externos: backlog
+  9-2-permissoes-categoria-dado: backlog
+  9-3-visualizacao-portal: backlog
+  9-4-consentimento-parental-menores: backlog
+  epic-9-retrospective: optional
+
+  epic-10: backlog
+  10-1-gestao-tenants: backlog
+  10-2-planos-limites-add-ons: backlog
+  10-3-metricas-plataforma: backlog
+  10-4-catalogo-portarias-taco-templates: backlog
+  10-5-crud-versionamento-checklists-regulatorios: backlog
+  10-6-notificar-atualizar-portaria: backlog
+  epic-10-retrospective: optional
+
+  epic-11: backlog
+  11-1-testes-rls-multi-tenant: backlog
+  11-2-log-auditoria-dados-paciente: backlog
+  11-3-registo-consentimentos-digital: backlog
+  11-4-relatorio-dados-pessoais-dsar-paciente: backlog
+  11-5-portabilidade-dados-profissional: backlog
+  11-6-notificacoes-push-email-transversais: backlog
+  11-7-exclusao-conta-lgpd: backlog
+  11-8-smoke-acessibilidade-wcag-aa: backlog
+  epic-11-retrospective: optional

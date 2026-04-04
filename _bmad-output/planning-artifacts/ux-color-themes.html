@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NutriGestão — Temas de cor (tokens semânticos)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --font: "Plus Jakarta Sans", system-ui, sans-serif;
+      --page: #f4f5f7;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --text: #111827;
+      --muted-text: #6b7280;
+      --primary: #e11d48;
+      --primary-fg: #ffffff;
+      --secondary: #f1f5f9;
+      --secondary-fg: #0f172a;
+      --muted: #f3f4f6;
+      --muted-fg: #4b5563;
+      --accent: #fef2f2;
+      --accent-fg: #9f1239;
+      --destructive: #dc2626;
+      --destructive-fg: #ffffff;
+      --success: #059669;
+      --success-bg: #d1fae5;
+      --warning: #d97706;
+      --warning-bg: #ffedd5;
+      --kpi-1: #ffe4e6;
+      --kpi-2: #ffedd5;
+      --kpi-3: #dbeafe;
+      --chart-1: #fb7185;
+      --chart-2: #f97316;
+      --chart-3: #3b82f6;
+      --radius: 14px;
+    }
+    [data-theme="slate"] {
+      --page: #f8fafc;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted-text: #64748b;
+      --primary: #2563eb;
+      --primary-fg: #ffffff;
+      --secondary: #f1f5f9;
+      --secondary-fg: #0f172a;
+      --muted: #f1f5f9;
+      --muted-fg: #475569;
+      --accent: #eff6ff;
+      --accent-fg: #1e40af;
+      --destructive: #dc2626;
+      --destructive-fg: #ffffff;
+      --success: #059669;
+      --success-bg: #d1fae5;
+      --warning: #d97706;
+      --warning-bg: #ffedd5;
+      --kpi-1: #e0f2fe;
+      --kpi-2: #f1f5f9;
+      --kpi-3: #e2e8f0;
+      --chart-1: #60a5fa;
+      --chart-2: #2563eb;
+      --chart-3: #94a3b8;
+    }
+    /* Teal: texto secundário nunca em teal claro sobre fundo menta — falha WCAG.
+       "Premium" = hierarquia com neutro esverdeado + acentos teal só em primário/bordas. */
+    [data-theme="teal"] {
+      --page: #f4faf9;
+      --card: #ffffff;
+      --border: #9dd4cf;
+      --text: #0f2724;
+      --muted-text: #4a6360;
+      --primary: #0f766e;
+      --primary-fg: #ffffff;
+      --secondary: #e8f5f3;
+      --secondary-fg: #134e4a;
+      --muted: #ecf6f4;
+      --muted-fg: #3d5552;
+      --accent: #d8f0ec;
+      --accent-fg: #115e59;
+      --destructive: #dc2626;
+      --destructive-fg: #ffffff;
+      --success: #059669;
+      --success-bg: #d1fae5;
+      --warning: #d97706;
+      --warning-bg: #ffedd5;
+      --kpi-1: #d8f0ec;
+      --kpi-2: #e0f2f0;
+      --kpi-3: #e0f2fe;
+      --chart-1: #0d9488;
+      --chart-2: #0f766e;
+      --chart-3: #0e7490;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--page);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    header {
+      padding: 1.5rem 1.25rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 {
+      font-size: 1.25rem;
+      margin: 0 0 0.35rem;
+    }
+    header p {
+      margin: 0;
+      color: var(--muted-text);
+      font-size: 0.9rem;
+      max-width: 70ch;
+    }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    .toolbar span {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--muted-text);
+      margin-right: 0.25rem;
+    }
+    .toolbar button {
+      font-family: inherit;
+      font-size: 0.85rem;
+      padding: 0.45rem 0.9rem;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--muted);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .toolbar button.active {
+      background: var(--primary);
+      color: var(--primary-fg);
+      border-color: var(--primary);
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 1.5rem 1.25rem 3rem;
+    }
+    h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted-text);
+      margin: 2rem 0 0.75rem;
+    }
+    h2:first-of-type { margin-top: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 0.75rem;
+    }
+    .swatch {
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--card);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .swatch .color {
+      height: 56px;
+    }
+    .swatch .meta {
+      padding: 0.5rem 0.65rem;
+      font-size: 0.72rem;
+    }
+    .swatch .name { font-weight: 600; display: block; }
+    .swatch .hex { color: var(--muted-text); font-family: ui-monospace, monospace; font-size: 0.68rem; }
+    .demo {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 768px) {
+      .demo { grid-template-columns: 1fr 1fr; }
+    }
+    .demo-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+    .demo-card h3 {
+      margin: 0 0 0.75rem;
+      font-size: 0.95rem;
+    }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .btn {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 0.5rem 1rem;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: var(--primary-fg);
+    }
+    .btn-secondary {
+      background: var(--secondary);
+      color: var(--secondary-fg);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost {
+      background: transparent;
+      color: var(--primary);
+    }
+    .alert {
+      padding: 0.65rem 0.85rem;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-top: 0.75rem;
+    }
+    .alert-warn {
+      background: var(--warning-bg);
+      color: #9a3412;
+      border: 1px solid #fdba74;
+    }
+    .alert-ok {
+      background: var(--success-bg);
+      color: #065f46;
+      border: 1px solid #6ee7b7;
+    }
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+    }
+    @media (max-width: 500px) {
+      .kpis { grid-template-columns: 1fr; }
+    }
+    .kpi {
+      border-radius: 12px;
+      padding: 0.6rem;
+      font-size: 0.75rem;
+    }
+    .kpi strong { display: block; font-size: 1rem; margin-top: 0.2rem; }
+    .chart-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 64px;
+      margin-top: 0.75rem;
+      padding: 0.5rem;
+      background: var(--muted);
+      border-radius: 10px;
+    }
+    .chart-bar div {
+      flex: 1;
+      border-radius: 4px 4px 0 0;
+      min-height: 20%;
+    }
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      color: var(--muted-text);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Temas de cor — NutriGestão</h1>
+    <p>Visualizador de <strong>tokens semânticos</strong> alinhado ao Passo 8 do UX spec. HSL shadcn na mesma pasta: <code>theme-nutri-ref-a.css</code> (Direção A — coral) e <code>theme-nutri-teal.css</code> (Alternativa Teal, preferência de produto). Três presets interativos: referência, slate, teal.</p>
+    <div class="toolbar" role="group" aria-label="Preset de tema">
+      <span>Tema</span>
+      <button type="button" class="active" data-set-theme="ref">Direção A — referência</button>
+      <button type="button" data-set-theme="slate">Alternativa — slate</button>
+      <button type="button" data-set-theme="teal">Alternativa — teal</button>
+    </div>
+  </header>
+
+  <main>
+    <h2>Superfície e texto</h2>
+    <div class="grid" id="swatches-base"></div>
+
+    <h2>Ação e feedback</h2>
+    <div class="grid" id="swatches-semantic"></div>
+
+    <h2>KPI / gráficos (pastéis)</h2>
+    <div class="grid" id="swatches-kpi"></div>
+
+    <h2>Pré-visualização de UI</h2>
+    <div class="demo">
+      <div class="demo-card">
+        <h3>Botões e alertas</h3>
+        <div class="btn-row">
+          <button type="button" class="btn btn-primary">Primário</button>
+          <button type="button" class="btn btn-secondary">Secundário</button>
+          <button type="button" class="btn btn-ghost">Terciário</button>
+        </div>
+        <div class="alert alert-warn"><strong>Atenção:</strong> checklist da portaria vence em 3 dias.</div>
+        <div class="alert alert-ok">Conformidade registada com sucesso.</div>
+      </div>
+      <div class="demo-card">
+        <h3>Cartões de métrica + barras</h3>
+        <div class="kpis">
+          <div class="kpi" style="background: var(--kpi-1); color: var(--text);"><span style="opacity:.8">Alertas</span><strong>3</strong></div>
+          <div class="kpi" style="background: var(--kpi-2); color: var(--text);"><span style="opacity:.8">Visitas hoje</span><strong>2</strong></div>
+          <div class="kpi" style="background: var(--kpi-3); color: var(--text);"><span style="opacity:.8">Pend. fin.</span><strong>1</strong></div>
+        </div>
+        <div class="chart-bar">
+          <div style="height:35%; background: var(--chart-1)"></div>
+          <div style="height:55%; background: var(--chart-1)"></div>
+          <div style="height:45%; background: var(--chart-2)"></div>
+          <div style="height:70%; background: var(--chart-1)"></div>
+          <div style="height:50%; background: var(--chart-3)"></div>
+          <div style="height:65%; background: var(--chart-2)"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    Artefacto: <code>ux-color-themes.html</code> · NutriGestão · BMad UX · Validar contraste WCAG AA antes do lançamento
+  </footer>
+
+  <script>
+    const themes = { ref: "", slate: "slate", teal: "teal" };
+    const tokens = [
+      { id: "swatches-base", items: [
+        { var: "--page", label: "Fundo página" },
+        { var: "--card", label: "Cartão" },
+        { var: "--border", label: "Borda" },
+        { var: "--text", label: "Texto principal" },
+        { var: "--muted-text", label: "Texto secundário" },
+      ]},
+      { id: "swatches-semantic", items: [
+        { var: "--primary", label: "Primário" },
+        { var: "--primary-fg", label: "Sobre primário" },
+        { var: "--secondary", label: "Secundário" },
+        { var: "--muted", label: "Muted bg" },
+        { var: "--accent", label: "Accent bg" },
+        { var: "--destructive", label: "Destrutivo" },
+      ]},
+      { id: "swatches-kpi", items: [
+        { var: "--kpi-1", label: "KPI pastel 1" },
+        { var: "--kpi-2", label: "KPI pastel 2" },
+        { var: "--kpi-3", label: "KPI pastel 3" },
+        { var: "--chart-1", label: "Série gráfico 1" },
+        { var: "--chart-2", label: "Série gráfico 2" },
+        { var: "--chart-3", label: "Série gráfico 3" },
+      ]},
+    ];
+
+    function hexFromComputed(el, varName) {
+      const s = getComputedStyle(el).getPropertyValue(varName).trim();
+      if (!s) return "—";
+      const tmp = document.createElement("div");
+      tmp.style.color = s;
+      document.body.appendChild(tmp);
+      const rgb = getComputedStyle(tmp).color;
+      document.body.removeChild(tmp);
+      const m = rgb.match(/\d+/g);
+      if (!m || m.length < 3) return s;
+      const r = +m[0], g = +m[1], b = +m[2];
+      return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join("");
+    }
+
+    function renderSwatches() {
+      const root = document.documentElement;
+      tokens.forEach(({ id, items }) => {
+        const host = document.getElementById(id);
+        host.innerHTML = "";
+        items.forEach(({ var: v, label }) => {
+          const sw = document.createElement("div");
+          sw.className = "swatch";
+          const color = document.createElement("div");
+          color.className = "color";
+          color.style.background = `var(${v})`;
+          const meta = document.createElement("div");
+          meta.className = "meta";
+          const hx = hexFromComputed(root, v);
+          meta.innerHTML = `<span class="name">${label}</span><span class="token">${v}</span><span class="hex">${hx}</span>`;
+          sw.append(color, meta);
+          host.append(sw);
+        });
+      });
+    }
+
+    document.querySelectorAll("[data-set-theme]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const t = btn.getAttribute("data-set-theme");
+        const attr = themes[t];
+        if (attr) document.documentElement.setAttribute("data-theme", attr);
+        else document.documentElement.removeAttribute("data-theme");
+        document.querySelectorAll("[data-set-theme]").forEach((b) => b.classList.toggle("active", b === btn));
+        renderSwatches();
+      });
+    });
+
+    renderSwatches();
+  </script>
+</body>
+</html>

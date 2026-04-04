@@ -1,0 +1,58 @@
+/**
+ * NutriGestão — Direção A (referência stakeholder)
+ * Origem hex: ux-color-themes.html → preset default (:root / "Direção A — referência")
+ *
+ * Coral/rose primário, fundo cinza claro, pastéis para KPIs nos gráficos.
+ * Para comparar com o produto após build; **preferência de produto documentada: tema Teal**
+ * (`theme-nutri-teal.css`).
+ *
+ * Uso: valores "H S% L%" para shadcn (`hsl(var(--primary))`).
+ *   <html class="theme-nutri-ref-a"> … </html>
+ */
+
+.theme-nutri-ref-a,
+[data-theme="nutri-ref-a"] {
+  /* #f4f5f7 */
+  --background: 220 14% 96%;
+  /* #111827 */
+  --foreground: 222 47% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+
+  /* #e11d48 — rose/coral; texto branco em botões */
+  --primary: 347 77% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  /* #f1f5f9 / #0f172a */
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+
+  /* #f3f4f6 / #4b5563 */
+  --muted: 220 14% 96%;
+  --muted-foreground: 220 9% 34%;
+
+  /* #fef2f2 / #9f1239 */
+  --accent: 356 100% 97%;
+  --accent-foreground: 343 88% 30%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  /* #e5e7eb */
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 347 77% 50%;
+
+  --radius: 0.875rem;
+
+  /* #fb7185, #f97316, #3b82f6 + suaves para séries extra */
+  --chart-1: 351 95% 71%;
+  --chart-2: 25 95% 53%;
+  --chart-3: 217 91% 60%;
+  --chart-4: 350 80% 76%;
+  --chart-5: 214 95% 88%;
+}

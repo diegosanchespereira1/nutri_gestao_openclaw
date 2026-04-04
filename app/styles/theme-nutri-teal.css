@@ -1,0 +1,54 @@
+/**
+ * NutriGestão — tema Teal (preferência de produto).
+ * Origem: _bmad-output/planning-artifacts/theme-nutri-teal.css
+ * Valores em hsl() completos para Tailwind v4 + shadcn (tokens via var(--primary)).
+ */
+
+/* `html.` garante maior especificidade que `:root` em globals.css (senão o toggle de tema não muda nada). */
+html.theme-nutri-teal,
+html[data-theme="nutri-teal"] {
+  --background: hsl(165 33% 97%);
+  --foreground: hsl(172 46% 11%);
+
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(172 46% 11%);
+
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(172 46% 11%);
+
+  --primary: hsl(173 80% 26%);
+  --primary-foreground: hsl(0 0% 100%);
+
+  --secondary: hsl(168 33% 94%);
+  --secondary-foreground: hsl(171 61% 19%);
+
+  --muted: hsl(168 29% 94%);
+  --muted-foreground: hsl(168 16% 29%);
+
+  --accent: hsl(168 33% 89%);
+  --accent-foreground: hsl(171 69% 22%);
+
+  --destructive: hsl(0 72% 51%);
+  --destructive-foreground: hsl(0 0% 100%);
+
+  --border: hsl(173 42% 72%);
+  --input: hsl(173 42% 72%);
+  --ring: hsl(173 80% 26%);
+
+  --radius: 0.875rem;
+
+  --chart-1: hsl(175 84% 32%);
+  --chart-2: hsl(173 80% 26%);
+  --chart-3: hsl(193 82% 31%);
+  --chart-4: hsl(168 33% 45%);
+  --chart-5: hsl(168 29% 94%);
+
+  --sidebar: hsl(168 33% 94%);
+  --sidebar-foreground: hsl(172 46% 11%);
+  --sidebar-primary: hsl(173 80% 26%);
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent: hsl(168 33% 89%);
+  --sidebar-accent-foreground: hsl(171 69% 22%);
+  --sidebar-border: hsl(173 42% 72%);
+  --sidebar-ring: hsl(173 80% 26%);
+}

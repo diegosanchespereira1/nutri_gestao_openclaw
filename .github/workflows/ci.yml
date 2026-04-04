@@ -9,18 +9,24 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    # Alinha com o runtime JS das Actions (Node 24 como predefinição em GitHub desde ~jun/2026).
+    # Ver: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: npm
 
       - run: npm ci
 
       - run: npm run lint
+
+      - run: npm run test
 
       - name: Audit (production deps)
         run: npm audit --omit=dev

@@ -2,10 +2,13 @@
   "name": "nutricao-gestao",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "npx next dev",
+    "build": "npx next build",
+    "start": "npx next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest"

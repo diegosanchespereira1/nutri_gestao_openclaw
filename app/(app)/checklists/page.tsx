@@ -17,6 +17,10 @@ export default async function ChecklistsPage({
 }) {
   const sp = await searchParams;
   const err = typeof sp.err === "string" ? sp.err : undefined;
+  const focusTemplateId =
+    typeof sp.template === "string" && /^[0-9a-f-]{36}$/i.test(sp.template)
+      ? sp.template
+      : null;
   const [{ templates }, { rows: establishments }] = await Promise.all([
     loadChecklistCatalog(),
     loadEstablishmentsForOwner(),
@@ -70,10 +74,12 @@ export default async function ChecklistsPage({
       ) : null}
 
       <ChecklistCatalog
+        key={focusTemplateId ?? "checklist-catalog-default"}
         establishments={establishmentOptions}
         templates={templates}
         startFillAction={startChecklistFill}
         duplicateTemplateAction={duplicateGlobalTemplateAction}
+        focusTemplateId={focusTemplateId}
       />
     </div>
   );

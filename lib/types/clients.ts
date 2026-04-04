@@ -1,6 +1,9 @@
+import type { ClientBusinessSegment } from "@/lib/constants/client-business-segment";
 import type { PatientSex } from "@/lib/types/patients";
 
 export type ClientKind = "pf" | "pj";
+
+export type { ClientBusinessSegment };
 
 /** Estado comercial do contrato (PJ; PF mantém-se sempre ativo na prática). */
 export type ClientLifecycleStatus = "ativo" | "inativo" | "finalizado";
@@ -24,6 +27,8 @@ export type ClientRow = {
   phone: string | null;
   notes: string | null;
   lifecycle_status: ClientLifecycleStatus;
+  /** Só PJ: padaria, mercado, escola, etc. */
+  business_segment: ClientBusinessSegment | null;
   activated_at: string | null;
   state_registration: string | null;
   municipal_registration: string | null;

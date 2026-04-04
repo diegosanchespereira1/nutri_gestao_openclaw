@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { createSupabaseAuthCallbackClient } from "@/lib/supabase/auth-callback-client";
 
 const OTP_TYPES: ReadonlySet<EmailOtpType> = new Set([
@@ -33,11 +34,7 @@ export async function GET(request: NextRequest) {
   const token_hash = url.searchParams.get("token_hash");
   const type = parseOtpType(url.searchParams.get("type"));
 
-  const nextRaw = url.searchParams.get("next");
-  const next =
-    nextRaw && nextRaw.startsWith("/") && !nextRaw.startsWith("//")
-      ? nextRaw
-      : "/inicio";
+  const next = safeNextPath(url.searchParams.get("next"));
 
   const oauthError = url.searchParams.get("error");
   if (oauthError) {

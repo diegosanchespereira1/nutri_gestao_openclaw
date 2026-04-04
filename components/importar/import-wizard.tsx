@@ -395,7 +395,7 @@ export function ImportWizard() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx"
                 onChange={handleFileInput}
                 className="sr-only"
                 aria-label="Selecionar arquivo para importação"

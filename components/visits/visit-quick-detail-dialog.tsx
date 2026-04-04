@@ -132,7 +132,9 @@ export function VisitQuickDetailDialog({
               className={cn(buttonVariants(), "min-h-11 flex-1 justify-center")}
               onClick={() => onOpenChange(false)}
             >
-              Iniciar visita
+              {visit.status === "in_progress"
+                ? "Continuar visita"
+                : "Iniciar visita"}
             </Link>
           ) : null}
         </div>

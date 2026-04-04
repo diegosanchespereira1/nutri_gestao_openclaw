@@ -31,8 +31,8 @@ export function RegisterForm() {
       setError("As palavras-passe não coincidem.");
       return;
     }
-    if (password.length < 8) {
-      setError("A palavra-passe deve ter pelo menos 8 caracteres.");
+    if (password.length < 12) {
+      setError("A palavra-passe deve ter pelo menos 12 caracteres.");
       return;
     }
 
@@ -50,10 +50,34 @@ export function RegisterForm() {
     });
 
     if (signErr) {
-      const msg = signErr.message.toLowerCase().includes("already")
-        ? "Este email já está registado."
-        : signErr.message;
-      setError(msg);
+      const m = signErr.message.toLowerCase();
+      const weak =
+        m.includes("password") &&
+        (m.includes("short") ||
+          m.includes("weak") ||
+          m.includes("least") ||
+          m.includes("minimum"));
+      if (weak) {
+        setError(
+          "A palavra-passe não cumpre os requisitos mínimos (comprimento ou complexidade).",
+        );
+        setLoading(false);
+        return;
+      }
+      const maybeDuplicate =
+        m.includes("already") ||
+        m.includes("registered") ||
+        m.includes("exists") ||
+        m.includes("user already");
+      if (maybeDuplicate) {
+        setError(null);
+        setInfo(
+          "Se o email estiver disponível, receberá uma mensagem para confirmar a conta antes de entrar. Se já tiver conta, utilize «Entrar».",
+        );
+        setLoading(false);
+        return;
+      }
+      setError("Não foi possível concluir o registo. Tente novamente.");
       setLoading(false);
       return;
     }

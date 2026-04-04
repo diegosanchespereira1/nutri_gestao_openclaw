@@ -2,25 +2,34 @@ import Link from "next/link";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { ClientesFilters } from "@/components/clientes/clientes-filters";
+import { ClientesListBadges } from "@/components/clientes/clientes-list-badges";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
-import { formatCnpjDisplay, formatCpfDisplay } from "@/lib/format/br-document";
-import { clientLifecycleLabel } from "@/lib/constants/client-lifecycle";
-import type { ClientKind, ClientRow } from "@/lib/types/clients";
+import type {
+  ClientKind,
+  ClientLifecycleStatus,
+  ClientRow,
+} from "@/lib/types/clients";
 
 function parseTipo(raw: string | undefined): ClientKind | "all" {
   if (raw === "pf" || raw === "pj") return raw;
   return "all";
 }
 
-function formatDocument(row: ClientRow): string {
-  if (!row.document_id) return "—";
-  return row.kind === "pf"
-    ? formatCpfDisplay(row.document_id)
-    : formatCnpjDisplay(row.document_id);
+function parseSituacao(
+  raw: string | undefined,
+): ClientLifecycleStatus | "all" {
+  if (
+    raw === "ativo" ||
+    raw === "inativo" ||
+    raw === "finalizado"
+  ) {
+    return raw;
+  }
+  return "all";
 }
 
 export default async function ClientesPage({
@@ -32,7 +41,14 @@ export default async function ClientesPage({
   const q = typeof sp.q === "string" ? sp.q : "";
   const tipoRaw = typeof sp.tipo === "string" ? sp.tipo : undefined;
   const tipo = parseTipo(tipoRaw);
-  const { rows } = await loadClientsForOwner({ q, kind: tipo });
+  const situacaoRaw =
+    typeof sp.situacao === "string" ? sp.situacao : undefined;
+  const situacao = parseSituacao(situacaoRaw);
+  const { rows } = await loadClientsForOwner({
+    q,
+    kind: tipo,
+    lifecycle: situacao,
+  });
 
   const supabase = await createClient();
   const rowsWithLogos: {
@@ -68,16 +84,17 @@ export default async function ClientesPage({
       <ClientesFilters
         defaultQ={q}
         defaultTipo={tipo === "all" ? "all" : tipo}
+        defaultSituacao={situacao}
       />
 
       {rows.length === 0 ? (
         <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
           <p className="text-muted-foreground text-sm">
-            {q || tipo !== "all"
+            {q || tipo !== "all" || situacao !== "all"
               ? "Nenhum cliente corresponde aos filtros."
               : "Ainda não tem clientes. Crie o primeiro para começar."}
           </p>
-          {!q && tipo === "all" ? (
+          {!q && tipo === "all" && situacao === "all" ? (
             <Link
               href="/clientes/novo"
               className={cn(buttonVariants(), "mt-4 inline-flex")}
@@ -103,7 +120,7 @@ export default async function ClientesPage({
                   className="mt-0.5"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                     <div className="min-w-0">
                       <span className="text-foreground font-medium">
                         {row.legal_name}
@@ -114,20 +131,17 @@ export default async function ClientesPage({
                         </span>
                       ) : null}
                     </div>
-                    <div className="text-muted-foreground flex shrink-0 flex-wrap items-center gap-x-2 text-xs font-medium uppercase">
-                      <span>{row.kind === "pf" ? "PF" : "PJ"}</span>
-                      {row.kind === "pj" &&
-                      row.lifecycle_status !== "ativo" ? (
-                        <span className="text-foreground normal-case">
-                          · {clientLifecycleLabel[row.lifecycle_status]}
-                        </span>
-                      ) : null}
+                    <ClientesListBadges
+                      kind={row.kind}
+                      businessSegment={row.business_segment}
+                      lifecycleStatus={row.lifecycle_status}
+                    />
+                  </div>
+                  {row.email ? (
+                    <div className="text-muted-foreground mt-2 text-sm">
+                      <span>Email: {row.email}</span>
                     </div>
-                  </div>
-                  <div className="text-muted-foreground mt-2 grid gap-1 text-sm sm:grid-cols-2">
-                    <span>Documento: {formatDocument(row)}</span>
-                    {row.email ? <span>Email: {row.email}</span> : null}
-                  </div>
+                  ) : null}
                 </div>
               </Link>
             </li>

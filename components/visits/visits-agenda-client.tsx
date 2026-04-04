@@ -35,6 +35,7 @@ import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import type { TeamJobRole } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind, VisitPriority } from "@/lib/types/visits";
 import { visitDisplayTitle } from "@/lib/visits/display-title";
+import { compareScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { cn } from "@/lib/utils";
 
 type PriorityFilter = VisitPriority | "all";
@@ -65,11 +66,7 @@ function groupVisitsByDay(
     map.set(k, arr);
   }
   for (const arr of map.values()) {
-    arr.sort(
-      (a, b) =>
-        new Date(a.scheduled_start).getTime() -
-        new Date(b.scheduled_start).getTime(),
-    );
+    arr.sort(compareScheduledVisitsForDashboard);
   }
   return map;
 }
@@ -194,7 +191,7 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
 
   const canStartVisit = useCallback(
     (v: ScheduledVisitWithTargets) =>
-      v.status === "scheduled" &&
+      (v.status === "scheduled" || v.status === "in_progress") &&
       isSameCalendarDay(v.scheduled_start, tz),
     [tz],
   );
@@ -235,6 +232,23 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
               Clientes
             </Link>
             .
+          </div>
+        ) : null}
+
+        {visits.length > 0 ? (
+          <div
+            role="note"
+            className="border-border bg-primary/5 text-foreground rounded-lg border border-primary/20 px-4 py-3 text-sm"
+          >
+            <span className="font-medium">Checklist na visita: </span>
+            os itens do checklist só aparecem depois de abrir{" "}
+            <span className="font-medium">Iniciar visita</span> ou{" "}
+            <span className="font-medium">Continuar visita</span>. Esse botão
+            fica disponível no{" "}
+            <span className="font-medium">dia da visita</span> (no fuso de
+            Definições → Região), no detalhe da visita, no painel ao lado ou no
+            cartão do dia em Início. Se houver vários modelos, escolha um antes
+            do preenchimento.
           </div>
         ) : null}
 
@@ -675,7 +689,9 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
                     href={`/visitas/${selectedVisit.id}/iniciar`}
                     className={cn(buttonVariants(), "w-full justify-center")}
                   >
-                    Iniciar visita
+                    {selectedVisit.status === "in_progress"
+                      ? "Continuar visita"
+                      : "Iniciar visita"}
                   </Link>
                 ) : null}
               </div>

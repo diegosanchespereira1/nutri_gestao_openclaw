@@ -17,10 +17,12 @@ import type { TeamJobRole } from "@/lib/types/team-members";
 import type { VisitKind } from "@/lib/types/visits";
 import { visitDisplayTitle } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
+import { VisitDossierEmailPanel } from "@/components/visits/visit-dossier-email-panel";
+import type { DossierEmailSendStatus } from "@/lib/types/visits";
 
 const avisoMessages: Record<string, string> = {
   visita_nao_agendada:
-    "Só é possível iniciar visitas com estado «Agendada».",
+    "Só é possível abrir a execução com visita «Agendada» ou «Em curso».",
   inicio_somente_hoje:
     "«Iniciar visita» só está disponível no dia da visita (no seu fuso horário).",
 };
@@ -60,8 +62,38 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
         : null;
 
   const canStartToday =
-    row.status === "scheduled" &&
+    (row.status === "scheduled" || row.status === "in_progress") &&
     isSameCalendarDay(row.scheduled_start, tz);
+
+  const { data: approvedSess } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id")
+    .eq("scheduled_visit_id", id)
+    .eq("user_id", user.id)
+    .not("dossier_approved_at", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const hasApprovedDossier = Boolean(approvedSess);
+
+  const dossierEmails = row.dossier_recipient_emails ?? [];
+  const initialEmailsText = dossierEmails.join(", ");
+  const sendStatusRaw = row.dossier_email_send_status;
+  const sendStatus: DossierEmailSendStatus | undefined =
+    sendStatusRaw === "sent" || sendStatusRaw === "failed" || sendStatusRaw === "not_sent"
+      ? sendStatusRaw
+      : undefined;
+
+  const resendConfigured =
+    Boolean(process.env.RESEND_API_KEY?.trim()) &&
+    Boolean(
+      (process.env.DOSSIER_EMAIL_FROM ?? process.env.RESEND_FROM_EMAIL)?.trim(),
+    );
+
+  const sentAtLabel = row.dossier_email_sent_at
+    ? formatDateTimeShort(row.dossier_email_sent_at, tz)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -102,7 +134,7 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
               "min-h-11 min-w-[44px] items-center justify-center px-4",
             )}
           >
-            Iniciar visita
+            {row.status === "in_progress" ? "Continuar visita" : "Iniciar visita"}
           </Link>
         ) : null}
       </div>
@@ -149,6 +181,16 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
           </dd>
         </div>
       </dl>
+
+      <VisitDossierEmailPanel
+        visitId={id}
+        initialEmailsText={initialEmailsText}
+        sendStatus={sendStatus}
+        lastError={row.dossier_email_last_error}
+        sentAtLabel={sentAtLabel}
+        hasApprovedDossier={hasApprovedDossier}
+        resendConfigured={resendConfigured}
+      />
 
       {row.notes ? (
         <section aria-labelledby="visita-notas">

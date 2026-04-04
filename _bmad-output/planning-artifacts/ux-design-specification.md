@@ -824,7 +824,7 @@ flowchart TD
 
 **Utilização:** Modo execução de visita (mobile-first); lista virtualizável se portarias muito longas.
 
-**Anatomia:** Número/código do item + título; grupo opcional (*accordion* por secção); zona de estado (**Conforme** / **Não conforme**); miniaturas de fotos + CTA câmara/galeria; *textarea* colapsável para nota; *badge* ou *inline alert* “Recorrente (n visitas)”.
+**Anatomia:** Número/código do item + título; grupo opcional (*accordion* por secção); zona de estado (**Conforme** / **Não conforme**); miniaturas de fotos + **dois CTAs explícitos**: **Tirar foto** (input `capture="environment"` para abrir câmara em telemóvel/tablet) e **Galeria** (sem `capture`, para ficheiros já guardados ou *picker* em desktop); *textarea* colapsável para nota; *badge* ou *inline alert* “Recorrente (n visitas)”.
 
 **Estados:** Colapsado / expandido; conforme; não conforme (com ou sem foto obrigatória conforme regra); *disabled* durante *sync*; erro de upload com retry.
 

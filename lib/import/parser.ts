@@ -1,7 +1,7 @@
 // Story 2.6: Parser client-side para CSV e Excel + validadores por entidade
 
+import ExcelJS from "exceljs";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 
 import type {
   ClientImportRow,
@@ -23,28 +23,75 @@ export const MAX_ROWS = 500;
 export function parseCsvFile(file: File): Promise<string[][]> {
   return new Promise((resolve, reject) => {
     Papa.parse<string[]>(file, {
-      complete: (result) => resolve(result.data as string[][]),
-      error: (err) => reject(new Error(err.message)),
+      complete: (result: Papa.ParseResult<string[]>) =>
+        resolve(result.data as string[][]),
+      error: (err: Error) => reject(new Error(err.message)),
       skipEmptyLines: true,
     });
   });
 }
 
+function excelCellToString(cell: ExcelJS.Cell): string {
+  const v = cell.value;
+  if (v == null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  if (v instanceof Date) return v.toISOString().slice(0, 10);
+  if (typeof v === "object") {
+    const o = v as unknown as Record<string, unknown>;
+    if (typeof o.text === "string") return o.text;
+    if (typeof o.result === "string" || typeof o.result === "number") {
+      return String(o.result);
+    }
+    if (o.result instanceof Date) return o.result.toISOString().slice(0, 10);
+    if (Array.isArray(o.richText)) {
+      return (o.richText as { text?: string }[])
+        .map((t) => t.text ?? "")
+        .join("");
+    }
+  }
+  return "";
+}
+
 /** Lê arquivo Excel (.xlsx) e retorna array de arrays da primeira aba. */
 export async function parseExcelFile(file: File): Promise<string[][]> {
-  const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: "array" });
-  const sheetName = wb.SheetNames[0];
-  if (!sheetName) throw new Error("Arquivo Excel não contém abas.");
-  const ws = wb.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await file.arrayBuffer());
+  const worksheet = workbook.getWorksheet(1);
+  if (!worksheet) throw new Error("Arquivo Excel não contém abas.");
+
+  const data: string[][] = [];
+  worksheet.eachRow({ includeEmpty: true }, (row) => {
+    const out: string[] = [];
+    row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      while (out.length < colNumber - 1) {
+        out.push("");
+      }
+      out[colNumber - 1] = excelCellToString(cell);
+    });
+    data.push(out);
+  });
+
+  if (data.length === 0) return [];
+
+  const width = Math.max(...data.map((r) => r.length), 0);
+  return data.map((r) => {
+    const row = [...r];
+    while (row.length < width) row.push("");
+    return row;
+  });
 }
 
 /** Detecta o tipo de arquivo e retorna as linhas brutas. */
 export async function readFileRows(file: File): Promise<string[][]> {
   const name = file.name.toLowerCase();
   if (name.endsWith(".csv")) return parseCsvFile(file);
-  if (name.endsWith(".xlsx") || name.endsWith(".xls")) return parseExcelFile(file);
+  if (name.endsWith(".xlsx")) return parseExcelFile(file);
+  if (name.endsWith(".xls")) {
+    throw new Error(
+      "Ficheiros .xls (Excel 97–2003) não são suportados. Guarde como .xlsx ou exporte CSV.",
+    );
+  }
   throw new Error("Formato não suportado. Use .csv ou .xlsx.");
 }
 

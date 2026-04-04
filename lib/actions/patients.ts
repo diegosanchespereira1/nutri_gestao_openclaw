@@ -127,6 +127,11 @@ export async function loadPatientById(
   id: string,
 ): Promise<{ row: PatientRow | null }> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { row: null };
+
   const { data, error } = await supabase
     .from("patients")
     .select("*")

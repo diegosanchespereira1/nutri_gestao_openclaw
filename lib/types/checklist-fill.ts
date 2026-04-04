@@ -1,5 +1,8 @@
 import type { ChecklistTemplateSectionWithItems } from "@/lib/types/checklists";
 
+/** Limite de caracteres para anotação opcional por item (FR20). */
+export const MAX_CHECKLIST_ITEM_ANNOTATION_CHARS = 4000;
+
 export type ChecklistFillOutcome = "conforme" | "nc" | "na";
 
 export type ChecklistFillSessionRow = {
@@ -8,6 +11,9 @@ export type ChecklistFillSessionRow = {
   establishment_id: string;
   template_id: string | null;
   custom_template_id?: string | null;
+  scheduled_visit_id?: string | null;
+  /** Quando definido, o dossiê foi aprovado e as respostas/fotos não podem mudar (FR23/FR70). */
+  dossier_approved_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -19,6 +25,7 @@ export type ChecklistFillItemResponseRow = {
   custom_item_id: string | null;
   outcome: ChecklistFillOutcome;
   note: string | null;
+  item_annotation?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -26,6 +33,8 @@ export type ChecklistFillItemResponseRow = {
 export type FillItemResponseState = {
   outcome: ChecklistFillOutcome | null;
   note: string | null;
+  /** Nota de contexto opcional (guardada em `item_annotation`). */
+  annotation: string | null;
 };
 
 export type SectionValidationIssue = {

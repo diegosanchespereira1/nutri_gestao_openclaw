@@ -8,6 +8,8 @@ export type VisitStatus =
   | "completed"
   | "cancelled";
 
+export type DossierEmailSendStatus = "not_sent" | "sent" | "failed";
+
 /** Tipo operacional da visita (independente do destino PJ/PF). */
 export type VisitKind =
   | "patient_care"
@@ -29,6 +31,11 @@ export type ScheduledVisitRow = {
   visit_kind: VisitKind;
   assigned_team_member_id: string | null;
   notes: string | null;
+  /** Após migração 20260418120000; até lá pode vir ausente do API. */
+  dossier_recipient_emails?: string[];
+  dossier_email_send_status?: DossierEmailSendStatus;
+  dossier_email_last_error?: string | null;
+  dossier_email_sent_at?: string | null;
   created_at: string;
   updated_at: string;
 };

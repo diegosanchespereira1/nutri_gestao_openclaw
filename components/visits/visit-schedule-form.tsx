@@ -12,6 +12,7 @@ import {
   visitPriorityLabel,
 } from "@/lib/constants/visit-priorities";
 import { VISIT_KINDS, visitKindLabel } from "@/lib/constants/visit-kinds";
+import { MAX_DOSSIER_EMAIL_RECIPIENTS } from "@/lib/constants/dossier-email";
 import type { TeamMemberRow } from "@/lib/types/team-members";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { Button } from "@/components/ui/button";
@@ -275,6 +276,28 @@ export function VisitScheduleForm({
           rows={3}
           className={textareaClass}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="dossier-recipient-emails">
+          Emails para envio do dossiê (opcional)
+        </Label>
+        <textarea
+          id="dossier-recipient-emails"
+          name="dossier_recipient_emails"
+          rows={2}
+          className={textareaClass}
+          placeholder="ex.: contacto@cliente.pt"
+          aria-describedby="dossier-recipient-emails-hint"
+        />
+        <p
+          id="dossier-recipient-emails-hint"
+          className="text-muted-foreground text-xs"
+        >
+          Após aprovar o dossiê do checklist, o PDF é enviado automaticamente a
+          estes endereços (se o envio estiver configurado no servidor). Até{" "}
+          {MAX_DOSSIER_EMAIL_RECIPIENTS} emails, separados por vírgula ou linha.
+        </p>
       </div>
 
       <Button type="submit" disabled={disableSubmit}>

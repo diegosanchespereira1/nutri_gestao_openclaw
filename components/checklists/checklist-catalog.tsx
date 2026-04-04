@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,8 @@ type Props = {
   templates: ChecklistTemplateWithSections[];
   startFillAction: (formData: FormData) => Promise<void>;
   duplicateTemplateAction: (formData: FormData) => Promise<void>;
+  /** Abre e faz scroll ao cartão deste template (ex.: link do dashboard). */
+  focusTemplateId?: string | null;
 };
 
 const selectClassName =
@@ -41,13 +43,18 @@ export function ChecklistCatalog({
   templates,
   startFillAction,
   duplicateTemplateAction,
+  focusTemplateId = null,
 }: Props) {
   const [establishmentId, setEstablishmentId] = useState<string>("");
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
+    focusTemplateId ? { [focusTemplateId]: true } : {},
+  );
+
+  const filterEstablishmentId = focusTemplateId ? "" : establishmentId;
 
   const visibleTemplates = useMemo(() => {
-    const selected = establishmentId
-      ? (establishments.find((e) => e.id === establishmentId) ?? null)
+    const selected = filterEstablishmentId
+      ? (establishments.find((e) => e.id === filterEstablishmentId) ?? null)
       : null;
     const filter = selected
       ? {
@@ -56,7 +63,16 @@ export function ChecklistCatalog({
         }
       : null;
     return filterTemplatesForEstablishment(templates, filter);
-  }, [establishmentId, establishments, templates]);
+  }, [filterEstablishmentId, establishments, templates]);
+
+  useLayoutEffect(() => {
+    if (!focusTemplateId) return;
+    window.setTimeout(() => {
+      document
+        .getElementById(`checklist-template-${focusTemplateId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }, [focusTemplateId]);
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -69,7 +85,7 @@ export function ChecklistCatalog({
         <select
           id="checklist-establishment"
           className={selectClassName}
-          value={establishmentId}
+          value={focusTemplateId ? "" : establishmentId}
           onChange={(e) => setEstablishmentId(e.target.value)}
           aria-describedby="checklist-establishment-hint"
         >
@@ -84,9 +100,11 @@ export function ChecklistCatalog({
           id="checklist-establishment-hint"
           className="text-muted-foreground text-sm"
         >
-          {establishmentId
-            ? "Lista filtrada pela UF e pelo tipo do estabelecimento selecionado."
-            : "Sem filtro: mostra todos os modelos ativos do catálogo. Selecione um estabelecimento para ver apenas os aplicáveis."}
+          {focusTemplateId
+            ? "Ligação direta a um modelo: lista completa do catálogo. Escolha um estabelecimento para filtrar ou iniciar o preenchimento."
+            : establishmentId
+              ? "Lista filtrada pela UF e pelo tipo do estabelecimento selecionado."
+              : "Sem filtro: mostra todos os modelos ativos do catálogo. Selecione um estabelecimento para ver apenas os aplicáveis."}
         </p>
       </div>
 
@@ -116,7 +134,7 @@ export function ChecklistCatalog({
               .map((x) => establishmentTypeLabel[x])
               .join(", ");
             return (
-              <li key={t.id}>
+              <li key={t.id} id={`checklist-template-${t.id}`}>
                 <Card size="sm">
                   <CardHeader className="border-border border-b">
                     <CardTitle className="text-base">{t.name}</CardTitle>

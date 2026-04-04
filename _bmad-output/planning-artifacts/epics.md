@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos 1–3 concluídos (épico 2 com story 2.7 em backlog); épicos 4–11 em backlog — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml` (sincronizado em 2026-04-04).
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–4 concluídos** (épico 2 com story 2.7 em backlog); **épico 5 quase concluído** (5.1–5.2, 5.4–5.6 concluídas; **5.3** depende do épico 8); **épico 6 em curso** (6.1 concluída; 6.2–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml` (sincronizado em 2026-04-04).
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -158,7 +158,7 @@ UX-DR1: Inicializar design system shadcn/ui + Tailwind com componentes base: but
 UX-DR2: Aplicar tema de cor preferido theme-nutri-teal (HSL em theme-nutri-teal.css); manter theme-nutri-ref-a disponível para comparação com referências stakeholder.
 UX-DR3: Implementar shell logado: sidebar + header coerentes com referências visuais; sidebar colapsável / Sheet em mobile.
 UX-DR4: Login e registo: layout duas colunas 50/50; **apenas** email + palavra-passe (sem login social/OAuth); CRN no registo; acessível (foco, labels, erros).
-UX-DR5: Componente ChecklistItemVisit: item regulatório com conforme/NC, foto e nota por itemId, aviso de recorrência, estados de sync/erro.
+UX-DR5: Componente ChecklistItemVisit: item regulatório com conforme/NC, foto e nota por itemId (CTAs **Tirar foto** / **Galeria** em campo), aviso de recorrência, estados de sync/erro.
 UX-DR6: Componente VisitExecutionHeader: contexto estabelecimento, data, progresso x/n, rascunho, menu sair/guardar.
 UX-DR7: Componente DossierPreview: secções colapsáveis, galeria com legenda ao item, edição leve antes de aprovar.
 UX-DR8: Componente TechnicalSheetIngredientRow + CostSummaryPanel: linha editável com TACO/custo e painel de totais, recálculo visível.
@@ -215,17 +215,17 @@ Sistema disponibiliza modelos por portaria; profissional preenche com validaçã
 ### Epic 4: Visitas técnicas, dossiê, PDF e email
 Profissional agenda e executa visitas com evidências, gera dossiê, aprova, exporta PDF com CRN e envia por email; registos imutáveis com versionamento.  
 **FRs:** FR5, FR17–FR25, FR70.
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Concluído.
 
 ### Epic 5: Dashboard e organização
 Profissional vê agenda do dia, alertas com *countdown*, financeiro resumido, separação por tópico e briefing da semana.  
 **FRs:** FR50–FR54.
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Quase concluído (5.3 pendente / épico 8).
 
 ### Epic 6: Ficha técnica, TACO e custos
 Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.  
 **FRs:** FR26–FR36.
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Em curso (6.1 concluída; 6.2–6.8 em backlog).
 
 ### Epic 7: POPs
 Profissional usa templates, customiza POPs por estabelecimento, versiona e exporta PDF.  
@@ -577,7 +577,7 @@ So that adapto a clientes específicos (FR14).
 
 ## Epic 4: Visitas técnicas, dossiê, PDF e email
 
-**Implementação (épico):** Em curso (4.1 concluída).
+**Implementação (épico):** Concluído (4.1–4.9).
 
 ### Story 4.1: Agendamento de visitas
 
@@ -602,7 +602,7 @@ So that organizo o calendário (FR17, UX-DR9).
 
 ### Story 4.2: Iniciar visita e checklist aplicável
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-04: sessão de preenchimento ligada à visita, cabeçalho de execução, modelo aplicável por estabelecimento, pendências de NC da última sessão no mesmo estabelecimento).
 
 As a profissional,  
 I want iniciar execução com checklist carregado e cabeçalho de contexto,  
@@ -617,7 +617,7 @@ So that sei onde estou (FR18, UX-DR5, UX-DR6).
 
 ### Story 4.3: Fotos por item com *storage*
 
-**Implementação:** Backlog
+**Implementação:** Concluída (bucket `checklist-fill-photos`, tabela `checklist_fill_item_photos`, UI por item no wizard com **Tirar foto** (`capture=environment`, telemóvel/tablet) e **Galeria** (sem *capture*), geolocalização opcional, erro de rede com retry por origem).
 
 As a profissional,  
 I want anexar fotos a itens específicos,  
@@ -630,9 +630,11 @@ So that tenho evidência (FR19).
 **Then** *thumbnail* liga-se ao `itemId` e metadados (tempo; geo se ativo) guardam  
 **And** falha de rede mostra estado recuperável (MVP online)
 
+**Extensão UX (campo):** em *mobile/tablet*, o profissional dispõe de ação explícita **Tirar foto** (câmara) além de **Galeria** (ficheiros existentes), alinhado a UX-DR5 / *ChecklistItemVisit*.
+
 ### Story 4.4: Anotações textuais por item
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-16: coluna `item_annotation` em `checklist_fill_item_responses`, nota opcional por item após avaliação, distinta da descrição de NC em `note`; resumo “dossiê” ao validar a última secção com texto e fotos por item).
 
 As a profissional,  
 I want notas por item,  
@@ -646,7 +648,7 @@ So that documento o contexto (FR20).
 
 ### Story 4.5: Destaque de não-conformidade recorrente
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-16: por item, contagem de sessões anteriores no mesmo estabelecimento com NC; *badge* **Recorrente · N×** e texto explicativo no cartão do item; aviso global na página de execução da visita).
 
 As a profissional,  
 I want ver aviso quando item falhou em visitas anteriores,  
@@ -660,7 +662,7 @@ So that priorizo correção (FR21).
 
 ### Story 4.6: Compilar dossiê ao finalizar
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-16: após validar a última secção, **Finalizar e ver dossiê** abre diálogo de confirmação; componente *ChecklistFillDossierPreview* com secções colapsáveis e conteúdo completo por item — avaliação, NC, anotação, fotos — via `ChecklistFillDossierItemBody`).
 
 As a profissional,  
 I want que o sistema agregue checklist, fotos e notas ao finalizar,  
@@ -674,7 +676,7 @@ So that obtenho relatório único (FR22, UX-DR7).
 
 ### Story 4.7: Revisar, editar observações e aprovar
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-16: `dossier_approved_at` em `checklist_fill_sessions`; edição no *preview* de texto de NC e anotação antes de aprovar; `Aprovar dossiê` com validação global; bloqueio de mutações em respostas/fotos via trigger + server actions após aprovação; visita ligada → `completed`; reabertura = nova versão de produto em roadmap explícito na UI).
 
 As a profissional,  
 I want ajustar texto e aprovar antes de fechar,  
@@ -689,7 +691,7 @@ So that controlo o que sai (FR23).
 
 ### Story 4.8: Geração de PDF assíncrona com CRN
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-17: tabela `checklist_fill_pdf_exports` + bucket `checklist-dossier-pdfs`; `pdf-lib` com texto do dossié e CRN/nome do perfil; job `processing→ready|failed`; UI *Gerar PDF / Gerar novamente / Transferir* com erro e retry; geração no server action com URL assinada; fila “assíncrona” MVP = job persistido + estados na UI; sem worker separado.)
 
 As a profissional,  
 I want exportar PDF do relatório com CRN incluído,  
@@ -704,7 +706,7 @@ So that envio a cliente e arquivo (FR24, FR5, UX-DR13).
 
 ### Story 4.9: Envio automático por email
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-18: colunas em `scheduled_visits` — `dossier_recipient_emails`, `dossier_email_send_status`, `dossier_email_last_error`, `dossier_email_sent_at`; Resend com PDF em anexo; após aprovação do dossiê `after()` tenta envio se houver destinatários e `RESEND_API_KEY` + remetente; UI na ficha da visita — destinatários, estado, erro, *Enviar*/*Reenviar*; opcional na *Nova visita*; sem fila externa — envio no worker da resposta em segundo plano via `after()`.)
 
 As a profissional,  
 I want configurar destinatários e enviar PDF por email,  
@@ -721,11 +723,11 @@ So that o cliente recebe sem passos manuais extra (FR25).
 
 ## Epic 5: Dashboard e organização
 
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Quase concluído (falta 5.3, bloqueada por dados do épico 8).
 
 ### Story 5.1: Agenda do dia por prioridade
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-18: `/inicio` ordena visitas do dia com `sortScheduledVisitsForDashboard` — prioridade urgente→baixa, tipo de visita regulatório antes de clínico, depois hora; `VisitAgendaBlock` com barra lateral por prioridade, tipo visível, CTAs *Ver* e *Iniciar*/*Continuar*; mesma ordenação por dia na agenda `/visitas`.)
 
 As a profissional,  
 I want ver visitas do dia ordenadas por prioridade/tipo,  
@@ -739,7 +741,7 @@ So that planifico a manhã (FR50, UX-DR9).
 
 ### Story 5.2: Alertas regulatórios com *countdown*
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-18: tabela `establishment_compliance_deadlines` + RLS por dono do cliente; secção na edição do estabelecimento para criar/eliminar prazos; `/inicio` lista alertas no horizonte −365d..+90d; `RegulatoryAlertCard` + `RegulatoryCountdown` (texto + ícone + estado textual, não só cor); CTA *Ver checklist* com `?template=` e scroll no catálogo; `diffCalendarDayKeys` / `calendarDaysUntilDueDate` no fuso do perfil.)
 
 As a profissional,  
 I want alertas de portaria com prazo visível,  
@@ -768,7 +770,7 @@ So that cobro ou acompanho (FR52).
 
 ### Story 5.4: Separação pacientes vs financeiro
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-18: `/inicio` com dois `DashboardFocusPanel` — bloco clínico «Pacientes, visitas e compliance» com barra lateral *primary* e subsecções; bloco «Financeiro» com barra *âmbar* e *placeholder* para 5.3; atalhos Pacientes / Visitas / Checklists no primeiro painel.)
 
 As a profissional,  
 I want blocos distintos para tópicos clínicos e financeiros,  
@@ -782,7 +784,7 @@ So that reduzo ruído cognitivo (FR53).
 
 ### Story 5.5: Briefing semanal
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-18: `buildWeeklyBriefing` — janela móvel de 7 dias civis no fuso do perfil; filtra visitas `scheduled`/`in_progress` e prazos de compliance já carregados; `WeeklyBriefingWidget` com `<details>` (abrir/fechar), listas com limite + remissão à agenda / alertas completos; `formatDayKeyLong` em `calendar-tz`.)
 
 As a profissional,  
 I want resumo de avisos da semana,  
@@ -796,7 +798,7 @@ So that me organizo (FR54).
 
 ### Story 5.6: Gráficos com tokens de tema
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-18: dependência `recharts`; `buildVisitsByMonthSeries` + `VisitsMonthBarChart` no `/inicio` quando há visitas nos últimos 6 meses; `Cell` com `fill: var(--chart-1)` … `--chart-5`; grelha/eixos/tooltip com `var(--border)`, `var(--muted-foreground)`, `var(--card)`; helper `chartCssVar` em `lib/constants/chart-theme.ts`.)
 
 As a profissional,  
 I want gráficos de resumo quando houver dados,  
@@ -812,11 +814,11 @@ So that vejo tendências (UX-DR16).
 
 ## Epic 6: Ficha técnica, TACO e custos
 
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Em curso (6.1 concluída; 6.2–6.8 em backlog).
 
 ### Story 6.1: Receitas e linhas de ingrediente
 
-**Implementação:** Backlog
+**Implementação:** Concluída (tabelas `technical_recipes` / `technical_recipe_lines`, RLS; UI lista/nova/editar em `/ficha-tecnica`; rascunho; validação de totais homogéneos massa/volume.)
 
 As a profissional,  
 I want criar receita com ingredientes e quantidades,  

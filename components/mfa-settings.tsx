@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { MfaTotpQr } from "@/components/auth/mfa-totp-qr";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -206,16 +207,7 @@ export function MfaSettings() {
                     Leia o código QR com a sua aplicação:
                   </p>
                   <div className="bg-background flex justify-center rounded-lg border p-4">
-                    {qrCode.startsWith("data:") ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- data URL do Supabase
-                      <img
-                        src={qrCode}
-                        alt="Código QR para configurar TOTP"
-                        className="max-w-[220px]"
-                      />
-                    ) : (
-                      <div dangerouslySetInnerHTML={{ __html: qrCode }} />
-                    )}
+                    <MfaTotpQr qrCode={qrCode} />
                   </div>
                 </div>
               ) : null}

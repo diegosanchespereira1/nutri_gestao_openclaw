@@ -2,9 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DeleteEstablishmentButton } from "@/components/clientes/delete-establishment-button";
+import { EstablishmentComplianceDeadlinesSection } from "@/components/clientes/establishment-compliance-deadlines-section";
 import { EstablishmentForm } from "@/components/clientes/establishment-form";
 import { PatientsSection } from "@/components/pacientes/patients-section";
 import { Separator } from "@/components/ui/separator";
+import {
+  loadComplianceDeadlinesForEstablishment,
+} from "@/lib/actions/compliance-deadlines";
+import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { createClient } from "@/lib/supabase/server";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 import { cn } from "@/lib/utils";
@@ -45,6 +50,15 @@ export default async function EditarEstabelecimentoPage({
 
   const row = est as EstablishmentRow;
 
+  const [deadlines, { templates }] = await Promise.all([
+    loadComplianceDeadlinesForEstablishment(row.id),
+    loadChecklistCatalog(),
+  ]);
+  const templateOptions = templates.map((t) => ({
+    id: t.id,
+    label: `${t.name} (${t.portaria_ref})`,
+  }));
+
   return (
     <div className="space-y-6">
       <Link
@@ -75,6 +89,14 @@ export default async function EditarEstabelecimentoPage({
           state: row.state ?? "",
           postal_code: row.postal_code ?? "",
         }}
+      />
+      <Separator />
+      <EstablishmentComplianceDeadlinesSection
+        clientId={clientId}
+        establishmentId={row.id}
+        establishmentName={row.name}
+        initialRows={deadlines}
+        templateOptions={templateOptions}
       />
       {blockedPatients ? (
         <p className="text-destructive text-sm" role="alert">

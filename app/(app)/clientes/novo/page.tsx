@@ -72,6 +72,7 @@ export default function NovoClientePage() {
         defaultTechnicalRepProfessionalId=""
         defaultTechnicalRepEmail=""
         defaultTechnicalRepPhone=""
+        defaultBusinessSegment=""
       />
     </div>
   );

@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-03T20:00:00Z"
+last_updated: "2026-04-04T18:00:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -50,29 +50,29 @@ development_status:
   3-3-checklists-customizados-profissional: done
   epic-3-retrospective: optional
 
-  epic-4: in-progress
+  epic-4: done
   4-1-agendamento-visitas: done
-  4-2-iniciar-visita-checklist-aplicavel: backlog
-  4-3-fotos-por-item-storage: backlog
-  4-4-anotacoes-textuais-por-item: backlog
-  4-5-destaque-nc-recorrente: backlog
-  4-6-compilar-dossie-ao-finalizar: backlog
-  4-7-revisar-editar-aprovar: backlog
-  4-8-pdf-assincrono-crn: backlog
-  4-9-envio-automatico-email: backlog
+  4-2-iniciar-visita-checklist-aplicavel: done
+  4-3-fotos-por-item-storage: done
+  4-4-anotacoes-textuais-por-item: done
+  4-5-destaque-nc-recorrente: done
+  4-6-compilar-dossie-ao-finalizar: done
+  4-7-revisar-editar-aprovar: done
+  4-8-pdf-assincrono-crn: done
+  4-9-envio-automatico-email: done
   epic-4-retrospective: optional
 
-  epic-5: backlog
-  5-1-agenda-dia-prioridade: backlog
-  5-2-alertas-regulatorios-countdown: backlog
+  epic-5: in-progress
+  5-1-agenda-dia-prioridade: done
+  5-2-alertas-regulatorios-countdown: done
   5-3-pendencias-financeiras-dashboard: backlog
-  5-4-separacao-pacientes-financeiro: backlog
-  5-5-briefing-semanal: backlog
-  5-6-graficos-tokens-tema: backlog
+  5-4-separacao-pacientes-financeiro: done
+  5-5-briefing-semanal: done
+  5-6-graficos-tokens-tema: done
   epic-5-retrospective: optional
 
-  epic-6: backlog
-  6-1-receitas-linhas-ingrediente: backlog
+  epic-6: in-progress
+  6-1-receitas-linhas-ingrediente: done
   6-2-ligacao-taco-informacao-nutricional: backlog
   6-3-materia-prima-custo-unitario: backlog
   6-4-fatores-correcao-coccao: backlog

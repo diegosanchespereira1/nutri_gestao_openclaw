@@ -18,6 +18,9 @@ import type {
 } from "@/lib/types/clients";
 import type { PatientSex } from "@/lib/types/patients";
 import {
+  isClientBusinessSegment,
+} from "@/lib/constants/client-business-segment";
+import {
   isValidCnpj,
   isValidCpf,
   onlyDigits,
@@ -54,6 +57,7 @@ function nullPfProfile(): PfProfileFields {
 function pfOnlyClearPayload() {
   return {
     lifecycle_status: "ativo" as const,
+    business_segment: null,
     activated_at: null,
     state_registration: null,
     municipal_registration: null,
@@ -241,10 +245,20 @@ function parsePjFields(formData: FormData):
   const technical_rep_phone =
     String(formData.get("technical_rep_phone") ?? "").trim() || null;
 
+  const segRaw = String(formData.get("business_segment") ?? "").trim();
+  let business_segment: string | null = null;
+  if (segRaw.length > 0) {
+    if (!isClientBusinessSegment(segRaw)) {
+      return { ok: false, error: "Categoria do negócio inválida." };
+    }
+    business_segment = segRaw;
+  }
+
   return {
     ok: true,
     fields: {
       lifecycle_status,
+      business_segment,
       activated_at,
       state_registration,
       municipal_registration,
@@ -572,6 +586,7 @@ export async function deleteClientAction(formData: FormData) {
 export async function loadClientsForOwner(options: {
   q?: string;
   kind?: ClientKind | "all";
+  lifecycle?: ClientLifecycleStatus | "all";
 }): Promise<{ rows: ClientRow[] }> {
   const supabase = await createClient();
   const {
@@ -588,6 +603,15 @@ export async function loadClientsForOwner(options: {
   const kindFilter = options.kind;
   if (kindFilter === "pf" || kindFilter === "pj") {
     q = q.eq("kind", kindFilter);
+  }
+
+  const lifeFilter = options.lifecycle;
+  if (
+    lifeFilter === "ativo" ||
+    lifeFilter === "inativo" ||
+    lifeFilter === "finalizado"
+  ) {
+    q = q.eq("lifecycle_status", lifeFilter);
   }
 
   const rawQ = (options.q ?? "").trim();

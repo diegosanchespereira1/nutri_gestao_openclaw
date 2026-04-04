@@ -17,3 +17,10 @@ export const clientLifecycleShortHint: Record<ClientLifecycleStatus, string> = {
   inativo: "Contrato em pausa — não agenda visitas até reativar.",
   finalizado: "Contrato encerrado — não agenda visitas até reativar.",
 };
+
+/** Rótulos curtos para lista / badges (diferente do texto longo do formulário). */
+export const clientLifecycleBadgeLabel: Record<ClientLifecycleStatus, string> = {
+  ativo: "Ativo",
+  inativo: "Inativo",
+  finalizado: "Finalizado",
+};

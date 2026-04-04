@@ -131,6 +131,7 @@ export default async function EditarClientePage({
         }
         defaultTechnicalRepEmail={row.technical_rep_email ?? ""}
         defaultTechnicalRepPhone={row.technical_rep_phone ?? ""}
+        defaultBusinessSegment={row.business_segment ?? ""}
       />
       {row.kind === "pf" ? (
         <>

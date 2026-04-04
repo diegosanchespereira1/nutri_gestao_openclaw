@@ -188,3 +188,34 @@ export function formatDayColumnHeader(dayKey: string, timeZone: string): string 
   }).format(base);
   return `${wd} ${dd}/${m}`;
 }
+
+/** Diferença em dias civis entre duas chaves `YYYY-MM-DD` (to − from). */
+export function diffCalendarDayKeys(fromKey: string, toKey: string): number {
+  const [fy, fm, fd] = fromKey.split("-").map(Number);
+  const [ty, tm, td] = toKey.split("-").map(Number);
+  const from = Date.UTC(fy, fm - 1, fd);
+  const to = Date.UTC(ty, tm - 1, td);
+  return Math.round((to - from) / 86400000);
+}
+
+/**
+ * Dias até a data limite no calendário civil do fuso (positivo = futuro, 0 = hoje, negativo = atraso).
+ */
+export function calendarDaysUntilDueDate(
+  dueDateKey: string,
+  timeZone: string,
+  reference: Date = new Date(),
+): number {
+  const tKey = todayKey(reference, timeZone);
+  return diffCalendarDayKeys(tKey, dueDateKey);
+}
+
+/** Data longa (civil) para uma chave `YYYY-MM-DD` no fuso dado. */
+export function formatDayKeyLong(dayKey: string, timeZone: string): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const base = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return new Intl.DateTimeFormat("pt-PT", {
+    timeZone,
+    dateStyle: "long",
+  }).format(base);
+}

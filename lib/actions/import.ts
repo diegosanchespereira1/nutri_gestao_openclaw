@@ -4,19 +4,18 @@
 // Segurança: auth obrigatório; owner_user_id sempre do token JWT, nunca do cliente.
 
 import { createClient } from "@/lib/supabase/server";
-import type {
-  ClientImportRow,
-  EstablishmentImportRow,
-  ImportResult,
-  PatientImportRow,
-} from "@/lib/types/import";
-
-const MAX_ROWS = 500;
+import type { ImportResult } from "@/lib/types/import";
+import {
+  MAX_IMPORT_ROWS,
+  parseImportClientsPayload,
+  parseImportEstablishmentsPayload,
+  parseImportPatientsPayload,
+} from "@/lib/validators/import-rows";
 
 // ── Importar Clientes ───────────────────────────────────────────────────────
 
 export async function importClientsAction(
-  rows: ClientImportRow[],
+  rows: unknown,
 ): Promise<ImportResult> {
   const supabase = await createClient();
   const {
@@ -25,11 +24,10 @@ export async function importClientsAction(
 
   if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
 
-  // Limite de segurança server-side (NFR7)
-  const safe = rows.slice(0, MAX_ROWS);
+  const parsed = parseImportClientsPayload(rows);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
 
-  // Enriquecer com owner_user_id do token — nunca do client
-  const records = safe.map((r) => ({ ...r, owner_user_id: user.id }));
+  const records = parsed.rows.map((r) => ({ ...r, owner_user_id: user.id }));
 
   const { error } = await supabase.from("clients").insert(records);
 
@@ -38,14 +36,19 @@ export async function importClientsAction(
     return { ok: false, error: "Erro ao importar clientes. Verifique os dados e tente novamente." };
   }
 
-  return { ok: true, imported: records.length, skipped: rows.length - records.length };
+  const rowCount = Array.isArray(rows) ? rows.length : 0;
+  return {
+    ok: true,
+    imported: records.length,
+    skipped: rowCount > MAX_IMPORT_ROWS ? rowCount - MAX_IMPORT_ROWS : 0,
+  };
 }
 
 // ── Importar Estabelecimentos ───────────────────────────────────────────────
 
 export async function importEstablishmentsAction(
-  rows: EstablishmentImportRow[],
-  clientId: string,
+  rows: unknown,
+  clientId: unknown,
 ): Promise<ImportResult> {
   const supabase = await createClient();
   const {
@@ -54,20 +57,23 @@ export async function importEstablishmentsAction(
 
   if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
 
-  // Verificar que o clientId pertence ao tenant autenticado (RLS garante na query abaixo,
-  // mas verificamos explicitamente para dar erro claro antes do insert)
+  const parsed = parseImportEstablishmentsPayload(rows, clientId);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
   const { data: clientCheck, error: checkError } = await supabase
     .from("clients")
     .select("id")
-    .eq("id", clientId)
+    .eq("id", parsed.clientId)
     .single();
 
   if (checkError || !clientCheck) {
     return { ok: false, error: "Cliente não encontrado ou sem permissão de acesso." };
   }
 
-  const safe = rows.slice(0, MAX_ROWS);
-  const records = safe.map((r) => ({ ...r, client_id: clientId }));
+  const records = parsed.rows.map((r) => ({
+    ...r,
+    client_id: parsed.clientId,
+  }));
 
   const { error } = await supabase.from("establishments").insert(records);
 
@@ -76,14 +82,19 @@ export async function importEstablishmentsAction(
     return { ok: false, error: "Erro ao importar estabelecimentos. Verifique os dados e tente novamente." };
   }
 
-  return { ok: true, imported: records.length, skipped: rows.length - records.length };
+  const rowCount = Array.isArray(rows) ? rows.length : 0;
+  return {
+    ok: true,
+    imported: records.length,
+    skipped: rowCount > MAX_IMPORT_ROWS ? rowCount - MAX_IMPORT_ROWS : 0,
+  };
 }
 
 // ── Importar Pacientes ──────────────────────────────────────────────────────
 
 export async function importPatientsAction(
-  rows: PatientImportRow[],
-  clientId: string,
+  rows: unknown,
+  clientId: unknown,
 ): Promise<ImportResult> {
   const supabase = await createClient();
   const {
@@ -92,19 +103,24 @@ export async function importPatientsAction(
 
   if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
 
-  // Verificar ownership do cliente (RLS garante, mas dá feedback claro)
+  const parsed = parseImportPatientsPayload(rows, clientId);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
   const { data: clientCheck, error: checkError } = await supabase
     .from("clients")
     .select("id")
-    .eq("id", clientId)
+    .eq("id", parsed.clientId)
     .single();
 
   if (checkError || !clientCheck) {
     return { ok: false, error: "Cliente não encontrado ou sem permissão de acesso." };
   }
 
-  const safe = rows.slice(0, MAX_ROWS);
-  const records = safe.map((r) => ({ ...r, client_id: clientId }));
+  const records = parsed.rows.map((r) => ({
+    ...r,
+    client_id: parsed.clientId,
+    sex: r.sex ?? null,
+  }));
 
   const { error } = await supabase.from("patients").insert(records);
 
@@ -113,5 +129,10 @@ export async function importPatientsAction(
     return { ok: false, error: "Erro ao importar pacientes. Verifique os dados e tente novamente." };
   }
 
-  return { ok: true, imported: records.length, skipped: rows.length - records.length };
+  const rowCount = Array.isArray(rows) ? rows.length : 0;
+  return {
+    ok: true,
+    imported: records.length,
+    skipped: rowCount > MAX_IMPORT_ROWS ? rowCount - MAX_IMPORT_ROWS : 0,
+  };
 }

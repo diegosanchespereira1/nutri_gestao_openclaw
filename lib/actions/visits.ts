@@ -7,6 +7,7 @@ import { parseVisitPriority } from "@/lib/constants/visit-priorities";
 import { parseVisitKind } from "@/lib/constants/visit-kinds";
 import { createClient } from "@/lib/supabase/server";
 import type { ScheduledVisitWithTargets, VisitTargetType } from "@/lib/types/visits";
+import { parseDossierRecipientEmailsFromText } from "@/lib/validators/dossier-email-recipients";
 
 function parseTargetType(raw: unknown): VisitTargetType | null {
   if (raw === "establishment" || raw === "patient") return raw;
@@ -86,6 +87,17 @@ export async function createScheduledVisitAction(
   const priority = parseVisitPriority(formData.get("priority")) ?? "normal";
   const notesRaw = String(formData.get("notes") ?? "").trim();
   const notes = notesRaw.length > 0 ? notesRaw : null;
+  const dossierEmailsRaw = String(
+    formData.get("dossier_recipient_emails") ?? "",
+  ).trim();
+  let dossier_recipient_emails: string[] = [];
+  if (dossierEmailsRaw.length > 0) {
+    const parsed = parseDossierRecipientEmailsFromText(dossierEmailsRaw);
+    if (!parsed.ok) {
+      redirect("/visitas/nova?err=dossier_email");
+    }
+    dossier_recipient_emails = parsed.emails;
+  }
   const visitKind = parseVisitKind(formData.get("visit_kind"));
   const assignRaw = String(
     formData.get("assigned_team_member_id") ?? "",
@@ -179,6 +191,7 @@ export async function createScheduledVisitAction(
     visit_kind: visitKind,
     assigned_team_member_id: assignedTeamMemberId,
     notes,
+    dossier_recipient_emails,
   };
 
   const { data: created, error } = await supabase
@@ -195,4 +208,52 @@ export async function createScheduledVisitAction(
   revalidatePath("/inicio");
   revalidatePath(`/visitas/${created.id as string}`);
   redirect(`/visitas/${created.id as string}`);
+}
+
+export type UpdateDossierRecipientsState =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/** Atualiza destinatários de email do dossiê (ficha da visita). */
+export async function updateScheduledVisitDossierRecipientsFormAction(
+  _prev: UpdateDossierRecipientsState | null,
+  formData: FormData,
+): Promise<UpdateDossierRecipientsState> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const visitId = String(formData.get("visit_id") ?? "").trim();
+  if (!visitId) return { ok: false, error: "Visita inválida." };
+
+  const raw = String(formData.get("dossier_recipient_emails") ?? "").trim();
+  const parsed =
+    raw.length === 0
+      ? ({ ok: true as const, emails: [] as string[] })
+      : parseDossierRecipientEmailsFromText(raw);
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  const { data: v } = await supabase
+    .from("scheduled_visits")
+    .select("id")
+    .eq("id", visitId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!v) return { ok: false, error: "Visita não encontrada." };
+
+  const { error } = await supabase
+    .from("scheduled_visits")
+    .update({ dossier_recipient_emails: parsed.emails })
+    .eq("id", visitId)
+    .eq("user_id", user.id);
+
+  if (error) return { ok: false, error: "Não foi possível guardar." };
+
+  revalidatePath(`/visitas/${visitId}`);
+  revalidatePath("/visitas");
+  revalidatePath("/inicio");
+  return { ok: true };
 }

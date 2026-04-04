@@ -31,6 +31,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  CLIENT_BUSINESS_SEGMENTS,
+  clientBusinessSegmentLabel,
+} from "@/lib/constants/client-business-segment";
 import { clientLifecycleLabel } from "@/lib/constants/client-lifecycle";
 import { MAX_CLIENT_LOGO_BYTES } from "@/lib/constants/client-logos-storage";
 import type { ClientKind, ClientLifecycleStatus } from "@/lib/types/clients";
@@ -115,6 +119,7 @@ export function ClientForm({
   defaultTechnicalRepProfessionalId,
   defaultTechnicalRepEmail,
   defaultTechnicalRepPhone,
+  defaultBusinessSegment,
 }: {
   mode: "create" | "edit";
   clientId?: string;
@@ -157,6 +162,8 @@ export function ClientForm({
   defaultTechnicalRepProfessionalId: string;
   defaultTechnicalRepEmail: string;
   defaultTechnicalRepPhone: string;
+  /** Valor do select `business_segment`; vazio = sem categoria. */
+  defaultBusinessSegment: string;
 }) {
   const action =
     mode === "create" ? createClientAction : updateClientAction;
@@ -334,6 +341,31 @@ export function ClientForm({
                     </p>
                   ) : null}
                 </div>
+
+                {kind === "pj" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="business-segment">
+                      Categoria do negócio (opcional)
+                    </Label>
+                    <select
+                      id="business-segment"
+                      name="business_segment"
+                      defaultValue={defaultBusinessSegment}
+                      className={selectClassName}
+                    >
+                      <option value="">— Indefinida —</option>
+                      {CLIENT_BUSINESS_SEGMENTS.map((s) => (
+                        <option key={s} value={s}>
+                          {clientBusinessSegmentLabel[s]}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-muted-foreground text-xs">
+                      Aparece na lista de clientes (ex.: padaria, escola,
+                      hospital). Pode definir mais tarde.
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="space-y-2">
                   <Label htmlFor="client-document">

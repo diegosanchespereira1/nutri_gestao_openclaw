@@ -12,6 +12,8 @@ const errMessages: Record<string, string> = {
     "Preencha o tipo de visita, o destino, a data e a hora.",
   date: "Data ou hora inválida.",
   save: "Não foi possível guardar. Tente novamente.",
+  dossier_email:
+    "Revise os emails para envio do dossiê (válidos, separados por vírgula ou linha; no máximo 5).",
   client_inativo:
     "Este cliente está inativo (pausa). Reative o contrato na ficha do cliente para agendar visitas.",
   client_finalizado:

@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 
 import { DashboardClinicalSubsection } from "@/components/dashboard/dashboard-clinical-subsection";
 import { DashboardFocusPanel } from "@/components/dashboard/dashboard-focus-panel";
+import { FinancialPendingCard } from "@/components/dashboard/financial-pending-card";
 import { RegulatoryAlertCard } from "@/components/dashboard/regulatory-alert-card";
 import { VisitsMonthBarChart } from "@/components/dashboard/visits-month-bar-chart";
 import { WeeklyBriefingWidget } from "@/components/dashboard/weekly-briefing-widget";
 import { VisitAgendaBlock } from "@/components/visits/visit-agenda-block";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadComplianceDashboardAlerts } from "@/lib/actions/compliance-deadlines";
+import { loadFinancialDashboardSummary } from "@/lib/actions/financial-charges";
 import {
   buildVisitsByMonthSeries,
   visitsByMonthHasData,
@@ -33,9 +35,10 @@ export default async function InicioPage() {
     redirect("/login");
   }
   const tz = await fetchProfileTimeZone(supabase, user.id);
-  const [{ rows }, complianceAlerts] = await Promise.all([
+  const [{ rows }, complianceAlerts, financialSummary] = await Promise.all([
     loadScheduledVisitsForOwner(),
     loadComplianceDashboardAlerts(tz),
+    loadFinancialDashboardSummary(tz),
   ]);
   const today = sortScheduledVisitsForDashboard(
     rows.filter(
@@ -196,19 +199,10 @@ export default async function InicioPage() {
         title="Financeiro"
         description="Resumo de cobranças, contratos e alertas de renovação — área separada da operação clínica."
       >
-        <div
-          className="border-border bg-background/60 rounded-lg border border-dashed px-4 py-5 text-sm"
-          role="status"
-        >
-          <p className="text-foreground font-medium">
-            Módulo financeiro em preparação
-          </p>
-          <p className="text-muted-foreground mt-2">
-            Os totais de pendências e ligações ao detalhe surgirão aqui com a
-            story 5.3 (épico 8). Este bloco mantém o financeiro visualmente
-            distinto dos pacientes, visitas e compliance.
-          </p>
-        </div>
+        <FinancialPendingCard
+          overdueCount={financialSummary.overdueCount}
+          overdueTotalLabel={financialSummary.overdueTotalLabel}
+        />
       </DashboardFocusPanel>
     </div>
   );

@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-04T18:00:00Z"
+last_updated: "2026-04-04T22:00:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -62,10 +62,10 @@ development_status:
   4-9-envio-automatico-email: done
   epic-4-retrospective: optional
 
-  epic-5: in-progress
+  epic-5: done
   5-1-agenda-dia-prioridade: done
   5-2-alertas-regulatorios-countdown: done
-  5-3-pendencias-financeiras-dashboard: backlog
+  5-3-pendencias-financeiras-dashboard: done
   5-4-separacao-pacientes-financeiro: done
   5-5-briefing-semanal: done
   5-6-graficos-tokens-tema: done

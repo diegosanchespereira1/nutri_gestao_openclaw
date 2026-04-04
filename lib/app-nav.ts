@@ -12,6 +12,7 @@ import {
   UserCircle2,
   Users,
   UtensilsCrossed,
+  Wallet,
 } from "lucide-react";
 
 export type AppNavItem = {
@@ -29,6 +30,7 @@ export const appNavItems: AppNavItem[] = [
   { href: "/equipe", label: "Equipe", icon: Users },
   { href: "/checklists", label: "Checklists", icon: ClipboardCheck },
   { href: "/ficha-tecnica", label: "Ficha técnica", icon: UtensilsCrossed },
+  { href: "/financeiro", label: "Financeiro", icon: Wallet },
   { href: "/pops", label: "POPs", icon: Soup },
   { href: "/importar", label: "Importar", icon: Upload },
   { href: "/perfil", label: "Perfil", icon: CircleUserRound },

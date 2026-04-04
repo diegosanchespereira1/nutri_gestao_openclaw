@@ -220,7 +220,7 @@ Profissional agenda e executa visitas com evidências, gera dossiê, aprova, exp
 ### Epic 5: Dashboard e organização
 Profissional vê agenda do dia, alertas com *countdown*, financeiro resumido, separação por tópico e briefing da semana.  
 **FRs:** FR50–FR54.
-**Implementação (épico):** Quase concluído (5.3 pendente / épico 8).
+**Implementação (épico):** Concluído.
 
 ### Epic 6: Ficha técnica, TACO e custos
 Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.  
@@ -723,7 +723,7 @@ So that o cliente recebe sem passos manuais extra (FR25).
 
 ## Epic 5: Dashboard e organização
 
-**Implementação (épico):** Quase concluído (falta 5.3, bloqueada por dados do épico 8).
+**Implementação (épico):** Concluído (5.1–5.6; dados financeiros mínimos em `financial_charges` antecipam integração com o épico 8).
 
 ### Story 5.1: Agenda do dia por prioridade
 
@@ -756,7 +756,7 @@ So that não perco vencimentos (FR51, UX-DR10).
 
 ### Story 5.3: Pendências financeiras no *dashboard*
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-04: tabela `financial_charges` + RLS por `owner_user_id`; `/financeiro` com lista, nova cobrança e *Marcar pago*; `/inicio` com `FinancialPendingCard` — totais em atraso e CTA *Ver pendências* / *Área financeira*; agregação com `summarizeOverdueCharges` e fuso do perfil via `todayKey`. Base de dados alinhada ao Épico 8.)
 
 As a profissional,  
 I want ver resumo de pendências financeiras,  

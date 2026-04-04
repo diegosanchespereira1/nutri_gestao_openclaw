@@ -59,4 +59,16 @@ describe("sumRecipeMaterialCostBrl", () => {
     expect(s.totalBrl).toBe(2);
     expect(s.linesWithCost).toBe(1);
   });
+
+  it("aplica fator de correção no custo", () => {
+    const s = sumRecipeMaterialCostBrl([
+      {
+        quantity: 100,
+        unit: "g",
+        correction_factor: 2,
+        raw_material: { price_unit: "kg", unit_price_brl: 10 },
+      },
+    ]);
+    expect(s.totalBrl).toBe(2);
+  });
 });

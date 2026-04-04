@@ -101,6 +101,8 @@ export function sumRecipeMaterialCostBrl(
     quantity: number;
     unit: RecipeLineUnit;
     raw_material: Pick<RawMaterialRow, "price_unit" | "unit_price_brl"> | null;
+    /** Padrão 1. Multiplica quantidade para matéria-prima a comprar (perdas). */
+    correction_factor?: number;
   }>,
 ): { totalBrl: number; linesWithCost: number; skippedDimension: number } {
   let totalBrl = 0;
@@ -109,8 +111,9 @@ export function sumRecipeMaterialCostBrl(
 
   for (const line of lines) {
     if (!line.raw_material) continue;
+    const corr = line.correction_factor ?? 1;
     const r = lineRawMaterialCostBrl(
-      line.quantity,
+      line.quantity * corr,
       line.unit,
       line.raw_material,
     );

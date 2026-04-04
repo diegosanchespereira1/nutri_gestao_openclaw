@@ -21,6 +21,14 @@ const tacoIdSchema = z.preprocess(
   z.union([z.string().uuid(), z.null()]),
 );
 
+const lineFactorSchema = z.preprocess(
+  (val) => (val === undefined || val === null || val === "" ? 1 : val),
+  z.coerce
+    .number()
+    .min(0.01, "Fatores: mínimo 0,01.")
+    .max(10, "Fatores: máximo 10."),
+);
+
 const lineSchema = z.object({
   ingredient_name: z.string().trim().min(1).max(500),
   quantity: z.coerce.number().positive("Quantidade deve ser maior que zero."),
@@ -28,6 +36,8 @@ const lineSchema = z.object({
   notes: z.string().max(1000).optional(),
   taco_food_id: tacoIdSchema,
   raw_material_id: tacoIdSchema,
+  correction_factor: lineFactorSchema,
+  cooking_factor: lineFactorSchema,
 });
 
 const saveDraftSchema = z.object({
@@ -53,6 +63,12 @@ function parseLineQuantity(raw: unknown): number {
     return Number.isFinite(n) ? n : 0;
   }
   return 0;
+}
+
+function parseLineFactor(raw: unknown): number {
+  const n = parseLineQuantity(raw);
+  if (!Number.isFinite(n) || n <= 0) return 1;
+  return Math.min(10, Math.max(0.01, n));
 }
 
 function parseRawMaterialJoin(raw: unknown): RawMaterialRow | null {
@@ -99,6 +115,8 @@ function mapLineRow(row: {
   taco_reference_foods?: unknown;
   raw_material_id?: string | null;
   professional_raw_materials?: unknown;
+  correction_factor?: unknown;
+  cooking_factor?: unknown;
 }): TechnicalRecipeLineRow {
   const tacoFood = parseTacoFoodJoin(row.taco_reference_foods);
   const colTacoId =
@@ -124,6 +142,8 @@ function mapLineRow(row: {
     taco_food: tacoFood,
     raw_material_id: colRmId ?? rawMat?.id ?? null,
     raw_material: rawMat,
+    correction_factor: parseLineFactor(row.correction_factor),
+    cooking_factor: parseLineFactor(row.cooking_factor),
   };
 }
 
@@ -221,6 +241,8 @@ export async function loadTechnicalRecipeById(
             taco_reference_foods?: unknown;
             raw_material_id?: string | null;
             professional_raw_materials?: unknown;
+            correction_factor?: unknown;
+            cooking_factor?: unknown;
           },
         ),
       ),
@@ -253,6 +275,8 @@ export async function saveTechnicalRecipeDraftAction(
     notes: l.notes?.trim() ? l.notes.trim() : undefined,
     taco_food_id: l.taco_food_id ?? null,
     raw_material_id: l.raw_material_id ?? null,
+    correction_factor: l.correction_factor,
+    cooking_factor: l.cooking_factor,
   }));
 
   const rmIds = [...new Set(lines.map((l) => l.raw_material_id).filter(Boolean))] as string[];
@@ -384,6 +408,8 @@ export async function saveTechnicalRecipeDraftAction(
     notes: line.notes != null && line.notes.length > 0 ? line.notes : null,
     taco_food_id: line.taco_food_id,
     raw_material_id: line.raw_material_id,
+    correction_factor: line.correction_factor,
+    cooking_factor: line.cooking_factor,
   }));
 
   const { error: insErr } = await supabase

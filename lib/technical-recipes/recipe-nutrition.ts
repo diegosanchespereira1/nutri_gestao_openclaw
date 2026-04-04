@@ -45,6 +45,8 @@ export function computeRecipeNutritionTotals(
     quantity: number;
     unit: RecipeLineUnit;
     taco: TacoReferenceFoodRow | null;
+    /** Padrão 1. Aplica-se à quantidade antes do TACO (cocção / estado). */
+    cooking_factor?: number;
   }>,
 ): RecipeNutritionTotals {
   let kcal = 0;
@@ -60,7 +62,8 @@ export function computeRecipeNutritionTotals(
       unlinkedCount += 1;
       continue;
     }
-    const g = quantityToNutritionGrams(line.quantity, line.unit);
+    const cook = line.cooking_factor ?? 1;
+    const g = quantityToNutritionGrams(line.quantity * cook, line.unit);
     if (g === null) {
       skippedUnitCount += 1;
       continue;

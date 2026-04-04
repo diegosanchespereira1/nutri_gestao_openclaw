@@ -27,6 +27,10 @@ export type TechnicalRecipeLineRow = {
   raw_material_id: string | null;
   /** Join `professional_raw_materials` quando guardado. */
   raw_material: RawMaterialRow | null;
+  /** Multiplicador na quantidade para custo de matéria-prima (perdas / limpeza). */
+  correction_factor: number;
+  /** Multiplicador na quantidade para nutrição TACO (ajuste de estado / cocção). */
+  cooking_factor: number;
 };
 
 export type TechnicalRecipeWithLines = TechnicalRecipeRow & {

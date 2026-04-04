@@ -45,6 +45,13 @@ function formatBrl(value: number): string {
   }).format(value);
 }
 
+/** Fator 0,01–10 para payload e pré-visualizações; inválido → 1. */
+function parseFactorInput(s: string): number {
+  const n = parseFloat(s.replace(",", "."));
+  if (!Number.isFinite(n)) return 1;
+  return Math.min(10, Math.max(0.01, n));
+}
+
 type LineDraft = {
   key: string;
   ingredient_name: string;
@@ -55,6 +62,8 @@ type LineDraft = {
   taco_food: TacoReferenceFoodRow | null;
   raw_material_id: string | null;
   raw_material: RawMaterialRow | null;
+  correction_factor: string;
+  cooking_factor: string;
 };
 
 function newLine(): LineDraft {
@@ -68,6 +77,8 @@ function newLine(): LineDraft {
     taco_food: null,
     raw_material_id: null,
     raw_material: null,
+    correction_factor: "1",
+    cooking_factor: "1",
   };
 }
 
@@ -83,6 +94,8 @@ function linesFromRecipe(recipe: TechnicalRecipeWithLines): LineDraft[] {
     taco_food: l.taco_food,
     raw_material_id: l.raw_material_id,
     raw_material: l.raw_material,
+    correction_factor: String(l.correction_factor ?? 1),
+    cooking_factor: String(l.cooking_factor ?? 1),
   }));
 }
 
@@ -130,6 +143,7 @@ export function RecipeForm({
       quantity: number;
       unit: RecipeLineUnit;
       taco: TacoReferenceFoodRow | null;
+      cooking_factor?: number;
     }> = [];
     for (const l of lines) {
       const q = parseFloat(l.quantity.replace(",", "."));
@@ -138,6 +152,7 @@ export function RecipeForm({
         quantity: q,
         unit: l.unit,
         taco: l.taco_food,
+        cooking_factor: parseFactorInput(l.cooking_factor),
       });
     }
     return computeRecipeNutritionTotals(parsed);
@@ -148,6 +163,7 @@ export function RecipeForm({
       quantity: number;
       unit: RecipeLineUnit;
       raw_material: RawMaterialRow | null;
+      correction_factor?: number;
     }> = [];
     for (const l of lines) {
       const q = parseFloat(l.quantity.replace(",", "."));
@@ -156,6 +172,7 @@ export function RecipeForm({
         quantity: q,
         unit: l.unit,
         raw_material: l.raw_material,
+        correction_factor: parseFactorInput(l.correction_factor),
       });
     }
     return sumRecipeMaterialCostBrl(parsed);
@@ -192,6 +209,8 @@ export function RecipeForm({
       notes: l.notes.trim() || undefined,
       taco_food_id: l.taco_food_id,
       raw_material_id: l.raw_material_id,
+      correction_factor: parseFactorInput(l.correction_factor),
+      cooking_factor: parseFactorInput(l.cooking_factor),
     }));
 
     startTransition(async () => {
@@ -313,8 +332,9 @@ export function RecipeForm({
                 Nutrição estimada (TACO)
               </CardTitle>
               <CardDescription>
-                Valores por 100 g do item ligado; ml/l assumem densidade tipo
-                água. Unidades (&quot;un&quot;) não entram no somatório.
+                Valores por 100 g do item ligado; aplica o fator de cocção por
+                linha. ml/l assumem densidade tipo água; &quot;un&quot; não entra
+                no somatório.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -370,8 +390,8 @@ export function RecipeForm({
                 Custo estimado (matéria-prima)
               </CardTitle>
               <CardDescription>
-                Soma das linhas ligadas a matérias-primas com a mesma dimensão
-                de unidade (massa, volume ou unidade).
+                Usa a quantidade × fator de correção por linha; mesma dimensão
+                de unidade que a matéria-prima (massa, volume ou unidade).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
@@ -488,6 +508,49 @@ export function RecipeForm({
                   <Trash2 className="size-4" />
                 </Button>
               </div>
+              <div className="flex flex-wrap items-end gap-4 sm:col-span-full">
+                <div className="w-full min-w-[7rem] space-y-1.5 sm:w-36">
+                  <Label className="text-xs" htmlFor={`corr-${line.key}`}>
+                    Correção (custo)
+                  </Label>
+                  <Input
+                    id={`corr-${line.key}`}
+                    inputMode="decimal"
+                    value={line.correction_factor}
+                    onChange={(e) =>
+                      updateLine(line.key, {
+                        correction_factor: e.target.value,
+                      })
+                    }
+                    placeholder="1"
+                    aria-describedby={`factors-hint-${line.key}`}
+                  />
+                </div>
+                <div className="w-full min-w-[7rem] space-y-1.5 sm:w-36">
+                  <Label className="text-xs" htmlFor={`cook-${line.key}`}>
+                    Cocção (TACO)
+                  </Label>
+                  <Input
+                    id={`cook-${line.key}`}
+                    inputMode="decimal"
+                    value={line.cooking_factor}
+                    onChange={(e) =>
+                      updateLine(line.key, {
+                        cooking_factor: e.target.value,
+                      })
+                    }
+                    placeholder="1"
+                    aria-describedby={`factors-hint-${line.key}`}
+                  />
+                </div>
+              </div>
+              <p
+                id={`factors-hint-${line.key}`}
+                className="text-muted-foreground sm:col-span-full text-xs"
+              >
+                1 = sem ajuste. Correção multiplica a quantidade no custo da
+                matéria-prima; cocção multiplica na nutrição (TACO).
+              </p>
               <div className="space-y-1.5 sm:col-span-full">
                 <Label className="text-xs" htmlFor={`notes-${line.key}`}>
                   Notas (opcional)
@@ -548,7 +611,7 @@ export function RecipeForm({
                       const q = parseFloat(line.quantity.replace(",", "."));
                       if (!Number.isFinite(q) || q <= 0) return null;
                       const r = lineRawMaterialCostBrl(
-                        q,
+                        q * parseFactorInput(line.correction_factor),
                         line.unit,
                         line.raw_material,
                       );

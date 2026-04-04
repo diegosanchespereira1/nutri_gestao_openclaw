@@ -27,6 +27,13 @@ describe("computeRecipeNutritionTotals", () => {
     fiber_g_per_100g: 2,
   };
 
+  it("aplica fator de cocção na quantidade", () => {
+    const t = computeRecipeNutritionTotals([
+      { quantity: 100, unit: "g", taco, cooking_factor: 2 },
+    ]);
+    expect(t.kcal).toBe(200);
+  });
+
   it("soma 100 g como 1× referência", () => {
     const t = computeRecipeNutritionTotals([
       { quantity: 100, unit: "g", taco },

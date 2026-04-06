@@ -77,7 +77,7 @@ export function ChecklistFillDossierPdfCard({
     job?.status === "processing" || job?.status === "pending";
 
   return (
-    <div className="border-border rounded-lg border bg-card/50 p-4 text-sm">
+    <div className="border-border rounded-lg border bg-background p-4 text-sm">
       <p className="text-foreground font-medium">PDF do relatório</p>
       <p className="text-muted-foreground mt-1 text-xs">
         Gera um ficheiro com o texto do dossié e a identificação do profissional (CRN). As

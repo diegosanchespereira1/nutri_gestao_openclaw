@@ -60,25 +60,27 @@ export function PreviewTable({
       </div>
 
       {/* Table */}
-      <div className="overflow-auto rounded-lg border border-foreground/10">
+      <div className="border-border overflow-auto rounded-lg border bg-white">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-foreground/10 bg-muted/40">
-              <th className="w-10 px-3 py-2 text-left font-medium text-muted-foreground">
+            <tr className="border-border border-b bg-primary/10 dark:bg-primary/15">
+              <th className="text-foreground w-10 px-3 py-2 text-left font-bold">
                 #
               </th>
               {fields.map((f) => (
                 <th
                   key={f}
-                  className="whitespace-nowrap px-3 py-2 text-left font-medium text-muted-foreground"
+                  className="text-foreground whitespace-nowrap px-3 py-2 text-left font-bold"
                 >
                   {f}
                 </th>
               ))}
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">
+              <th className="text-foreground px-3 py-2 text-left font-bold">
                 Status
               </th>
-              <th className="w-24 px-3 py-2" />
+              <th className="w-24 px-3 py-2 text-left font-bold">
+                <span className="sr-only">Ignorar linha</span>
+              </th>
             </tr>
           </thead>
           <tbody>

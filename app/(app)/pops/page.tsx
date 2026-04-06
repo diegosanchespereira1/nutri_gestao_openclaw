@@ -36,13 +36,19 @@ export default async function PopsPage() {
           </Link>
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+        <div className="border-border overflow-x-auto rounded-xl border bg-white">
           <table className="w-full min-w-[560px] text-left text-sm">
-            <thead className="bg-muted/50 border-b border-foreground/10">
+            <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
               <tr>
-                <th className="px-4 py-3 font-medium">Estabelecimento</th>
-                <th className="px-4 py-3 font-medium">Tipo</th>
-                <th className="px-4 py-3 font-medium text-right">Ações</th>
+                <th className="text-foreground px-4 py-3 text-left font-bold">
+                  Estabelecimento
+                </th>
+                <th className="text-foreground px-4 py-3 text-left font-bold">
+                  Tipo
+                </th>
+                <th className="text-foreground px-4 py-3 text-right font-bold">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>

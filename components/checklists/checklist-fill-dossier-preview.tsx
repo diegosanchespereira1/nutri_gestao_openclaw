@@ -69,7 +69,7 @@ export function ChecklistFillDossierPreview({
   return (
     <div
       className={cn(
-        "border-border rounded-xl border bg-card/40 p-4 shadow-xs",
+        "border-border rounded-xl border bg-background p-4 shadow-xs",
         className,
       )}
     >
@@ -84,7 +84,7 @@ export function ChecklistFillDossierPreview({
           return (
             <div
               key={section.id}
-              className="border-border overflow-hidden rounded-lg border bg-background/50"
+              className="border-border overflow-hidden rounded-lg border bg-background"
             >
               <button
                 type="button"

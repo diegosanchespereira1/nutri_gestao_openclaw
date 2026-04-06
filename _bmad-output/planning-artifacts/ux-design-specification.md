@@ -29,12 +29,14 @@ workflowType: ux-design
 project_name: 'Nutricao_stratosTech'
 user_name: 'Diego'
 date: '2026-03-31'
+lastSurfacePatternSync: '2026-04-06'
 ---
 
 # UX Design Specification Nutricao_stratosTech
 
 **Author:** Diego
-**Date:** 2026-03-31
+**Date:** 2026-03-31  
+**Atualização de superfícies (listas / checklist / dossiê):** 2026-04-06 — alinhada à lista de clientes e à implementação em `components/checklists/*`.
 
 ---
 
@@ -512,17 +514,37 @@ Se isto for impecável, **ficha técnica com cascata** e **dashboard** tornam-se
 
 ### Color System
 
-**Direção:** fundo **cinza muito claro** na área de trabalho; **cartões brancos** com sombra suave; **acento primário** forte nos CTAs e estado ativo da sidebar (como nas referências *Fitness Pro*). Tom geral **profissional e caloroso**, não lúdico.
+**Direção:** fundo **cinza muito claro** na área de trabalho (token `background` da shell); **dashboard e KPIs** podem usar cartões com sombra suave ou pastéis; **listas operacionais** (carteira de clientes, itens de checklist, linhas do dossiê) usam o **mesmo tom de superfície** que a lista de clientes — ver **Superfícies de lista, checklist e dossiê** abaixo. **Acento primário** forte nos CTAs e estado ativo da sidebar (como nas referências *Fitness Pro*). Tom geral **profissional e caloroso**, não lúdico.
 
 | Token semântico | Uso | Notas |
 |-----------------|-----|--------|
 | **Primary** | Botões principais, item ativo na navegação, links de ação | Validar **contraste** texto branco sobre primário (mín. 4.5:1 corpo; 3:1 UI grande). |
-| **Background / Card** | `background`, superfícies elevadas | Referências: off-white / branco. |
-| **Muted** | Bordas de inputs, divisores, texto secundário | Manter legibilidade de *labels* em formulários longos. |
+| **Background** | Área de trabalho (`main`), **linhas de lista tipo carteira** (ex. `/clientes`), **cartão por item de checklist**, blocos do dossiê em revisão | Mesmo token que o fundo “herdado” nas linhas da lista de clientes; separação visual por **borda** (`border`) e **raio**, não por `bg-card` translúcido sobre o mesmo plano. |
+| **Card** | Cartões de KPI, painéis do dashboard, formulários em `Card` shadcn | Superfície elevada quando o contexto não é “lista densa de itens homogéneos”. |
+| **Muted** | Bordas de inputs, divisores, texto secundário; **hover** em linhas clicáveis (`hover:bg-muted/50`) | Manter legibilidade de *labels* em formulários longos. |
 | **Success / Warning / Destructive** | Conformidade OK, prazo a expirar, eliminar / erro crítico | **Nunca** só cor: ícone ou texto acompanhando (dashboard e alertas). |
 | **Pastéis (KPI cards)** | Gráficos e cartões de métrica | Como no dashboard detalhado; testar contraste de texto sobre pastel. |
 
 **Marca:** se existir manual de marca NutriGestão, **substituir** o vermelho das referências pela paleta oficial; até lá, usar primário provisório ajustável via CSS variables (`--primary`).
+
+### Superfícies de lista, checklist e dossiê (padrão NutriGestão)
+
+**Problema a evitar:** itens de checklist ou dossiê com **o mesmo cinza translúcido** que o fundo da página (`bg-card/40`, etc.) — em revisão longa, **confunde** a leitura de onde começa e acaba cada item.
+
+**Referência de produto — lista de clientes** (`/clientes`): `<ul>` com `border` + `divide-y`; cada linha **não** define cor de fundo própria e herda o **`background`** da área logada; links usam **`hover:bg-muted/50`**. O contraste vem de **divisores** e de **tipografia**, não de um segundo tom de cinza semelhante ao fundo.
+
+**Regra para checklists e dossiê (implementação alvo):**
+
+| Contexto | Tokens / classes Tailwind (referência) | Notas |
+|----------|------------------------------------------|--------|
+| **Item** de checklist na visita | `bg-background`, `border-border`, `rounded-xl`, `shadow-xs` | Mesmo **tom** que uma linha da lista de clientes; um bloco = um item regulatório claro. |
+| **Item** no corpo do dossiê (revisão pré-aprovação) | `bg-background`, `border-border`, `rounded-lg` | Consistente com o preenchimento. |
+| **Painel** do dossiê (wrapper + secções colapsáveis) | `bg-background`, `border-border` | Alinhado ao padrão de lista; evitar painel com `bg-muted/30` como base se o objetivo for homogeneizar com carteiras/listas densas. |
+| **Estados vazios** (*empty state*, área tracejada) | `bg-muted/30`, `border-dashed` | Mantém-se (ex.: lista de clientes sem resultados, catálogos). |
+
+**Tipografia nos blocos:** `text-foreground` para título e valores principais; `text-muted-foreground` para legendas; **badges** (ex. obrigatório `bg-primary/15 text-primary`, recorrência em âmbar) seguem o sistema semântico — em **modo escuro**, rever contraste se combinar fundo claro local com tokens de texto globais.
+
+**Componentes de referência no repositório:** `checklist-fill-wizard.tsx`, `checklist-fill-dossier-item-body.tsx`, `checklist-fill-dossier-preview.tsx`, `checklist-fill-dossier-pdf-card.tsx`, `custom-checklist-editor.tsx` (secções por modelo personalizado).
 
 ### Tokens HSL — Direção A (referência stakeholder)
 
@@ -804,7 +826,7 @@ flowchart TD
 |------|-------------|----------------|
 | **Formulários** | `Input`, `Label`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`, `Form` (react-hook-form) | Login, registo CRN, perfil, toggles de preferências, filtros admin |
 | **Ações** | `Button`, `DropdownMenu`, `Tooltip` | CTAs primários/secundários, menus de contexto em listas |
-| **Superfícies** | `Card`, `Separator`, `ScrollArea`, `Tabs` | Dashboard KPIs, secções de ficha técnica, separação Pacientes / Financeiro |
+| **Superfícies** | `Card`, `Separator`, `ScrollArea`, `Tabs` | Dashboard KPIs, secções de ficha técnica, separação Pacientes / Financeiro; **itens de checklist e linhas do dossiê** usam o token `background` + borda (padrão alinhado à lista de clientes — ver **Superfícies de lista, checklist e dossiê** no Passo 9). |
 | **Sobreposição** | `Dialog`, `Sheet`, `Popover`, `AlertDialog` | Confirmações, *drawer* mobile para detalhe, date-picker |
 | **Dados** | `Table`, `Badge`, `Skeleton`, `Progress` | Ficha técnica (desktop), estados de carregamento, progresso `x/n` na visita |
 | **Feedback** | `Toast` / Sonner, `Alert` | Fotos anexadas, erros de PDF/email, avisos regulatórios |
@@ -823,6 +845,8 @@ flowchart TD
 **Propósito:** Um item regulatório com estado de conformidade, evidência (foto/nota) e aviso de recorrência.
 
 **Utilização:** Modo execução de visita (mobile-first); lista virtualizável se portarias muito longas.
+
+**Superfície / cor:** cada item é um bloco com **`bg-background`**, **`border-border`**, **`rounded-xl`**, **`shadow-xs`** — mesmo tom que a **lista de clientes** (sem `bg-card` translúcido que se misture com a página). Ver **Superfícies de lista, checklist e dossiê** (Passo 9).
 
 **Anatomia:** Número/código do item + título; grupo opcional (*accordion* por secção); zona de estado (**Conforme** / **Não conforme**); miniaturas de fotos + **dois CTAs explícitos**: **Tirar foto** (input `capture="environment"` para abrir câmara em telemóvel/tablet) e **Galeria** (sem `capture`, para ficheiros já guardados ou *picker* em desktop); *textarea* colapsável para nota; *badge* ou *inline alert* “Recorrente (n visitas)”.
 
@@ -857,6 +881,8 @@ flowchart TD
 **Propósito:** Secções colapsáveis do dossiê antes de aprovar (checklist, evidências, recomendações).
 
 **Utilização:** Após **Finalizar visita**, antes de **Aprovar** e gerar PDF.
+
+**Superfície / cor:** painel exterior e **secções colapsáveis** com **`bg-background`** e **`border-border`**, alinhados ao padrão de lista (incl. itens no corpo com o mesmo tom). Ver **Superfícies de lista, checklist e dossiê** (Passo 9).
 
 **Anatomia:** `Accordion` ou lista de `Card` por secção; galeria de fotos com legenda = referência ao item; *inline edit* leve para observações finais.
 

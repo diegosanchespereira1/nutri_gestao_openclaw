@@ -28,7 +28,7 @@ export function CustomChecklistEditor({
       {sections.map((sec) => (
         <section
           key={sec.id}
-          className="border-border rounded-xl border bg-card/40 p-4 shadow-xs"
+          className="border-border rounded-xl border bg-background p-4 shadow-xs"
         >
           <h2 className="text-foreground text-base font-semibold">{sec.title}</h2>
           <ul className="border-border mt-3 divide-y rounded-lg border">

@@ -488,21 +488,3 @@ export async function approveChecklistFillDossierAction(
   return { ok: true, approvedAt: at };
 }
 
-/** Valida secção com base nas respostas persistidas (servidor). */
-export async function validateFillSectionAction(
-  sessionId: string,
-  sectionId: string,
-): Promise<FillActionResult> {
-  const bundle = await loadFillSessionPageData(sessionId);
-  if (!bundle) return { ok: false, error: "Rascunho não encontrado." };
-
-  const section = bundle.template.sections.find((s) => s.id === sectionId);
-  if (!section) return { ok: false, error: "Secção inválida." };
-
-  const issues = validateChecklistSection(section, bundle.responses);
-  if (issues.length > 0) {
-    return { ok: false, error: issues[0].message };
-  }
-
-  return { ok: true };
-}

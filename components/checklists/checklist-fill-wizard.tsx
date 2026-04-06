@@ -19,14 +19,11 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import {
-  approveChecklistFillDossierAction,
-  saveFillItemResponse,
-  validateFillSectionAction,
-} from "@/lib/actions/checklist-fill";
+import { approveChecklistFillDossierAction, saveFillItemResponse } from "@/lib/actions/checklist-fill";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
   validateChecklistSection,
+  validateChecklistTemplate,
   type ChecklistFillOutcome,
   type FillItemResponseState,
   type FillResponsesMap,
@@ -37,6 +34,9 @@ import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
 const textareaClass =
   "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+
+const sectionSelectClassName =
+  "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full min-w-[12rem] max-w-xl rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
 
@@ -104,9 +104,7 @@ export function ChecklistFillWizard({
   }));
 
   const [advanceError, setAdvanceError] = useState<string | null>(null);
-  const [completedAll, setCompletedAll] = useState(() =>
-    Boolean(initialDossierApprovedAt),
-  );
+  const [finalizeDialogError, setFinalizeDialogError] = useState<string | null>(null);
   const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
   const [dossierPreviewConfirmed, setDossierPreviewConfirmed] = useState(() =>
     Boolean(initialDossierApprovedAt),
@@ -119,10 +117,11 @@ export function ChecklistFillWizard({
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
 
+  const formLocked = dossierPreviewConfirmed || Boolean(dossierApprovedAt);
+
   const showDossierPeekButton = useMemo(
-    () =>
-      !dossierApprovedAt && !(completedAll && dossierPreviewConfirmed),
-    [dossierApprovedAt, completedAll, dossierPreviewConfirmed],
+    () => !dossierApprovedAt && !dossierPreviewConfirmed,
+    [dossierApprovedAt, dossierPreviewConfirmed],
   );
   const [livePhotos, setLivePhotos] = useState<Record<string, ChecklistFillPhotoView[]>>(
     () => ({ ...initialItemPhotos }),
@@ -231,24 +230,10 @@ export function ChecklistFillWizard({
     });
   }
 
-  async function handleNext() {
+  function handleNext() {
     setAdvanceError(null);
-    if (!section) return;
-    const local = validateChecklistSection(section, responses);
-    if (local.length > 0) {
-      setAdvanceError(local[0].message);
-      return;
-    }
-    const server = await validateFillSectionAction(sessionId, section.id);
-    if (!server.ok) {
-      setAdvanceError(server.error);
-      return;
-    }
-    if (isLast) {
-      setCompletedAll(true);
-    } else {
-      setSectionIndex((i) => i + 1);
-    }
+    if (!section || isLast) return;
+    setSectionIndex((i) => i + 1);
   }
 
   function handlePrev() {
@@ -303,7 +288,7 @@ export function ChecklistFillWizard({
       ) : null}
 
       <fieldset
-        disabled={isPending || completedAll}
+        disabled={isPending || formLocked}
         className="space-y-6"
         aria-busy={isPending}
       >
@@ -318,7 +303,7 @@ export function ChecklistFillWizard({
             <div
               key={item.id}
               className={cn(
-                "rounded-xl border bg-card/40 p-4 shadow-xs transition-[box-shadow,border-color] duration-150",
+                "rounded-xl border border-border bg-background p-4 shadow-xs transition-[box-shadow,border-color] duration-150",
                 requiredInvalid
                   ? "border-destructive ring-destructive/35 ring-2"
                   : "border-border",
@@ -326,13 +311,13 @@ export function ChecklistFillWizard({
               aria-invalid={requiredInvalid || undefined}
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="text-foreground text-sm font-medium">
+                <p className="text-foreground text-base leading-snug font-semibold tracking-tight sm:text-lg">
                   {item.description}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   {showRecurringNc ? (
                     <span
-                      className="bg-amber-500/15 text-amber-900 dark:text-amber-100 shrink-0 rounded-md px-2 py-0.5 text-xs font-medium"
+                      className="bg-amber-500/15 text-amber-900 shrink-0 rounded-md px-2 py-0.5 text-xs font-medium"
                       title="Não conformidade em visitas anteriores neste estabelecimento"
                     >
                       Recorrente · {recurringNcSessions}×
@@ -435,7 +420,7 @@ export function ChecklistFillWizard({
                 itemId={item.id}
                 itemResponseSource={itemResponseSource}
                 initialPhotos={livePhotos[item.id] ?? EMPTY_ITEM_PHOTOS}
-                disabled={isPending || completedAll}
+                disabled={isPending || formLocked}
                 onPhotosChange={(photos) => handlePhotosChange(item.id, photos)}
               />
 
@@ -499,34 +484,77 @@ export function ChecklistFillWizard({
         })}
       </fieldset>
 
-      <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handlePrev}
-          disabled={sectionIndex === 0 || isPending}
-        >
-          Secção anterior
-        </Button>
-        <Button
-          type="button"
-          onClick={() => void handleNext()}
-          disabled={isPending || completedAll}
-        >
-          {isLast ? "Validar última secção" : "Seguinte secção"}
-        </Button>
-        {completedAll ? (
+      <div className="flex flex-col gap-4 border-t pt-4">
+        {!formLocked ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+            <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-xl">
+              <Label htmlFor="checklist-section-jump" className="text-xs">
+                Ir para secção
+              </Label>
+              <select
+                id="checklist-section-jump"
+                className={sectionSelectClassName}
+                value={sectionIndex}
+                onChange={(e) => {
+                  setAdvanceError(null);
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (!Number.isFinite(next)) return;
+                  setSectionIndex(Math.min(Math.max(0, next), sections.length - 1));
+                }}
+                aria-label="Escolher secção do checklist"
+              >
+                {sections.map((s, i) => (
+                  <option key={s.id} value={i}>
+                    {i + 1}. {s.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePrev}
+            disabled={sectionIndex === 0 || isPending || formLocked}
+          >
+            Secção anterior
+          </Button>
+          <Button
+            type="button"
+            onClick={handleNext}
+            disabled={isPending || formLocked || isLast}
+          >
+            Seguinte secção
+          </Button>
+          {!formLocked ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isPending}
+              onClick={() => {
+                setAdvanceError(null);
+                setFinalizeDialogError(null);
+                setFinalizeDialogOpen(true);
+              }}
+            >
+              Finalizar e ver dossiê
+            </Button>
+          ) : null}
+        </div>
+        {dossierPreviewConfirmed || dossierApprovedAt ? (
           <div className="space-y-4">
             <div className="bg-muted/50 rounded-lg border p-4 text-sm">
               <p className="text-foreground font-medium">
-                Todas as secções foram validadas.
+                {dossierApprovedAt
+                  ? "Dossiê aprovado"
+                  : "Dossiê em revisão"}
               </p>
               <p className="text-muted-foreground mt-1">
                 {dossierApprovedAt
                   ? "Dossiê aprovado e registado. Se esta sessão estiver ligada a uma visita, a visita foi marcada como concluída."
-                  : dossierPreviewConfirmed
-                    ? "Dossiê compilado abaixo. Ajuste textos se necessário e aprove para fechar o ciclo."
-                    : "Confirme a finalização para ver o dossiê completo com secções colapsáveis (checklist, notas e fotos)."}
+                  : "Dossiê compilado abaixo. Ajuste textos se necessário e aprove para fechar o ciclo."}
               </p>
               {dossierApprovedAt ? (
                 <p
@@ -538,18 +566,6 @@ export function ChecklistFillWizard({
                 </p>
               ) : null}
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                {completedAll && !dossierApprovedAt ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => setDossierPeekOpen(true)}
-                  >
-                    <Eye className="size-4 shrink-0" aria-hidden />
-                    Pré-visualizar dossiê
-                  </Button>
-                ) : null}
                 {dossierApprovedAt ? (
                   <Button
                     type="button"
@@ -560,15 +576,6 @@ export function ChecklistFillWizard({
                   >
                     <Eye className="size-4 shrink-0" aria-hidden />
                     Ver dossiê
-                  </Button>
-                ) : null}
-                {!dossierPreviewConfirmed && completedAll && !dossierApprovedAt ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => setFinalizeDialogOpen(true)}
-                  >
-                    Finalizar e ver dossiê
                   </Button>
                 ) : null}
                 <Link
@@ -638,16 +645,28 @@ export function ChecklistFillWizard({
         ) : null}
       </div>
 
-      <Dialog open={finalizeDialogOpen} onOpenChange={setFinalizeDialogOpen}>
+      <Dialog
+        open={finalizeDialogOpen}
+        onOpenChange={(open) => {
+          setFinalizeDialogOpen(open);
+          if (!open) setFinalizeDialogError(null);
+        }}
+      >
         <DialogContent showCloseButton>
           <DialogHeader>
             <DialogTitle>Finalizar e compilar dossiê?</DialogTitle>
             <DialogDescription>
               Será gerado um relatório único com todas as secções, avaliações, textos de
-              não conformidade, anotações e fotos. Os dados já estão guardados; pode usar
-              “Secção anterior” para rever o formulário antes de sair.
+              não conformidade, anotações e fotos. Os dados já estão guardados. Ao
+              confirmar, todos os itens obrigatórios têm de estar válidos; caso falte
+              algum requisito, indicamos a secção a corrigir.
             </DialogDescription>
           </DialogHeader>
+          {finalizeDialogError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {finalizeDialogError}
+            </p>
+          ) : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
@@ -661,6 +680,17 @@ export function ChecklistFillWizard({
               type="button"
               size="sm"
               onClick={() => {
+                const issues = validateChecklistTemplate(sections, responses);
+                if (issues.length > 0) {
+                  const first = issues[0];
+                  const idx = sections.findIndex((sec) =>
+                    sec.items.some((it) => it.id === first.item_id),
+                  );
+                  if (idx >= 0) setSectionIndex(idx);
+                  setFinalizeDialogError(first.message);
+                  return;
+                }
+                setFinalizeDialogError(null);
                 setDossierPreviewConfirmed(true);
                 setFinalizeDialogOpen(false);
               }}

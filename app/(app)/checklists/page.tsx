@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { ChecklistCatalog } from "@/components/checklists/checklist-catalog";
+import { PageHelpHint } from "@/components/help/page-help-hint";
 import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
 import { startChecklistFill } from "@/lib/actions/checklist-fill";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
@@ -40,13 +41,17 @@ export default async function ChecklistsPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Checklists
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Catálogo oficial e modelos personalizados por estabelecimento. Use um
-            template global ou duplique-o para adicionar itens extra (FR14).
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-foreground text-2xl font-semibold tracking-tight">
+              Checklists
+            </h1>
+            <PageHelpHint ariaLabel="Como funciona a página de checklists">
+              <p>
+                Catálogo oficial e modelos personalizados por estabelecimento. Use um template
+                global ou duplique-o para adicionar itens extra (FR14).
+              </p>
+            </PageHelpHint>
+          </div>
         </div>
         <Link
           href="/checklists/personalizados"

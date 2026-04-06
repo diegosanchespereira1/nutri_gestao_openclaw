@@ -87,3 +87,15 @@ export function validateChecklistSection(
   }
   return issues;
 }
+
+/** Valida todas as secções (ordem do modelo). Útil antes de compilar/aprovar o dossiê. */
+export function validateChecklistTemplate(
+  sections: ChecklistTemplateSectionWithItems[],
+  responses: FillResponsesMap,
+): SectionValidationIssue[] {
+  const issues: SectionValidationIssue[] = [];
+  for (const section of sections) {
+    issues.push(...validateChecklistSection(section, responses));
+  }
+  return issues;
+}

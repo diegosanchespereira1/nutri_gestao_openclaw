@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Images, Trash2 } from "lucide-react";
 
+import { PageHelpHint } from "@/components/help/page-help-hint";
 import { Button } from "@/components/ui/button";
 import {
   deleteChecklistFillPhotoAction,
@@ -146,9 +147,18 @@ export function ChecklistItemPhotos({
   return (
     <div className="mt-4 border-border border-t pt-4">
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <p className="text-muted-foreground text-xs font-medium">
-          Fotos de evidência
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="text-foreground text-sm font-semibold sm:text-base">
+            Fotos de evidência
+          </p>
+          <PageHelpHint ariaLabel="Como anexar fotos de evidência a este item">
+            <p>
+              Em telemóvel ou tablet, use <strong>Tirar foto</strong> para abrir a câmara;{" "}
+              <strong>Galeria</strong> para escolher uma imagem já guardada. Formatos JPEG,
+              PNG ou WebP até 6 MB. A localização é opcional se o browser permitir.
+            </p>
+          </PageHelpHint>
+        </div>
         <input
           ref={inputCameraRef}
           type="file"
@@ -203,12 +213,6 @@ export function ChecklistItemPhotos({
           )}
         </div>
       </div>
-      <p className="text-muted-foreground mt-1 text-xs">
-        Em telemóvel ou tablet, use <span className="text-foreground font-medium">Tirar foto</span>{" "}
-        para abrir a câmara; <span className="text-foreground font-medium">Galeria</span> para
-        escolher uma imagem já guardada. JPEG, PNG ou WebP até 6 MB. Localização opcional se o
-        browser permitir.
-      </p>
 
       {uploadError ? (
         <div

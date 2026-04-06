@@ -76,7 +76,7 @@ export function ChecklistFillDossierItemBody({
         return (
           <li
             key={item.id}
-            className="border-border rounded-lg border bg-background/60 p-3 text-sm"
+            className="border-border rounded-lg border bg-background p-3 text-sm"
           >
             <p className="text-foreground font-medium">{item.description}</p>
             <p className="text-muted-foreground mt-1 text-xs">

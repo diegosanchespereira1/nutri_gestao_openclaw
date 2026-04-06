@@ -71,14 +71,22 @@ export default async function PopsPorEstabelecimentoPage({ params }: Props) {
           Ainda não há POPs neste estabelecimento.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+        <div className="border-border overflow-x-auto rounded-xl border bg-white">
           <table className="w-full min-w-[560px] text-left text-sm">
-            <thead className="bg-muted/50 border-b border-foreground/10">
+            <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
               <tr>
-                <th className="px-4 py-3 font-medium">Título</th>
-                <th className="px-4 py-3 font-medium">Versão</th>
-                <th className="px-4 py-3 font-medium">Atualizado</th>
-                <th className="px-4 py-3 font-medium text-right">Ações</th>
+                <th className="text-foreground px-4 py-3 text-left font-bold">
+                  Título
+                </th>
+                <th className="text-foreground px-4 py-3 text-left font-bold">
+                  Versão
+                </th>
+                <th className="text-foreground px-4 py-3 text-left font-bold">
+                  Atualizado
+                </th>
+                <th className="text-foreground px-4 py-3 text-right font-bold">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>

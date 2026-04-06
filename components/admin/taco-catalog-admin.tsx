@@ -167,14 +167,22 @@ export function TacoCatalogAdmin() {
         {total} registo(s) — página {page} de {totalPages}
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-foreground/10">
+      <div className="border-border overflow-x-auto rounded-xl border bg-white">
         <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-muted/50 border-b border-foreground/10">
+          <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
             <tr>
-              <th className="px-3 py-2 font-medium">Código</th>
-              <th className="px-3 py-2 font-medium">Nome</th>
-              <th className="px-3 py-2 font-medium">kcal/100g</th>
-              <th className="px-3 py-2 font-medium text-right">Ações</th>
+              <th className="text-foreground px-3 py-2 text-left font-bold">
+                Código
+              </th>
+              <th className="text-foreground px-3 py-2 text-left font-bold">
+                Nome
+              </th>
+              <th className="text-foreground px-3 py-2 text-left font-bold">
+                kcal/100g
+              </th>
+              <th className="text-foreground px-3 py-2 text-right font-bold">
+                Ações
+              </th>
             </tr>
           </thead>
           <tbody>

@@ -9,6 +9,12 @@ export type TechnicalRecipeRow = {
   establishment_id: string;
   name: string;
   status: TechnicalRecipeStatus;
+  /** Número de porções que a receita rende (preço e nutrição por porção). */
+  portions_yield: number;
+  /** Margem de venda sobre o custo (%). */
+  margin_percent: number;
+  /** Impostos incidentes sobre o preço sugerido (%). */
+  tax_percent: number;
   created_at: string;
   updated_at: string;
 };

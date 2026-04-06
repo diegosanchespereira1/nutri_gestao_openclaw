@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   computeRecipeNutritionTotals,
+  divideRecipeNutritionByPortions,
   quantityToNutritionGrams,
 } from "./recipe-nutrition";
 
@@ -55,5 +56,25 @@ describe("computeRecipeNutritionTotals", () => {
     expect(t.kcal).toBe(0);
     expect(t.unlinkedCount).toBe(1);
     expect(t.skippedUnitCount).toBe(1);
+  });
+});
+
+describe("divideRecipeNutritionByPortions", () => {
+  it("divide macros pelo rendimento", () => {
+    const per = divideRecipeNutritionByPortions(
+      {
+        kcal: 200,
+        proteinG: 20,
+        carbG: 30,
+        lipidG: 10,
+        fiberG: 5,
+        skippedUnitCount: 0,
+        unlinkedCount: 0,
+      },
+      4,
+    );
+    expect(per.kcal).toBe(50);
+    expect(per.proteinG).toBe(5);
+    expect(per.carbG).toBe(7.5);
   });
 });

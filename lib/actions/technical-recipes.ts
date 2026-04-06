@@ -44,6 +44,19 @@ const saveDraftSchema = z.object({
   recipeId: z.string().uuid().optional(),
   establishmentId: z.string().uuid(),
   name: z.string().trim().min(1).max(200),
+  portions_yield: z.coerce
+    .number()
+    .int("Rendimento deve ser um número inteiro.")
+    .min(1, "Rendimento: mínimo 1 porção.")
+    .max(999_999, "Rendimento demasiado elevado."),
+  margin_percent: z.coerce
+    .number()
+    .min(0, "Margem não pode ser negativa.")
+    .max(1000, "Margem: máximo 1000%."),
+  tax_percent: z.coerce
+    .number()
+    .min(0, "Impostos não podem ser negativos.")
+    .max(100, "Impostos: máximo 100%."),
   lines: z.array(lineSchema).min(1, "Adicione pelo menos um ingrediente."),
 });
 
@@ -100,6 +113,41 @@ function parseTacoFoodJoin(raw: unknown): TacoReferenceFoodRow | null {
     carb_g_per_100g: Number(o.carb_g_per_100g ?? 0),
     lipid_g_per_100g: Number(o.lipid_g_per_100g ?? 0),
     fiber_g_per_100g: Number(o.fiber_g_per_100g ?? 0),
+  };
+}
+
+function toIntUnknown(v: unknown, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+  if (typeof v === "string" && v.length > 0) {
+    const n = parseInt(v, 10);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function toNumUnknown(v: unknown, fallback: number): number {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.length > 0) {
+    const n = parseFloat(v.replace(",", "."));
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
+function mapRecipeHeader(raw: Record<string, unknown>): TechnicalRecipeRow {
+  return {
+    id: String(raw.id),
+    establishment_id: String(raw.establishment_id),
+    name: String(raw.name),
+    status: raw.status === "published" ? "published" : "draft",
+    portions_yield: Math.max(1, toIntUnknown(raw.portions_yield, 1)),
+    margin_percent: Math.max(
+      0,
+      Math.min(1000, toNumUnknown(raw.margin_percent, 0)),
+    ),
+    tax_percent: Math.max(0, Math.min(100, toNumUnknown(raw.tax_percent, 0))),
+    created_at: String(raw.created_at ?? ""),
+    updated_at: String(raw.updated_at ?? ""),
   };
 }
 
@@ -223,7 +271,7 @@ export async function loadTechnicalRecipeById(
 
   if (lErr) return { recipe: null };
 
-  const base = recipe as TechnicalRecipeRow;
+  const base = mapRecipeHeader(recipe as Record<string, unknown>);
   return {
     recipe: {
       ...base,
@@ -269,7 +317,15 @@ export async function saveTechnicalRecipeDraftAction(
     return { ok: false, error: msg };
   }
 
-  const { recipeId, establishmentId, name, lines: rawLines } = parsed.data;
+  const {
+    recipeId,
+    establishmentId,
+    name,
+    portions_yield,
+    margin_percent,
+    tax_percent,
+    lines: rawLines,
+  } = parsed.data;
   const lines = rawLines.map((l) => ({
     ...l,
     notes: l.notes?.trim() ? l.notes.trim() : undefined,
@@ -364,6 +420,9 @@ export async function saveTechnicalRecipeDraftAction(
       .update({
         name,
         status: "draft",
+        portions_yield,
+        margin_percent,
+        tax_percent,
       })
       .eq("id", recipeId);
 
@@ -386,6 +445,9 @@ export async function saveTechnicalRecipeDraftAction(
         establishment_id: establishmentId,
         name,
         status: "draft",
+        portions_yield,
+        margin_percent,
+        tax_percent,
       })
       .select("id")
       .single();

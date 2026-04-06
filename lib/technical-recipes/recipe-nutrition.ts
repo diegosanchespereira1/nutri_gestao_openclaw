@@ -86,3 +86,21 @@ export function computeRecipeNutritionTotals(
     unlinkedCount,
   };
 }
+
+/** Divide totais da receita pelo número de porções (rendimento). */
+export function divideRecipeNutritionByPortions(
+  totals: RecipeNutritionTotals,
+  portionsYield: number,
+): RecipeNutritionTotals {
+  const p =
+    Number.isFinite(portionsYield) && portionsYield >= 1 ? portionsYield : 1;
+  return {
+    kcal: round1(totals.kcal / p),
+    proteinG: round1(totals.proteinG / p),
+    carbG: round1(totals.carbG / p),
+    lipidG: round1(totals.lipidG / p),
+    fiberG: round1(totals.fiberG / p),
+    skippedUnitCount: totals.skippedUnitCount,
+    unlinkedCount: totals.unlinkedCount,
+  };
+}

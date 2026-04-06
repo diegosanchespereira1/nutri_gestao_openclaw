@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.4 concluídas; 6.5–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.5 concluídas; 6.6–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -225,7 +225,7 @@ Profissional vê agenda do dia, alertas com *countdown*, financeiro resumido, se
 ### Epic 6: Ficha técnica, TACO e custos
 Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.  
 **FRs:** FR26–FR36.
-**Implementação (épico):** Em curso (6.1–6.4 concluídas; 6.5–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.5 concluídas; 6.6–6.8 em backlog).
 
 ### Epic 7: POPs
 Profissional usa templates, customiza POPs por estabelecimento, versiona e exporta PDF.  
@@ -814,7 +814,7 @@ So that vejo tendências (UX-DR16).
 
 ## Epic 6: Ficha técnica, TACO e custos
 
-**Implementação (épico):** Em curso (6.1–6.4 concluídas; 6.5–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.5 concluídas; 6.6–6.8 em backlog).
 
 ### Story 6.1: Receitas e linhas de ingrediente
 
@@ -875,7 +875,7 @@ So that quantidades netas estão corretas (FR29).
 
 ### Story 6.5: Custo total, impostos, margem e preço por porção
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-05: colunas `portions_yield`, `margin_percent`, `tax_percent` em `technical_recipes`; `CostSummaryPanel` no formulário; `computeRecipePricingBreakdown` e nutrição por porção; persistência no guardar rascunho.)
 
 As a profissional,  
 I want ver painel de totais com impostos e margem,  

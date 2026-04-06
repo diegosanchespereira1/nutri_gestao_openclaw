@@ -76,7 +76,7 @@ development_status:
   6-2-ligacao-taco-informacao-nutricional: done
   6-3-materia-prima-custo-unitario: done
   6-4-fatores-correcao-coccao: done
-  6-5-custo-total-impostos-margem-porcao: backlog
+  6-5-custo-total-impostos-margem-porcao: done
   6-6-escalonamento-regra-de-tres: backlog
   6-7-recalculo-em-cascata: backlog
   6-8-exportar-ficha-tecnica-pdf: backlog

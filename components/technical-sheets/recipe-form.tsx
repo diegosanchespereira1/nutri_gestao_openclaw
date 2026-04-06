@@ -34,6 +34,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
+import { CostSummaryPanel } from "@/components/technical-sheets/cost-summary-panel";
 
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
@@ -66,9 +67,12 @@ type LineDraft = {
   cooking_factor: string;
 };
 
-function newLine(): LineDraft {
+/** Chave fixa para a 1.ª linha em SSR — evita hydration mismatch (servidor ≠ cliente com `randomUUID`). */
+const INITIAL_LINE_KEY = "__recipe-line-initial__";
+
+function newLine(key?: string): LineDraft {
   return {
-    key: crypto.randomUUID(),
+    key: key ?? crypto.randomUUID(),
     ingredient_name: "",
     quantity: "",
     unit: "g",
@@ -83,7 +87,7 @@ function newLine(): LineDraft {
 }
 
 function linesFromRecipe(recipe: TechnicalRecipeWithLines): LineDraft[] {
-  if (recipe.lines.length === 0) return [newLine()];
+  if (recipe.lines.length === 0) return [newLine(INITIAL_LINE_KEY)];
   return recipe.lines.map((l) => ({
     key: l.id,
     ingredient_name: l.ingredient_name,
@@ -120,7 +124,16 @@ export function RecipeForm({
   );
   const [name, setName] = useState(recipe?.name ?? "");
   const [lines, setLines] = useState<LineDraft[]>(() =>
-    recipe ? linesFromRecipe(recipe) : [newLine()],
+    recipe ? linesFromRecipe(recipe) : [newLine(INITIAL_LINE_KEY)],
+  );
+  const [portionsYieldInput, setPortionsYieldInput] = useState(() =>
+    String(recipe?.portions_yield ?? 1),
+  );
+  const [marginPercentInput, setMarginPercentInput] = useState(() =>
+    String(recipe?.margin_percent ?? 0),
+  );
+  const [taxPercentInput, setTaxPercentInput] = useState(() =>
+    String(recipe?.tax_percent ?? 0),
   );
 
   const parsedForTotals = useMemo(() => {
@@ -213,11 +226,31 @@ export function RecipeForm({
       cooking_factor: parseFactorInput(l.cooking_factor),
     }));
 
+    const pyRaw = portionsYieldInput.replace(/\D/g, "");
+    const portions_yield = (() => {
+      const n = parseInt(pyRaw || "1", 10);
+      if (!Number.isFinite(n) || n < 1) return 1;
+      return Math.min(999_999, n);
+    })();
+    const margin_percent = (() => {
+      const n = parseFloat(marginPercentInput.replace(",", "."));
+      if (!Number.isFinite(n) || n < 0) return 0;
+      return Math.min(1000, n);
+    })();
+    const tax_percent = (() => {
+      const n = parseFloat(taxPercentInput.replace(",", "."));
+      if (!Number.isFinite(n) || n < 0) return 0;
+      return Math.min(100, n);
+    })();
+
     startTransition(async () => {
       const result = await saveTechnicalRecipeDraftAction({
         recipeId: recipe?.id,
         establishmentId,
         name: name.trim(),
+        portions_yield,
+        margin_percent,
+        tax_percent,
         lines: payloadLines,
       });
 
@@ -259,187 +292,82 @@ export function RecipeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="recipe-establishment">Estabelecimento</Label>
-            {isEdit ? (
-              <p
-                id="recipe-establishment"
-                className="text-muted-foreground text-sm"
-              >
-                {(() => {
-                  const est = establishments.find(
-                    (e) => e.id === establishmentId,
-                  );
-                  return est
-                    ? `${establishmentClientLabel(est)} — ${est.name}`
-                    : establishmentId;
-                })()}
-              </p>
-            ) : (
-              <select
-                id="recipe-establishment"
-                className={selectClassName}
-                value={establishmentId}
-                onChange={(e) => setEstablishmentId(e.target.value)}
-                required
-              >
-                {establishments.map((est) => (
-                  <option key={est.id} value={est.id}>
-                    {establishmentClientLabel(est)} — {est.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="recipe-name">Nome da receita</Label>
-            <Input
-              id="recipe-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Sopa de legumes — lote base"
-              required
-              maxLength={200}
-            />
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="recipe-name">Nome da receita</Label>
+          <Input
+            id="recipe-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex.: Sopa de legumes — lote base"
+            required
+            maxLength={200}
+          />
         </div>
-
-        <div className="space-y-4">
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Validação de totais</CardTitle>
-              <CardDescription>
-                Só é possível somar automaticamente quando todas as linhas usam
-                apenas massa (g, kg) ou apenas volume (ml, l).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p className="text-foreground">{totalsPreview.label}</p>
-              {lastTotals ? (
-                <p className="text-muted-foreground border-t pt-2">
-                  Último guardado: {lastTotals}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">
-                Nutrição estimada (TACO)
-              </CardTitle>
-              <CardDescription>
-                Valores por 100 g do item ligado; aplica o fator de cocção por
-                linha. ml/l assumem densidade tipo água; &quot;un&quot; não entra
-                no somatório.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-                <div>
-                  <dt className="text-muted-foreground">Energia</dt>
-                  <dd className="text-foreground font-medium tabular-nums">
-                    {nutritionPreview.kcal} kcal
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Proteína</dt>
-                  <dd className="text-foreground font-medium tabular-nums">
-                    {nutritionPreview.proteinG} g
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">H. de carbono</dt>
-                  <dd className="text-foreground font-medium tabular-nums">
-                    {nutritionPreview.carbG} g
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Lípidos</dt>
-                  <dd className="text-foreground font-medium tabular-nums">
-                    {nutritionPreview.lipidG} g
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-muted-foreground">Fibra</dt>
-                  <dd className="text-foreground font-medium tabular-nums">
-                    {nutritionPreview.fiberG} g
-                  </dd>
-                </div>
-              </dl>
-              {nutritionPreview.unlinkedCount > 0 ||
-              nutritionPreview.skippedUnitCount > 0 ? (
-                <p className="text-muted-foreground border-border mt-2 border-t pt-2 text-xs">
-                  {nutritionPreview.unlinkedCount > 0
-                    ? `${nutritionPreview.unlinkedCount} linha(s) sem TACO. `
-                    : null}
-                  {nutritionPreview.skippedUnitCount > 0
-                    ? `${nutritionPreview.skippedUnitCount} linha(s) em unidades não convertidas para gramas.`
-                    : null}
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          <Card className="border-dashed">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">
-                Custo estimado (matéria-prima)
-              </CardTitle>
-              <CardDescription>
-                Usa a quantidade × fator de correção por linha; mesma dimensão
-                de unidade que a matéria-prima (massa, volume ou unidade).
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p className="text-foreground text-lg font-semibold tabular-nums">
-                {formatBrl(costPreview.totalBrl)}
-              </p>
-              {costPreview.linesWithCost > 0 ? (
-                <p className="text-muted-foreground text-xs">
-                  {costPreview.linesWithCost} linha(s) com custo calculado.
-                </p>
-              ) : (
-                <p className="text-muted-foreground text-xs">
-                  Ligue linhas a matérias-primas em «Matéria-prima (custo)».
-                </p>
-              )}
-              {costPreview.skippedDimension > 0 ? (
-                <p className="text-amber-700 dark:text-amber-400 text-xs">
-                  {costPreview.skippedDimension} linha(s) com unidade incompatível
-                  com o preço registado da matéria-prima.
-                </p>
-              ) : null}
-            </CardContent>
-          </Card>
+        <div className="space-y-2">
+          <Label htmlFor="recipe-establishment">Estabelecimento</Label>
+          {isEdit ? (
+            <p
+              id="recipe-establishment"
+              className="text-muted-foreground text-sm"
+            >
+              {(() => {
+                const est = establishments.find(
+                  (e) => e.id === establishmentId,
+                );
+                return est
+                  ? `${establishmentClientLabel(est)} — ${est.name}`
+                  : establishmentId;
+              })()}
+            </p>
+          ) : (
+            <select
+              id="recipe-establishment"
+              className={selectClassName}
+              value={establishmentId}
+              onChange={(e) => setEstablishmentId(e.target.value)}
+              required
+            >
+              {establishments.map((est) => (
+                <option key={est.id} value={est.id}>
+                  {establishmentClientLabel(est)} — {est.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-foreground font-medium">Ingredientes</h2>
-            <p className="text-muted-foreground text-sm">
-              Quantidade e unidade; associe{" "}
-              <Link
-                href="/ficha-tecnica/materias-primas"
-                className="text-primary font-medium underline-offset-4 hover:underline"
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="min-w-0 space-y-6">
+          <div className="space-y-3">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-foreground font-medium">Ingredientes</h2>
+                <p className="text-muted-foreground text-sm">
+                  Quantidade e unidade; associe{" "}
+                  <Link
+                    href="/ficha-tecnica/materias-primas"
+                    className="text-primary font-medium underline-offset-4 hover:underline"
+                  >
+                    matéria-prima
+                  </Link>{" "}
+                  para custo e TACO para nutrição.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addLine}
               >
-                matéria-prima
-              </Link>{" "}
-              para custo e TACO para nutrição.
-            </p>
-          </div>
-          <Button type="button" variant="outline" size="sm" onClick={addLine}>
-            <Plus className="size-4" />
-            Linha
-          </Button>
-        </div>
+                <Plus className="size-4" />
+                Linha
+              </Button>
+            </div>
 
-        <div className="space-y-4">
+            <div className="space-y-4">
           {lines.map((line, index) => (
             <div
               key={line.key}
@@ -664,25 +592,118 @@ export function RecipeForm({
               />
             </div>
           ))}
+            </div>
+          </div>
+
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <div className="flex flex-wrap gap-3">
+            <Button type="submit" disabled={pending}>
+              {pending ? "A guardar…" : "Guardar rascunho"}
+            </Button>
+            <Link
+              href="/ficha-tecnica"
+              className={cn(buttonVariants({ variant: "outline" }))}
+            >
+              Cancelar
+            </Link>
+          </div>
         </div>
-      </div>
 
-      {error ? (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
-      ) : null}
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:z-10 lg:max-h-[calc(100dvh-5rem)] lg:overflow-y-auto lg:overscroll-contain lg:pb-6">
+          <Card className="border-dashed">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Validação de totais</CardTitle>
+              <CardDescription>
+                Só é possível somar automaticamente quando todas as linhas usam
+                apenas massa (g, kg) ou apenas volume (ml, l).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p className="text-foreground">{totalsPreview.label}</p>
+              {lastTotals ? (
+                <p className="text-muted-foreground border-t pt-2">
+                  Último guardado: {lastTotals}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" disabled={pending}>
-          {pending ? "A guardar…" : "Guardar rascunho"}
-        </Button>
-        <Link
-          href="/ficha-tecnica"
-          className={cn(buttonVariants({ variant: "outline" }))}
-        >
-          Cancelar
-        </Link>
+          <Card className="border-dashed">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                Nutrição estimada (TACO)
+              </CardTitle>
+              <CardDescription>
+                Valores por 100 g do item ligado; aplica o fator de cocção por
+                linha. ml/l assumem densidade tipo água; &quot;un&quot; não entra
+                no somatório.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
+                <div>
+                  <dt className="text-muted-foreground">Energia</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.kcal} kcal
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Proteína</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.proteinG} g
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">H. de carbono</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.carbG} g
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Lípidos</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.lipidG} g
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Fibra</dt>
+                  <dd className="text-foreground font-medium tabular-nums">
+                    {nutritionPreview.fiberG} g
+                  </dd>
+                </div>
+              </dl>
+              {nutritionPreview.unlinkedCount > 0 ||
+              nutritionPreview.skippedUnitCount > 0 ? (
+                <p className="text-muted-foreground border-border mt-2 border-t pt-2 text-xs">
+                  {nutritionPreview.unlinkedCount > 0
+                    ? `${nutritionPreview.unlinkedCount} linha(s) sem TACO. `
+                    : null}
+                  {nutritionPreview.skippedUnitCount > 0
+                    ? `${nutritionPreview.skippedUnitCount} linha(s) em unidades não convertidas para gramas.`
+                    : null}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <CostSummaryPanel
+            totalMaterialCostBrl={costPreview.totalBrl}
+            linesWithCost={costPreview.linesWithCost}
+            skippedDimension={costPreview.skippedDimension}
+            recipeNutritionTotals={nutritionPreview}
+            portionsYieldInput={portionsYieldInput}
+            onPortionsYieldInputChange={setPortionsYieldInput}
+            marginPercentInput={marginPercentInput}
+            onMarginPercentInputChange={setMarginPercentInput}
+            taxPercentInput={taxPercentInput}
+            onTaxPercentInputChange={setTaxPercentInput}
+          />
+        </aside>
       </div>
     </form>
   );

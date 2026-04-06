@@ -41,8 +41,8 @@ export default async function FichaTecnicaPage() {
             Ficha técnica
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Receitas com ingredientes, TACO e custo por matéria-prima. PDF e
-            impostos nas stories seguintes.
+            Receitas com ingredientes, TACO e custo por matéria-prima. Exporte
+            PDF a partir de cada linha ou na edição da receita.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

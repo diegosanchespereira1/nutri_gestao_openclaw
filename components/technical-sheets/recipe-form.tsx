@@ -20,6 +20,7 @@ import {
   sumRecipeMaterialCostBrl,
 } from "@/lib/technical-recipes/recipe-material-cost";
 import { computeRecipeNutritionTotals } from "@/lib/technical-recipes/recipe-nutrition";
+import { scaleIngredientQuantitiesForPortionYield } from "@/lib/technical-recipes/recipe-yield-scale";
 import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-totals";
 import { saveTechnicalRecipeDraftAction } from "@/lib/actions/technical-recipes";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -135,6 +136,7 @@ export function RecipeForm({
   const [taxPercentInput, setTaxPercentInput] = useState(() =>
     String(recipe?.tax_percent ?? 0),
   );
+  const [scaleTargetInput, setScaleTargetInput] = useState("");
 
   const parsedForTotals = useMemo(() => {
     const parsed: { quantity: number; unit: RecipeLineUnit }[] = [];
@@ -208,6 +210,37 @@ export function RecipeForm({
 
   function removeLine(key: string) {
     setLines((prev) => (prev.length <= 1 ? prev : prev.filter((l) => l.key !== key)));
+  }
+
+  function applyPortionYieldScale() {
+    setError(null);
+    const pyRaw = portionsYieldInput.replace(/\D/g, "");
+    const current = parseInt(pyRaw || "1", 10);
+    const targetRaw = scaleTargetInput.replace(/\D/g, "");
+    const target = parseInt(targetRaw || "0", 10);
+    const scaled = scaleIngredientQuantitiesForPortionYield({
+      currentPortions: current,
+      targetPortions: target,
+      lineQuantities: lines.map((l) => l.quantity),
+    });
+    if (!scaled.ok) {
+      const msg =
+        scaled.reason === "invalid_current"
+          ? "Rendimento atual inválido (use ≥ 1 porção no resumo)."
+          : scaled.reason === "invalid_target"
+            ? "Indique um novo rendimento válido (número inteiro ≥ 1)."
+            : "Adicione ingredientes antes de escalonar.";
+      setError(msg);
+      return;
+    }
+    setLines((prev) =>
+      prev.map((row, i) => ({
+        ...row,
+        quantity: scaled.quantities[i] ?? row.quantity,
+      })),
+    );
+    setPortionsYieldInput(String(target));
+    setScaleTargetInput("");
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -366,6 +399,42 @@ export function RecipeForm({
                 Linha
               </Button>
             </div>
+
+            <Card className="border-dashed">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">
+                  Escalonar por rendimento (regra de três)
+                </CardTitle>
+                <CardDescription>
+                  Multiplica todas as quantidades pelo factor{" "}
+                  <span className="text-foreground font-medium">
+                    novo rendimento ÷ rendimento atual
+                  </span>
+                  . O rendimento atual é o valor «Rendimento (porções)» no
+                  resumo à direita.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <div className="space-y-1.5 sm:max-w-[12rem]">
+                  <Label htmlFor="recipe-scale-target">Novo rendimento (porções)</Label>
+                  <Input
+                    id="recipe-scale-target"
+                    inputMode="numeric"
+                    value={scaleTargetInput}
+                    onChange={(e) => setScaleTargetInput(e.target.value)}
+                    placeholder="Ex.: 20"
+                    min={1}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={applyPortionYieldScale}
+                >
+                  Aplicar às quantidades
+                </Button>
+              </CardContent>
+            </Card>
 
             <div className="space-y-4">
           {lines.map((line, index) => (

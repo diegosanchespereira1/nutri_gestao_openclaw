@@ -8,6 +8,7 @@ import { RECIPE_LINE_UNITS } from "@/lib/constants/recipe-line-units";
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
 import { createClient } from "@/lib/supabase/server";
 import type { RawMaterialRow } from "@/lib/types/raw-materials";
+import { countRecipesUsingRawMaterial } from "@/lib/technical-recipes/raw-material-recipe-impact";
 
 const saveSchema = z.object({
   id: z.string().uuid().optional(),
@@ -122,10 +123,25 @@ export async function saveRawMaterialAction(
         `/ficha-tecnica/materias-primas/${id}/editar?err=save`,
       );
     }
+
+    const { data: lineRows } = await supabase
+      .from("technical_recipe_lines")
+      .select("recipe_id")
+      .eq("raw_material_id", id);
+    const recipeIds = [
+      ...new Set((lineRows ?? []).map((r) => r.recipe_id as string)),
+    ];
+    for (const rid of recipeIds) {
+      revalidatePath(`/ficha-tecnica/${rid}/editar`);
+    }
+
+    const affectedRecipes = await countRecipesUsingRawMaterial(supabase, id);
     revalidatePath("/ficha-tecnica/materias-primas");
     revalidatePath(`/ficha-tecnica/materias-primas/${id}/editar`);
     revalidatePath("/ficha-tecnica");
-    redirect("/ficha-tecnica/materias-primas");
+    redirect(
+      `/ficha-tecnica/materias-primas?priceUpdated=1&recipes=${affectedRecipes}`,
+    );
   }
 
   const { error } = await supabase.from("professional_raw_materials").insert({
@@ -157,6 +173,14 @@ export async function deleteRawMaterialAction(
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/ficha-tecnica/materias-primas?err=invalid");
 
+  const { data: lineRowsDel } = await supabase
+    .from("technical_recipe_lines")
+    .select("recipe_id")
+    .eq("raw_material_id", id);
+  const recipeIdsDel = [
+    ...new Set((lineRowsDel ?? []).map((r) => r.recipe_id as string)),
+  ];
+
   const { error } = await supabase
     .from("professional_raw_materials")
     .delete()
@@ -165,6 +189,10 @@ export async function deleteRawMaterialAction(
 
   if (error) {
     redirect("/ficha-tecnica/materias-primas?err=save");
+  }
+
+  for (const rid of recipeIdsDel) {
+    revalidatePath(`/ficha-tecnica/${rid}/editar`);
   }
 
   revalidatePath("/ficha-tecnica/materias-primas");

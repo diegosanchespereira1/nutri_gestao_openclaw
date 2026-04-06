@@ -41,6 +41,14 @@ export function RecipeListRowActions({ recipeId }: Props) {
       >
         Editar
       </Link>
+      <Link
+        href={`/ficha-tecnica/${recipeId}/pdf`}
+        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        PDF
+      </Link>
       <Button
         type="button"
         variant="ghost"

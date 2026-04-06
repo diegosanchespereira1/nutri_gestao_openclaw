@@ -71,16 +71,16 @@ development_status:
   5-6-graficos-tokens-tema: done
   epic-5-retrospective: optional
 
-  epic-6: in-progress
+  epic-6: done
   6-1-receitas-linhas-ingrediente: done
   6-2-ligacao-taco-informacao-nutricional: done
   6-3-materia-prima-custo-unitario: done
   6-4-fatores-correcao-coccao: done
   6-5-custo-total-impostos-margem-porcao: done
-  6-6-escalonamento-regra-de-tres: backlog
-  6-7-recalculo-em-cascata: backlog
-  6-8-exportar-ficha-tecnica-pdf: backlog
-  6-9-admin-catalogo-taco-reference: ready-for-dev
+  6-6-escalonamento-regra-de-tres: done
+  6-7-recalculo-em-cascata: done
+  6-8-exportar-ficha-tecnica-pdf: done
+  6-9-admin-catalogo-taco-reference: done
   epic-6-retrospective: optional
 
   epic-7: backlog

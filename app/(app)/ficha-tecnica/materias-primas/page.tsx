@@ -30,13 +30,21 @@ const errMessages: Record<string, string> = {
 };
 
 type Props = {
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<{
+    err?: string;
+    priceUpdated?: string;
+    recipes?: string;
+  }>;
 };
 
 export default async function MateriasPrimasPage({ searchParams }: Props) {
   const { rows } = await loadRawMaterialsForOwner();
-  const { err } = await searchParams;
+  const sp = await searchParams;
+  const { err, priceUpdated, recipes } = sp;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
+  const recipesN = parseInt(String(recipes ?? "0"), 10);
+  const showPriceBanner =
+    priceUpdated === "1" && !errMsg && Number.isFinite(recipesN);
 
   return (
     <div className="space-y-8">
@@ -70,6 +78,25 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
           className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-4 py-3 text-sm"
         >
           {errMsg}
+        </div>
+      ) : null}
+
+      {showPriceBanner ? (
+        <div
+          role="status"
+          className="border-primary/35 bg-primary/10 text-foreground rounded-lg border px-4 py-3 text-sm"
+        >
+          Preço guardado.
+          {recipesN > 0 ? (
+            <>
+              {" "}
+              Afeta {recipesN}{" "}
+              {recipesN === 1 ? "receita" : "receitas"} — reabra cada ficha
+              técnica para ver custos atualizados.
+            </>
+          ) : (
+            <> Nenhuma linha de receita usa este item.</>
+          )}
         </div>
       ) : null}
 

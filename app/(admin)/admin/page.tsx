@@ -19,12 +19,20 @@ export default function AdminHomePage() {
           update public.profiles set role = &apos;admin&apos; where user_id = &apos;…&apos;;
         </code>
       </p>
-      <Link
-        href="/inicio"
-        className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
-      >
-        Voltar à aplicação
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/admin/catalogo-taco"
+          className={cn(buttonVariants(), "inline-flex")}
+        >
+          Catálogo TACO
+        </Link>
+        <Link
+          href="/inicio"
+          className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
+        >
+          Voltar à aplicação
+        </Link>
+      </div>
     </div>
   );
 }

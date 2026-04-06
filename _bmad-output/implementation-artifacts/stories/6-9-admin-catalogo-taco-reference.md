@@ -2,7 +2,14 @@
 
 ## Estado
 
-**ready-for-dev** (contexto para implementação)
+Implementado em 2026-04-06.
+
+## Referência rápida
+
+- Migração RLS: `supabase/migrations/20260424120000_taco_reference_foods_admin_rls.sql`
+- Actions: `lib/actions/taco-reference-foods-admin.ts`
+- UI: `components/admin/taco-catalog-admin.tsx`, `app/(admin)/admin/catalogo-taco/page.tsx`
+- Entrada: link em `app/(admin)/admin/page.tsx`
 
 ## Resumo
 

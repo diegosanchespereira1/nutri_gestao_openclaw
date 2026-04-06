@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.5 concluídas; 6.6–6.8 em backlog; story **6.9** catálogo TACO admin em *ready-for-dev*); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 concluído** (6.1–6.9); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -225,7 +225,7 @@ Profissional vê agenda do dia, alertas com *countdown*, financeiro resumido, se
 ### Epic 6: Ficha técnica, TACO e custos
 Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.  
 **FRs:** FR26–FR36.
-**Implementação (épico):** Em curso (6.1–6.5 concluídas; 6.6–6.8 em backlog).
+**Implementação (épico):** Concluído (6.1–6.9).
 
 ### Epic 7: POPs
 Profissional usa templates, customiza POPs por estabelecimento, versiona e exporta PDF.  
@@ -814,7 +814,7 @@ So that vejo tendências (UX-DR16).
 
 ## Epic 6: Ficha técnica, TACO e custos
 
-**Implementação (épico):** Em curso (6.1–6.5 concluídas; 6.6–6.8 em backlog; 6.9 *ready-for-dev*).
+**Implementação (épico):** Concluído (6.1–6.9, 2026-04-06).
 
 ### Story 6.1: Receitas e linhas de ingrediente
 
@@ -889,7 +889,7 @@ So that defino preço de venda (FR30–FR33, UX-DR8).
 
 ### Story 6.6: Escalonamento por regra de três
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-06: `scaleIngredientQuantitiesForPortionYield` + cartão no `RecipeForm`; testes em `recipe-yield-scale.test.ts`.)
 
 As a profissional,  
 I want escalonar rendimento,  
@@ -903,7 +903,7 @@ So that adapto porções (FR34).
 
 ### Story 6.7: Recálculo em cascata
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-06: após atualizar preço da matéria-prima, `revalidatePath` das fichas afetadas + redirecionamento com contagem de receitas; banner em `materias-primas`. Custos continuam derivados da base em tempo real.)
 
 As a profissional,  
 I want que alterar preço de ingrediente atualize todas as fichas afetadas,  
@@ -918,7 +918,7 @@ So that não fico com valores obsoletos (FR35, NFR3).
 
 ### Story 6.8: Exportar ficha técnica em PDF
 
-**Implementação:** Backlog
+**Implementação:** Concluída (2026-04-06: `GET /ficha-tecnica/[id]/pdf`, `buildTechnicalRecipePdfBytes` com pdf-lib; ligações na lista e na edição; teste `technical-sheet-pdf.test.ts`.)
 
 As a profissional,  
 I want PDF da ficha,  
@@ -932,7 +932,7 @@ So that partilho com cozinha ou cliente (FR36).
 
 ### Story 6.9: Administração — catálogo TACO (referência)
 
-**Implementação:** *Ready-for-dev* — ficheiro `_bmad-output/implementation-artifacts/stories/6-9-admin-catalogo-taco-reference.md`.
+**Implementação:** Concluída (2026-04-06: migração `20260424120000_taco_reference_foods_admin_rls.sql`; `/admin/catalogo-taco`; `lib/actions/taco-reference-foods-admin.ts`; componente `TacoCatalogAdmin`.)
 
 As a **administrador** ou **super administrador**,  
 I want **gerir o catálogo `taco_reference_foods` na área `/admin`**,  

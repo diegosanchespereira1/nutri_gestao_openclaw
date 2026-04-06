@@ -16,6 +16,7 @@ export function isAuthPublicPath(pathname: string): boolean {
 /** Área logada (Épico 1) — requer utilizador autenticado. */
 export const PROTECTED_PREFIXES = [
   "/inicio",
+  "/onboarding",
   "/clientes",
   "/visitas",
   "/pacientes",

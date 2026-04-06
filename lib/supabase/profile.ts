@@ -21,6 +21,21 @@ export async function fetchProfileRole(
   return isProfileRole(data.role) ? data.role : null;
 }
 
+/** True quando o perfil existe e ainda não concluiu o wizard (Story 2.7). */
+export async function profileNeedsOnboarding(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("onboarding_completed_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) return false;
+  return data.onboarding_completed_at === null;
+}
+
 export async function fetchProfileTimeZone(
   supabase: SupabaseClient,
   userId: string,

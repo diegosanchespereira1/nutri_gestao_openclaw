@@ -26,7 +26,14 @@ import { cn } from "@/lib/utils";
 const clinicalQuickLinkClass =
   "text-primary font-medium underline-offset-4 hover:underline";
 
-export default async function InicioPage() {
+export default async function InicioPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const bemvindo = sp.bemvindo === "1";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -54,6 +61,29 @@ export default async function InicioPage() {
 
   return (
     <div className="space-y-10">
+      {bemvindo ? (
+        <div
+          className="border-primary/40 bg-primary/5 rounded-xl border p-4"
+          role="status"
+        >
+          <p className="text-foreground text-sm font-medium">
+            Está tudo pronto para agendar a primeira visita
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            O primeiro cliente já está na tua carteira. Usa o fluxo de visitas
+            para marcar quando fores ao terreno.
+          </p>
+          <Link
+            href="/visitas/nova"
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "mt-4 inline-flex w-full justify-center sm:w-auto",
+            )}
+          >
+            Agendar visita
+          </Link>
+        </div>
+      ) : null}
       <div className="space-y-2">
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
           Início

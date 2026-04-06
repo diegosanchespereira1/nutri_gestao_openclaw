@@ -508,7 +508,7 @@ So that migro do Excel rapidamente (FR11, UX-DR11).
 
 ### Story 2.7: Wizard de onboarding e sugestão de portarias
 
-**Implementação:** Backlog
+**Implementação:** Concluída
 
 As a novo profissional,  
 I want ser guiado no setup inicial e receber sugestão de portarias por UF/tipo,  

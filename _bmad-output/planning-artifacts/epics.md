@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.5 concluídas; 6.6–6.8 em backlog); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 em curso** (6.1–6.5 concluídas; 6.6–6.8 em backlog; story **6.9** catálogo TACO admin em *ready-for-dev*); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -814,7 +814,7 @@ So that vejo tendências (UX-DR16).
 
 ## Epic 6: Ficha técnica, TACO e custos
 
-**Implementação (épico):** Em curso (6.1–6.5 concluídas; 6.6–6.8 em backlog).
+**Implementação (épico):** Em curso (6.1–6.5 concluídas; 6.6–6.8 em backlog; 6.9 *ready-for-dev*).
 
 ### Story 6.1: Receitas e linhas de ingrediente
 
@@ -929,6 +929,21 @@ So that partilho com cozinha ou cliente (FR36).
 **Given** receita validada  
 **When** exporto PDF  
 **Then** documento inclui tabela de ingredientes, custos e nutrição conforme template
+
+### Story 6.9: Administração — catálogo TACO (referência)
+
+**Implementação:** *Ready-for-dev* — ficheiro `_bmad-output/implementation-artifacts/stories/6-9-admin-catalogo-taco-reference.md`.
+
+As a **administrador** ou **super administrador**,  
+I want **gerir o catálogo `taco_reference_foods` na área `/admin`**,  
+So that **a lista completa é auditável e atualizável no front** sem SQL manual (FR60, NFR35).
+
+**Acceptance Criteria:**
+
+**Given** `profiles.role` ∈ {`admin`, `super_admin`}  
+**When** acedo à rota de administração do catálogo TACO  
+**Then** vejo e posso criar, editar e eliminar alimentos de referência com RLS a permitir mutações só para estes papéis  
+**And** utilizadores `user` não acedem à UI nem conseguem mutar a tabela
 
 ---
 

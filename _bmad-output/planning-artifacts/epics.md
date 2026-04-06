@@ -14,7 +14,7 @@ inputDocuments:
 
 ## Overview
 
-Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 concluído** (6.1–6.9); épicos **7–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
+Este documento decompõe requisitos do PRD, da arquitetura e do UX Design em épicos e *stories* implementáveis. **Estado:** workflow de épicos **concluído** (Passos 1–4). **Implementação:** épicos **1–5 concluídos** (épico 2 com story 2.7 em backlog); **épico 6 concluído** (6.1–6.9); **épico 7 concluído** (7.1–7.4); épicos **8–11 em backlog** — detalhe por story abaixo e em `_bmad-output/implementation-artifacts/sprint-status.yaml`.
 
 **Decisão de âmbito (produto):** **FR2** (autenticação OAuth / login social) **não será implementado** na fase atual. Mantém-se no inventário do PRD como requisito documentado, fora do *delivery* até nova decisão.
 
@@ -230,7 +230,7 @@ Profissional gere receitas, ingredientes, TACO, custos, cascata e PDF da ficha.
 ### Epic 7: POPs
 Profissional usa templates, customiza POPs por estabelecimento, versiona e exporta PDF.  
 **FRs:** FR37–FR40.
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Concluído (7.1–7.4).
 
 ### Epic 8: Controle financeiro e contratos
 Profissional regista pagamentos, recorrência, contratos e alertas de renovação.  
@@ -949,11 +949,11 @@ So that **a lista completa é auditável e atualizável no front** sem SQL manua
 
 ## Epic 7: POPs
 
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Concluído (2026-04-06).
 
 ### Story 7.1: Templates POP por tipo de estabelecimento
 
-**Implementação:** Backlog
+**Implementação:** Concluída (tabela `pop_templates` + seeds por tipo; `/pops/modelos`; modelos filtrados em «Novo POP» por `establishment_type`.)
 
 As a profissional,  
 I want escolher template POP adequado,  
@@ -961,7 +961,7 @@ So that começo de modelo válido (FR37).
 
 ### Story 7.2: Criar e editar POP por estabelecimento
 
-**Implementação:** Backlog
+**Implementação:** Concluída (`establishment_pops` + RLS por estabelecimento; `/pops`, `/pops/estabelecimento/[id]`, novo/editar, eliminar.)
 
 As a profissional,  
 I want POPs vinculados ao estabelecimento,  
@@ -969,7 +969,7 @@ So that procedimentos são locais (FR38).
 
 ### Story 7.3: Versionamento de POP
 
-**Implementação:** Backlog
+**Implementação:** Concluída (`pop_versions` imutáveis; guardar cria nova versão; `/pops/[popId]/historico`; `nextPopVersionNumber` + testes.)
 
 As a profissional,  
 I want histórico de versões do POP,  
@@ -977,7 +977,7 @@ So that audito mudanças (FR39).
 
 ### Story 7.4: Exportar POP em PDF
 
-**Implementação:** Backlog
+**Implementação:** Concluída (`GET /pops/[popId]/pdf`, `buildPopPdfBytes`, teste `pop-pdf.test.ts`.)
 
 As a profissional,  
 I want PDF do POP,  

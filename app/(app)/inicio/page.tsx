@@ -11,6 +11,8 @@ import { VisitAgendaBlock } from "@/components/visits/visit-agenda-block";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadComplianceDashboardAlerts } from "@/lib/actions/compliance-deadlines";
 import { loadFinancialDashboardSummary } from "@/lib/actions/financial-charges";
+import { loadExpiringContracts } from "@/lib/actions/client-contracts";
+import { ContractRenewalAlerts } from "@/components/dashboard/contract-renewal-alerts";
 import {
   buildVisitsByMonthSeries,
   visitsByMonthHasData,
@@ -42,10 +44,11 @@ export default async function InicioPage({
     redirect("/login");
   }
   const tz = await fetchProfileTimeZone(supabase, user.id);
-  const [{ rows }, complianceAlerts, financialSummary] = await Promise.all([
+  const [{ rows }, complianceAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([
     loadScheduledVisitsForOwner(),
     loadComplianceDashboardAlerts(tz),
     loadFinancialDashboardSummary(tz),
+    loadExpiringContracts(60),
   ]);
   const today = sortScheduledVisitsForDashboard(
     rows.filter(
@@ -229,6 +232,9 @@ export default async function InicioPage({
         title="Financeiro"
         description="Resumo de cobranças, contratos e alertas de renovação — área separada da operação clínica."
       >
+        {expiringContracts.length > 0 && (
+          <ContractRenewalAlerts rows={expiringContracts} withinDays={60} />
+        )}
         <FinancialPendingCard
           overdueCount={financialSummary.overdueCount}
           overdueTotalLabel={financialSummary.overdueTotalLabel}

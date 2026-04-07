@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { ClientExamDocumentList } from "@/components/clientes/client-exam-document-list";
 import { ClientAvatar } from "@/components/clientes/client-avatar";
+import { ClientContractsSection } from "@/components/clientes/client-contracts-section";
 import { ClientForm } from "@/components/clientes/client-form";
 import { DeleteClientButton } from "@/components/clientes/delete-client-button";
 import { EstablishmentsSection } from "@/components/clientes/establishments-section";
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
+import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { normalizeClientRow } from "@/lib/clients/normalize-client-row";
 import { todayKey } from "@/lib/datetime/calendar-tz";
@@ -35,10 +37,14 @@ function dateInputValue(isoOrDate: string | null): string {
 
 export default async function EditarClientePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ contractErr?: string }>;
 }) {
   const { id } = await params;
+  const { contractErr } = await searchParams;
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("clients")
@@ -67,6 +73,7 @@ export default async function EditarClientePage({
     row.id,
   );
   const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
+  const { rows: contracts } = await loadContractsByClient(row.id);
 
   return (
     <div className="space-y-6">
@@ -229,6 +236,19 @@ export default async function EditarClientePage({
             </Link>
           </CardContent>
         </Card>
+      </section>
+
+      {/* Story 8.2 + 8.3 — Contratos e recorrência */}
+      <Separator />
+      <section aria-labelledby="contratos-cliente-heading">
+        <h2 id="contratos-cliente-heading" className="sr-only">
+          Contratos e recorrência
+        </h2>
+        <ClientContractsSection
+          clientId={row.id}
+          contracts={contracts}
+          contractErr={contractErr}
+        />
       </section>
 
       {row.kind === "pf" ? (

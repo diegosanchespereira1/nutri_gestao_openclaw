@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Test environment (credenciais locais — nunca commitar)
+.env.test
+!.env.test.example

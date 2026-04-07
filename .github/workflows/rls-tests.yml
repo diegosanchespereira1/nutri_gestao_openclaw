@@ -1,0 +1,93 @@
+name: RLS Multi-Tenant Isolation Tests
+
+# Executa em todos os pushes e PRs para garantir que nenhuma migração
+# ou mudança de RLS introduz vazamento de dados cross-tenant.
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "supabase/migrations/**"
+      - "tests/rls/**"
+      - "lib/actions/**"
+      - "vitest.config.rls.ts"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "supabase/migrations/**"
+      - "tests/rls/**"
+      - "lib/actions/**"
+      - "vitest.config.rls.ts"
+
+jobs:
+  rls-isolation:
+    name: RLS Isolation Tests
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ── Supabase Local ────────────────────────────────────────────────────
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local
+        run: supabase start
+
+      - name: Wait for Supabase healthcheck
+        run: |
+          echo "Aguardando Supabase estar pronto..."
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:54321/health > /dev/null 2>&1; then
+              echo "✅ Supabase pronto."
+              break
+            fi
+            echo "  Tentativa $i/30 — aguardando..."
+            sleep 2
+          done
+
+      # ── Extrair credenciais geradas pelo supabase start ───────────────────
+      - name: Extract Supabase credentials
+        run: |
+          STATUS=$(supabase status --output json)
+          SUPABASE_URL=$(echo "$STATUS" | jq -r '.API_URL')
+          ANON_KEY=$(echo "$STATUS" | jq -r '.ANON_KEY')
+          SERVICE_ROLE_KEY=$(echo "$STATUS" | jq -r '.SERVICE_ROLE_KEY')
+
+          echo "SUPABASE_TEST_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_TEST_ANON_KEY=$ANON_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_TEST_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY" >> "$GITHUB_ENV"
+          echo "TEST_TENANT_A_EMAIL=tenant_a_rls@nutrigestao.test" >> "$GITHUB_ENV"
+          echo "TEST_TENANT_A_PASSWORD=RlsTest@TenantA2026!" >> "$GITHUB_ENV"
+          echo "TEST_TENANT_B_EMAIL=tenant_b_rls@nutrigestao.test" >> "$GITHUB_ENV"
+          echo "TEST_TENANT_B_PASSWORD=RlsTest@TenantB2026!" >> "$GITHUB_ENV"
+
+      # ── Executar testes de isolamento ─────────────────────────────────────
+      - name: Run RLS isolation tests
+        run: npm run test:rls
+        env:
+          SUPABASE_TEST_URL: ${{ env.SUPABASE_TEST_URL }}
+          SUPABASE_TEST_ANON_KEY: ${{ env.SUPABASE_TEST_ANON_KEY }}
+          SUPABASE_TEST_SERVICE_ROLE_KEY: ${{ env.SUPABASE_TEST_SERVICE_ROLE_KEY }}
+          TEST_TENANT_A_EMAIL: ${{ env.TEST_TENANT_A_EMAIL }}
+          TEST_TENANT_A_PASSWORD: ${{ env.TEST_TENANT_A_PASSWORD }}
+          TEST_TENANT_B_EMAIL: ${{ env.TEST_TENANT_B_EMAIL }}
+          TEST_TENANT_B_PASSWORD: ${{ env.TEST_TENANT_B_PASSWORD }}
+
+      # ── Parar Supabase ────────────────────────────────────────────────────
+      - name: Stop Supabase local
+        if: always()
+        run: supabase stop

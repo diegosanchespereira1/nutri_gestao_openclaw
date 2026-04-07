@@ -1,38 +1,95 @@
+// Epic 10 — Administração da plataforma — hub de navegação
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+
+const adminSections = [
+  {
+    href: "/admin/tenants",
+    title: "Gestão de tenants",
+    description: "Listar, suspender e alterar plano de profissionais.",
+    emoji: "🏢",
+  },
+  {
+    href: "/admin/planos",
+    title: "Planos e limites",
+    description: "Configuração de planos, limites e feature flags.",
+    emoji: "💳",
+  },
+  {
+    href: "/admin/metricas",
+    title: "Métricas da plataforma",
+    description: "MRR, tenants, conversão e dados agregados.",
+    emoji: "📊",
+  },
+  {
+    href: "/admin/catalogo-taco",
+    title: "Catálogo TACO",
+    description: "Gerir alimentos da tabela TACO compartilhada.",
+    emoji: "🥦",
+  },
+  {
+    href: "/admin/checklists",
+    title: "Checklists regulatórios",
+    description: "CRUD e versionamento de checklists de portaria.",
+    emoji: "📋",
+  },
+];
 
 export default function AdminHomePage() {
   return (
-    <div className="mx-auto max-w-2xl space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Área de administração</h1>
-      <p className="text-muted-foreground text-sm">
-        Esta área só é acessível a contas com papel <strong className="text-foreground">admin</strong> ou{" "}
-        <strong className="text-foreground">super_admin</strong> na tabela{" "}
-        <code className="bg-muted rounded px-1 py-0.5 text-xs">profiles</code>. Utilizadores normais
-        ficam com <code className="bg-muted rounded px-1 py-0.5 text-xs">user</code>.
-      </p>
-      <p className="text-muted-foreground text-sm">
-        Promova um utilizador no Supabase (SQL Editor):{" "}
-        <code className="bg-muted break-all rounded px-1 py-0.5 text-xs">
-          update public.profiles set role = &apos;admin&apos; where user_id = &apos;…&apos;;
-        </code>
-      </p>
-      <div className="flex flex-wrap gap-3">
-        <Link
-          href="/admin/catalogo-taco"
-          className={cn(buttonVariants(), "inline-flex")}
-        >
-          Catálogo TACO
-        </Link>
-        <Link
-          href="/inicio"
-          className={cn(buttonVariants({ variant: "outline" }), "inline-flex")}
-        >
-          Voltar à aplicação
-        </Link>
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Área de administração
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Acessível apenas a contas com papel{" "}
+          <strong className="text-foreground">admin</strong> ou{" "}
+          <strong className="text-foreground">super_admin</strong>.
+        </p>
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        {adminSections.map((s) => (
+          <Link key={s.href} href={s.href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
+            <Card className="h-full hover:bg-muted/40 transition-colors cursor-pointer">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <span aria-hidden>{s.emoji}</span>
+                  {s.title}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {s.description}
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      <div className="border-border rounded-lg border p-4 text-sm">
+        <p className="text-muted-foreground text-xs">
+          Para promover um utilizador a admin, use o Supabase SQL Editor:
+        </p>
+        <code className="bg-muted mt-1 block break-all rounded px-2 py-1.5 text-xs">
+          update public.profiles set role = &apos;super_admin&apos; where id = &apos;USER_UUID&apos;;
+        </code>
+      </div>
+
+      <Link
+        href="/inicio"
+        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+      >
+        ← Voltar à aplicação
+      </Link>
     </div>
   );
 }

@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-07T12:00:00Z"
+last_updated: "2026-04-06T18:00:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -90,28 +90,28 @@ development_status:
   7-4-exportar-pop-pdf: done
   epic-7-retrospective: optional
 
-  epic-8: in-progress
+  epic-8: done
   8-1-status-pagamento-cliente: done
-  8-2-recorrencia-cobranca: backlog
-  8-3-datas-contrato: backlog
-  8-4-contratos-modelos: backlog
-  8-5-alertas-renovacao-vencimento: backlog
+  8-2-recorrencia-cobranca: done
+  8-3-datas-contrato: done
+  8-4-contratos-modelos: done
+  8-5-alertas-renovacao-vencimento: done
   epic-8-retrospective: optional
 
-  epic-9: backlog
-  9-1-cadastro-utilizadores-externos: backlog
-  9-2-permissoes-categoria-dado: backlog
-  9-3-visualizacao-portal: backlog
-  9-4-consentimento-parental-menores: backlog
+  epic-9: done
+  9-1-cadastro-utilizadores-externos: done
+  9-2-permissoes-categoria-dado: done
+  9-3-visualizacao-portal: done
+  9-4-consentimento-parental-menores: done
   epic-9-retrospective: optional
 
-  epic-10: backlog
-  10-1-gestao-tenants: backlog
-  10-2-planos-limites-add-ons: backlog
-  10-3-metricas-plataforma: backlog
-  10-4-catalogo-portarias-taco-templates: backlog
-  10-5-crud-versionamento-checklists-regulatorios: backlog
-  10-6-notificar-atualizar-portaria: backlog
+  epic-10: done
+  10-1-gestao-tenants: done
+  10-2-planos-limites-add-ons: done
+  10-3-metricas-plataforma: done
+  10-4-catalogo-portarias-taco-templates: done
+  10-5-crud-versionamento-checklists-regulatorios: done
+  10-6-notificar-atualizar-portaria: done
   epic-10-retrospective: optional
 
   epic-11: backlog

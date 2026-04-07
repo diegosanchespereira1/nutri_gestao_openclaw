@@ -1,5 +1,8 @@
 # Story 8.1: Status de pagamento por cliente
 
+**Sprint / tracking:** `sprint-status.yaml` → `8-1-status-pagamento-cliente: done` (épico 8 `in-progress`).  
+**Último incremento (código + docs):** 2026-04-07 — períodos *Total* e *Intervalo* (`win_*` / `from_*` / `to_*`), paleta de alto contraste, `financial-chart-shell`, `financial-charts-ux-pattern.md`, testes em `chart-window` / séries.
+
 ## Objetivo
 
 Registar e filtrar o estado das cobranças e ver inadimplência agregada por cliente (FR41).

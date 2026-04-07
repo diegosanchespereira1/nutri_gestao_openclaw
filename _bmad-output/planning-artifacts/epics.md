@@ -993,7 +993,7 @@ So that imprimo ou envio (FR40).
 
 ### Story 8.1: Status de pagamento por cliente
 
-**Implementação:** Concluída
+**Implementação:** Concluída (gráficos: últimos N meses, total até hoje, intervalo por datas; CSV por cartão; cores semânticas — ver story file e `financial-charts-ux-pattern.md`).
 
 As a profissional,  
 I want registar e filtrar status de pagamento,  

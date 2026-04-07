@@ -989,11 +989,11 @@ So that imprimo ou envio (FR40).
 
 ## Epic 8: Controle financeiro e contratos
 
-**Implementação (épico):** Backlog.
+**Implementação (épico):** Em progresso.
 
 ### Story 8.1: Status de pagamento por cliente
 
-**Implementação:** Backlog
+**Implementação:** Concluída
 
 As a profissional,  
 I want registar e filtrar status de pagamento,  

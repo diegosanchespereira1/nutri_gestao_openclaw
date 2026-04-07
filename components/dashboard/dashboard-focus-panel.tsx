@@ -6,9 +6,9 @@ type Tone = "clinical" | "financial";
 
 const toneClass: Record<Tone, string> = {
   clinical:
-    "border-border border-l-primary bg-primary/[0.03] dark:bg-primary/5 border-y border-r border-l-4",
+    "border-border rounded-xl border bg-white shadow-xs dark:bg-card",
   financial:
-    "border-border border-l-amber-600/80 bg-amber-500/[0.06] dark:border-l-amber-500/80 dark:bg-amber-950/25 border-y border-r border-l-4",
+    "border-border border-l-amber-600/80 bg-amber-500/[0.06] dark:border-l-amber-500/80 dark:bg-amber-950/25 border-y border-r border-l-4 rounded-r-xl",
 };
 
 type Props = {
@@ -32,7 +32,7 @@ export function DashboardFocusPanel({
 }: Props) {
   return (
     <section
-      className={cn("rounded-r-xl px-4 py-5 sm:px-5 sm:py-6", toneClass[tone])}
+      className={cn("px-4 py-5 sm:px-5 sm:py-6", toneClass[tone])}
       aria-labelledby={labelledById}
     >
       <header className="mb-5 space-y-1 border-b border-border/60 pb-4">

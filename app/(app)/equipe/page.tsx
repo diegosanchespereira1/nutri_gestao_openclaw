@@ -39,7 +39,7 @@ export default async function EquipePage() {
         </div>
       ) : (
         <ul
-          className="divide-border divide-y overflow-hidden rounded-lg border"
+          className="border-border divide-border divide-y overflow-hidden rounded-lg border bg-white"
           aria-label="Membros da equipe"
         >
           {rows.map((m) => (

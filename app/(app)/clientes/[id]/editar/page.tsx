@@ -7,10 +7,24 @@ import { ClientForm } from "@/components/clientes/client-form";
 import { DeleteClientButton } from "@/components/clientes/delete-client-button";
 import { EstablishmentsSection } from "@/components/clientes/establishments-section";
 import { PatientsSection } from "@/components/pacientes/patients-section";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { normalizeClientRow } from "@/lib/clients/normalize-client-row";
+import { todayKey } from "@/lib/datetime/calendar-tz";
+import {
+  formatBRLFromCents,
+} from "@/lib/dashboard/financial-pending";
+import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status";
 import { createClient } from "@/lib/supabase/server";
+import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 
@@ -43,6 +57,16 @@ export default async function EditarClientePage({
   );
 
   const social = row.social_links ?? {};
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const tz = await fetchProfileTimeZone(supabase, user?.id ?? "");
+  const tKey = todayKey(new Date(), tz);
+  const { rows: chargesForClient } = await loadFinancialChargesForClient(
+    row.id,
+  );
+  const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
 
   return (
     <div className="space-y-6">
@@ -133,6 +157,80 @@ export default async function EditarClientePage({
         defaultTechnicalRepPhone={row.technical_rep_phone ?? ""}
         defaultBusinessSegment={row.business_segment ?? ""}
       />
+
+      <Separator />
+      <section aria-labelledby="pagamentos-cliente-heading">
+        <Card className="border-border shadow-xs ring-1 ring-border">
+          <CardHeader className="pb-2">
+            <CardTitle
+              id="pagamentos-cliente-heading"
+              className="text-base font-semibold"
+            >
+              Pagamentos e inadimplência
+            </CardTitle>
+            <CardDescription>
+              Resumo do estado de cobranças deste cliente; filtre e registe
+              lançamentos no módulo financeiro.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            {payMetrics.hasDelinquency ? (
+              <p
+                className="border-amber-500/35 bg-amber-500/10 text-amber-950 dark:border-amber-500/40 dark:bg-amber-500/15 dark:text-amber-100 rounded-md border px-3 py-2 text-sm"
+                role="status"
+              >
+                <span className="font-semibold">Inadimplência: </span>
+                {payMetrics.overdueCount} cobrança(s) em atraso, total{" "}
+                {formatBRLFromCents(payMetrics.overdueTotalCents)}.
+              </p>
+            ) : payMetrics.openCount > 0 ? (
+              <p className="text-muted-foreground">
+                {payMetrics.openCount} em aberto (
+                {formatBRLFromCents(payMetrics.openTotalCents)}
+                ), sem vencimento ultrapassado.
+              </p>
+            ) : payMetrics.paidCount > 0 ? (
+              <p className="text-muted-foreground">
+                {payMetrics.paidCount} cobrança(s) paga(s); nada em aberto.
+              </p>
+            ) : (
+              <p className="text-muted-foreground">
+                Ainda não há cobranças associadas a este cliente.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-xs tabular-nums">
+              <span>
+                Em aberto:{" "}
+                <span className="text-foreground font-medium">
+                  {payMetrics.openCount}
+                </span>
+              </span>
+              <span>
+                Em atraso:{" "}
+                <span className="text-foreground font-medium">
+                  {payMetrics.overdueCount}
+                </span>
+              </span>
+              <span>
+                Pagas:{" "}
+                <span className="text-foreground font-medium">
+                  {payMetrics.paidCount}
+                </span>
+              </span>
+            </div>
+            <Link
+              href={`/financeiro?client=${encodeURIComponent(row.id)}&tab=operacoes`}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "inline-flex w-full justify-center sm:w-auto",
+              )}
+            >
+              Abrir no financeiro
+            </Link>
+          </CardContent>
+        </Card>
+      </section>
+
       {row.kind === "pf" ? (
         <>
           <Separator />

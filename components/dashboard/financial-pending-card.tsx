@@ -52,7 +52,11 @@ export function FinancialPendingCard({ overdueCount, overdueTotalLabel }: Props)
       )}
       <div className="mt-4">
         <Link
-          href="/financeiro"
+          href={
+            hasOverdue
+              ? "/financeiro?tab=operacoes&status=overdue"
+              : "/financeiro?tab=resumo"
+          }
           className={cn(
             buttonVariants({ variant: hasOverdue ? "default" : "outline", size: "sm" }),
             "w-full justify-center sm:w-auto",

@@ -91,15 +91,58 @@ export async function loadFinancialChargesForOwner(): Promise<{
     .select(
       `
       id,
+      client_id,
       description,
       amount_cents,
       due_date,
       status,
       paid_at,
+      created_at,
       clients ( legal_name, trade_name )
     `,
     )
     .eq("owner_user_id", user.id)
+    .order("due_date", { ascending: true });
+
+  if (error || !data) return { rows: [] };
+  return { rows: data as unknown as FinancialChargeListRow[] };
+}
+
+export async function loadFinancialChargesForClient(
+  clientId: string,
+): Promise<{ rows: FinancialChargeListRow[] }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { rows: [] };
+
+  const { data: clientOk } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("id", clientId)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
+
+  if (!clientOk) return { rows: [] };
+
+  const { data, error } = await supabase
+    .from("financial_charges")
+    .select(
+      `
+      id,
+      client_id,
+      description,
+      amount_cents,
+      due_date,
+      status,
+      paid_at,
+      created_at,
+      clients ( legal_name, trade_name )
+    `,
+    )
+    .eq("owner_user_id", user.id)
+    .eq("client_id", clientId)
     .order("due_date", { ascending: true });
 
   if (error || !data) return { rows: [] };
@@ -122,7 +165,7 @@ export async function createFinancialChargeAction(
   const cents = parseMoneyToCents(amountRaw);
 
   if (!clientId || !due || cents === null) {
-    redirect("/financeiro?err=invalid");
+    redirect("/financeiro?err=invalid&tab=operacoes");
   }
 
   const { data: clientOk, error: clientErr } = await supabase
@@ -133,7 +176,7 @@ export async function createFinancialChargeAction(
     .maybeSingle();
 
   if (clientErr || !clientOk) {
-    redirect("/financeiro?err=client");
+    redirect("/financeiro?err=client&tab=operacoes");
   }
 
   const { error } = await supabase.from("financial_charges").insert({
@@ -146,12 +189,13 @@ export async function createFinancialChargeAction(
   });
 
   if (error) {
-    redirect("/financeiro?err=save");
+    redirect("/financeiro?err=save&tab=operacoes");
   }
 
   revalidatePath("/financeiro");
   revalidatePath("/inicio");
-  redirect("/financeiro");
+  revalidatePath(`/clientes/${clientId}/editar`);
+  redirect("/financeiro?tab=operacoes");
 }
 
 export async function markFinancialChargePaidAction(
@@ -164,7 +208,14 @@ export async function markFinancialChargePaidAction(
   if (!user) redirect("/login");
 
   const id = String(formData.get("id") ?? "").trim();
-  if (!id) redirect("/financeiro?err=invalid");
+  if (!id) redirect("/financeiro?err=invalid&tab=operacoes");
+
+  const { data: existing } = await supabase
+    .from("financial_charges")
+    .select("client_id")
+    .eq("id", id)
+    .eq("owner_user_id", user.id)
+    .maybeSingle();
 
   const { error } = await supabase
     .from("financial_charges")
@@ -177,10 +228,14 @@ export async function markFinancialChargePaidAction(
     .eq("status", "open");
 
   if (error) {
-    redirect("/financeiro?err=save");
+    redirect("/financeiro?err=save&tab=operacoes");
   }
 
   revalidatePath("/financeiro");
   revalidatePath("/inicio");
-  redirect("/financeiro");
+  const cid = existing?.client_id as string | undefined;
+  if (cid) {
+    revalidatePath(`/clientes/${cid}/editar`);
+  }
+  redirect("/financeiro?tab=operacoes");
 }

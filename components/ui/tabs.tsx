@@ -19,7 +19,7 @@ function TabsList({ className, ...props }: TabsPrimitive.List.Props) {
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "text-muted-foreground inline-flex min-h-10 flex-wrap items-center gap-1 rounded-lg bg-muted/80 p-1",
+        "inline-flex min-h-10 flex-wrap items-center gap-1 rounded-lg border border-border bg-muted/70 p-1 shadow-inner",
         className,
       )}
       {...props}
@@ -32,11 +32,13 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-        "hover:text-foreground",
+        "ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow]",
+        "border-border/80 bg-card text-foreground/80 shadow-xs",
+        "hover:border-primary/45 hover:bg-primary/18 hover:text-foreground",
         "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
         "disabled:pointer-events-none disabled:opacity-50",
-        "aria-selected:bg-background aria-selected:text-foreground aria-selected:shadow-sm",
+        "aria-selected:border-primary aria-selected:bg-primary aria-selected:text-primary-foreground aria-selected:shadow-sm",
+        "aria-selected:hover:border-primary aria-selected:hover:bg-primary aria-selected:hover:text-primary-foreground",
         className,
       )}
       {...props}

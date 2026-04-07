@@ -195,7 +195,7 @@ Evitar deliberadamente: **vergonha** por não saber legislação, **pânico** po
 | **Nutrium / apps clínicos (referência PRD)** | Prontuário, paciente no centro, apps móveis | Portal e dados do paciente com hierarquia clara; mobile-first em consulta de dados, não só em visita. |
 | **Food Checker / ERP alimentar (referência PRD)** | Checklist e conformidade como fluxo de trabalho | Itens de checklist como **tarefas completáveis** com evidência ligada, não PDF estático. |
 | **Linear / Jira (modo simples)** | Estados, filtros, “inbox” de trabalho | Pendências de visita, não-conformidades recorrentes e tarefas pós-visita como fila acionável. |
-| **Stripe / dashboards financeiros B2B** | Status de cobrança, linha do tempo, poucos KPIs | Módulo financeiro: estados (ok / em risco / vencido) sem poluir com gráficos desnecessários no MVP. |
+| **Stripe / dashboards financeiros B2B** | Status de cobrança, linha do tempo, poucos KPIs | Módulo financeiro: estados (ok / em risco / vencido) com **aba Resumo** (gráficos de evolução e inadimplência) e **aba Operações** (registo, filtros, tabela), sem sobrecarregar o ecrã numa única vista. |
 
 ### Transferable UX Patterns
 
@@ -214,6 +214,13 @@ Evitar deliberadamente: **vergonha** por não saber legislação, **pânico** po
 
 - **Tipografia legível e contraste** (WCAG AA no PRD) — prioridade sobre estética “modinha”.
 - **Cor com significado funcional** (semáforo de conformidade / pagamento) — usar com legenda e não só cor (acessibilidade).
+
+### Módulo Financeiro (`/financeiro`)
+
+- **Abas internas (Tabs):** **Resumo e análise** — gráficos de acompanhamento e tabela «estado por cliente»; **Cobranças e registos** — formulário de nova cobrança, filtros (estado / cliente) e tabela de movimentos. Parâmetro de URL `tab=resumo` ou `tab=operacoes`; com filtros ativos ou mensagem de erro de formulário, a página abre por defeito em **Cobranças e registos** (exceto se `tab=resumo` for explícito).
+- **Gráficos (Recharts, padrão visual do módulo — ver `planning-artifacts/financial-charts-ux-pattern.md`):** cada cartão tem **período independente** com três modos persistidos na query string (sufixos `_rec`, `_flux`, `_atr`): **`win_*=months`** + `m_*` (3 / 6 / 12 / 24 meses civis, padrão 6); **`win_*=total`** — série temporal desde o **primeiro mês com dados relevantes** até ao mês actual (recebido: primeiro `paid_at`; fluxo: mínimo entre `created_at` e `paid_at`); **`win_*=range`** + `from_*` / `to_*` (`YYYY-MM-DD`, limitados a «hoje» no fuso do profissional). (1) **Recebido por mês** — `paid_at`; (2) **Lançado vs recebido** — `created_at` vs `paid_at` no mês; (3) **Top inadimplência** — filtro de **vencimento**: em modo meses, vencimento ≥ 1.º dia do mês mais antigo da janela; em **total**, todo o atraso até hoje; em **intervalo**, `due_date` entre `from` e `to` (inclusive). **Cores semânticas de alto contraste** (verde recebido, laranja lançado, azul recebido no mês, tons quentes distintos no ranking).
+- **Exportar CSV:** em cada gráfico, botão **Exportar CSV** gera ficheiro UTF-8 (BOM) com as mesmas colunas visíveis nos dados agregados (rótulos de mês, centavos e BRL onde aplicável; no ranking, `cliente_id`, nome e valores).
+- **Ligações e formulários:** filtros da lista em **Cobranças e registos** enviam `tab=operacoes` e preservam todos os parâmetros de janela (`win_*`, `m_*`, `from_*`, `to_*`). CTAs da ficha do cliente mantêm `tab=operacoes` para a lista filtrada.
 
 ### Anti-Patterns to Avoid
 

@@ -105,7 +105,7 @@ export default async function ClientesPage({
         </div>
       ) : (
         <ul
-          className="border-border divide-border divide-y overflow-hidden rounded-lg border"
+          className="border-border divide-border divide-y overflow-hidden rounded-lg border bg-white"
           aria-label="Lista de clientes"
         >
           {rowsWithLogos.map(({ row, logoUrl }) => (

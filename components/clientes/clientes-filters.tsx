@@ -35,6 +35,7 @@ export function ClientesFilters({
           placeholder="Nome, documento, email…"
           defaultValue={defaultQ}
           autoComplete="off"
+          className="bg-white dark:bg-card"
         />
       </div>
       <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-0 lg:max-w-md lg:grid-cols-2">
@@ -44,7 +45,7 @@ export function ClientesFilters({
             id="filtro-tipo"
             name="tipo"
             defaultValue={defaultTipo}
-            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="border-input bg-white ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-card"
           >
             <option value="all">Todas (PF e PJ)</option>
             <option value="pf">Pessoa física</option>
@@ -57,7 +58,7 @@ export function ClientesFilters({
             id="filtro-situacao"
             name="situacao"
             defaultValue={defaultSituacao}
-            className="border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="border-input bg-white ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-card"
           >
             <option value="all">Todas</option>
             {CLIENT_LIFECYCLE_STATUSES.map((s) => (

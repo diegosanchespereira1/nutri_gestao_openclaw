@@ -1,16 +1,27 @@
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button-variants";
+import { ExternalPortalSection } from "@/components/equipe/external-portal-section";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
+import { loadExternalPortalUsers } from "@/lib/actions/external-portal";
 import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import type { TeamJobRole } from "@/lib/types/team-members";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-export default async function EquipePage() {
-  const { rows } = await loadTeamMembersForOwner();
+export default async function EquipePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ portalErr?: string; portalOk?: string }>;
+}) {
+  const { portalErr, portalOk } = await searchParams;
+  const [{ rows }, { rows: portalUsers }] = await Promise.all([
+    loadTeamMembersForOwner(),
+    loadExternalPortalUsers(),
+  ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
@@ -65,6 +76,19 @@ export default async function EquipePage() {
           ))}
         </ul>
       )}
+
+      {/* Story 9.1 + 9.2 — Acesso externo (portal) */}
+      <Separator />
+      <section aria-labelledby="portal-externo-heading">
+        <h2 id="portal-externo-heading" className="sr-only">
+          Acesso externo
+        </h2>
+        <ExternalPortalSection
+          users={portalUsers}
+          portalErr={portalErr}
+          portalOk={portalOk}
+        />
+      </section>
     </div>
   );
 }

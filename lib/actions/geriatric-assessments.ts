@@ -145,7 +145,13 @@ export async function createGeriatricAssessmentAction(
     });
 
   if (error) {
-    return { ok: false, error: "Não foi possível guardar a avaliação." };
+    // Log server-side para diagnóstico (visível nos logs Next.js / Vercel)
+    console.error("[geriatric-assessments] Supabase insert error:", error);
+    const detail =
+      process.env.NODE_ENV === "development"
+        ? ` [${error.code ?? "?"}: ${error.message}]`
+        : "";
+    return { ok: false, error: `Não foi possível guardar a avaliação.${detail}` };
   }
 
   revalidatePath(`/pacientes/${patientId}/editar`);

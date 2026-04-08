@@ -10,6 +10,7 @@ import {
   PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
   type PatientGroup,
+  type NutritionalRisk,
 } from "@/lib/types/geriatric-assessments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,11 @@ function calcAlturaBase(group: PatientGroup, aj: number, age: number): number {
     : (84.88 + 1.83 * aj - 0.24 * age) / 100;
 }
 
+function toNum(v: string): number | null {
+  const n = Number(v.replace(",", "."));
+  return v.trim() !== "" && Number.isFinite(n) ? n : null;
+}
+
 function fmt(n: number | null, decimals = 2): string {
   if (n === null || !Number.isFinite(n)) return "–";
   return n.toFixed(decimals).replace(".", ",");
@@ -75,6 +81,9 @@ function CalcBox({
   );
 }
 
+// ── Tipos auxiliares ──────────────────────────────────────────────────────────
+type NumericField = string; // valor string do input; converte para número só no cálculo
+
 export function GeriatricAssessmentForm({
   patientId,
   defaultAge,
@@ -84,58 +93,77 @@ export function GeriatricAssessmentForm({
 }) {
   const [state, formAction] = useActionState(createGeriatricAssessmentAction, initial);
 
-  const [group, setGroup] = useState<PatientGroup>("mulher_branca");
+  // ── Estado dos inputs (todos controlados para preservar valores em re-render) ─
+  const [group, setGroup]               = useState<PatientGroup>("mulher_branca");
   const [hasAmputation, setHasAmputation] = useState(false);
-  const [ampPct, setAmpPct] = useState(5.9);
+  const [ampPct, setAmpPct]             = useState<NumericField>("5.9");
 
-  const [age, setAge]   = useState<number | "">(defaultAge ?? "");
-  const [cb, setCb]     = useState<number | "">("");
-  const [dct, setDct]   = useState<number | "">("");
-  const [aj, setAj]     = useState<number | "">("");
-  const [kcal, setKcal] = useState<number | "">("");
-  const [ptn, setPtn]   = useState<number | "">("");
+  const [age, setAge]               = useState<NumericField>(defaultAge != null ? String(defaultAge) : "");
+  const [cb, setCb]                 = useState<NumericField>("");
+  const [dct, setDct]               = useState<NumericField>("");
+  const [cp, setCp]                 = useState<NumericField>("");
+  const [aj, setAj]                 = useState<NumericField>("");
+  const [weightReal, setWeightReal] = useState<NumericField>("");
+  const [kcal, setKcal]             = useState<NumericField>("");
+  const [ptn, setPtn]               = useState<NumericField>("");
 
-  // ── Cálculos derivados ────────────────────────────────────────────────────
+  const [risk, setRisk]             = useState<string>("");
+  const [diagnosis, setDiagnosis]   = useState<string>("");
+  const [notes, setNotes]           = useState<string>("");
+
+  // ── Valores numéricos derivados do estado ─────────────────────────────────
+  const numAge  = toNum(age);
+  const numCb   = toNum(cb);
+  const numDct  = toNum(dct);
+  const numAj   = toNum(aj);
+  const numKcal = toNum(kcal);
+  const numPtn  = toNum(ptn);
+  const numAmp  = toNum(ampPct);
+
+  // ── Cálculos em tempo real ────────────────────────────────────────────────
   const cmb = useMemo<number | null>(() => {
-    if (cb === "" || dct === "") return null;
-    return Number(cb) - Number(dct) * 0.314;
-  }, [cb, dct]);
+    if (numCb === null || numDct === null) return null;
+    return numCb - numDct * 0.314;
+  }, [numCb, numDct]);
 
   const peBase = useMemo<number | null>(() => {
-    if (aj === "" || cb === "") return null;
-    const v = calcPeBase(group, Number(aj), Number(cb));
+    if (numAj === null || numCb === null) return null;
+    const v = calcPeBase(group, numAj, numCb);
     return Number.isFinite(v) ? v : null;
-  }, [group, aj, cb]);
+  }, [group, numAj, numCb]);
+
+  const ampPctNum = hasAmputation && numAmp !== null ? numAmp : 0;
 
   const pe = useMemo<number | null>(() => {
     if (peBase === null) return null;
-    if (!hasAmputation) return peBase;
-    return (peBase * 100) / (100 - ampPct);
-  }, [peBase, hasAmputation, ampPct]);
+    if (!hasAmputation || ampPctNum <= 0) return peBase;
+    return (peBase * 100) / (100 - ampPctNum);
+  }, [peBase, hasAmputation, ampPctNum]);
 
   const altura = useMemo<number | null>(() => {
-    if (aj === "" || age === "") return null;
-    const v = calcAlturaBase(group, Number(aj), Number(age));
+    if (numAj === null || numAge === null) return null;
+    const v = calcAlturaBase(group, numAj, numAge);
     return Number.isFinite(v) ? v : null;
-  }, [group, aj, age]);
+  }, [group, numAj, numAge]);
 
   const imc = useMemo<number | null>(() => {
     if (pe === null || altura === null || altura <= 0) return null;
     const rawImc = pe / (altura * altura);
-    if (!hasAmputation) return rawImc;
-    return rawImc * (1 - ampPct / 100);
-  }, [pe, altura, hasAmputation, ampPct]);
+    if (!hasAmputation || ampPctNum <= 0) return rawImc;
+    return rawImc * (1 - ampPctNum / 100);
+  }, [pe, altura, hasAmputation, ampPctNum]);
 
   const ne = useMemo<number | null>(() => {
-    if (pe === null || kcal === "") return null;
-    return pe * Number(kcal);
-  }, [pe, kcal]);
+    if (pe === null || numKcal === null) return null;
+    return pe * numKcal;
+  }, [pe, numKcal]);
 
   const np = useMemo<number | null>(() => {
-    if (pe === null || ptn === "") return null;
-    return pe * Number(ptn);
-  }, [pe, ptn]);
+    if (pe === null || numPtn === null) return null;
+    return pe * numPtn;
+  }, [pe, numPtn]);
 
+  // ── Fórmulas exibidas ────────────────────────────────────────────────────
   const peFormula = (() => {
     const baseMap: Record<PatientGroup, string> = {
       mulher_branca: "AJ×1,09 + CB×2,68 − 65,51",
@@ -144,7 +172,9 @@ export function GeriatricAssessmentForm({
       homem_negro:   "AJ×0,44 + CB×2,86 − 39,21",
     };
     const base = baseMap[group];
-    return hasAmputation ? `(${base}) × 100 ÷ (100 − ${ampPct}%)` : base;
+    return hasAmputation && ampPctNum > 0
+      ? `(${base}) × 100 ÷ (100 − ${ampPctNum}%)`
+      : base;
   })();
 
   const isMale = group === "homem_branco" || group === "homem_negro";
@@ -152,21 +182,22 @@ export function GeriatricAssessmentForm({
     ? "(64,19 + 2,04×AJ − 0,04×Idade) ÷ 100"
     : "(84,88 + 1,83×AJ − 0,24×Idade) ÷ 100";
 
-  const imcFormula = hasAmputation
-    ? `PE ÷ Altura² × (1 − ${ampPct}%)`
-    : "PE ÷ Altura²";
+  const imcFormula =
+    hasAmputation && ampPctNum > 0
+      ? `PE ÷ Altura² × (1 − ${ampPctNum}%)`
+      : "PE ÷ Altura²";
 
   return (
     <form action={formAction} className="space-y-6">
-      <input type="hidden" name="patient_id" value={patientId} />
-      {/* Valores calculados enviados como hidden para armazenamento */}
-      <input type="hidden" name="cmb_cm"              value={cmb              ?? ""} />
-      <input type="hidden" name="estimated_weight_kg" value={pe               ?? ""} />
-      <input type="hidden" name="estimated_height_m"  value={altura           ?? ""} />
-      <input type="hidden" name="bmi"                 value={imc              ?? ""} />
-      <input type="hidden" name="energy_needs_kcal"   value={ne               ?? ""} />
-      <input type="hidden" name="protein_needs_g"     value={np               ?? ""} />
+      {/* ── Campos ocultos: identificação + valores calculados ───────────── */}
+      <input type="hidden" name="patient_id"          value={patientId} />
       <input type="hidden" name="has_amputation"      value={String(hasAmputation)} />
+      <input type="hidden" name="cmb_cm"              value={cmb              !== null ? String(cmb)    : ""} />
+      <input type="hidden" name="estimated_weight_kg" value={pe               !== null ? String(pe)     : ""} />
+      <input type="hidden" name="estimated_height_m"  value={altura           !== null ? String(altura) : ""} />
+      <input type="hidden" name="bmi"                 value={imc              !== null ? String(imc)    : ""} />
+      <input type="hidden" name="energy_needs_kcal"   value={ne               !== null ? String(ne)     : ""} />
+      <input type="hidden" name="protein_needs_g"     value={np               !== null ? String(np)     : ""} />
 
       {/* ── Grupo 1: Perfil ─────────────────────────────────────────────── */}
       <fieldset className="space-y-4">
@@ -184,9 +215,7 @@ export function GeriatricAssessmentForm({
             >
               {(Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]).map(
                 ([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
+                  <option key={val} value={val}>{label}</option>
                 ),
               )}
             </select>
@@ -208,9 +237,7 @@ export function GeriatricAssessmentForm({
               placeholder="Ex.: 80"
               className="tabular-nums"
               value={age}
-              onChange={(e) =>
-                setAge(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setAge(e.target.value)}
             />
           </div>
         </div>
@@ -240,9 +267,7 @@ export function GeriatricAssessmentForm({
                 step={0.1}
                 className="w-24 tabular-nums"
                 value={ampPct}
-                onChange={(e) =>
-                  setAmpPct(Number(e.target.value) || 5.9)
-                }
+                onChange={(e) => setAmpPct(e.target.value)}
               />
               <span className="text-xs text-muted-foreground">
                 coxa=10,0% · perna+pé=5,9% · pé=1,8%
@@ -260,7 +285,7 @@ export function GeriatricAssessmentForm({
 
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="ga-cb">CB — Circunferência do Braço (cm)</Label>
+            <Label htmlFor="ga-cb">CB — Circ. do Braço (cm)</Label>
             <Input
               id="ga-cb"
               name="cb_cm"
@@ -271,9 +296,7 @@ export function GeriatricAssessmentForm({
               placeholder="Ex.: 23"
               className="tabular-nums"
               value={cb}
-              onChange={(e) =>
-                setCb(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setCb(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -288,13 +311,11 @@ export function GeriatricAssessmentForm({
               placeholder="Ex.: 8"
               className="tabular-nums"
               value={dct}
-              onChange={(e) =>
-                setDct(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setDct(e.target.value)}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ga-cp">CP — Circunferência da Panturrilha (cm)</Label>
+            <Label htmlFor="ga-cp">CP — Circ. da Panturrilha (cm)</Label>
             <Input
               id="ga-cp"
               name="cp_cm"
@@ -304,6 +325,8 @@ export function GeriatricAssessmentForm({
               inputMode="decimal"
               placeholder="Ex.: 27"
               className="tabular-nums"
+              value={cp}
+              onChange={(e) => setCp(e.target.value)}
             />
           </div>
         </div>
@@ -329,9 +352,7 @@ export function GeriatricAssessmentForm({
               placeholder="Ex.: 48,5"
               className="tabular-nums"
               value={aj}
-              onChange={(e) =>
-                setAj(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setAj(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -343,8 +364,10 @@ export function GeriatricAssessmentForm({
               step="0.1"
               min={0}
               inputMode="decimal"
-              placeholder="Opcional — deixe em branco se não mensurável"
+              placeholder="Opcional — deixe vazio se não mensurável"
               className="tabular-nums"
+              value={weightReal}
+              onChange={(e) => setWeightReal(e.target.value)}
             />
           </div>
         </div>
@@ -399,9 +422,7 @@ export function GeriatricAssessmentForm({
               placeholder="Ex.: 30"
               className="tabular-nums"
               value={kcal}
-              onChange={(e) =>
-                setKcal(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setKcal(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -416,9 +437,7 @@ export function GeriatricAssessmentForm({
               placeholder="Ex.: 1,2"
               className="tabular-nums"
               value={ptn}
-              onChange={(e) =>
-                setPtn(e.target.value === "" ? "" : Number(e.target.value))
-              }
+              onChange={(e) => setPtn(e.target.value)}
             />
           </div>
         </div>
@@ -448,15 +467,19 @@ export function GeriatricAssessmentForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="ga-risk">Risco Nutricional</Label>
-            <select id="ga-risk" name="nutritional_risk" className={selectClass} defaultValue="">
+            <select
+              id="ga-risk"
+              name="nutritional_risk"
+              className={selectClass}
+              value={risk}
+              onChange={(e) => setRisk(e.target.value)}
+            >
               <option value="">— não avaliado —</option>
-              {(
-                Object.entries(NUTRITIONAL_RISK_LABELS) as [string, string][]
-              ).map(([val, label]) => (
-                <option key={val} value={val}>
-                  {label}
-                </option>
-              ))}
+              {(Object.entries(NUTRITIONAL_RISK_LABELS) as [NutritionalRisk, string][]).map(
+                ([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ),
+              )}
             </select>
           </div>
           <div className="space-y-2">
@@ -465,6 +488,8 @@ export function GeriatricAssessmentForm({
               id="ga-diagnosis"
               name="nutritional_diagnosis"
               placeholder="Ex.: SRD-19, SRN-12, D-16 (opcional)"
+              value={diagnosis}
+              onChange={(e) => setDiagnosis(e.target.value)}
             />
           </div>
         </div>
@@ -478,6 +503,8 @@ export function GeriatricAssessmentForm({
             className={textareaClass}
             style={{ minHeight: "72px" }}
             placeholder="Condicionantes, medicação com impacto nutricional, objetivos… (opcional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
           />
         </div>
       </fieldset>

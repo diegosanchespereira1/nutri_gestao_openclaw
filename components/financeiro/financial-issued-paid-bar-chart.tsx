@@ -89,6 +89,7 @@ export function FinancialIssuedPaidBarChart({ data }: Props) {
             fill={FIN_CHART_PAID_IN_MONTH_FILL}
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
+            isAnimationActive={false}
           />
           <Bar
             dataKey="issuedCents"
@@ -96,6 +97,7 @@ export function FinancialIssuedPaidBarChart({ data }: Props) {
             fill={FIN_CHART_ISSUED_FILL}
             radius={[4, 4, 0, 0]}
             maxBarSize={28}
+            isAnimationActive={false}
           />
         </BarChart>
       </ResponsiveContainer>

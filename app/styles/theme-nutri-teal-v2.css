@@ -1,0 +1,119 @@
+/**
+ * NutriGestão — Design System 2.0
+ * Tema: Teal Profissional (Datadog-style, dark sidebar)
+ * Versão: 2.0.0 — 2026-04-07
+ */
+
+html[data-theme="nutri-teal-v2"] {
+
+  /* ── Neutros ─────────────────────────────────────────────── */
+  --background:          hsl(165 25% 97%);   /* #F4F9F8 */
+  --foreground:          hsl(172 46% 10%);   /* #0B2420 */
+
+  --card:                hsl(0 0% 100%);
+  --card-foreground:     hsl(172 46% 10%);
+
+  --muted:               hsl(168 20% 94%);   /* #EDF4F3 */
+  --muted-foreground:    hsl(168 14% 40%);   /* #516361 */
+
+  --border:              hsl(168 22% 85%);   /* #C8DDD9 */
+  --input:               hsl(168 22% 85%);
+
+  /* ── Marca Teal ──────────────────────────────────────────── */
+  --primary:             hsl(173 72% 28%);   /* #136C62 */
+  --primary-foreground:  hsl(0 0% 100%);
+  --primary-hover:       hsl(173 72% 23%);   /* #0F5950 */
+  --primary-light:       hsl(173 60% 36%);   /* #248C7F */
+
+  /* ── Teal Scale ──────────────────────────────────────────── */
+  --teal-50:   hsl(168 40% 97%);
+  --teal-100:  hsl(168 35% 92%);
+  --teal-200:  hsl(170 40% 82%);
+  --teal-300:  hsl(171 50% 65%);
+  --teal-400:  hsl(172 55% 48%);
+  --teal-500:  hsl(173 65% 38%);
+  --teal-600:  hsl(173 72% 28%);
+  --teal-700:  hsl(173 76% 22%);
+  --teal-800:  hsl(172 80% 16%);
+  --teal-900:  hsl(172 82% 11%);
+
+  /* ── Secundário / Accent ─────────────────────────────────── */
+  --secondary:            hsl(168 25% 92%);
+  --secondary-foreground: hsl(171 55% 16%);
+  --accent:               hsl(168 28% 88%);
+  --accent-foreground:    hsl(171 65% 20%);
+
+  /* ── Popover ─────────────────────────────────────────────── */
+  --popover:              hsl(0 0% 100%);
+  --popover-foreground:   hsl(172 46% 10%);
+
+  /* ── Ring ────────────────────────────────────────────────── */
+  --ring:                 hsl(173 72% 28%);
+
+  /* ── Radius ──────────────────────────────────────────────── */
+  --radius:               0.5rem;
+
+  /* ── Status Semânticos ───────────────────────────────────── */
+  --success:              hsl(142 65% 42%);
+  --success-subtle:       hsl(142 60% 95%);
+  --success-foreground:   hsl(142 65% 18%);
+
+  --warning:              hsl(38 90% 50%);
+  --warning-subtle:       hsl(48 100% 95%);
+  --warning-foreground:   hsl(32 90% 22%);
+
+  --destructive:          hsl(0 82% 57%);
+  --destructive-subtle:   hsl(0 85% 97%);
+  --destructive-foreground: hsl(0 0% 100%);
+
+  --info:                 hsl(199 85% 46%);
+  --info-subtle:          hsl(204 100% 97%);
+  --info-foreground:      hsl(199 85% 18%);
+
+  /* ── Sidebar Dark (Datadog-style) ────────────────────────── */
+  --sidebar:              hsl(173 60% 10%);   /* #072E2A */
+  --sidebar-foreground:   hsl(168 25% 88%);   /* #D6EDEA */
+  --sidebar-primary:      hsl(173 60% 36%);   /* #248C7F */
+  --sidebar-primary-foreground: hsl(0 0% 100%);
+  --sidebar-accent:       hsl(173 50% 16%);   /* #123E3A */
+  --sidebar-accent-foreground: hsl(168 30% 92%);
+  --sidebar-border:       hsl(173 45% 16%);
+  --sidebar-ring:         hsl(173 60% 36%);
+
+  /* ── Gráficos ────────────────────────────────────────────── */
+  --chart-1: hsl(173 72% 28%);  /* teal-600  */
+  --chart-2: hsl(142 65% 42%);  /* green-500 */
+  --chart-3: hsl(38 90% 50%);   /* amber-500 */
+  --chart-4: hsl(0 82% 57%);    /* red-500   */
+  --chart-5: hsl(199 85% 46%);  /* sky-500   */
+}
+
+/* ── Dark mode ────────────────────────────────────────────── */
+html[data-theme="nutri-teal-v2"].dark {
+  --background:          hsl(173 40% 6%);
+  --foreground:          hsl(168 25% 95%);
+
+  --card:                hsl(173 38% 9%);
+  --card-foreground:     hsl(168 25% 95%);
+
+  --muted:               hsl(172 32% 14%);
+  --muted-foreground:    hsl(168 18% 58%);
+
+  --border:              hsl(172 28% 18%);
+  --input:               hsl(172 28% 18%);
+
+  --primary:             hsl(173 65% 40%);
+  --primary-foreground:  hsl(173 60% 6%);
+
+  --secondary:           hsl(172 32% 14%);
+  --secondary-foreground: hsl(168 25% 95%);
+
+  --accent:              hsl(172 28% 18%);
+  --accent-foreground:   hsl(173 65% 40%);
+
+  --sidebar:             hsl(173 50% 7%);
+  --sidebar-foreground:  hsl(168 22% 82%);
+  --sidebar-accent:      hsl(173 42% 13%);
+  --sidebar-accent-foreground: hsl(168 28% 92%);
+  --sidebar-border:      hsl(173 38% 12%);
+}

@@ -71,7 +71,7 @@ export function VisitsMonthBarChart({ data }: Props) {
               return row?.label ?? "";
             }}
           />
-          <Bar dataKey="count" name="Visitas" radius={[4, 4, 0, 0]} maxBarSize={40}>
+          <Bar dataKey="count" name="Visitas" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false}>
             {data.map((row, i) => (
               <Cell
                 key={row.monthKey}

@@ -32,18 +32,19 @@ export function RegulatoryAlertCard({ alert, timeZone }: Props) {
   const statusWord =
     days < 0 ? "Em atraso" : days === 0 ? "Termina hoje" : days <= 7 ? "Prazo próximo" : "A planear";
 
-  const surface =
+  // DS 2.0: border-l-4 por urgência (critical / warning / info)
+  const urgencyClasses =
     days < 0
-      ? "border-destructive/40 bg-destructive/5"
+      ? "border-l-4 border-l-destructive bg-red-50/60"
       : days <= 7
-        ? "border-amber-500/40 bg-amber-500/5"
-        : "border-border bg-card/60";
+        ? "border-l-4 border-l-warning bg-amber-50/60"
+        : "border-l-4 border-l-info bg-sky-50/40";
 
   return (
     <article
       className={cn(
-        "flex flex-col gap-3 rounded-xl border p-4 shadow-xs sm:flex-row sm:items-start sm:justify-between",
-        surface,
+        "flex flex-col gap-3 rounded-lg border border-border p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between",
+        urgencyClasses,
       )}
       aria-labelledby={`reg-alert-title-${alert.id}`}
     >

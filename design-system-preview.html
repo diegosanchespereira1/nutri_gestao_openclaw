@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="nutri-teal-v2">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NutriGestão — Design System 2.0 Preview</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Tokens v2.0 ───────────────────────────────────────── */
+    :root {
+      --background:        hsl(165 25% 97%);
+      --foreground:        hsl(172 46% 10%);
+      --card:              hsl(0 0% 100%);
+      --card-foreground:   hsl(172 46% 10%);
+      --muted:             hsl(168 20% 94%);
+      --muted-foreground:  hsl(168 14% 40%);
+      --border:            hsl(168 22% 85%);
+      --primary:           hsl(173 72% 28%);
+      --primary-foreground:hsl(0 0% 100%);
+      --primary-hover:     hsl(173 72% 23%);
+      --primary-light:     hsl(173 60% 36%);
+      --secondary:         hsl(168 25% 92%);
+      --secondary-foreground: hsl(171 55% 16%);
+      --accent:            hsl(168 28% 88%);
+      --accent-foreground: hsl(171 65% 20%);
+      --success:           hsl(142 65% 42%);
+      --success-subtle:    hsl(142 60% 95%);
+      --success-foreground:hsl(142 65% 18%);
+      --warning:           hsl(38 90% 50%);
+      --warning-subtle:    hsl(48 100% 95%);
+      --warning-foreground:hsl(32 90% 22%);
+      --destructive:       hsl(0 82% 57%);
+      --destructive-subtle:hsl(0 85% 97%);
+      --destructive-foreground: hsl(0 0% 100%);
+      --info:              hsl(199 85% 46%);
+      --info-subtle:       hsl(204 100% 97%);
+      --info-foreground:   hsl(199 85% 18%);
+      --sidebar:           hsl(173 60% 10%);
+      --sidebar-foreground:hsl(168 25% 88%);
+      --sidebar-accent:    hsl(173 50% 16%);
+      --sidebar-border:    hsl(173 45% 16%);
+      --radius:            0.5rem;
+      --shadow-sm:         0 1px 2px 0 rgb(0 0 0 / .05);
+      --shadow:            0 1px 3px 0 rgb(0 0 0 / .10), 0 1px 2px -1px rgb(0 0 0 / .10);
+      --shadow-md:         0 4px 6px -1px rgb(0 0 0 / .10), 0 2px 4px -2px rgb(0 0 0 / .10);
+      --shadow-lg:         0 10px 15px -3px rgb(0 0 0 / .10), 0 4px 6px -4px rgb(0 0 0 / .10);
+    }
+
+    /* ── Base ──────────────────────────────────────────────── */
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      font-size: 14px;
+      line-height: 1.5;
+      display: flex;
+      min-height: 100vh;
+    }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Layout ────────────────────────────────────────────── */
+    .sidebar {
+      width: 240px;
+      min-height: 100vh;
+      background: var(--sidebar);
+      border-right: 1px solid var(--sidebar-border);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 40;
+      box-shadow: var(--shadow-lg);
+    }
+    .sidebar-logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid var(--sidebar-border);
+    }
+    .sidebar-logo-icon {
+      width: 32px; height: 32px;
+      background: var(--primary);
+      border-radius: var(--radius);
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 16px;
+    }
+    .sidebar-logo-text { color: var(--sidebar-foreground); font-weight: 600; font-size: 15px; }
+    .sidebar-logo-badge {
+      font-size: 9px; font-weight: 600; letter-spacing: .05em;
+      background: var(--primary-light); color: white;
+      padding: 1px 5px; border-radius: 99px; margin-top: 1px;
+    }
+    .sidebar-section-label {
+      font-size: 10px; font-weight: 500; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--sidebar-foreground);
+      opacity: .45; padding: 14px 16px 4px;
+    }
+    .sidebar-nav { padding: 8px; }
+    .sidebar-sep { height: 1px; background: var(--sidebar-border); opacity: .5; margin: 8px 0; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: var(--radius);
+      color: var(--sidebar-foreground); font-size: 13.5px; font-weight: 450;
+      cursor: pointer; transition: background .15s;
+      text-decoration: none; opacity: .85;
+    }
+    .nav-item:hover { background: var(--sidebar-accent); opacity: 1; }
+    .nav-item.active {
+      background: var(--sidebar-accent); color: white; opacity: 1; font-weight: 500;
+    }
+    .nav-item .icon { font-size: 15px; width: 18px; text-align: center; }
+    .nav-badge {
+      margin-left: auto; background: var(--destructive);
+      color: white; font-size: 10px; font-weight: 600;
+      padding: 1px 6px; border-radius: 99px;
+    }
+
+    .main-area { margin-left: 240px; flex: 1; display: flex; flex-direction: column; }
+
+    .topbar {
+      height: 56px; background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 24px; position: sticky; top: 0; z-index: 30;
+    }
+    .topbar-left { display: flex; align-items: center; gap: 8px; }
+    .breadcrumb { font-size: 13px; color: var(--muted-foreground); display: flex; align-items: center; gap: 6px; }
+    .breadcrumb-sep { opacity: .4; }
+    .breadcrumb-current { color: var(--foreground); font-weight: 500; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .notif-btn {
+      position: relative; background: transparent; border: none; cursor: pointer;
+      color: var(--muted-foreground); font-size: 18px; padding: 4px;
+      border-radius: var(--radius); transition: background .15s;
+    }
+    .notif-btn:hover { background: var(--muted); }
+    .notif-dot {
+      position: absolute; top: 2px; right: 2px; width: 8px; height: 8px;
+      background: var(--destructive); border-radius: 99px;
+      border: 2px solid var(--card);
+    }
+    .avatar {
+      width: 32px; height: 32px; border-radius: 99px;
+      background: var(--primary); color: white;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+
+    /* ── Conteúdo ───────────────────────────────────────────── */
+    .page-content { padding: 28px 28px 60px; max-width: 1200px; }
+    .section { margin-bottom: 52px; }
+    .section-title {
+      font-size: 11px; font-weight: 600; letter-spacing: .1em;
+      text-transform: uppercase; color: var(--muted-foreground);
+      margin-bottom: 16px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section-title span { color: var(--primary); }
+
+    /* ── Cards ──────────────────────────────────────────────── */
+    .card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow-sm);
+    }
+    .card-header { padding: 20px 24px 12px; }
+    .card-title { font-size: 14px; font-weight: 600; }
+    .card-desc { font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+    .card-content { padding: 0 24px 20px; }
+    .card-footer { padding: 12px 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+
+    /* ── MetricCard ─────────────────────────────────────────── */
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .metric-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow-sm);
+      padding: 18px 20px 14px; position: relative; overflow: hidden;
+      transition: box-shadow .2s;
+    }
+    .metric-card:hover { box-shadow: var(--shadow-md); }
+    .metric-card.warning { border-color: var(--warning); }
+    .metric-card.critical { border-color: var(--destructive); }
+    .metric-label { font-size: 12px; color: var(--muted-foreground); font-weight: 500; margin-bottom: 8px; }
+    .metric-value-row { display: flex; align-items: baseline; gap: 8px; }
+    .metric-value {
+      font-size: 30px; font-weight: 700;
+      font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .metric-value.critical { color: var(--destructive); }
+    .metric-unit { font-size: 12px; color: var(--muted-foreground); font-weight: 500; }
+    .metric-delta {
+      margin-left: auto; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; gap: 2px;
+    }
+    .delta-up { color: var(--success); }
+    .delta-down { color: var(--destructive); }
+    .delta-label { font-size: 10px; color: var(--muted-foreground); margin-top: 2px; }
+    .sparkline { margin-top: 12px; height: 44px; }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: inherit; font-size: 13.5px; font-weight: 500;
+      padding: 0 16px; height: 36px; border-radius: var(--radius);
+      border: none; cursor: pointer; transition: background .15s, box-shadow .15s;
+      white-space: nowrap;
+    }
+    .btn-default { background: var(--primary); color: var(--primary-foreground); }
+    .btn-default:hover { background: var(--primary-hover); }
+    .btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+    .btn-secondary:hover { background: var(--accent); }
+    .btn-outline { background: transparent; color: var(--foreground); border: 1px solid var(--border); }
+    .btn-outline:hover { background: var(--accent); }
+    .btn-ghost { background: transparent; color: var(--foreground); }
+    .btn-ghost:hover { background: var(--muted); }
+    .btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
+    .btn-destructive:hover { filter: brightness(.9); }
+    .btn-sm { height: 30px; padding: 0 12px; font-size: 12px; }
+    .btn-lg { height: 44px; padding: 0 24px; font-size: 15px; }
+    .btn-icon { width: 36px; padding: 0; justify-content: center; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .spin { animation: spin 1s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Badges ─────────────────────────────────────────────── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11.5px; font-weight: 500; padding: 3px 9px;
+      border-radius: var(--radius);
+    }
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 99px; flex-shrink: 0;
+    }
+    .pulse { animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .badge-success { background: var(--success-subtle); color: var(--success-foreground); }
+    .badge-dot-success { background: var(--success); }
+    .badge-warning { background: var(--warning-subtle); color: var(--warning-foreground); }
+    .badge-dot-warning { background: var(--warning); }
+    .badge-destructive { background: var(--destructive-subtle); color: var(--destructive); }
+    .badge-dot-destructive { background: var(--destructive); }
+    .badge-info { background: var(--info-subtle); color: var(--info-foreground); }
+    .badge-dot-info { background: var(--info); }
+    .badge-secondary { background: var(--muted); color: var(--muted-foreground); }
+    .badge-dot-secondary { background: hsl(215 16% 58%); }
+    .badge-primary { background: hsl(173 72% 92%); color: var(--primary); }
+    .badge-dot-primary { background: var(--primary); }
+
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+    /* ── Tabela ─────────────────────────────────────────────── */
+    table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+    thead tr { border-bottom: 2px solid var(--border); }
+    th { padding: 9px 14px; text-align: left; font-size: 11.5px; font-weight: 600; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .06em; }
+    td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: hsl(168 20% 97%); }
+    .td-right { text-align: right; font-variant-numeric: tabular-nums; }
+    .td-medium { font-weight: 500; }
+    .table-wrap { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+
+    /* ── Forms ──────────────────────────────────────────────── */
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-size: 13px; font-weight: 500; }
+    .form-input {
+      font-family: inherit; font-size: 13.5px;
+      padding: 0 12px; height: 36px; border-radius: var(--radius);
+      border: 1px solid var(--border); background: var(--card);
+      color: var(--foreground); outline: none; transition: border .15s, box-shadow .15s;
+      width: 100%;
+    }
+    .form-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px hsl(173 72% 28% / .15); }
+    .form-input.error { border-color: var(--destructive); }
+    .form-input.error:focus { box-shadow: 0 0 0 3px hsl(0 82% 57% / .15); }
+    .form-input.mono { font-family: 'JetBrains Mono', monospace; }
+    .form-hint { font-size: 11.5px; color: var(--muted-foreground); }
+    .form-error { font-size: 11.5px; color: var(--destructive); }
+    textarea.form-input { height: auto; padding: 10px 12px; resize: none; }
+    select.form-input { cursor: pointer; appearance: none; padding-right: 32px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23516361' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* ── Alerts ─────────────────────────────────────────────── */
+    .alert {
+      padding: 14px 16px; border-radius: var(--radius);
+      display: flex; gap: 12px; font-size: 13px;
+    }
+    .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .alert-title { font-weight: 600; margin-bottom: 2px; }
+    .alert-desc { opacity: .85; font-size: 12.5px; }
+    .alert-success { background: var(--success-subtle); color: var(--success-foreground); border-left: 4px solid var(--success); }
+    .alert-warning { background: var(--warning-subtle); color: var(--warning-foreground); border-left: 4px solid var(--warning); }
+    .alert-destructive { background: var(--destructive-subtle); color: var(--destructive); border-left: 4px solid var(--destructive); }
+    .alert-info { background: var(--info-subtle); color: var(--info-foreground); border-left: 4px solid var(--info); }
+
+    /* ── Regulatory Alert Card ──────────────────────────────── */
+    .reg-card {
+      background: var(--card); border-radius: var(--radius);
+      border: 1px solid var(--border); border-left: 4px solid transparent;
+      padding: 14px 18px; display: flex; align-items: center; gap: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+    .reg-card.critical { border-left-color: var(--destructive); background: var(--destructive-subtle); }
+    .reg-card.warning  { border-left-color: var(--warning); background: var(--warning-subtle); }
+    .reg-card.info     { border-left-color: var(--info); background: var(--info-subtle); }
+    .reg-icon { font-size: 20px; flex-shrink: 0; }
+    .reg-main { flex: 1; }
+    .reg-title { font-weight: 600; font-size: 13.5px; }
+    .reg-sub { font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+    .reg-days { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .reg-days.critical { color: var(--destructive); }
+    .reg-days.warning  { color: var(--warning-foreground); }
+
+    /* ── Visit Status Header ────────────────────────────────── */
+    .visit-header {
+      background: hsl(168 40% 97%); border: 1px solid hsl(168 40% 85%);
+      border-radius: var(--radius); padding: 14px 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .visit-dot { width: 10px; height: 10px; border-radius: 99px; background: var(--primary); animation: pulse 1.5s ease-in-out infinite; flex-shrink: 0; }
+    .visit-status-label { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--primary); }
+    .visit-name { font-weight: 600; font-size: 14px; }
+    .visit-time { font-size: 12px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; margin-top: 1px; }
+    .visit-actions { margin-left: auto; display: flex; gap: 8px; }
+
+    /* ── Charts ─────────────────────────────────────────────── */
+    .chart-wrap { position: relative; }
+    .chart-legend { display: flex; gap: 16px; margin-bottom: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 99px; }
+    .legend-line { width: 16px; height: 2px; border-radius: 1px; }
+    .legend-dashed { background: repeating-linear-gradient(to right, hsl(215 16% 58%) 0, hsl(215 16% 58%) 4px, transparent 4px, transparent 7px); height: 2px; width: 16px; }
+
+    /* Compliance bar */
+    .compliance-bar-wrap { display: flex; flex-direction: column; gap: 8px; }
+    .compliance-bar-row { display: flex; align-items: center; gap: 10px; }
+    .compliance-bar-label { font-size: 12px; width: 80px; color: var(--muted-foreground); font-weight: 500; }
+    .compliance-bar-track { flex: 1; height: 20px; border-radius: var(--radius); background: var(--muted); overflow: hidden; }
+    .compliance-bar-fill { height: 100%; border-radius: var(--radius); transition: width .4s; display: flex; align-items: center; padding: 0 8px; }
+    .compliance-bar-pct { font-size: 11px; font-weight: 600; color: white; font-variant-numeric: tabular-nums; }
+    .bar-success { background: var(--success); }
+    .bar-warning { background: var(--warning); }
+    .bar-critical { background: var(--destructive); }
+
+    /* ── Tipografia ─────────────────────────────────────────── */
+    .typo-row { display: flex; align-items: baseline; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .typo-row:last-child { border-bottom: none; }
+    .typo-token { font-size: 11px; font-family: 'JetBrains Mono', monospace; color: var(--muted-foreground); width: 130px; flex-shrink: 0; }
+    .typo-meta  { font-size: 11px; color: var(--muted-foreground); width: 140px; flex-shrink: 0; }
+
+    /* ── Paleta ─────────────────────────────────────────────── */
+    .color-grid { display: flex; gap: 0; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+    .color-swatch { flex: 1; height: 56px; display: flex; align-items: flex-end; padding: 6px; }
+    .color-swatch span { font-size: 9px; font-family: 'JetBrains Mono', monospace; font-weight: 500; color: white; opacity: .8; text-shadow: 0 0 4px #0006; }
+
+    .palette-row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .palette-chip { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+    .chip { width: 52px; height: 52px; border-radius: var(--radius); border: 1px solid var(--border); }
+    .chip-label { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--muted-foreground); }
+
+    /* ── Grid helpers ───────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+
+    /* ── Empty state ────────────────────────────────────────── */
+    .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; text-align: center; }
+    .empty-icon-wrap { width: 56px; height: 56px; border-radius: 99px; background: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 14px; }
+    .empty-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+    .empty-desc { font-size: 13px; color: var(--muted-foreground); max-width: 280px; margin-bottom: 20px; }
+
+    /* ── Skeleton ───────────────────────────────────────────── */
+    .skeleton { background: linear-gradient(90deg, var(--muted) 25%, var(--border) 50%, var(--muted) 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: var(--radius); }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+    /* ── Tabs ───────────────────────────────────────────────── */
+    .tabs-list { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding: 0; }
+    .tab-trigger {
+      padding: 8px 12px 9px; font-size: 13.5px; font-weight: 500;
+      color: var(--muted-foreground); background: transparent; border: none;
+      border-bottom: 2px solid transparent; cursor: pointer; transition: color .15s, border .15s;
+      margin-bottom: -1px;
+    }
+    .tab-trigger:hover { color: var(--foreground); }
+    .tab-trigger.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* ── Misc ───────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 8px 0; }
+    .text-muted { color: var(--muted-foreground); }
+    .text-sm { font-size: 12px; }
+    .font-semibold { font-weight: 600; }
+    .tag-version { font-size: 10px; font-weight: 600; background: var(--primary); color: white; padding: 2px 7px; border-radius: 99px; vertical-align: middle; }
+
+    /* Audit log */
+    .audit-log { background: hsl(220 20% 10%); border-radius: var(--radius); padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.8; }
+    .log-ts { color: hsl(215 20% 50%); }
+    .log-create { color: hsl(173 65% 55%); }
+    .log-update { color: hsl(38 90% 60%); }
+    .log-delete { color: hsl(0 82% 65%); }
+    .log-read   { color: hsl(199 85% 60%); }
+    .log-info   { color: hsl(215 20% 72%); }
+
+    /* Portal access card */
+    .portal-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .portal-row { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+    .portal-row:last-child { border-bottom: none; }
+    .portal-avatar { width: 34px; height: 34px; border-radius: 99px; background: var(--muted); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--muted-foreground); flex-shrink: 0; }
+    .portal-name { font-weight: 600; font-size: 13.5px; }
+    .portal-role { font-size: 11.5px; color: var(--muted-foreground); }
+    .portal-perms { font-size: 11px; color: var(--muted-foreground); margin-top: 3px; }
+    .portal-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .portal-last { font-size: 11px; color: var(--muted-foreground); }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">🌿</div>
+    <div>
+      <div class="sidebar-logo-text">NutriGestão</div>
+      <div class="sidebar-logo-badge">DS 2.0</div>
+    </div>
+  </div>
+
+  <div class="sidebar-nav">
+    <a class="nav-item active" href="#">
+      <span class="icon">🏠</span> Início
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">👥</span> Clientes
+      <span class="nav-badge">3</span>
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">🏥</span> Estabelecimentos
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">🧑</span> Pacientes
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">📋</span> Visitas
+    </a>
+    <div class="sidebar-sep"></div>
+    <div class="sidebar-section-label">Módulos</div>
+    <a class="nav-item" href="#">
+      <span class="icon">📊</span> Fichas Técnicas
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">📄</span> POPs
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">💰</span> Financeiro
+    </a>
+    <a class="nav-item" href="#">
+      <span class="icon">🤝</span> Equipe
+    </a>
+    <div class="sidebar-sep"></div>
+    <a class="nav-item" href="#">
+      <span class="icon">⚙️</span> Configurações
+    </a>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════ MAIN ═════ -->
+<div class="main-area">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="breadcrumb">
+        <span>NutriGestão</span>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-current">Design System 2.0 Preview</span>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="notif-btn">🔔<span class="notif-dot"></span></button>
+      <div class="avatar" title="Maria Nutricionista">MN</div>
+    </div>
+  </header>
+
+  <!-- Page content -->
+  <div class="page-content">
+
+    <!-- Page header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;">
+      <div>
+        <h1 style="font-size:24px;font-weight:700;letter-spacing:-.015em;">
+          Design System <span class="tag-version">v2.0</span>
+        </h1>
+        <p class="text-muted text-sm" style="margin-top:4px;">
+          Todos os elementos visuais — paleta Datadog-style com identidade NutriGestão
+        </p>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm">↓ Exportar</button>
+        <button class="btn btn-default btn-sm">✓ Aprovar DS 2.0</button>
+      </div>
+    </div>
+
+    <!-- ─── 1. CORES ─────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">01 — <span>Paleta de Cores</span></div>
+
+      <p class="text-sm text-muted" style="margin-bottom:12px;">Escala Teal — identidade da marca</p>
+      <div class="color-grid" style="margin-bottom:20px;">
+        <div class="color-swatch" style="background:hsl(168 40% 97%)"><span>50</span></div>
+        <div class="color-swatch" style="background:hsl(168 35% 92%)"><span>100</span></div>
+        <div class="color-swatch" style="background:hsl(170 40% 82%)"><span>200</span></div>
+        <div class="color-swatch" style="background:hsl(171 50% 65%)"><span>300</span></div>
+        <div class="color-swatch" style="background:hsl(172 55% 48%)"><span>400</span></div>
+        <div class="color-swatch" style="background:hsl(173 65% 38%)"><span>500</span></div>
+        <div class="color-swatch" style="background:hsl(173 72% 28%)"><span>600 ★</span></div>
+        <div class="color-swatch" style="background:hsl(173 76% 22%)"><span>700</span></div>
+        <div class="color-swatch" style="background:hsl(172 80% 16%)"><span>800</span></div>
+        <div class="color-swatch" style="background:hsl(173 60% 10%)"><span>900 sidebar</span></div>
+      </div>
+
+      <p class="text-sm text-muted" style="margin-bottom:12px;">Status semânticos</p>
+      <div class="palette-row">
+        <div class="palette-chip">
+          <div class="chip" style="background:hsl(142 65% 42%)"></div>
+          <span class="chip-label">success</span>
+        </div>
+        <div class="palette-chip">
+          <div class="chip" style="background:hsl(142 60% 95%);border-color:hsl(142 65% 42%)"></div>
+          <span class="chip-label">success-subtle</span>
+        </div>
+        <div class="palette-chip" style="margin-right:8px;">
+          <div class="chip" style="background:hsl(38 90% 50%)"></div>
+          <span class="chip-label">warning</span>
+        </div>
+        <div class="palette-chip">
+          <div class="chip" style="background:hsl(48 100% 95%);border-color:hsl(38 90% 50%)"></div>
+          <span class="chip-label">warning-subtle</span>
+        </div>
+        <div class="palette-chip" style="margin-right:8px;">
+          <div class="chip" style="background:hsl(0 82% 57%)"></div>
+          <span class="chip-label">destructive</span>
+        </div>
+        <div class="palette-chip">
+          <div class="chip" style="background:hsl(0 85% 97%);border-color:hsl(0 82% 57%)"></div>
+          <span class="chip-label">destr-subtle</span>
+        </div>
+        <div class="palette-chip" style="margin-right:8px;">
+          <div class="chip" style="background:hsl(199 85% 46%)"></div>
+          <span class="chip-label">info</span>
+        </div>
+        <div class="palette-chip">
+          <div class="chip" style="background:hsl(204 100% 97%);border-color:hsl(199 85% 46%)"></div>
+          <span class="chip-label">info-subtle</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 2. TIPOGRAFIA ─────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">02 — <span>Tipografia</span></div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 20px;">
+        <div class="typo-row">
+          <span class="typo-token">display</span>
+          <span class="typo-meta">30px / 700</span>
+          <span style="font-size:30px;font-weight:700;letter-spacing:-.02em;">Conformidade Regulatória</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">title-lg</span>
+          <span class="typo-meta">24px / 600</span>
+          <span style="font-size:24px;font-weight:600;">Estabelecimentos Ativos</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">title</span>
+          <span class="typo-meta">20px / 600</span>
+          <span style="font-size:20px;font-weight:600;">Visitas do Mês</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">body-lg</span>
+          <span class="typo-meta">16px / 400</span>
+          <span style="font-size:16px;">Texto de corpo padrão para descrições e parágrafos</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">body</span>
+          <span class="typo-meta">14px / 400</span>
+          <span style="font-size:14px;">Texto padrão em tabelas, formulários e labels</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">body-sm</span>
+          <span class="typo-meta">12px / 400</span>
+          <span style="font-size:12px;">Labels, legendas e breadcrumbs de navegação</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">metric-xl</span>
+          <span class="typo-meta">36px / 700</span>
+          <span style="font-size:36px;font-weight:700;font-variant-numeric:tabular-nums;">91.4%</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">metric-lg</span>
+          <span class="typo-meta">24px / 600</span>
+          <span style="font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;">R$ 2.340,00</span>
+        </div>
+        <div class="typo-row">
+          <span class="typo-token">code</span>
+          <span class="typo-meta">14px mono</span>
+          <span style="font-size:14px;font-family:'JetBrains Mono',monospace;">CRN-3 12345 · NIF: 123.456.789-00</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 3. METRIC CARDS ───────────────────────────── -->
+    <div class="section">
+      <div class="section-title">03 — <span>MetricCards com Sparkline</span></div>
+      <div class="metric-grid">
+
+        <!-- Normal -->
+        <div class="metric-card">
+          <div class="metric-label">Clientes Ativos</div>
+          <div class="metric-value-row">
+            <span class="metric-value">47</span>
+            <span class="metric-unit">clientes</span>
+            <span class="metric-delta delta-up">▲ +3</span>
+          </div>
+          <div class="text-sm text-muted" style="margin-top:2px;">vs. mês anterior</div>
+          <div class="sparkline">
+            <svg viewBox="0 0 200 44" style="width:100%;height:100%;">
+              <polyline points="0,38 25,34 50,32 75,30 100,26 125,24 150,20 175,16 200,14"
+                fill="none" stroke="hsl(173 72% 28%)" stroke-width="2" stroke-linecap="round"/>
+              <polygon points="0,38 25,34 50,32 75,30 100,26 125,24 150,20 175,16 200,14 200,44 0,44"
+                fill="hsl(173 72% 28%)" opacity=".08"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Normal — conformidade -->
+        <div class="metric-card">
+          <div class="metric-label">Conformidade Média</div>
+          <div class="metric-value-row">
+            <span class="metric-value">91</span>
+            <span class="metric-unit">%</span>
+            <span class="metric-delta delta-down">▼ −2%</span>
+          </div>
+          <div class="text-sm text-muted" style="margin-top:2px;">vs. mês anterior</div>
+          <div class="sparkline">
+            <svg viewBox="0 0 200 44" style="width:100%;height:100%;">
+              <polyline points="0,12 25,14 50,10 75,16 100,14 125,18 150,16 175,20 200,22"
+                fill="none" stroke="hsl(142 65% 42%)" stroke-width="2" stroke-linecap="round"/>
+              <polygon points="0,12 25,14 50,10 75,16 100,14 125,18 150,16 175,20 200,22 200,44 0,44"
+                fill="hsl(142 65% 42%)" opacity=".08"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Warning -->
+        <div class="metric-card warning">
+          <div class="metric-label">⚠️ Portarias a Vencer</div>
+          <div class="metric-value-row">
+            <span class="metric-value" style="color:hsl(38 90% 40%);">3</span>
+            <span class="metric-unit">portarias</span>
+          </div>
+          <div class="text-sm" style="color:var(--warning-foreground);margin-top:2px;">em ≤ 30 dias</div>
+          <div class="sparkline">
+            <svg viewBox="0 0 200 44" style="width:100%;height:100%;">
+              <polyline points="0,40 40,40 80,40 100,38 130,30 160,20 200,10"
+                fill="none" stroke="hsl(38 90% 50%)" stroke-width="2" stroke-linecap="round" stroke-dasharray="5,3"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Critical -->
+        <div class="metric-card critical">
+          <div class="metric-label">🔴 Intervenção Necessária</div>
+          <div class="metric-value-row">
+            <span class="metric-value critical">2</span>
+            <span class="metric-unit">estabel.</span>
+          </div>
+          <div class="text-sm" style="color:var(--destructive);margin-top:2px;">abaixo de 70% conformidade</div>
+          <div class="sparkline">
+            <svg viewBox="0 0 200 44" style="width:100%;height:100%;">
+              <rect x="0" y="0" width="200" height="44" fill="hsl(0 85% 97%)"/>
+              <polyline points="0,10 40,14 80,18 100,24 130,30 160,38 200,42"
+                fill="none" stroke="hsl(0 82% 57%)" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ─── 4. BOTÕES ─────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">04 — <span>Botões</span></div>
+      <div class="stack">
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Variantes</p>
+          <div class="btn-row">
+            <button class="btn btn-default">✓ Iniciar Visita</button>
+            <button class="btn btn-secondary">↓ Exportar PDF</button>
+            <button class="btn btn-outline">📋 Ver Histórico</button>
+            <button class="btn btn-ghost">✏️ Editar</button>
+            <button class="btn btn-destructive">🗑 Revogar Acesso</button>
+          </div>
+        </div>
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Tamanhos</p>
+          <div class="btn-row" style="align-items:center;">
+            <button class="btn btn-default btn-sm">Compact</button>
+            <button class="btn btn-default">Default</button>
+            <button class="btn btn-default btn-lg">Grande — CTA</button>
+          </div>
+        </div>
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Estados</p>
+          <div class="btn-row">
+            <button class="btn btn-default" disabled><span class="spin">⟳</span> A guardar...</button>
+            <button class="btn btn-outline" disabled>Desabilitado</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 5. STATUS BADGES ──────────────────────────── -->
+    <div class="section">
+      <div class="section-title">05 — <span>StatusBadge — 11 Estados Semânticos</span></div>
+      <div class="stack">
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Visitas</p>
+          <div class="badge-row">
+            <span class="badge badge-secondary"><span class="badge-dot badge-dot-secondary"></span>Agendada</span>
+            <span class="badge badge-primary"><span class="badge-dot badge-dot-primary pulse"></span>Em Visita</span>
+            <span class="badge badge-success"><span class="badge-dot badge-dot-success"></span>Concluída</span>
+          </div>
+        </div>
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Conformidade</p>
+          <div class="badge-row">
+            <span class="badge badge-success"><span class="badge-dot badge-dot-success"></span>Conforme</span>
+            <span class="badge badge-warning"><span class="badge-dot badge-dot-warning pulse"></span>Alerta</span>
+            <span class="badge badge-destructive"><span class="badge-dot badge-dot-destructive pulse"></span>Crítico</span>
+          </div>
+        </div>
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Financeiro / Contrato</p>
+          <div class="badge-row">
+            <span class="badge badge-success"><span class="badge-dot badge-dot-success"></span>Pago</span>
+            <span class="badge badge-warning"><span class="badge-dot badge-dot-warning pulse"></span>Pendente</span>
+            <span class="badge badge-destructive"><span class="badge-dot badge-dot-destructive"></span>Vencido</span>
+          </div>
+        </div>
+        <div>
+          <p class="text-sm text-muted" style="margin-bottom:8px;">Portaria</p>
+          <div class="badge-row">
+            <span class="badge badge-success"><span class="badge-dot badge-dot-success"></span>Vigente</span>
+            <span class="badge badge-warning"><span class="badge-dot badge-dot-warning pulse"></span>A Vencer</span>
+            <span class="badge badge-destructive"><span class="badge-dot badge-dot-destructive"></span>Expirada</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 6. VISIT STATUS HEADER ────────────────────── -->
+    <div class="section">
+      <div class="section-title">06 — <span>VisitStatusHeader (Visita Ativa)</span></div>
+      <div class="stack">
+        <div class="visit-header">
+          <div class="visit-dot"></div>
+          <div>
+            <div class="visit-status-label">Em Visita</div>
+            <div class="visit-name">Escola Municipal Ipê — Cozinha Central</div>
+            <div class="visit-time">há 00:34:12 · 18 de 24 itens verificados</div>
+          </div>
+          <div class="visit-actions">
+            <button class="btn btn-outline btn-sm">⏸ Pausar</button>
+            <button class="btn btn-default btn-sm">✓ Finalizar Visita</button>
+          </div>
+        </div>
+        <div class="visit-header" style="background:hsl(48 100% 96%);border-color:hsl(38 90% 70%);">
+          <div class="visit-dot" style="background:var(--warning);"></div>
+          <div>
+            <div class="visit-status-label" style="color:hsl(32 90% 35%);">Pausada</div>
+            <div class="visit-name">Hospital Regional Norte — Nutrição Enteral</div>
+            <div class="visit-time" style="color:var(--warning-foreground);">Pausa iniciada há 00:08:45</div>
+          </div>
+          <div class="visit-actions">
+            <button class="btn btn-outline btn-sm">▶ Retomar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 7. TABELA ─────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">07 — <span>Tabela de Estabelecimentos</span></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Estabelecimento</th>
+              <th>Tipo</th>
+              <th>Conformidade</th>
+              <th>Próxima Visita</th>
+              <th>Último Checklist</th>
+              <th class="td-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="td-medium">Escola Municipal Ipê</td>
+              <td><span class="badge badge-info" style="font-size:11px;padding:2px 7px;">Escola</span></td>
+              <td><span class="badge badge-success"><span class="badge-dot badge-dot-success"></span>Conforme 94%</span></td>
+              <td class="text-muted text-sm">Em 5 dias</td>
+              <td class="text-muted text-sm">há 22 dias</td>
+              <td class="td-right"><button class="btn btn-ghost btn-sm">Ver →</button></td>
+            </tr>
+            <tr>
+              <td class="td-medium">Hospital Regional Norte</td>
+              <td><span class="badge badge-secondary" style="font-size:11px;padding:2px 7px;">Hospital</span></td>
+              <td><span class="badge badge-warning"><span class="badge-dot badge-dot-warning pulse"></span>Alerta 78%</span></td>
+              <td class="text-muted text-sm">Amanhã 09:00</td>
+              <td class="text-muted text-sm">há 28 dias</td>
+              <td class="td-right"><button class="btn btn-ghost btn-sm">Ver →</button></td>
+            </tr>
+            <tr>
+              <td class="td-medium">UBS Centro — Nutrição Infantil</td>
+              <td><span class="badge badge-secondary" style="font-size:11px;padding:2px 7px;">UBS</span></td>
+              <td><span class="badge badge-destructive"><span class="badge-dot badge-dot-destructive pulse"></span>Crítico 61%</span></td>
+              <td class="text-muted text-sm" style="color:var(--destructive);">Vencida há 3 dias</td>
+              <td class="text-muted text-sm">há 35 dias</td>
+              <td class="td-right">
+                <button class="btn btn-default btn-sm">Agendar ↗</button>
+              </td>
+            </tr>
+            <tr>
+              <td class="td-medium">Clínica Bem Viver</td>
+              <td><span class="badge badge-secondary" style="font-size:11px;padding:2px 7px;">Clínica</span></td>
+              <td><span class="badge badge-success"><span class="badge-dot badge-dot-success"></span>Conforme 97%</span></td>
+              <td class="text-muted text-sm">Em 18 dias</td>
+              <td class="text-muted text-sm">há 12 dias</td>
+              <td class="td-right"><button class="btn btn-ghost btn-sm">Ver →</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ─── 8. GRÁFICOS ───────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">08 — <span>Gráficos por Contexto</span></div>
+      <div class="grid-2">
+
+        <!-- Compliance Chart -->
+        <div class="card">
+          <div class="card-header" style="padding-bottom:8px;">
+            <div class="card-title">Evolução de Conformidade</div>
+            <div class="card-desc">Escola Municipal Ipê — últimos 8 meses</div>
+          </div>
+          <div class="card-content">
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-line" style="background:hsl(173 72% 28%)"></span>Conformidade</span>
+              <span class="legend-item"><span class="legend-dashed"></span>Mínimo (85%)</span>
+            </div>
+            <svg viewBox="0 0 340 160" style="width:100%;overflow:visible;">
+              <!-- Grid -->
+              <line x1="40" y1="20" x2="340" y2="20" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <line x1="40" y1="60" x2="340" y2="60" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <line x1="40" y1="100" x2="340" y2="100" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <line x1="40" y1="140" x2="340" y2="140" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <!-- Y labels -->
+              <text x="34" y="23" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">100%</text>
+              <text x="34" y="63" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">90%</text>
+              <text x="34" y="103" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">80%</text>
+              <text x="34" y="143" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">70%</text>
+              <!-- Threshold -->
+              <line x1="40" y1="50" x2="340" y2="50" stroke="hsl(38 90% 50%)" stroke-width="1.5" stroke-dasharray="5,3"/>
+              <text x="342" y="53" font-size="10" fill="hsl(32 90% 22%)">85%</text>
+              <!-- Area abaixo do threshold (zona de risco) -->
+              <rect x="40" y="50" width="300" height="90" fill="hsl(0 82% 57%)" opacity=".04"/>
+              <!-- Data points: mai=78%(92), jun=84%(84), jul=87%(72), ago=85%(76), set=88%(68), out=91%(56), nov=93%(50), dez=94%(44) -->
+              <polygon points="40,92 80,84 120,72 160,76 200,68 240,56 280,50 320,44 320,140 40,140"
+                fill="hsl(173 72% 28%)" opacity=".1"/>
+              <polyline points="40,92 80,84 120,72 160,76 200,68 240,56 280,50 320,44"
+                fill="none" stroke="hsl(173 72% 28%)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+              <!-- Dots -->
+              <circle cx="40" cy="92" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="80" cy="84" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="120" cy="72" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="160" cy="76" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="200" cy="68" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="240" cy="56" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="280" cy="50" r="3" fill="hsl(173 72% 28%)"/>
+              <circle cx="320" cy="44" r="4" fill="hsl(173 72% 28%)" stroke="white" stroke-width="2"/>
+              <!-- X labels -->
+              <text x="40" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Mai</text>
+              <text x="80" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Jun</text>
+              <text x="120" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Jul</text>
+              <text x="160" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Ago</text>
+              <text x="200" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Set</text>
+              <text x="240" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Out</text>
+              <text x="280" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Nov</text>
+              <text x="320" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Dez</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Visits Bar Chart -->
+        <div class="card">
+          <div class="card-header" style="padding-bottom:8px;">
+            <div class="card-title">Visitas por Mês</div>
+            <div class="card-desc">Realizadas vs. meta — 2026</div>
+          </div>
+          <div class="card-content">
+            <div class="chart-legend">
+              <span class="legend-item"><span class="legend-line" style="background:hsl(173 72% 28%)"></span>Realizadas</span>
+              <span class="legend-item"><span class="legend-line" style="background:hsl(199 85% 46%)"></span>Agendadas</span>
+              <span class="legend-item"><span class="legend-dashed"></span>Meta</span>
+            </div>
+            <svg viewBox="0 0 340 160" style="width:100%;overflow:visible;">
+              <!-- Grid -->
+              <line x1="40" y1="20" x2="340" y2="20" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <line x1="40" y1="60" x2="340" y2="60" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <line x1="40" y1="100" x2="340" y2="100" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <line x1="40" y1="140" x2="340" y2="140" stroke="hsl(168 22% 85%)" stroke-width="1" stroke-dasharray="3,3"/>
+              <!-- Y labels -->
+              <text x="34" y="23" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">20</text>
+              <text x="34" y="63" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">15</text>
+              <text x="34" y="103" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">10</text>
+              <text x="34" y="143" text-anchor="end" font-size="10" fill="hsl(168 14% 40%)">5</text>
+              <!-- Meta line -->
+              <line x1="40" y1="40" x2="340" y2="40" stroke="hsl(215 16% 58%)" stroke-width="1.5" stroke-dasharray="5,3"/>
+              <!-- Bars: jan=10, fev=12, mar=9, abr=14, mai=15, jun=12 (agendadas) -->
+              <!-- Jan -->
+              <rect x="50" y="60" width="14" height="80" fill="hsl(173 72% 28%)" rx="2"/>
+              <rect x="66" y="80" width="14" height="60" fill="hsl(199 85% 46%)" rx="2" opacity=".7"/>
+              <!-- Fev -->
+              <rect x="95" y="44" width="14" height="96" fill="hsl(173 72% 28%)" rx="2"/>
+              <rect x="111" y="60" width="14" height="80" fill="hsl(199 85% 46%)" rx="2" opacity=".7"/>
+              <!-- Mar -->
+              <rect x="140" y="68" width="14" height="72" fill="hsl(173 72% 28%)" rx="2"/>
+              <rect x="156" y="44" width="14" height="96" fill="hsl(199 85% 46%)" rx="2" opacity=".7"/>
+              <!-- Abr -->
+              <rect x="185" y="28" width="14" height="112" fill="hsl(173 72% 28%)" rx="2"/>
+              <rect x="201" y="40" width="14" height="100" fill="hsl(199 85% 46%)" rx="2" opacity=".7"/>
+              <!-- Mai -->
+              <rect x="230" y="20" width="14" height="120" fill="hsl(173 72% 28%)" rx="2"/>
+              <rect x="246" y="52" width="14" height="88" fill="hsl(199 85% 46%)" rx="2" opacity=".7"/>
+              <!-- Jun (atual) -->
+              <rect x="275" y="44" width="14" height="96" fill="hsl(173 72% 28%)" rx="2" opacity=".5"/>
+              <rect x="291" y="36" width="14" height="104" fill="hsl(199 85% 46%)" rx="2" opacity=".5"/>
+              <!-- X labels -->
+              <text x="65" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Jan</text>
+              <text x="110" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Fev</text>
+              <text x="155" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Mar</text>
+              <text x="200" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Abr</text>
+              <text x="245" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Mai</text>
+              <text x="291" y="158" text-anchor="middle" font-size="10" fill="hsl(168 14% 40%)">Jun</text>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Compliance Bar -->
+      <div class="card" style="margin-top:16px;">
+        <div class="card-header">
+          <div class="card-title">Distribuição de Conformidade — Todos os Estabelecimentos</div>
+          <div class="card-desc">14 estabelecimentos ativos</div>
+        </div>
+        <div class="card-content">
+          <div class="compliance-bar-wrap">
+            <div class="compliance-bar-row">
+              <span class="compliance-bar-label">Conforme</span>
+              <div class="compliance-bar-track">
+                <div class="compliance-bar-fill bar-success" style="width:78%">
+                  <span class="compliance-bar-pct">78% (11)</span>
+                </div>
+              </div>
+            </div>
+            <div class="compliance-bar-row">
+              <span class="compliance-bar-label">Alerta</span>
+              <div class="compliance-bar-track">
+                <div class="compliance-bar-fill bar-warning" style="width:14%">
+                  <span class="compliance-bar-pct">14% (2)</span>
+                </div>
+              </div>
+            </div>
+            <div class="compliance-bar-row">
+              <span class="compliance-bar-label">Crítico</span>
+              <div class="compliance-bar-track">
+                <div class="compliance-bar-fill bar-critical" style="width:8%">
+                  <span class="compliance-bar-pct">8% (1)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 9. ALERTAS REGULATÓRIOS ───────────────────── -->
+    <div class="section">
+      <div class="section-title">09 — <span>Alertas Regulatórios (border-l-4 v2.0)</span></div>
+      <div class="stack">
+        <div class="reg-card critical">
+          <div class="reg-icon">🚨</div>
+          <div class="reg-main">
+            <div class="reg-title">Portaria MS 1428/93 — Manipulação de Alimentos</div>
+            <div class="reg-sub">Hospital Regional Norte — Nutrição Enteral</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="reg-days critical">Vencida há 3 dias</div>
+            <button class="btn btn-default btn-sm" style="margin-top:6px;">Agendar Visita</button>
+          </div>
+        </div>
+        <div class="reg-card warning">
+          <div class="reg-icon">⚠️</div>
+          <div class="reg-main">
+            <div class="reg-title">RDC 216/2004 — Boas Práticas para Serviços de Alimentação</div>
+            <div class="reg-sub">Escola Municipal Ipê — Cozinha Central</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="reg-days warning">Vence em 12 dias</div>
+            <button class="btn btn-outline btn-sm" style="margin-top:6px;">Planejar</button>
+          </div>
+        </div>
+        <div class="reg-card info">
+          <div class="reg-icon">ℹ️</div>
+          <div class="reg-main">
+            <div class="reg-title">CVS 5/2013 — Controle de Qualidade na Produção de Alimentos</div>
+            <div class="reg-sub">Clínica Bem Viver — Nutrição Clínica</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="reg-days" style="color:var(--info-foreground);">Vence em 45 dias</div>
+            <button class="btn btn-ghost btn-sm" style="margin-top:6px;">Ver detalhes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 10. FORMULÁRIOS ───────────────────────────── -->
+    <div class="section">
+      <div class="section-title">10 — <span>Formulários Clínicos</span></div>
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Dados do Profissional</div>
+          <div class="card-desc">Campos obrigatórios marcados com *</div>
+        </div>
+        <div class="card-content">
+          <div class="form-grid" style="margin-bottom:16px;">
+            <div class="form-group">
+              <label class="form-label">Nome completo *</label>
+              <input class="form-input" type="text" value="Maria Nutricionista" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">CRN *</label>
+              <input class="form-input mono" type="text" value="CRN-3 12345" placeholder="CRN-X 00000" />
+              <span class="form-hint">Número de registo no Conselho Regional de Nutrição</span>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-bottom:16px;">
+            <div class="form-group">
+              <label class="form-label">Especialidade</label>
+              <select class="form-input">
+                <option>Nutrição Clínica e Hospitalar</option>
+                <option>Nutrição Esportiva</option>
+                <option>Nutrição em Saúde Coletiva</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email *</label>
+              <input class="form-input error" type="email" value="email-invalido" />
+              <span class="form-error">⚠ Email inválido ou já cadastrado</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Observações</label>
+            <textarea class="form-input" rows="3" placeholder="Notas sobre o estabelecimento ou paciente..."></textarea>
+            <span class="form-hint">Máximo 1.000 caracteres · Dados clínicos protegidos pela LGPD</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-ghost">Cancelar</button>
+          <div class="btn-row">
+            <button class="btn btn-outline">Guardar rascunho</button>
+            <button class="btn btn-default">✓ Guardar e continuar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 11. ALERTAS / TOASTS ──────────────────────── -->
+    <div class="section">
+      <div class="section-title">11 — <span>Alerts Inline</span></div>
+      <div class="stack">
+        <div class="alert alert-success">
+          <div class="alert-icon">✓</div>
+          <div>
+            <div class="alert-title">Visita concluída com sucesso</div>
+            <div class="alert-desc">Dossiê gerado e enviado para jose.silva@escola-ipe.edu.br. Score de conformidade: 94%.</div>
+          </div>
+        </div>
+        <div class="alert alert-warning">
+          <div class="alert-icon">⚠</div>
+          <div>
+            <div class="alert-title">Consentimento parental necessário</div>
+            <div class="alert-desc">Ana Lima tem 14 anos. É necessário registar o consentimento do responsável legal (LGPD Art. 14) para aceder a dados clínicos.</div>
+          </div>
+        </div>
+        <div class="alert alert-destructive">
+          <div class="alert-icon">✕</div>
+          <div>
+            <div class="alert-title">Falha ao gerar PDF</div>
+            <div class="alert-desc">Timeout na geração do dossiê. Tente novamente ou contacte o suporte se o problema persistir.</div>
+          </div>
+        </div>
+        <div class="alert alert-info">
+          <div class="alert-icon">ℹ</div>
+          <div>
+            <div class="alert-title">Nova versão de portaria disponível</div>
+            <div class="alert-desc">RDC 216/2004 foi atualizada. 3 checklists associados necessitam revisão.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 12. TABS ───────────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">12 — <span>Tabs Underline (estilo Datadog)</span></div>
+      <div class="card">
+        <div class="card-content" style="padding-top:20px;">
+          <div class="tabs-list">
+            <button class="tab-trigger active">Visão Geral</button>
+            <button class="tab-trigger">Estabelecimentos</button>
+            <button class="tab-trigger">Pacientes</button>
+            <button class="tab-trigger">Financeiro</button>
+            <button class="tab-trigger">Contratos</button>
+          </div>
+          <div style="padding-top:20px;color:var(--muted-foreground);font-size:13px;">
+            Conteúdo da aba "Visão Geral" — dashboard resumido do cliente selecionado
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 13. PORTAL EXTERNO ────────────────────────── -->
+    <div class="section">
+      <div class="section-title">13 — <span>Portal de Acesso Externo</span></div>
+      <div class="portal-card">
+        <div class="portal-row">
+          <div class="portal-avatar">JM</div>
+          <div>
+            <div class="portal-name">João Mendes</div>
+            <div class="portal-role">Familiar · Pai</div>
+            <div class="portal-perms">Permissões: Relatórios · Medições</div>
+          </div>
+          <div class="portal-actions">
+            <span class="badge badge-success" style="font-size:11px;"><span class="badge-dot badge-dot-success"></span>Ativo</span>
+            <span class="portal-last">Último acesso: há 2 dias</span>
+            <button class="btn btn-destructive btn-sm">Revogar</button>
+          </div>
+        </div>
+        <div class="portal-row">
+          <div class="portal-avatar" style="background:hsl(199 85% 90%);color:hsl(199 85% 25%);">AT</div>
+          <div>
+            <div class="portal-name">Dra. Ana Torres</div>
+            <div class="portal-role">Médica · CRM-SP 12345</div>
+            <div class="portal-perms">Permissões: Relatórios · Plano nutricional · Exames</div>
+          </div>
+          <div class="portal-actions">
+            <span class="badge badge-success" style="font-size:11px;"><span class="badge-dot badge-dot-success"></span>Ativa</span>
+            <span class="portal-last">Último acesso: hoje</span>
+            <button class="btn btn-destructive btn-sm">Revogar</button>
+          </div>
+        </div>
+        <div class="portal-row">
+          <div class="portal-avatar" style="background:var(--muted);color:var(--muted-foreground);opacity:.6;">CF</div>
+          <div style="opacity:.6;">
+            <div class="portal-name">Carlos Ferreira</div>
+            <div class="portal-role">Familiar · Tutor legal</div>
+            <div class="portal-perms">Permissões: Relatórios</div>
+          </div>
+          <div class="portal-actions">
+            <span class="badge badge-secondary" style="font-size:11px;"><span class="badge-dot badge-dot-secondary"></span>Revogado</span>
+            <span class="portal-last">há 15 dias</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── 14. AUDIT LOG ─────────────────────────────── -->
+    <div class="section">
+      <div class="section-title">14 — <span>Log de Auditoria (Story 11.2)</span></div>
+      <div class="audit-log">
+        <div><span class="log-ts">[09:14:22.341]</span> <span class="log-create">CREATE</span>  <span class="log-info">patient_nutrition_assessments</span>  · user: maria@nutri.com · patient: Ana Lima (ID: f4d2c…)</div>
+        <div><span class="log-ts">[09:34:08.120]</span> <span class="log-update">UPDATE</span>  <span class="log-info">patient_nutrition_assessments</span>  · campo: peso_kg  71.0 → 72.3 · user: maria@nutri.com</div>
+        <div><span class="log-ts">[10:05:44.892]</span> <span class="log-read  ">READ   </span>  <span class="log-info">patients</span>  · external_user: joao.mendes@gmail.com (portal) · patient: Ana Lima</div>
+        <div><span class="log-ts">[10:22:15.003]</span> <span class="log-update">UPDATE</span>  <span class="log-info">external_portal_users</span>  · is_active: true → false · revogado por: maria@nutri.com</div>
+        <div><span class="log-ts">[11:41:33.571]</span> <span class="log-create">CREATE</span>  <span class="log-info">patient_parental_consents</span>  · guardian: João Mendes · patient: Ana Lima · LGPD Art. 14</div>
+        <div><span class="log-ts">[14:00:00.000]</span> <span class="log-delete">DELETE </span>  <span class="log-info">external_access_permissions</span>  · external_user: carlos.f@… · patient: Ana Lima</div>
+      </div>
+    </div>
+
+    <!-- ─── 15. ESTADOS ESPECIAIS ─────────────────────── -->
+    <div class="section">
+      <div class="section-title">15 — <span>Estados Especiais</span></div>
+      <div class="grid-3">
+
+        <!-- Empty state -->
+        <div class="card">
+          <div class="empty-state">
+            <div class="empty-icon-wrap">👥</div>
+            <div class="empty-title">Nenhum paciente ainda</div>
+            <div class="empty-desc">Adicione o primeiro paciente para começar a acompanhar a evolução nutricional.</div>
+            <button class="btn btn-default btn-sm">+ Adicionar Paciente</button>
+          </div>
+        </div>
+
+        <!-- Skeleton -->
+        <div class="card" style="padding:20px;">
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div class="skeleton" style="height:12px;width:100px;"></div>
+            <div class="skeleton" style="height:32px;width:80px;"></div>
+            <div class="skeleton" style="height:44px;width:100%;"></div>
+            <div style="display:flex;gap:8px;margin-top:4px;">
+              <div class="skeleton" style="height:10px;width:60px;"></div>
+              <div class="skeleton" style="height:10px;width:80px;"></div>
+            </div>
+          </div>
+          <p class="text-sm text-muted" style="text-align:center;margin-top:16px;">SkeletonCard</p>
+        </div>
+
+        <!-- Error state -->
+        <div class="card">
+          <div class="empty-state">
+            <div class="empty-icon-wrap" style="background:var(--destructive-subtle);">❌</div>
+            <div class="empty-title" style="color:var(--destructive);">Erro ao carregar</div>
+            <div class="empty-desc">Timeout na conexão com o servidor. Verifique a sua ligação.</div>
+            <button class="btn btn-outline btn-sm">⟳ Tentar novamente</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ─── 16. SOMBRAS E RADIUS ──────────────────────── -->
+    <div class="section">
+      <div class="section-title">16 — <span>Sombras & Radius</span></div>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="text-align:center;">
+          <div style="width:100px;height:70px;background:var(--card);border-radius:4px;box-shadow:var(--shadow-sm);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted-foreground);">shadow-sm</div>
+          <div class="chip-label" style="margin-top:6px;">radius-sm 4px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:100px;height:70px;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted-foreground);">shadow</div>
+          <div class="chip-label" style="margin-top:6px;">radius 8px (padrão)</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:100px;height:70px;background:var(--card);border-radius:12px;box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted-foreground);">shadow-md</div>
+          <div class="chip-label" style="margin-top:6px;">radius-lg 12px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:100px;height:70px;background:var(--card);border-radius:16px;box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted-foreground);">shadow-lg</div>
+          <div class="chip-label" style="margin-top:6px;">radius-xl 16px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:70px;height:70px;background:var(--primary);border-radius:99px;box-shadow:var(--shadow-md);display:flex;align-items:center;justify-content:center;font-size:20px;color:white;">MN</div>
+          <div class="chip-label" style="margin-top:6px;">radius-full (avatar)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding-top:24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <p class="text-sm text-muted">NutriGestão Design System v2.0 · Retrofit Datadog-style · 2026-04-07</p>
+      <div class="btn-row">
+        <button class="btn btn-outline btn-sm">← Voltar ao v1.0</button>
+        <button class="btn btn-default" onclick="alert('✅ Design System 2.0 aprovado!')">✓ Aprovar e Implementar</button>
+      </div>
+    </div>
+
+  </div><!-- /page-content -->
+</div><!-- /main-area -->
+
+<script>
+  // Tabs interativas
+  document.querySelectorAll('.tab-trigger').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.tabs-list').querySelectorAll('.tab-trigger').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  // Sidebar nav interativa
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+      item.classList.add('active');
+    });
+  });
+
+  // Animar barra de conformidade ao carregar
+  document.querySelectorAll('.compliance-bar-fill').forEach(bar => {
+    const w = bar.style.width;
+    bar.style.width = '0';
+    setTimeout(() => { bar.style.width = w; }, 200);
+  });
+</script>
+</body>
+</html>

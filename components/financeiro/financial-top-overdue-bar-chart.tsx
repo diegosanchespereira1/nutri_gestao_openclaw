@@ -78,6 +78,7 @@ export function FinancialTopOverdueBarChart({ data }: Props) {
             name="Em atraso"
             radius={[0, 4, 4, 0]}
             maxBarSize={22}
+            isAnimationActive={false}
           >
             {data.map((row, i) => (
               <Cell key={row.clientId} fill={finChartOverdueFill(i)} />

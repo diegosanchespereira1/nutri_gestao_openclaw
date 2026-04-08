@@ -82,6 +82,7 @@ export function FinancialReceivedBarChart({ data }: Props) {
             fill={FIN_CHART_RECEIVED_FILL}
             radius={[4, 4, 0, 0]}
             maxBarSize={40}
+            isAnimationActive={false}
           />
         </BarChart>
       </ResponsiveContainer>

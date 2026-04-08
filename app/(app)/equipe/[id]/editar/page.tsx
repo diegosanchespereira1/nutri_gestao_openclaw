@@ -1,11 +1,17 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { TeamMemberForm } from "@/components/team/team-member-form";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { deleteTeamMemberAction, loadTeamMemberById } from "@/lib/actions/team-members";
-import { cn } from "@/lib/utils";
 
 const errMessages: Record<string, string> = {
   missing: "Preencha nome, área e cargo.",
@@ -27,47 +33,51 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/equipe"
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground -ml-2 mb-2",
-          )}
-        >
-          ← Equipe
-        </Link>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Editar membro
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">{row.full_name}</p>
-      </div>
+    <PageLayout variant="form">
+      <PageHeader
+        title={row.full_name}
+        description="Dados profissionais e área de atuação do membro da equipe."
+        back={{ href: "/equipe", label: "Equipe" }}
+      />
 
       {errMsg ? (
         <div
           role="alert"
-          className="border-destructive/40 bg-destructive/10 text-destructive rounded-lg border px-4 py-3 text-sm"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
         >
           {errMsg}
         </div>
       ) : null}
 
-      <TeamMemberForm mode="edit" initial={row} />
+      {/* ── Seção 1: Dados do membro ────────────────────────── */}
+      <Card>
+        <CardHeader className="border-b border-border pb-4">
+          <CardTitle className="text-base">Dados do membro</CardTitle>
+          <CardDescription>
+            Nome, contacto, área profissional e cargo na equipe.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <TeamMemberForm mode="edit" initial={row} />
+        </CardContent>
+      </Card>
 
-      <div className="border-border max-w-lg border-t pt-6">
-        <h2 className="text-foreground text-sm font-medium">Remover membro</h2>
-        <p className="text-muted-foreground mt-1 text-xs">
-          Visitas futuras com este profissional ficam sem atribuição (campo
-          limpo).
+      {/* ── Seção 2: Zona de perigo ─────────────────────────── */}
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
+        <h2 className="text-sm font-semibold text-destructive">
+          Zona de perigo
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Remover este membro desvincula-o de visitas futuras (campo de
+          responsável fica vazio).
         </p>
-        <form action={deleteTeamMemberAction} className="mt-3">
+        <form action={deleteTeamMemberAction} className="mt-4">
           <input type="hidden" name="id" value={row.id} />
           <Button type="submit" variant="destructive" size="sm">
-            Eliminar
+            Remover membro
           </Button>
         </form>
       </div>
-    </div>
+    </PageLayout>
   );
 }

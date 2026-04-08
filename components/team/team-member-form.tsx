@@ -12,11 +12,12 @@ import {
 import { TEAM_JOB_ROLES, teamJobRoleLabel } from "@/lib/constants/team-roles";
 import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
 
+// Dentro do Card (bg-card = branco), select e textarea usam bg-card para consistência
 const selectClassName =
-  "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+  "border-input bg-card text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const textareaClass =
-  "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
+  "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[72px] w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
 type Props = {
   mode: "create" | "edit";
@@ -72,7 +73,7 @@ export function TeamMemberForm({ mode, initial }: Props) {
       </div>
 
       <fieldset className="space-y-3">
-        <legend className="text-foreground text-sm font-medium">
+        <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Área profissional
         </legend>
         <p className="text-muted-foreground text-xs">

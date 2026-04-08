@@ -5,51 +5,48 @@ import {
   buildAssessmentSummaryLine,
   formatAssessmentRecordedAt,
 } from "@/lib/utils/nutrition-assessment-display";
-import { Separator } from "@/components/ui/separator";
 
 function AssessmentHistoryCard({ row }: { row: NutritionAssessmentRow }) {
   const summary = buildAssessmentSummaryLine(row);
 
   return (
-    <li className="border-border rounded-lg border">
+    <li className="overflow-hidden rounded-lg border border-border bg-muted/30">
       <details className="group">
-        <summary className="hover:bg-muted/40 cursor-pointer list-none px-4 py-3 transition-colors marker:content-none [&::-webkit-details-marker]:hidden">
-          <span className="text-foreground flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-            <span className="font-medium">
+        <summary className="cursor-pointer list-none px-4 py-3 transition-colors hover:bg-muted/50 marker:content-none [&::-webkit-details-marker]:hidden">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <span className="text-sm font-medium text-foreground">
               {formatAssessmentRecordedAt(row.recorded_at)}
             </span>
-            <span className="text-muted-foreground text-sm font-normal">
-              {summary}
-            </span>
-          </span>
+            <span className="text-xs text-muted-foreground">{summary}</span>
+          </div>
         </summary>
-        <div className="border-border space-y-3 border-t px-4 py-3 text-sm">
+        <div className="space-y-3 border-t border-border bg-card px-4 py-4 text-sm">
           {row.diet_notes ? (
             <div>
-              <span className="text-muted-foreground font-medium">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Alimentação / hábitos
-              </span>
-              <p className="text-foreground mt-1 whitespace-pre-wrap">
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-foreground">
                 {row.diet_notes}
               </p>
             </div>
           ) : null}
           {row.clinical_notes ? (
             <div>
-              <span className="text-muted-foreground font-medium">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Notas clínicas
-              </span>
-              <p className="text-foreground mt-1 whitespace-pre-wrap">
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-foreground">
                 {row.clinical_notes}
               </p>
             </div>
           ) : null}
           {row.goals ? (
             <div>
-              <span className="text-muted-foreground font-medium">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
                 Objetivos
-              </span>
-              <p className="text-foreground mt-1 whitespace-pre-wrap">
+              </p>
+              <p className="mt-1 whitespace-pre-wrap text-foreground">
                 {row.goals}
               </p>
             </div>
@@ -65,6 +62,12 @@ function AssessmentHistoryCard({ row }: { row: NutritionAssessmentRow }) {
   );
 }
 
+/**
+ * Conteúdo da secção de avaliações nutricionais.
+ *
+ * Deve ser usado dentro de um <Card> da página — o título e descrição
+ * ficam no CardHeader externo; aqui apenas o formulário + histórico.
+ */
 export async function NutritionAssessmentsSection({
   patientId,
 }: {
@@ -73,31 +76,17 @@ export async function NutritionAssessmentsSection({
   const { rows } = await loadNutritionAssessmentsForPatient(patientId);
 
   return (
-    <section
-      className="space-y-6"
-      aria-labelledby="nutrition-assessments-heading"
-    >
-      <div>
-        <h2
-          id="nutrition-assessments-heading"
-          className="text-foreground text-lg font-semibold tracking-tight"
-        >
-          Avaliações nutricionais
-        </h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Formulário por secções (MVP). Cada registo fica com data e hora —
-          histórico imutável para acompanhamento.
-        </p>
-      </div>
-
+    <div className="space-y-6" aria-label="Avaliações nutricionais">
+      {/* Formulário de nova avaliação */}
       <NutritionAssessmentForm patientId={patientId} />
 
-      <Separator />
-
-      <div>
-        <h3 className="text-foreground mb-3 text-sm font-medium">Histórico</h3>
+      {/* Histórico */}
+      <div className="border-t border-border pt-6">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
+          Histórico de avaliações
+        </h3>
         {rows.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-muted-foreground">
             Ainda não há avaliações. Utilize o formulário acima para o primeiro
             registo.
           </p>
@@ -109,6 +98,6 @@ export async function NutritionAssessmentsSection({
           </ul>
         )}
       </div>
-    </section>
+    </div>
   );
 }

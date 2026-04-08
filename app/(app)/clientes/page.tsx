@@ -1,8 +1,12 @@
 import Link from "next/link";
+import { Users } from "lucide-react";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { ClientesFilters } from "@/components/clientes/clientes-filters";
 import { ClientesListBadges } from "@/components/clientes/clientes-list-badges";
+import { EmptyState } from "@/components/common/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
@@ -22,11 +26,7 @@ function parseTipo(raw: string | undefined): ClientKind | "all" {
 function parseSituacao(
   raw: string | undefined,
 ): ClientLifecycleStatus | "all" {
-  if (
-    raw === "ativo" ||
-    raw === "inativo" ||
-    raw === "finalizado"
-  ) {
+  if (raw === "ativo" || raw === "inativo" || raw === "finalizado") {
     return raw;
   }
   return "all";
@@ -44,42 +44,33 @@ export default async function ClientesPage({
   const situacaoRaw =
     typeof sp.situacao === "string" ? sp.situacao : undefined;
   const situacao = parseSituacao(situacaoRaw);
-  const { rows } = await loadClientsForOwner({
-    q,
-    kind: tipo,
-    lifecycle: situacao,
-  });
+  const { rows } = await loadClientsForOwner({ q, kind: tipo, lifecycle: situacao });
 
   const supabase = await createClient();
-  const rowsWithLogos: {
-    row: ClientRow;
-    logoUrl: string | null;
-  }[] = await Promise.all(
-    rows.map(async (row) => ({
-      row,
-      logoUrl:
-        row.kind === "pj" && row.logo_storage_path
-          ? await getClientLogoSignedUrl(supabase, row.logo_storage_path)
-          : null,
-    })),
-  );
+  const rowsWithLogos: { row: ClientRow; logoUrl: string | null }[] =
+    await Promise.all(
+      rows.map(async (row) => ({
+        row,
+        logoUrl:
+          row.kind === "pj" && row.logo_storage_path
+            ? await getClientLogoSignedUrl(supabase, row.logo_storage_path)
+            : null,
+      })),
+    );
+
+  const hasFilters = !!(q || tipo !== "all" || situacao !== "all");
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Clientes
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Carteira de clientes pessoa física ou jurídica. Os dados são visíveis
-            apenas na sua conta.
-          </p>
-        </div>
-        <Link href="/clientes/novo" className={cn(buttonVariants())}>
-          Novo cliente
-        </Link>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title="Clientes"
+        description={`${rows.length > 0 ? `${rows.length} cliente${rows.length !== 1 ? "s" : ""}` : "Carteira de clientes"} — pessoa física ou jurídica.`}
+        actions={
+          <Link href="/clientes/novo" className={cn(buttonVariants())}>
+            Novo cliente
+          </Link>
+        }
+      />
 
       <ClientesFilters
         defaultQ={q}
@@ -88,24 +79,27 @@ export default async function ClientesPage({
       />
 
       {rows.length === 0 ? (
-        <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
-          <p className="text-muted-foreground text-sm">
-            {q || tipo !== "all" || situacao !== "all"
-              ? "Nenhum cliente corresponde aos filtros."
-              : "Ainda não tem clientes. Crie o primeiro para começar."}
-          </p>
-          {!q && tipo === "all" && situacao === "all" ? (
-            <Link
-              href="/clientes/novo"
-              className={cn(buttonVariants(), "mt-4 inline-flex")}
-            >
-              Criar cliente
-            </Link>
-          ) : null}
-        </div>
+        hasFilters ? (
+          <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground text-sm">
+              Nenhum cliente corresponde aos filtros.
+            </p>
+          </div>
+        ) : (
+          <EmptyState
+            icon={Users}
+            title="Nenhum cliente ainda"
+            description="Comece por adicionar o primeiro cliente. Poderá depois associar estabelecimentos e pacientes."
+            action={
+              <Link href="/clientes/novo" className={cn(buttonVariants())}>
+                Criar cliente
+              </Link>
+            }
+          />
+        )
       ) : (
         <ul
-          className="border-border divide-border divide-y overflow-hidden rounded-lg border bg-white"
+          className="border-border divide-border divide-y overflow-hidden rounded-lg border bg-card shadow-sm"
           aria-label="Lista de clientes"
         >
           {rowsWithLogos.map(({ row, logoUrl }) => (
@@ -117,12 +111,12 @@ export default async function ClientesPage({
                 <ClientAvatar
                   name={row.legal_name}
                   imageUrl={logoUrl}
-                  className="mt-0.5"
+                  className="mt-0.5 shrink-0"
                 />
                 <div className="min-w-0 flex-1">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
                     <div className="min-w-0">
-                      <span className="text-foreground font-medium">
+                      <span className="text-foreground font-medium leading-snug">
                         {row.legal_name}
                       </span>
                       {row.kind === "pj" && row.trade_name ? (
@@ -138,9 +132,9 @@ export default async function ClientesPage({
                     />
                   </div>
                   {row.email ? (
-                    <div className="text-muted-foreground mt-2 text-sm">
-                      <span>Email: {row.email}</span>
-                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      {row.email}
+                    </p>
                   ) : null}
                 </div>
               </Link>
@@ -148,6 +142,6 @@ export default async function ClientesPage({
           ))}
         </ul>
       )}
-    </div>
+    </PageLayout>
   );
 }

@@ -1,27 +1,16 @@
-import Link from "next/link";
-
 import { MfaSettings } from "@/components/mfa-settings";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 
 export default function SegurancaPage() {
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-muted-foreground text-sm">
-          <Link
-            href="/definicoes"
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            ← Definições
-          </Link>
-        </p>
-        <h1 className="text-foreground mt-2 text-2xl font-semibold tracking-tight">
-          Segurança
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Gestão de autenticação em dois fatores (TOTP).
-        </p>
-      </div>
+    <PageLayout variant="form">
+      <PageHeader
+        title="Segurança"
+        description="Gestão de autenticação em dois fatores (TOTP)."
+        back={{ href: "/definicoes", label: "Definições" }}
+      />
       <MfaSettings />
-    </div>
+    </PageLayout>
   );
 }

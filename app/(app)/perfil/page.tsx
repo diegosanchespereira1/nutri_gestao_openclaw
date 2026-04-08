@@ -1,4 +1,6 @@
 import { PerfilForm } from "@/components/perfil-form";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { profileRoleLabel } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 
@@ -15,24 +17,16 @@ export default async function PerfilPage() {
     .maybeSingle();
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Perfil profissional
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Nome e CRN usados em documentos e identificação na plataforma.
-        </p>
-        <p className="text-muted-foreground mt-2 text-sm">
-          <span className="text-foreground font-medium">Papel na plataforma:</span>{" "}
-          {profileRoleLabel(profile?.role)}
-          <span className="text-muted-foreground/80"> (definido pelo administrador)</span>
-        </p>
-      </div>
+    <PageLayout variant="form">
+      <PageHeader
+        title="Perfil profissional"
+        description={`Nome e CRN usados em documentos e identificação. Papel: ${profileRoleLabel(profile?.role)}.`}
+        back={{ href: "/definicoes", label: "Definições" }}
+      />
       <PerfilForm
         defaultFullName={profile?.full_name ?? ""}
         defaultCrn={profile?.crn ?? ""}
       />
-    </div>
+    </PageLayout>
   );
 }

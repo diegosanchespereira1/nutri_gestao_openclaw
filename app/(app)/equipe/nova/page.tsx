@@ -1,8 +1,6 @@
-import Link from "next/link";
-
 import { TeamMemberForm } from "@/components/team/team-member-form";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 
 const errMessages: Record<string, string> = {
   missing: "Preencha nome, área e cargo.",
@@ -19,21 +17,12 @@ export default async function NovaEquipePage({ searchParams }: Props) {
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/equipe"
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground -ml-2 mb-2",
-          )}
-        >
-          ← Equipe
-        </Link>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Novo membro da equipe
-        </h1>
-      </div>
+    <PageLayout variant="form">
+      <PageHeader
+        title="Novo membro da equipe"
+        description="Adicione colegas para os associar a visitas agendadas."
+        back={{ href: "/equipe", label: "Equipe" }}
+      />
 
       {errMsg ? (
         <div
@@ -45,6 +34,6 @@ export default async function NovaEquipePage({ searchParams }: Props) {
       ) : null}
 
       <TeamMemberForm mode="create" />
-    </div>
+    </PageLayout>
   );
 }

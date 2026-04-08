@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { LayoutDashboard } from "lucide-react";
+
+import { PageLayout } from "@/components/layout/page-layout";
 
 import { DashboardClinicalSubsection } from "@/components/dashboard/dashboard-clinical-subsection";
 import { DashboardFocusPanel } from "@/components/dashboard/dashboard-focus-panel";
@@ -63,7 +66,7 @@ export default async function InicioPage({
   const showVisitsChart = visitsByMonthHasData(visitsByMonth);
 
   return (
-    <div className="space-y-10">
+    <PageLayout>
       {bemvindo ? (
         <div
           className="border-primary/40 bg-primary/5 rounded-xl border p-4"
@@ -87,21 +90,36 @@ export default async function InicioPage({
           </Link>
         </div>
       ) : null}
-      <div className="space-y-2">
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Início
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Dois eixos separados: atividade com visitas e compliance num bloco;
-          finanças noutro, para reduzir ruído entre contextos (FR53).
-        </p>
+
+      {/* Cabeçalho de página */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="text-primary size-5" aria-hidden />
+          <h1 className="text-foreground text-2xl font-bold tracking-tight">
+            Início
+          </h1>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href="/visitas/nova"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Agendar visita
+          </Link>
+          <Link
+            href="/clientes/novo"
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
+            Novo cliente
+          </Link>
+        </div>
       </div>
 
       <DashboardFocusPanel
         labelledById="dashboard-clinical-heading"
         tone="clinical"
-        title="Pacientes, visitas e compliance"
-        description="Tudo o que é rotina clínica, deslocações e obrigações regulatórias por estabelecimento."
+        title="Visitas e compliance"
+        description="Agenda de visitas, obrigações regulatórias e checklists por estabelecimento."
       >
         <nav
           className="border-border -mt-2 flex flex-wrap gap-x-4 gap-y-2 border-b pb-4 text-sm"
@@ -230,7 +248,7 @@ export default async function InicioPage({
         labelledById="dashboard-financial-heading"
         tone="financial"
         title="Financeiro"
-        description="Resumo de cobranças, contratos e alertas de renovação — área separada da operação clínica."
+        description="Cobranças, contratos e alertas de renovação."
       >
         {expiringContracts.length > 0 && (
           <ContractRenewalAlerts rows={expiringContracts} withinDays={60} />
@@ -240,6 +258,6 @@ export default async function InicioPage({
           overdueTotalLabel={financialSummary.overdueTotalLabel}
         />
       </DashboardFocusPanel>
-    </div>
+    </PageLayout>
   );
 }

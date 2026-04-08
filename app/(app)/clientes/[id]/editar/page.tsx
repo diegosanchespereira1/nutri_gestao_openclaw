@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 import { ClientExamDocumentList } from "@/components/clientes/client-exam-document-list";
 import { ClientAvatar } from "@/components/clientes/client-avatar";
@@ -16,6 +16,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
@@ -75,45 +77,28 @@ export default async function EditarClientePage({
   const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
   const { rows: contracts } = await loadContractsByClient(row.id);
 
+  const statusLabel =
+    row.lifecycle_status === "ativo"
+      ? "Ativo"
+      : row.lifecycle_status === "inativo"
+        ? "Inativo"
+        : "Finalizado";
+
   return (
-    <div className="space-y-6">
-      <Link
-        href="/clientes"
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "text-muted-foreground hover:text-foreground -ml-2 h-auto px-2 py-1",
-        )}
-      >
-        ← Clientes
-      </Link>
+    <PageLayout variant="form">
       <div className="flex flex-wrap items-start gap-4">
         <ClientAvatar
           name={row.legal_name}
           imageUrl={logoPreviewUrl}
           size="lg"
+          className="shrink-0"
         />
-        <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Editar cliente
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {row.kind === "pf" ? "Pessoa física" : "Pessoa jurídica"} ·{" "}
-            {row.legal_name}
-            {row.kind === "pj" ? (
-              <>
-                {" "}
-                ·{" "}
-                <span className="text-foreground font-medium">
-                  {row.lifecycle_status === "ativo"
-                    ? "Ativo"
-                    : row.lifecycle_status === "inativo"
-                      ? "Inativo"
-                      : "Finalizado"}
-                </span>
-              </>
-            ) : null}
-          </p>
-        </div>
+        <PageHeader
+          title={row.legal_name}
+          description={`${row.kind === "pf" ? "Pessoa física" : "Pessoa jurídica"}${row.kind === "pj" ? ` · ${statusLabel}` : ""}`}
+          back={{ href: "/clientes", label: "Clientes" }}
+          className="flex-1 min-w-0"
+        />
       </div>
       <ClientForm
         mode="edit"
@@ -266,8 +251,8 @@ export default async function EditarClientePage({
         </>
       ) : null}
       <Separator />
-      <div>
-        <h2 className="text-foreground text-sm font-medium">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+        <h2 className="text-sm font-semibold text-destructive">
           Zona de perigo
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">
@@ -278,6 +263,6 @@ export default async function EditarClientePage({
           <DeleteClientButton clientId={row.id} />
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

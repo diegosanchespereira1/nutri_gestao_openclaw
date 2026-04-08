@@ -1,4 +1,6 @@
+import { GeriatricAssessmentsSection } from "@/components/pacientes/geriatric-assessments-section";
 import { NutritionAssessmentForm } from "@/components/pacientes/nutrition-assessment-form";
+import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
 import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-assessments";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
 import {
@@ -63,24 +65,28 @@ function AssessmentHistoryCard({ row }: { row: NutritionAssessmentRow }) {
 }
 
 /**
- * Conteúdo da secção de avaliações nutricionais.
+ * Conteúdo do card "Avaliações nutricionais" na página do paciente.
  *
- * Deve ser usado dentro de um <Card> da página — o título e descrição
- * ficam no CardHeader externo; aqui apenas o formulário + histórico.
+ * Renderiza duas abas:
+ * - "Avaliação Geral"  — formulário padrão + histórico
+ * - "Avaliação para Idosos" — formulário especializado (Chumlea) + histórico datado
+ *
+ * As abas são um Client Component; o conteúdo de cada aba é Server-rendered
+ * e passado como slot (ReactNode), respeitando o padrão RSC de composição.
  */
 export async function NutritionAssessmentsSection({
   patientId,
+  defaultAge,
 }: {
   patientId: string;
+  defaultAge?: number;
 }) {
   const { rows } = await loadNutritionAssessmentsForPatient(patientId);
 
-  return (
-    <div className="space-y-6" aria-label="Avaliações nutricionais">
-      {/* Formulário de nova avaliação */}
+  const generalTabContent = (
+    <div className="space-y-6" aria-label="Avaliações nutricionais gerais">
       <NutritionAssessmentForm patientId={patientId} />
 
-      {/* Histórico */}
       <div className="border-t border-border pt-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground">
           Histórico de avaliações
@@ -91,7 +97,7 @@ export async function NutritionAssessmentsSection({
             registo.
           </p>
         ) : (
-          <ul className="space-y-2" aria-label="Histórico de avaliações">
+          <ul className="space-y-2" aria-label="Histórico de avaliações gerais">
             {rows.map((r) => (
               <AssessmentHistoryCard key={r.id} row={r} />
             ))}
@@ -99,5 +105,16 @@ export async function NutritionAssessmentsSection({
         )}
       </div>
     </div>
+  );
+
+  const geriatricTabContent = (
+    <GeriatricAssessmentsSection patientId={patientId} defaultAge={defaultAge} />
+  );
+
+  return (
+    <NutritionAssessmentsTabs
+      generalTab={generalTabContent}
+      geriatricTab={geriatricTabContent}
+    />
   );
 }

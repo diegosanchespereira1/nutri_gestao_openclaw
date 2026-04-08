@@ -36,6 +36,14 @@ export default async function EditarPacientePage({
     ? String(row.birth_date).slice(0, 10)
     : "";
 
+  // Idade aproximada para pré-preencher o campo na avaliação geriátrica
+  const defaultAge = birthSlice
+    ? Math.floor(
+        (Date.now() - new Date(birthSlice).getTime()) /
+          (1000 * 60 * 60 * 24 * 365.25),
+      )
+    : undefined;
+
   const backHref = row.establishment_id
     ? `/clientes/${row.client_id}/estabelecimentos/${row.establishment_id}/editar`
     : `/clientes/${row.client_id}/editar`;
@@ -108,7 +116,7 @@ export default async function EditarPacientePage({
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <NutritionAssessmentsSection patientId={row.id} />
+          <NutritionAssessmentsSection patientId={row.id} defaultAge={defaultAge} />
         </CardContent>
       </Card>
 

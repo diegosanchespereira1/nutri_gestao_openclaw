@@ -7,12 +7,13 @@ export default function NovoClientePage() {
     <PageLayout variant="form">
       <PageHeader
         title="Novo cliente"
-        description="Pessoa física (particular) ou jurídica (empresa). Estabelecimentos e pacientes são associados depois."
+        description="Empresa, hospital ou clínica (pessoa jurídica). Estabelecimentos e pacientes associam-se depois. Para pacientes individuais, use o módulo Pacientes."
         back={{ href: "/clientes", label: "Clientes" }}
       />
       <ClientForm
         mode="create"
-        defaultKind="pf"
+        defaultKind="pj"
+        lockKind
         defaultLegalName=""
         defaultTradeName=""
         defaultDocumentId=""

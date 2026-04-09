@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-09T15:30:00Z"
+last_updated: "2026-04-09T16:00:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -35,7 +35,7 @@ development_status:
   epic-1-retrospective: optional
 
   epic-2: in-progress
-  2-1a-crud-clientes-apenas-pj: ready-for-dev
+  2-1a-crud-clientes-apenas-pj: done
   2-1b-cadastro-pacientes-pf-independente: ready-for-dev
   2-2-estabelecimentos-cliente-pj-tipo: done
   2-3-pacientes-vinculos-estabelecimento-pf: done

@@ -104,6 +104,7 @@ export default async function EditarClientePage({
         mode="edit"
         clientId={row.id}
         defaultKind={row.kind}
+        lockKind={row.kind === "pj"}
         defaultLegalName={row.legal_name}
         defaultTradeName={row.trade_name ?? ""}
         defaultDocumentId={row.document_id ?? ""}

@@ -13,11 +13,9 @@ import { cn } from "@/lib/utils";
 
 export function ClientesFilters({
   defaultQ,
-  defaultTipo,
   defaultSituacao,
 }: {
   defaultQ: string;
-  defaultTipo: "all" | "pf" | "pj";
   defaultSituacao: ClientLifecycleStatus | "all";
 }) {
   return (
@@ -32,27 +30,14 @@ export function ClientesFilters({
           id="filtro-q"
           name="q"
           type="search"
-          placeholder="Nome, documento, email…"
+          placeholder="Nome, CNPJ, email…"
           defaultValue={defaultQ}
           autoComplete="off"
           className="bg-white dark:bg-card"
         />
       </div>
-      <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-auto lg:min-w-0 lg:max-w-md lg:grid-cols-2">
-        <div className="space-y-2 sm:min-w-[10rem]">
-          <Label htmlFor="filtro-tipo">Tipo (PF / PJ)</Label>
-          <select
-            id="filtro-tipo"
-            name="tipo"
-            defaultValue={defaultTipo}
-            className="border-input bg-white ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-card"
-          >
-            <option value="all">Todas (PF e PJ)</option>
-            <option value="pf">Pessoa física</option>
-            <option value="pj">Pessoa jurídica</option>
-          </select>
-        </div>
-        <div className="space-y-2 sm:min-w-[10rem]">
+      <div className="w-full lg:w-auto lg:min-w-[10rem] lg:max-w-xs">
+        <div className="space-y-2">
           <Label htmlFor="filtro-situacao">Situação</Label>
           <select
             id="filtro-situacao"

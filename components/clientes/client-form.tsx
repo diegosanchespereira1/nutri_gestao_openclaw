@@ -82,6 +82,7 @@ export function ClientForm({
   mode,
   clientId,
   defaultKind,
+  lockKind = false,
   defaultLegalName,
   defaultTradeName,
   defaultDocumentId,
@@ -124,6 +125,9 @@ export function ClientForm({
   mode: "create" | "edit";
   clientId?: string;
   defaultKind: ClientKind;
+  /** Quando true, o toggle PF/PJ fica oculto e o kind é fixado em defaultKind.
+   *  Usar nas páginas de Clientes (apenas PJ). */
+  lockKind?: boolean;
   defaultLegalName: string;
   defaultTradeName: string;
   defaultDocumentId: string;
@@ -256,39 +260,44 @@ export function ClientForm({
             </TabsList>
 
             <TabsContent value="identificacao" className="space-y-6">
-              <fieldset className="space-y-3">
-                <legend className="text-foreground mb-1 text-sm font-medium">
-                  Tipo de cliente
-                </legend>
-                <div className="flex flex-wrap gap-4">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="kind"
-                      value="pf"
-                      checked={kind === "pf"}
-                      onChange={() => setKindAndTab("pf")}
-                      className="border-input size-4 accent-primary"
-                    />
-                    Pessoa física
-                  </label>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name="kind"
-                      value="pj"
-                      checked={kind === "pj"}
-                      onChange={() => setKindAndTab("pj")}
-                      className="border-input size-4 accent-primary"
-                    />
-                    <Building2
-                      className="text-muted-foreground size-4"
-                      aria-hidden
-                    />
-                    Pessoa jurídica
-                  </label>
-                </div>
-              </fieldset>
+              {lockKind ? (
+                /* kind fixado — campo hidden para garantir envio no form */
+                <input type="hidden" name="kind" value={kind} />
+              ) : (
+                <fieldset className="space-y-3">
+                  <legend className="text-foreground mb-1 text-sm font-medium">
+                    Tipo de cliente
+                  </legend>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="kind"
+                        value="pf"
+                        checked={kind === "pf"}
+                        onChange={() => setKindAndTab("pf")}
+                        className="border-input size-4 accent-primary"
+                      />
+                      Pessoa física
+                    </label>
+                    <label className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="kind"
+                        value="pj"
+                        checked={kind === "pj"}
+                        onChange={() => setKindAndTab("pj")}
+                        className="border-input size-4 accent-primary"
+                      />
+                      <Building2
+                        className="text-muted-foreground size-4"
+                        aria-hidden
+                      />
+                      Pessoa jurídica
+                    </label>
+                  </div>
+                </fieldset>
+              )}
 
               <Separator />
 

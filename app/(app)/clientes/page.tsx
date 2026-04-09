@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { ClientesFilters } from "@/components/clientes/clientes-filters";
@@ -13,15 +13,9 @@ import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import type {
-  ClientKind,
   ClientLifecycleStatus,
   ClientRow,
 } from "@/lib/types/clients";
-
-function parseTipo(raw: string | undefined): ClientKind | "all" {
-  if (raw === "pf" || raw === "pj") return raw;
-  return "all";
-}
 
 function parseSituacao(
   raw: string | undefined,
@@ -39,12 +33,12 @@ export default async function ClientesPage({
 }) {
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
-  const tipoRaw = typeof sp.tipo === "string" ? sp.tipo : undefined;
-  const tipo = parseTipo(tipoRaw);
   const situacaoRaw =
     typeof sp.situacao === "string" ? sp.situacao : undefined;
   const situacao = parseSituacao(situacaoRaw);
-  const { rows } = await loadClientsForOwner({ q, kind: tipo, lifecycle: situacao });
+  // Story 2.1a — Clientes = apenas Pessoa Jurídica (empresas, hospitais, clínicas).
+  // Pacientes PF têm módulo próprio em /pacientes/.
+  const { rows } = await loadClientsForOwner({ q, kind: "pj", lifecycle: situacao });
 
   const supabase = await createClient();
   const rowsWithLogos: { row: ClientRow; logoUrl: string | null }[] =
@@ -58,13 +52,13 @@ export default async function ClientesPage({
       })),
     );
 
-  const hasFilters = !!(q || tipo !== "all" || situacao !== "all");
+  const hasFilters = !!(q || situacao !== "all");
 
   return (
     <PageLayout>
       <PageHeader
         title="Clientes"
-        description={`${rows.length > 0 ? `${rows.length} cliente${rows.length !== 1 ? "s" : ""}` : "Carteira de clientes"} — pessoa física ou jurídica.`}
+        description={`${rows.length > 0 ? `${rows.length} cliente${rows.length !== 1 ? "s" : ""}` : "Carteira de clientes"} — empresas, hospitais e clínicas.`}
         actions={
           <Link href="/clientes/novo" className={cn(buttonVariants())}>
             Novo cliente
@@ -74,7 +68,6 @@ export default async function ClientesPage({
 
       <ClientesFilters
         defaultQ={q}
-        defaultTipo={tipo === "all" ? "all" : tipo}
         defaultSituacao={situacao}
       />
 
@@ -87,9 +80,9 @@ export default async function ClientesPage({
           </div>
         ) : (
           <EmptyState
-            icon={Users}
+            icon={Building2}
             title="Nenhum cliente ainda"
-            description="Comece por adicionar o primeiro cliente. Poderá depois associar estabelecimentos e pacientes."
+            description="Adicione empresas, hospitais ou clínicas. Poderá depois associar estabelecimentos e pacientes a cada cliente."
             action={
               <Link href="/clientes/novo" className={cn(buttonVariants())}>
                 Criar cliente

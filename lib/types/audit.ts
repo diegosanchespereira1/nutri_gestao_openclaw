@@ -39,7 +39,7 @@ export type AuditDsarReport = {
     timestamp: string;
     operation: AuditOperation;
     tableName: string;
-    dataChanged?: Record<string, unknown>;
+    dataChanged: Record<string, unknown> | null;
   }>;
   generatedAt: string;
   generatedBy: string;

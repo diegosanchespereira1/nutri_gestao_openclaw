@@ -140,7 +140,11 @@ export async function generateDsarReport(
   }
 
   // Construir relatório DSAR
-  const accessHistory = (logs ?? []).map((log: any) => ({
+  type LogWithUser = AuditLogRow & {
+    auth_users?: { email: string } | null;
+  };
+
+  const accessHistory = ((logs ?? []) as LogWithUser[]).map((log) => ({
     userId: log.user_id,
     userEmail: log.auth_users?.email ?? 'Utilizador desconhecido',
     timestamp: log.created_at,

@@ -1,0 +1,27 @@
+# deps & build
+node_modules
+.next
+out
+
+# git / ide
+.git
+.gitignore
+.cursor
+.claude
+.github
+
+# docs & planning (não necessários no build)
+_bmad-output
+*.md
+!README.md
+
+# env (segredos entram por ARG/ENV no build/run, não por ficheiros copiados)
+.env
+.env.*
+!.env.example
+
+# test & misc
+coverage
+**/*.test.ts
+**/*.test.tsx
+vitest.config*.ts

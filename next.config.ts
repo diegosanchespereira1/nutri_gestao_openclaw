@@ -11,6 +11,7 @@ const supabaseOrigin = (() => {
 })();
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async headers() {
     const base: { key: string; value: string }[] = [
       { key: "X-Frame-Options", value: "DENY" },

@@ -1,3 +1,4 @@
+import { AdultNutritionAssessmentsSection } from "@/components/pacientes/adult-nutrition-assessments-section";
 import { GeriatricAssessmentsSection } from "@/components/pacientes/geriatric-assessments-section";
 import { NutritionAssessmentForm } from "@/components/pacientes/nutrition-assessment-form";
 import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
@@ -67,9 +68,10 @@ function AssessmentHistoryCard({ row }: { row: NutritionAssessmentRow }) {
 /**
  * Conteúdo do card "Avaliações nutricionais" na página do paciente.
  *
- * Renderiza duas abas:
- * - "Avaliação Geral"  — formulário padrão + histórico
- * - "Avaliação para Idosos" — formulário especializado (Chumlea) + histórico datado
+ * Abas:
+ * - Avaliação Geral — formulário padrão + histórico
+ * - Avaliação Adultos — antropometria adulto (peso/altura estimados específicos)
+ * - Avaliação para Idosos — Chumlea idoso + histórico
  *
  * As abas são um Client Component; o conteúdo de cada aba é Server-rendered
  * e passado como slot (ReactNode), respeitando o padrão RSC de composição.
@@ -107,6 +109,13 @@ export async function NutritionAssessmentsSection({
     </div>
   );
 
+  const adultTabContent = (
+    <AdultNutritionAssessmentsSection
+      patientId={patientId}
+      defaultAge={defaultAge}
+    />
+  );
+
   const geriatricTabContent = (
     <GeriatricAssessmentsSection patientId={patientId} defaultAge={defaultAge} />
   );
@@ -114,6 +123,7 @@ export async function NutritionAssessmentsSection({
   return (
     <NutritionAssessmentsTabs
       generalTab={generalTabContent}
+      adultTab={adultTabContent}
       geriatricTab={geriatricTabContent}
     />
   );

@@ -28,6 +28,8 @@ export default async function EditarPacientePage({
   const sp = await searchParams;
   const avaliacaoOk =
     typeof sp.avaliacao === "string" && sp.avaliacao === "ok";
+  const avaliacaoAdultoOk =
+    typeof sp.avaliacao_adulto === "string" && sp.avaliacao_adulto === "ok";
 
   const { row } = await loadPatientById(id);
   if (!row) notFound();
@@ -75,6 +77,16 @@ export default async function EditarPacientePage({
         >
           <p className="text-sm font-medium text-green-800">
             Avaliação nutricional registada com sucesso.
+          </p>
+        </div>
+      ) : null}
+      {avaliacaoAdultoOk ? (
+        <div
+          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3"
+          role="status"
+        >
+          <p className="text-sm font-medium text-green-800">
+            Avaliação nutricional (adultos) registada com sucesso.
           </p>
         </div>
       ) : null}

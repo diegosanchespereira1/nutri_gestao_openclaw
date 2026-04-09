@@ -121,3 +121,85 @@ export async function createNutritionAssessmentAction(
   revalidatePath(`/pacientes/${patientId}/historico`);
   redirect(`/pacientes/${patientId}/editar?avaliacao=ok`);
 }
+
+// ── Helpers de permissão ──────────────────────────────────────────────────────
+async function assertAssessmentOwner(
+  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
+  userId: string,
+  assessmentId: string,
+): Promise<{ patientId: string } | { error: string }> {
+  const { data: row } = await supabase
+    .from("patient_nutrition_assessments")
+    .select("id, patient_id, patients!inner(client_id, clients!inner(owner_user_id))")
+    .eq("id", assessmentId)
+    .maybeSingle();
+
+  if (!row) return { error: "Avaliação não encontrada." };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const owner = (row as any).patients?.clients?.owner_user_id;
+  if (owner !== userId) return { error: "Sem permissão para esta avaliação." };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { patientId: (row as any).patient_id as string };
+}
+
+export async function deleteNutritionAssessmentAction(
+  _prev: NutritionAssessmentFormResult | undefined,
+  formData: FormData,
+): Promise<NutritionAssessmentFormResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const assessmentId = String(formData.get("assessment_id") ?? "").trim();
+  if (!assessmentId) return { ok: false, error: "ID em falta." };
+
+  const check = await assertAssessmentOwner(supabase, user.id, assessmentId);
+  if ("error" in check) return { ok: false, error: check.error };
+
+  const { error } = await supabase
+    .from("patient_nutrition_assessments")
+    .delete()
+    .eq("id", assessmentId);
+
+  if (error) return { ok: false, error: "Não foi possível eliminar." };
+
+  revalidatePath(`/pacientes/${check.patientId}/editar`);
+  revalidatePath(`/pacientes/${check.patientId}/historico`);
+  return { ok: true };
+}
+
+export async function updateNutritionAssessmentAction(
+  _prev: NutritionAssessmentFormResult | undefined,
+  formData: FormData,
+): Promise<NutritionAssessmentFormResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const assessmentId = String(formData.get("assessment_id") ?? "").trim();
+  if (!assessmentId) return { ok: false, error: "ID em falta." };
+
+  const check = await assertAssessmentOwner(supabase, user.id, assessmentId);
+  if ("error" in check) return { ok: false, error: check.error };
+
+  const height_cm    = parseOptDecimal(String(formData.get("height_cm") ?? ""));
+  const weight_kg    = parseOptDecimal(String(formData.get("weight_kg") ?? ""));
+  const waist_cm     = parseOptDecimal(String(formData.get("waist_cm") ?? ""));
+  const activity_level = parseActivityLevel(formData.get("activity_level"));
+  const diet_notes   = trimText(String(formData.get("diet_notes") ?? ""));
+  const clinical_notes = trimText(String(formData.get("clinical_notes") ?? ""));
+  const goals        = trimText(String(formData.get("goals") ?? ""));
+
+  const { error } = await supabase
+    .from("patient_nutrition_assessments")
+    .update({ height_cm, weight_kg, waist_cm, activity_level, diet_notes, clinical_notes, goals })
+    .eq("id", assessmentId);
+
+  if (error) return { ok: false, error: "Não foi possível guardar as alterações." };
+
+  revalidatePath(`/pacientes/${check.patientId}/editar`);
+  revalidatePath(`/pacientes/${check.patientId}/historico`);
+  return { ok: true };
+}

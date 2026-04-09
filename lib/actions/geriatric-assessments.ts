@@ -157,3 +157,105 @@ export async function createGeriatricAssessmentAction(
   revalidatePath(`/pacientes/${patientId}/editar`);
   redirect(`/pacientes/${patientId}/editar?avaliacao=ok`);
 }
+
+// ── Helpers de permissão ──────────────────────────────────────────────────────
+async function assertGeriatricOwner(
+  supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
+  userId: string,
+  assessmentId: string,
+): Promise<{ patientId: string } | { error: string }> {
+  const { data: row } = await supabase
+    .from("patient_geriatric_assessments")
+    .select("id, patient_id, patients!inner(client_id, clients!inner(owner_user_id))")
+    .eq("id", assessmentId)
+    .maybeSingle();
+
+  if (!row) return { error: "Avaliação não encontrada." };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const owner = (row as any).patients?.clients?.owner_user_id;
+  if (owner !== userId) return { error: "Sem permissão para esta avaliação." };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return { patientId: (row as any).patient_id as string };
+}
+
+export async function deleteGeriatricAssessmentAction(
+  _prev: GeriatricAssessmentFormResult | undefined,
+  formData: FormData,
+): Promise<GeriatricAssessmentFormResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const assessmentId = String(formData.get("assessment_id") ?? "").trim();
+  if (!assessmentId) return { ok: false, error: "ID em falta." };
+
+  const check = await assertGeriatricOwner(supabase, user.id, assessmentId);
+  if ("error" in check) return { ok: false, error: check.error };
+
+  const { error } = await supabase
+    .from("patient_geriatric_assessments")
+    .delete()
+    .eq("id", assessmentId);
+
+  if (error) return { ok: false, error: "Não foi possível eliminar." };
+
+  revalidatePath(`/pacientes/${check.patientId}/editar`);
+  return { ok: true };
+}
+
+export async function updateGeriatricAssessmentAction(
+  _prev: GeriatricAssessmentFormResult | undefined,
+  formData: FormData,
+): Promise<GeriatricAssessmentFormResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const assessmentId = String(formData.get("assessment_id") ?? "").trim();
+  if (!assessmentId) return { ok: false, error: "ID em falta." };
+
+  const check = await assertGeriatricOwner(supabase, user.id, assessmentId);
+  if ("error" in check) return { ok: false, error: check.error };
+
+  const patient_group = parsePatientGroup(formData.get("patient_group"));
+  if (!patient_group) return { ok: false, error: "Selecione o grupo do paciente." };
+
+  const has_amputation = formData.get("has_amputation") === "true";
+  const amputation_segment_pct = has_amputation ? parseDec(formData.get("amputation_segment_pct")) : null;
+
+  const { error } = await supabase
+    .from("patient_geriatric_assessments")
+    .update({
+      patient_group,
+      has_amputation,
+      amputation_segment_pct,
+      age_years:              Math.round(parseDec(formData.get("age_years")) ?? 0) || null,
+      cb_cm:                  parseDec(formData.get("cb_cm")),
+      dct_mm:                 parseDec(formData.get("dct_mm")),
+      cp_cm:                  parseDec(formData.get("cp_cm")),
+      aj_cm:                  parseDec(formData.get("aj_cm")),
+      weight_real_kg:         parseDec(formData.get("weight_real_kg")),
+      cmb_cm:                 parseDec(formData.get("cmb_cm")),
+      estimated_weight_kg:    parseDec(formData.get("estimated_weight_kg")),
+      estimated_height_m:     parseDec(formData.get("estimated_height_m")),
+      bmi:                    parseDec(formData.get("bmi")),
+      kcal_per_kg:            parseDec(formData.get("kcal_per_kg")),
+      energy_needs_kcal:      parseDec(formData.get("energy_needs_kcal")),
+      ptn_per_kg:             parseDec(formData.get("ptn_per_kg")),
+      protein_needs_g:        parseDec(formData.get("protein_needs_g")),
+      nutritional_risk:       parseRisk(formData.get("nutritional_risk")),
+      nutritional_diagnosis:  String(formData.get("nutritional_diagnosis") ?? "").trim() || null,
+      clinical_notes:         String(formData.get("clinical_notes") ?? "").trim() || null,
+    })
+    .eq("id", assessmentId);
+
+  if (error) {
+    console.error("[geriatric-assessments] update error:", error);
+    return { ok: false, error: "Não foi possível guardar as alterações." };
+  }
+
+  revalidatePath(`/pacientes/${check.patientId}/editar`);
+  return { ok: true };
+}

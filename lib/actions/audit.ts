@@ -1,12 +1,36 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 import { createClient } from '@/lib/supabase/server';
 import type {
   AuditLogRow,
   AuditLogFilters,
   AuditDsarReport,
 } from '@/lib/types/audit';
+
+// Schema de validação para UUID
+const uuidSchema = z.string().uuid('ID deve ser um UUID válido');
+
+// Rate limiting: máximo 10 exportações por minuto por utilizador
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '1 m'),
+});
+
+/** Verifica rate limit para um utilizador. */
+async function checkRateLimit(userId: string): Promise<boolean> {
+  try {
+    const { success } = await ratelimit.limit(userId);
+    return success;
+  } catch {
+    // Em caso de erro ao conectar com Redis, permitir a ação
+    // (graceful degradation em caso de indisponibilidade do Redis)
+    return true;
+  }
+}
 
 /** Carrega logs de auditoria do utilizador com paginação e filtros. */
 export async function loadAuditLogs(
@@ -59,6 +83,9 @@ export async function loadAuditLogs(
 export async function loadPatientAccessHistory(
   patientId: string,
 ): Promise<AuditLogRow[]> {
+  // Validar formato UUID
+  const validatedId = uuidSchema.parse(patientId);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -69,7 +96,7 @@ export async function loadPatientAccessHistory(
   const { data: patient, error: patientError } = await supabase
     .from('patients')
     .select('id, full_name, user_id')
-    .eq('id', patientId)
+    .eq('id', validatedId)
     .maybeSingle();
 
   if (patientError || !patient) {
@@ -85,7 +112,7 @@ export async function loadPatientAccessHistory(
     .from('audit_log')
     .select('*')
     .eq('status', 'active')
-    .eq('record_id', patientId)
+    .eq('record_id', validatedId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -99,6 +126,9 @@ export async function loadPatientAccessHistory(
 export async function generateDsarReport(
   patientId: string,
 ): Promise<AuditDsarReport> {
+  // Validar formato UUID
+  const validatedId = uuidSchema.parse(patientId);
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -109,7 +139,7 @@ export async function generateDsarReport(
   const { data: patient, error: patientError } = await supabase
     .from('patients')
     .select('id, full_name, user_id')
-    .eq('id', patientId)
+    .eq('id', validatedId)
     .maybeSingle();
 
   if (patientError || !patient) {
@@ -132,7 +162,7 @@ export async function generateDsarReport(
     `,
     )
     .eq('status', 'active')
-    .eq('record_id', patientId)
+    .eq('record_id', validatedId)
     .order('created_at', { ascending: false });
 
   if (logsError) {
@@ -154,7 +184,7 @@ export async function generateDsarReport(
   }));
 
   return {
-    patientId,
+    patientId: validatedId,
     patientName: patient.full_name,
     accessHistory,
     generatedAt: new Date().toISOString(),
@@ -166,7 +196,24 @@ export async function generateDsarReport(
 export async function exportPatientAuditCsv(
   patientId: string,
 ): Promise<string> {
-  const report = await generateDsarReport(patientId);
+  // Validar formato UUID
+  const validatedId = uuidSchema.parse(patientId);
+
+  // Verificar rate limit
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+
+  const rateLimitOk = await checkRateLimit(user.id);
+  if (!rateLimitOk) {
+    throw new Error(
+      'Limite de exportações excedido. Máximo 10 exportações por minuto.',
+    );
+  }
+
+  const report = await generateDsarReport(validatedId);
 
   // Cabeçalho CSV
   const csvRows = [
@@ -192,16 +239,28 @@ export async function exportPatientAuditCsv(
   return csvRows.join('\n');
 }
 
-/** Marca logs como expirados (retenção de 12 meses). */
+/** Marca logs como expirados (retenção de 12 meses).
+ *  NOTA: Esta é uma função administrativa que deveria ser chamada APENAS por um cron job
+ *  via Supabase Edge Function com service role, NOT como Server Action normal.
+ *  Para agora, valida que é chamada por um utilizador autenticado e expira apenas seus logs. */
 export async function expireOldLogs(): Promise<{ count: number }> {
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // Esta função deveria ser chamada por um cron job
-  // Aqui apenas marcamos como exemplo — em produção, usar Supabase Functions
+  // Em produção, esta função deveria ser chamada por um cron job Edge Function
+  // que usa service role e expira logs para TODOS os users de uma vez.
+  // Para agora, validar que foi chamada por um utilizador autenticado
+  // e expirar apenas os logs desse utilizador.
+  if (!user) {
+    throw new Error('Autenticação necessária para expirar logs');
+  }
 
   const { error, data } = await supabase
     .from('audit_log')
     .update({ status: 'expired' })
+    .eq('user_id', user.id)
     .lte('expires_at', new Date().toISOString())
     .eq('status', 'active')
     .select('id');
@@ -217,7 +276,24 @@ export async function expireOldLogs(): Promise<{ count: number }> {
 export async function exportPatientAuditJson(
   patientId: string,
 ): Promise<string> {
-  const report = await generateDsarReport(patientId);
+  // Validar formato UUID
+  const validatedId = uuidSchema.parse(patientId);
+
+  // Verificar rate limit
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect('/auth/login');
+
+  const rateLimitOk = await checkRateLimit(user.id);
+  if (!rateLimitOk) {
+    throw new Error(
+      'Limite de exportações excedido. Máximo 10 exportações por minuto.',
+    );
+  }
+
+  const report = await generateDsarReport(validatedId);
 
   return JSON.stringify(report, null, 2);
 }

@@ -47,7 +47,7 @@ export function PreferencesPanel({ className }: PreferencesPanelProps) {
   if (loading) {
     return (
       <div className={className}>
-        <div className="space-y-3">
+        <div className="space-y-3" role="status" aria-live="polite">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-20 bg-gray-100 rounded-lg animate-pulse" />
           ))}
@@ -59,7 +59,7 @@ export function PreferencesPanel({ className }: PreferencesPanelProps) {
   if (error) {
     return (
       <div className={className}>
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
           <p className="text-sm text-red-700">{error}</p>
         </div>
       </div>

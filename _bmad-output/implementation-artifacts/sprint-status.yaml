@@ -121,7 +121,7 @@ development_status:
   11-3-registo-consentimentos-digital: done
   11-4-relatorio-dados-pessoais-dsar-paciente: done
   11-5-portabilidade-dados-profissional: done
-  11-6-notificacoes-push-email-transversais: ready-for-dev
+  11-6-notificacoes-push-email-transversais: in-progress
   11-7-exclusao-conta-lgpd: backlog
   11-8-smoke-acessibilidade-wcag-aa: backlog
   epic-11-retrospective: optional

@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-09T17:00:00Z"
+last_updated: "2026-04-09T19:00:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -117,7 +117,7 @@ development_status:
 
   epic-11: in-progress
   11-1-testes-rls-multi-tenant: done
-  11-2-log-auditoria-dados-paciente: backlog
+  11-2-log-auditoria-dados-paciente: done
   11-3-registo-consentimentos-digital: backlog
   11-4-relatorio-dados-pessoais-dsar-paciente: backlog
   11-5-portabilidade-dados-profissional: backlog

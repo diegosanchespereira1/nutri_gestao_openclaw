@@ -18,7 +18,7 @@ export async function generateProfessionalDataPortability(
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     const targetUserId = userId || user.id;
 
@@ -176,7 +176,7 @@ export async function exportPortabilityAsJson(userId?: string): Promise<Portabil
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     const filename = `MEUS_DADOS_${user.id}_${new Date().toISOString().split('T')[0]}.json`;
     const content = JSON.stringify(response.report, null, 2);
@@ -220,7 +220,7 @@ export async function exportPortabilityAsCsv(userId?: string): Promise<Portabili
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     const report = response.report;
     const csvSections: string[] = [];

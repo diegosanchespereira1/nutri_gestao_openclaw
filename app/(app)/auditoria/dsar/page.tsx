@@ -17,7 +17,7 @@ export default async function DsarPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Carregar lista de pacientes do utilizador
   const { data: patients, error } = await supabase

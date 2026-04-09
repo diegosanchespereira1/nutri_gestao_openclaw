@@ -14,7 +14,7 @@ export async function recordConsent(input: RecordConsentInput): Promise<{ succes
   const headersList = await headers();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que paciente pertence ao utilizador
   const { data: patient, error: patientError } = await supabase
@@ -95,7 +95,7 @@ export async function revokeConsent(input: RevokeConsentInput): Promise<{ succes
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que consentimento pertence ao utilizador
   const { data: consent, error: fetchError } = await supabase
@@ -137,7 +137,7 @@ export async function loadPatientConsents(patientId: string): Promise<ConsentRec
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que paciente pertence ao utilizador
   const { data: patient } = await supabase
@@ -172,7 +172,7 @@ export async function validateMinorConsent(patientId: string): Promise<boolean> 
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que paciente pertence ao utilizador
   const { data: patient } = await supabase
@@ -217,7 +217,7 @@ export async function loadPatientConsentSummary(patientId: string): Promise<Pati
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que paciente pertence ao utilizador
   const { data: patient } = await supabase
@@ -263,7 +263,7 @@ export async function loadPatientConsentsWithUser(patientId: string): Promise<(C
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que paciente pertence ao utilizador
   const { data: patient } = await supabase

@@ -23,7 +23,7 @@ export default async function AuditoriaPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   const sp = await searchParams;
   const tableName = typeof sp.table === 'string' ? sp.table : undefined;

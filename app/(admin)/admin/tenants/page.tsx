@@ -5,6 +5,7 @@ import {
   suspendTenantAction,
   reactivateTenantAction,
   changeTenantPlanAction,
+  unblockLgpdTenantAction,
 } from "@/lib/actions/admin-platform";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +46,7 @@ export default async function TenantsPage({
     suspended: "Tenant suspenso com sucesso.",
     reactivated: "Tenant reativado.",
     plan_updated: "Plano atualizado.",
+    lgpd_unblocked: "Bloqueio LGPD revogado; utilizador pode voltar a aceder (se a sessão/ban for limpo).",
   };
   const errMessages: Record<string, string> = {
     invalid: "Dados inválidos.",
@@ -109,7 +111,9 @@ export default async function TenantsPage({
                     <CardTitle className="text-sm font-medium">
                       {t.full_name ?? "(sem nome)"}
                     </CardTitle>
-                    {t.is_suspended ? (
+                    {t.lgpd_blocked_at != null && t.lgpd_unblocked_at == null ? (
+                      <Badge variant="destructive">LGPD bloqueado</Badge>
+                    ) : t.is_suspended ? (
                       <Badge variant="destructive">Suspenso</Badge>
                     ) : (
                       <Badge variant="outline" className="border-green-500/50 text-green-700">
@@ -118,9 +122,6 @@ export default async function TenantsPage({
                     )}
                     <Badge variant="secondary">{t.plan_slug}</Badge>
                   </div>
-                  {t.email && (
-                    <p className="text-muted-foreground text-xs">{t.email}</p>
-                  )}
                   <p className="text-muted-foreground text-xs">
                     Desde {formatDate(t.created_at)}
                     {t.plan_expires_at &&
@@ -159,7 +160,15 @@ export default async function TenantsPage({
                   </form>
 
                   {/* Suspend / Reactivate */}
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {t.lgpd_blocked_at != null && t.lgpd_unblocked_at == null && (
+                      <form action={unblockLgpdTenantAction}>
+                        <input type="hidden" name="tenant_id" value={t.id} />
+                        <Button type="submit" size="sm" variant="outline" className="text-xs">
+                          Desbloquear LGPD
+                        </Button>
+                      </form>
+                    )}
                     {t.is_suspended ? (
                       <form action={reactivateTenantAction}>
                         <input type="hidden" name="tenant_id" value={t.id} />

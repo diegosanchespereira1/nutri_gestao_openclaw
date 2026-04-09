@@ -13,6 +13,22 @@ export function isAuthPublicPath(pathname: string): boolean {
   );
 }
 
+/** Rotas permitidas com conta LGPD bloqueada (evita loop de redirect). */
+export const LGPD_BLOCKED_ALLOWED_PREFIXES = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/auth",
+  "/conta-bloqueada",
+] as const;
+
+export function isPathAllowedWhenLgpdBlocked(pathname: string): boolean {
+  if (pathname === "/") return true;
+  return LGPD_BLOCKED_ALLOWED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+}
+
 /** Área logada (Épico 1) — requer utilizador autenticado. */
 export const PROTECTED_PREFIXES = [
   "/inicio",
@@ -27,6 +43,9 @@ export const PROTECTED_PREFIXES = [
   "/pops",
   "/definicoes",
   "/perfil",
+  "/configuracoes",
+  "/notificacoes",
+  "/auditoria",
   "/admin",
 ] as const;
 

@@ -49,3 +49,20 @@ export async function fetchProfileTimeZone(
   if (error || !data?.timezone) return DEFAULT_PROFILE_TIME_ZONE;
   return normalizeAppTimeZone(data.timezone);
 }
+
+/** Bloqueio LGPD ativo: titular sem acesso à app (Story 11.7). */
+export async function profileLgpdBlocked(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("lgpd_blocked_at, lgpd_unblocked_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) return false;
+  return (
+    data.lgpd_blocked_at != null && data.lgpd_unblocked_at == null
+  );
+}

@@ -16,7 +16,7 @@ async function requireSuperAdmin() {
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!profile || profile.role !== "super_admin") {
@@ -30,12 +30,13 @@ async function requireSuperAdmin() {
 export type TenantRow = {
   id: string;
   full_name: string | null;
-  email: string | null;
   plan_slug: string;
   is_suspended: boolean;
   suspended_reason: string | null;
   plan_expires_at: string | null;
   created_at: string;
+  lgpd_blocked_at: string | null;
+  lgpd_unblocked_at: string | null;
 };
 
 export async function loadTenants(search?: string): Promise<{
@@ -46,15 +47,13 @@ export async function loadTenants(search?: string): Promise<{
   let query = supabase
     .from("profiles")
     .select(
-      "id, full_name, email, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at",
+      "id, full_name, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at, lgpd_blocked_at, lgpd_unblocked_at",
     )
     .not("role", "in", '("admin","super_admin")')
     .order("created_at", { ascending: false });
 
   if (search) {
-    query = query.or(
-      `full_name.ilike.%${search}%,email.ilike.%${search}%`,
-    );
+    query = query.ilike("full_name", `%${search}%`);
   }
 
   const { data, error } = await query;
@@ -120,6 +119,37 @@ export async function changeTenantPlanAction(formData: FormData): Promise<void> 
 
   revalidatePath("/admin/tenants");
   redirect("/admin/tenants?ok=plan_updated");
+}
+
+export async function unblockLgpdTenantAction(formData: FormData): Promise<void> {
+  const { supabase } = await requireSuperAdmin();
+
+  const tenantId = String(formData.get("tenant_id") ?? "").trim();
+  if (!tenantId) redirect("/admin/tenants?err=invalid");
+
+  const { data, error } = await supabase.rpc("lgpd_admin_unblock_profile", {
+    p_profile_id: tenantId,
+  });
+
+  if (error) redirect("/admin/tenants?err=save");
+
+  const userId =
+    data &&
+    typeof data === "object" &&
+    "user_id" in data &&
+    typeof (data as { user_id: unknown }).user_id === "string"
+      ? (data as { user_id: string }).user_id
+      : null;
+
+  if (userId) {
+    const { liftAuthBanAfterLgpdUnblock } = await import(
+      "@/lib/actions/account-deletion"
+    );
+    await liftAuthBanAfterLgpdUnblock(userId);
+  }
+
+  revalidatePath("/admin/tenants");
+  redirect("/admin/tenants?ok=lgpd_unblocked");
 }
 
 // ── 10.2 — Planos ────────────────────────────────────────────────────────────

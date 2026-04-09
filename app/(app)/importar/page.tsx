@@ -15,7 +15,7 @@ export default async function ImportarPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/auth/login");
+  if (!user) redirect("/login");
 
   return (
     <main className="container max-w-4xl space-y-6 py-8">

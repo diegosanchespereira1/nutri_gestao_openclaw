@@ -1,12 +1,8 @@
-'use client';
+"use client";
 
-/**
- * Modal de Solicitação de Exclusão de Conta
- * Dupla confirmação: checkbox + password
- */
-
-import { useState } from 'react';
-import { requestAccountDeletion } from '@/lib/actions/account-deletion';
+import { useState } from "react";
+import { requestAccountDeletion } from "@/lib/actions/account-deletion";
+import { LGPD_RETENTION_YEARS } from "@/lib/types/account-deletion";
 import {
   Dialog,
   DialogContent,
@@ -14,12 +10,12 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { AlertCircle } from 'lucide-react';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { AlertCircle } from "lucide-react";
 
 interface DeletionRequestModalProps {
   open: boolean;
@@ -33,7 +29,7 @@ export function DeletionRequestModal({
   onSuccess,
 }: DeletionRequestModalProps) {
   const [confirmed, setConfirmed] = useState(false);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,13 +46,12 @@ export function DeletionRequestModal({
     setLoading(false);
 
     if (!result.success) {
-      setError(result.error || 'Erro ao solicitar exclusão');
+      setError(result.error || "Erro ao enviar pedido");
       return;
     }
 
-    // Reset form
     setConfirmed(false);
-    setPassword('');
+    setPassword("");
     onOpenChange(false);
     onSuccess?.();
   };
@@ -67,27 +62,28 @@ export function DeletionRequestModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="w-5 h-5 text-red-600" />
-            Solicitar Exclusão de Conta
+            Encerrar acesso à conta
           </DialogTitle>
           <DialogDescription>
-            Esta ação é irreversível. Seus dados serão deletados conforme LGPD Art. 18
+            Esta ação bloqueia o seu acesso à plataforma após confirmação no
+            email. Não elimina de imediato dados clínicos (retenção legal, mínimo{" "}
+            {LGPD_RETENTION_YEARS} anos).
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Warning Box */}
           <div className="p-3 bg-red-50 border border-red-200 rounded">
-            <p className="text-sm text-red-900 font-medium mb-2">O que acontecerá:</p>
+            <p className="text-sm text-red-900 font-medium mb-2">Resumo:</p>
             <ul className="text-xs text-red-800 space-y-1">
-              <li>✓ Sua conta de login será desativada</li>
-              <li>✓ Seu email e senha serão deletados</li>
-              <li>⏳ Você terá 24h para cancelar</li>
-              <li>⏳ Após 24h, sua conta não poderá mais acessar a plataforma</li>
-              <li>⏳ Dados de pacientes serão retidos por 5 anos (obrigação legal)</li>
+              <li>✓ Recebe um email com link para confirmar ou cancelar (24h)</li>
+              <li>✓ Após confirmar, o login deixa de ser permitido</li>
+              <li>
+                ✓ Dados de saúde podem ser retidos pelo período legal (mínimo{" "}
+                {LGPD_RETENTION_YEARS} anos)
+              </li>
             </ul>
           </div>
 
-          {/* Confirmation Checkbox */}
           <div className="flex items-start gap-2">
             <Checkbox
               id="confirm-deletion"
@@ -96,20 +92,20 @@ export function DeletionRequestModal({
               className="mt-1"
             />
             <Label htmlFor="confirm-deletion" className="cursor-pointer text-sm leading-relaxed">
-              Entendo que meus dados serão deletados conforme LGPD Art. 18 e que dados de saúde
-              serão retidos por 5 anos
+              Entendo que o pedido visa encerrar o meu acesso e que dados de
+              saúde podem ser retidos pelo período legal (mínimo{" "}
+              {LGPD_RETENTION_YEARS} anos).
             </Label>
           </div>
 
-          {/* Password Input */}
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-medium">
-              Digite sua senha para confirmar
+              Digite a sua senha para continuar
             </Label>
             <Input
               id="password"
               type="password"
-              placeholder="Sua senha"
+              placeholder="Senha"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={!confirmed || loading}
@@ -117,29 +113,28 @@ export function DeletionRequestModal({
             />
           </div>
 
-          {/* Error */}
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded" role="alert">
               <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
-          {/* Info */}
           <p className="text-xs text-gray-500">
-            Um email de confirmação será enviado. Você terá 24 horas para confirmar ou cancelar.
+            Será enviado um email com um link seguro. O token não é mostrado na
+            aplicação.
           </p>
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-            Cancelar
+            Fechar
           </Button>
           <Button
             variant="destructive"
             onClick={handleSubmit}
             disabled={!canSubmit || loading}
           >
-            {loading ? 'Processando...' : 'Solicitar Exclusão'}
+            {loading ? "A processar…" : "Enviar pedido"}
           </Button>
         </DialogFooter>
       </DialogContent>

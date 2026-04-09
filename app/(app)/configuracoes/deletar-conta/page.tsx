@@ -1,29 +1,28 @@
 /**
- * Página: Deletar Minha Conta
- * Rota: /app/configuracoes/deletar-conta
- * Story: 11.7 - LGPD Art. 18 (Right to be Forgotten)
+ * Página: Encerrar acesso à conta (LGPD) — Story 11.7
+ * Rota: /configuracoes/deletar-conta
  */
 
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { getDeletionStatus } from '@/lib/actions/account-deletion';
-import { AccountDeletionState } from '@/lib/types/account-deletion';
-import { DeletionRequestModal } from '@/components/settings/deletion-request-modal';
-import { DeletionStatusCard } from '@/components/settings/deletion-status-card';
-import { AlertCircle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import {
+  getDeletionStatus,
+  confirmAccountDeletion,
+  cancelAccountDeletion,
+} from "@/lib/actions/account-deletion";
+import { AccountClosureState, LGPD_RETENTION_YEARS } from "@/lib/types/account-deletion";
+import { DeletionRequestModal } from "@/components/settings/deletion-request-modal";
+import { DeletionStatusCard } from "@/components/settings/deletion-status-card";
+import { AlertCircle } from "lucide-react";
 
 export default function DeletarContaPage() {
-  const [state, setState] = useState<AccountDeletionState | null>(null);
+  const router = useRouter();
+  const [state, setState] = useState<AccountClosureState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
-
-  // Carregar status
-  useEffect(() => {
-    loadStatus();
-  }, []);
 
   const loadStatus = async () => {
     setLoading(true);
@@ -33,28 +32,52 @@ export default function DeletarContaPage() {
     setLoading(false);
 
     if (!result.success) {
-      setError(result.error || 'Erro ao carregar status');
+      setError(result.error || "Erro ao carregar estado");
     } else if (result.status) {
       setState(result.status);
     }
   };
 
-  // Detectar confirmação via query param (email link)
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-    const action = urlParams.get('action');
+    let cancelled = false;
 
-    if (token && action === 'confirm') {
-      // TODO: Chamar confirmAccountDeletion(token)
-      // e exibir modal de sucesso
-      console.log('Confirmar exclusão com token:', token);
-    } else if (token && action === 'cancel') {
-      // TODO: Chamar cancelAccountDeletion(token)
-      // e exibir modal de sucesso
-      console.log('Cancelar exclusão com token:', token);
-    }
-  }, []);
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get("token");
+      const action = params.get("action");
+
+      if (token && (action === "confirm" || action === "cancel")) {
+        setLoading(true);
+        setError(null);
+        const result =
+          action === "confirm"
+            ? await confirmAccountDeletion(token)
+            : await cancelAccountDeletion(token);
+        if (!cancelled && !result.success) {
+          setError(
+            result.error ??
+              "Operação falhou. Inicie sessão se o pedido exigir confirmação autenticada.",
+          );
+        }
+        if (!cancelled) {
+          router.replace("/configuracoes/deletar-conta");
+        }
+      }
+
+      const statusResult = await getDeletionStatus();
+      if (cancelled) return;
+      setLoading(false);
+      if (!statusResult.success) {
+        setError(statusResult.error || "Erro ao carregar estado");
+      } else if (statusResult.status) {
+        setState(statusResult.status);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   if (loading) {
     return (
@@ -68,10 +91,14 @@ export default function DeletarContaPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Deletar Minha Conta</h1>
-        <p className="text-gray-600">Solicitar exclusão da sua conta conforme LGPD Art. 18</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Encerrar acesso à conta
+        </h1>
+        <p className="text-gray-600">
+          Pedido de encerramento de acesso à plataforma (LGPD) — retenção mínima
+          de {LGPD_RETENTION_YEARS} anos para dados de saúde
+        </p>
       </div>
 
       {error && (
@@ -80,66 +107,61 @@ export default function DeletarContaPage() {
         </div>
       )}
 
-      {/* Status Card */}
       {state && (
         <DeletionStatusCard
           state={state}
           onRequestDeletion={() => setShowModal(true)}
           onCancelDeletion={() => {
-            // TODO: Implementar cancelamento
+            void (async () => {
+              const r = await cancelAccountDeletion("");
+              if (r.success) await loadStatus();
+              else setError(r.error ?? "Não foi possível cancelar");
+            })();
           }}
         />
       )}
 
-      {/* Main Content */}
       <div className="mt-8 space-y-8">
-        {/* LGPD Info */}
         <section className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <h2 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
-            Direito ao Esquecimento — LGPD Art. 18
+            O que este pedido faz
           </h2>
           <p className="text-sm text-blue-800 mb-2">
-            Você tem o direito de solicitar a exclusão completa de sua conta e dados pessoais.
-            Este processo segue a Lei Geral de Proteção de Dados (LGPD) Art. 18 e respeita
-            obrigações legais de retenção de dados de saúde.
+            Este fluxo <strong>não</strong> apaga de imediato dados clínicos. A
+            operação prevê <strong>bloquear o seu acesso</strong> à conta após
+            confirmação (e retenção legal de registos de saúde, em linha com a
+            legislação aplicável).
           </p>
         </section>
 
-        {/* Timeline Explicada */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">⏱️ O Que Acontecerá</h2>
+          <h2 className="text-lg font-semibold mb-4">⏱️ O que acontece</h2>
           <div className="space-y-3">
             {[
               {
-                time: 'Agora',
-                title: 'Solicitar Exclusão',
-                desc: 'Você clica em "Solicitar Exclusão" e recebe email de confirmação',
-                icon: '📧',
+                time: "Agora",
+                title: "Pedido",
+                desc: "Indica a sua senha e recebe um email com links para confirmar ou cancelar (24h).",
+                icon: "📧",
               },
               {
-                time: 'Próximas 24h',
-                title: 'Janela de Cancelamento',
-                desc: 'Clique no link do email para confirmar. Você pode cancelar a qualquer momento.',
-                icon: '⏳',
+                time: "Até 24h",
+                title: "Janela de confirmação",
+                desc: "Pode cancelar o pedido pelo email ou, com sessão iniciada, nesta página.",
+                icon: "⏳",
               },
               {
-                time: 'Após 24h',
-                title: 'Conta Desativada',
-                desc: 'Seu login será bloqueado. Você não conseguirá mais acessar a plataforma.',
-                icon: '🔒',
+                time: "Após confirmar",
+                title: "Acesso bloqueado",
+                desc: "O login deixa de ser permitido para o seu utilizador. Dados clínicos permanecem retidos.",
+                icon: "🔒",
               },
               {
-                time: 'Próximos 5 Anos',
-                title: 'Retenção Legal',
-                desc: 'Dados de pacientes serão retidos conforme obrigações legais de saúde.',
-                icon: '📋',
-              },
-              {
-                time: 'Após 5 Anos',
-                title: 'Limpeza Automática',
-                desc: 'Todos os dados serão completamente deletados do sistema.',
-                icon: '✓',
+                time: `Retenção (${LGPD_RETENTION_YEARS} anos)`,
+                title: "Dados de saúde",
+                desc: "Registos de saúde podem ser mantidos pelo período legal mínimo (documentação indica 10 anos).",
+                icon: "📋",
               },
             ].map((step, idx) => (
               <div key={idx} className="flex gap-4">
@@ -155,83 +177,54 @@ export default function DeletarContaPage() {
           </div>
         </section>
 
-        {/* O Que Será Deletado */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">🗑️ O Que Será Deletado Imediatamente</h2>
-          <ul className="space-y-2 text-sm text-gray-700">
-            <li>✓ Sua conta de login</li>
-            <li>✓ Seu email e senha</li>
-            <li>✓ Seus dados de perfil (CRN, telefone, endereço)</li>
-            <li>✓ Suas preferências e configurações</li>
-            <li>✓ Seus estabelecimentos cadastrados</li>
-          </ul>
-        </section>
-
-        {/* O Que Será Retido */}
-        <section>
-          <h2 className="text-lg font-semibold mb-4">📦 O Que Será Retido por 5 Anos</h2>
+          <h2 className="text-lg font-semibold mb-4">📦 O que não é apagado de imediato</h2>
           <div className="p-4 bg-yellow-50 border border-yellow-200 rounded">
             <p className="text-sm text-yellow-900 mb-2">
-              <strong>Por quê?</strong> Obrigações legais de retenção de dados de saúde no Brasil.
+              <strong>Por quê?</strong> Obrigações legais de retenção de dados de
+              saúde e de auditoria.
             </p>
             <ul className="space-y-1 text-sm text-yellow-900">
-              <li>📋 Dados de pacientes (nomes, avaliações)</li>
-              <li>📊 Relatórios de visitas técnicas</li>
-              <li>🔍 Log de auditoria (para segurança e compliance)</li>
-              <li>⚖️ Documentação legal (contratos, consentimentos)</li>
+              <li>📋 Dados de pacientes e registos clínicos</li>
+              <li>📊 Visitas técnicas e relatórios associados</li>
+              <li>🔍 Log de auditoria (compliance)</li>
+              <li>⚖️ Contratos e consentimentos quando aplicável</li>
             </ul>
           </div>
         </section>
 
-        {/* FAQ */}
         <section>
-          <h2 className="text-lg font-semibold mb-4">❓ Perguntas Frequentes</h2>
+          <h2 className="text-lg font-semibold mb-4">❓ Perguntas frequentes</h2>
           <div className="space-y-4 text-sm">
             <div>
-              <p className="font-medium text-gray-900">Posso cancelar depois?</p>
+              <p className="font-medium text-gray-900">Posso cancelar?</p>
               <p className="text-gray-600 mt-1">
-                Sim, mas apenas nos primeiros 24h após solicitar. Após esse período, a exclusão é
-                irreversível.
+                Sim, enquanto o pedido estiver pendente (até 24h após o email).
               </p>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Meus dados de pacientes serão deletados?</p>
+              <p className="font-medium text-gray-900">
+                Os dados de pacientes são apagados logo?
+              </p>
               <p className="text-gray-600 mt-1">
-                Não imediatamente. Conforme lei de saúde, eles serão retidos por 5 anos após sua
-                exclusão. Após isso, são completamente deletados.
+                Não. O modelo é bloqueio de acesso e retenção legal de dados de
+                saúde (mínimo {LGPD_RETENTION_YEARS} anos na documentação do
+                produto).
               </p>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Quem pode ver meus dados durante retenção?</p>
-              <p className="text-gray-600 mt-1">
-                Ninguém. Seus dados são completamente isolados e inacessíveis, mas mantidos por lei.
+              <p className="font-medium text-gray-900">
+                Quem pode ver dados durante a retenção?
               </p>
-            </div>
-            <div>
-              <p className="font-medium text-gray-900">Posso exportar meus dados antes?</p>
               <p className="text-gray-600 mt-1">
-                Sim! Acesse "Meus Dados" em configurações para exportar cópia completa (JSON/CSV)
-                antes de solicitar exclusão.
+                Administradores da plataforma podem ter acesso de leitura para
+                cumprimento legal; o titular não acede à app após o bloqueio.
               </p>
             </div>
           </div>
         </section>
-
-        {/* Compliance */}
-        <section className="p-4 bg-gray-50 border border-gray-200 rounded">
-          <h3 className="font-semibold text-gray-900 mb-2">🛡️ Conformidade LGPD</h3>
-          <ul className="text-xs text-gray-600 space-y-1">
-            <li>✓ Solicitação registada com timestamp e IP</li>
-            <li>✓ Confirmação por email (token único, 24h expiração)</li>
-            <li>✓ Soft-delete (dados não deletados imediatamente, apenas marcados)</li>
-            <li>✓ Retenção legal documentada (5 anos conforme práticas de saúde)</li>
-            <li>✓ Audit trail imutável (nunca deletado, apenas mascarado)</li>
-            <li>✓ Isolamento tenant (seus dados não afetam outros usuários)</li>
-          </ul>
-        </section>
       </div>
 
-      {/* Modal */}
       {state && (
         <DeletionRequestModal
           open={showModal}

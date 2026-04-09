@@ -1,10 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
-import { isAdminPath, isProtectedPath } from "@/lib/auth-paths";
+import {
+  isAdminPath,
+  isPathAllowedWhenLgpdBlocked,
+  isProtectedPath,
+} from "@/lib/auth-paths";
 import { canAccessAdminArea } from "@/lib/roles";
 import {
   fetchProfileRole,
+  profileLgpdBlocked,
   profileNeedsOnboarding,
 } from "@/lib/supabase/profile";
 
@@ -77,6 +82,21 @@ export async function updateSession(request: NextRequest) {
     const redirectRes = NextResponse.redirect(loginUrl);
     copyCookies(supabaseResponse, redirectRes);
     return redirectRes;
+  }
+
+  if (
+    user &&
+    isProtectedPath(pathname) &&
+    !isPathAllowedWhenLgpdBlocked(pathname)
+  ) {
+    const blocked = await profileLgpdBlocked(supabase, user.id);
+    if (blocked) {
+      const redirectRes = NextResponse.redirect(
+        new URL("/conta-bloqueada", request.url),
+      );
+      copyCookies(supabaseResponse, redirectRes);
+      return redirectRes;
+    }
   }
 
   if (user && isProtectedPath(pathname)) {

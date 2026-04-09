@@ -1,365 +1,193 @@
-# Story 11.7: Pedido de Exclusão de Conta e Dados (LGPD Art. 18)
+# Story 11.7: Bloqueio de Acesso por LGPD (retenção 10 anos, leitura admin)
+
+## Revisão (substitui especificação anterior)
+
+Esta story **substitui** a versão anterior da 11.7 que descrevia “exclusão imediata de dados”, retenção de **5 anos** e soft-delete agressivo. O modelo correto para o produto é:
+
+- **“Excluir conta” = bloquear acesso externo do titular**, não apagar dados clínicos.
+- **Retenção legal mínima: 10 anos** (documentação em UI e especificação técnica).
+- **Escrita bloqueada** em cadastros/pacientes afetados até **desbloqueio explícito** por `admin` ou `super_admin`.
+- **Leitura** de dados clínicos para `admin` / `super_admin` mantida para solicitações legais.
+- **Fora de escopo:** Firebase / FCM (push) neste ciclo.
 
 ## Contexto
 
-Stories 11.1–11.6 implementaram segurança, LGPD compliance, auditoria, consentimentos e notificações. Story 11.7 implementa o **direito ao esquecimento** (Right to be Forgotten) — LGPD Art. 18 — que garante ao titular o direito de solicitar a exclusão completa de sua conta e dados pessoais.
+Stories 11.1–11.6 cobriram segurança, auditoria, consentimentos e notificações. A 11.7 passa a implementar o fluxo de **pedido de encerramento de conta** alinhado ao LGPD: o titular pode pedir que deixe de aceder à plataforma, enquanto a operação **retém e protege** dados de saúde pelo período legal, com **bloqueio de escrita** e **acesso administrativo só leitura** onde aplicável.
 
-O diferencial da Story 11.7 é a **gestão de retenção legal**: embora o usuário possa solicitar exclusão imediata, dados de saúde (pacientes, visitas técnicas, relatórios) DEVEM ser retidos por **5 anos** conforme obrigações legais. A story implementa:
+## Contexto de negócio (OBRIGATÓRIO)
 
-1. **Request de Exclusão:** Profissional solicita exclusão via modal com confirmação dupla
-2. **Período de Retenção:** Dados são soft-deleted (status='deleted') por 5 anos
-3. **Auditoria:** Tentativa de acesso a conta deletada é registada
-4. **Notificação:** Email de confirmação com link para cancelar request
-5. **LGPD Compliance:** Relatório de retenção, períodos de espera, documentação
+1. Não implementar Firebase/FCM por enquanto.
+2. Retenção legal mínima é de **10 anos** (não 5).
+3. “Excluir conta” **não** significa apagar dados clínicos.
+4. Ao solicitar exclusão, o sistema deve **bloquear acesso externo** do titular (conta e, quando aplicável, cadastro de paciente) à plataforma.
+5. Perfis internos `admin` e `super_admin` mantêm **acesso de leitura** aos dados clínicos para atendimento de solicitações legais (alinhado a `lib/roles.ts`: `canAccessAdminArea`).
+6. Enquanto bloqueado, **não** pode haver inserção/atualização/remoção de dados clínicos desse cadastro (defesa em profundidade: server actions + RLS).
+7. A escrita só volta após **desbloqueio explícito** por `admin` ou `super_admin`.
 
 ## Objetivo
 
-Após Story 11.7, o profissional será capaz de:
-- Acessar uma página "Deletar Minha Conta" em `/app/configuracoes/deletar-conta/`
-- Clicar "Solicitar Exclusão" e confirmar via dupla verificação:
-  - Confirmação textual: "Entendo que meus dados serão retidos por 5 anos conforme lei"
-  - Email de confirmação com link (válido por 24h)
-- Receber email explicando:
-  - O que será deletado imediatamente (dados do profissional)
-  - O que será retido por 5 anos (dados de pacientes por obrigações legais)
-  - Como cancelar a solicitação (link no email válido por 24h)
-- Visualizar status da exclusão (pendente, confirmado, completado)
-- Sistema cumprir LGPD Art. 18 com retenção legal documentada
+Implementar **“bloqueio LGPD com retenção de 10 anos”**:
+
+- Bloquear login e uso de fluxos externos pelo titular após confirmação do fluxo.
+- Preservar dados clínicos para consulta administrativa.
+- Impedir alterações em registos vinculados ao cadastro bloqueado.
+- Permitir desbloqueio controlado e auditado.
 
 ## Stack & Convenções
 
-- **Framework:** Next.js 15 App Router, TypeScript strict
-- **Styling:** Tailwind CSS + shadcn/ui (Base UI)
-- **Auth:** @supabase/ssr (server-side session)
-- **Database:** Supabase PostgreSQL com RLS
-- **Email:** Resend (já implementado)
-- **Rota do módulo:** `app/(app)/configuracoes/deletar-conta/`
-- **Background Jobs:** Supabase pg_notify ou cron (PostgreSQL)
+- **Framework:** Next.js App Router, TypeScript strict (sem `any`).
+- **Auth / sessão:** `@supabase/ssr`.
+- **Papéis:** `lib/roles.ts` — `ProfileRole`: `user` | `admin` | `super_admin`; `canAccessAdminArea` para rotas `/admin`.
+- **Email transacional:** Resend (já usado no projeto), sem Firebase.
+- **Rotas:** área profissional `app/(app)/configuracoes/deletar-conta/` → URL `/configuracoes/deletar-conta`.
 
-## Requisitos Funcionais
+## Requisitos funcionais (resumo)
 
-- **FR69:** Profissional pode solicitar exclusão completa da sua conta e dados pessoais conforme LGPD Art. 18, respeitando obrigações legais de retenção
-- **LGPD Art. 18:** Direito ao esquecimento com documentação de retenção legal
-- **Retenção Legal:** Dados de saúde (pacientes, visitas) retidos por 5 anos mesmo após exclusão
-- **Confirmação Dupla:** Textual + email para evitar exclusão acidental
-- **Cancelamento:** Possibilidade de cancelar request dentro de 24h
-- **Auditoria:** Tentativas de acesso a conta deletada são registadas
-- **Email:** Confirmação de solicitação com timeline clara
-- **Soft-delete:** Nenhuma exclusão irreversível antes do período de retenção expirar
-- **Isolamento Tenant:** Um tenant não acessa dados de outro mesmo após exclusão
+- **FR69 (ajustado):** O titular pode solicitar **encerramento de acesso** à conta; dados clínicos permanecem retidos conforme obrigação legal (10 anos); escrita suspensa até desbloqueio administrativo.
+- **Bloqueio:** estado explícito com metadados (ver MVP).
+- **Auditoria:** eventos `ACCOUNT_BLOCKED_LGPD`, `ACCOUNT_UNBLOCKED`, `WRITE_BLOCKED_LGPD` (tentativa de escrita durante bloqueio).
 
-## Critérios de Aceitação
+## Escopo funcional (MVP)
 
-### 1. Interface de Solicitação
+### A. Bloqueio de conta / cadastro
 
-**Given** profissional autenticado acessa `/app/configuracoes/deletar-conta/`  
-**When** página carrega  
-**Then** exibe:
+Criar estado de bloqueio com metadados (em `profiles` e/ou entidade de paciente, conforme modelo de dados atual):
 
-- **Aviso vermelho:** "Esta ação é irreversível. Seus dados serão deletados após período de retenção legal."
-- **Timeline clara:**
-  - ✓ Imediato: Email deletado, senha resetada, login impossível
-  - ⏳ 24 horas: Janela para cancelar (email com link)
-  - ⏳ 5 anos: Dados de pacientes retidos por obrigações legais (soft-deleted)
-  - ✓ Após 5 anos: Limpeza automática de dados antigos
-- **Botão:** "Solicitar Exclusão da Conta"
+| Campo | Descrição |
+|-------|-----------|
+| `blocked_at` | Quando entrou em bloqueio |
+| `blocked_reason` | Ex.: `lgpd_account_closure` |
+| `blocked_until` | Opcional (ex.: revisão) |
+| `blocked_by` | Quem aplicou bloqueio (admin/super_admin ou sistema) |
+| `unblocked_at` | Quando desbloqueado |
+| `unblocked_by` | Admin/super_admin que desbloqueou |
 
-**And** clica no botão  
-**Then** modal de confirmação dupla:
+**Quando bloqueado:**
 
-```
-Tem a certeza? Esta ação é irreversível.
+- Titular **não** autentica ou recebe mensagem clara de conta inativa/bloqueada.
+- Dados permanecem em **leitura** para `admin` e `super_admin` (policies RLS + rotas servidor).
 
-[Checkbox] Entendo que meus dados serão retidos por 5 anos conforme lei
-[Texto input] Digite sua senha para confirmar
-[Botão: Cancelar] [Botão: Confirmar Exclusão]
-```
+### B. Escrita proibida durante bloqueio
 
-**And** após confirmar:
-- Email sent: "Solicitação de Exclusão de Conta Recebida"
-- Conteúdo do email:
-  ```
-  Recebemos sua solicitação de exclusão de conta.
+- Bloquear `INSERT` / `UPDATE` / `DELETE` em dados clínicos ligados ao cadastro bloqueado (paciente, visitas, avaliações, etc. — mapear tabelas no desenho da migração).
+- Mensagem de erro padronizada (PT): *«Cadastro bloqueado por LGPD. Solicite desbloqueio a um administrador.»*
 
-  Status: Pendente de Confirmação por Email
-  
-  ⏱️ TIMELINE:
-  - Agora: Sua conta permanece ativa durante 24 horas
-  - Próximas 24 horas: Você pode CANCELAR a solicitação clicando aqui: [LINK]
-  - Após 24 horas: Sua conta será desativada
-  - Próximos 5 anos: Seus dados de saúde (pacientes, visitas, relatórios) 
-    serão retidos conforme obrigações legais
-  
-  ℹ️ O que será deletado imediatamente:
-  - Sua conta de login
-  - Seus dados de profissional (CRN, email, telefone)
-  - Suas preferências e configurações
-  
-  ℹ️ O que será retido por 5 anos:
-  - Dados de pacientes (obrigação legal de saúde)
-  - Relatórios e visitas técnicas (auditoria, compliance)
-  - Log de auditoria (segurança e investigação)
-  
-  Dúvidas? Contate suporte@nutrigestao.com
-  ```
+### C. Desbloqueio
 
-### 2. Status de Exclusão
+- Ação administrativa (UI em `/admin` ou secção de conformidade) para desbloquear.
+- Após desbloqueio, escrita volta ao comportamento normal.
+- Auditoria completa (quem, quando, motivo).
 
-**Given** profissional com exclusão pendente  
-**When** acessa `/app/configuracoes/deletar-conta/`  
-**Then** exibe status atual:
+### D. Auditoria e conformidade
 
-| Estado | Exibição | Ações |
-|--------|----------|-------|
-| Nenhuma solicitação | Botão "Solicitar Exclusão" | Solicitar |
-| Pendente (< 24h) | "Exclusão pendente - Confirme no email enviado" + countdown | Cancelar solicitação (clique em link do email) |
-| Confirmado (24h–5 anos) | "Sua conta será deletada em [data]" | Contatar suporte para restaurar |
-| Deletado (> 5 anos) | "Conta deletada" | — |
+Registar em `audit_log` (ou equivalente):
 
-### 3. Cancelamento de Solicitação
+- `ACCOUNT_BLOCKED_LGPD`
+- `ACCOUNT_UNBLOCKED`
+- `WRITE_BLOCKED_LGPD` (tentativa de mutação com contexto: tabela, `record_id`, `user_id`)
 
-**Given** profissional recebe email com exclusão pendente  
-**When** clica "Cancelar exclusão" (link válido por 24h)  
-**Then** request é cancelado  
-**And** email sent: "Solicitação de Exclusão Cancelada"
+## Regras de autorização
 
-**And** status volta para "Nenhuma solicitação"
+- **`user`:** sem bypass; não desbloqueia; não lê dados de outro tenant.
+- **`admin` / `super_admin`:** leitura de dados bloqueados para fins legais + ação de desbloqueio (confirmar no UI se ambos ou só `super_admin`).
+- Reutilizar `canAccessAdminArea` e políticas existentes; não duplicar lógica de role em strings soltas.
 
-### 4. Bloqueio de Acesso Após Confirmação
+## Critérios de aceitação (Given / When / Then)
 
-**Given** exclusão confirmada (passadas 24h)  
-**When** profissional tenta fazer login  
-**Then** mensagem: "Sua conta foi marcada para exclusão e está desativada"
+1. **Given** cadastro ativo, **When** o fluxo de pedido LGPD é concluído (e/ou admin aplica bloqueio), **Then** o titular perde acesso externo e o estado passa a **bloqueado**.
+2. **Given** cadastro bloqueado, **When** qualquer fluxo tenta **escrever** dados clínicos associados, **Then** a operação falha com o erro de bloqueio padronizado.
+3. **Given** cadastro bloqueado, **When** `admin` ou `super_admin` consulta dados, **Then** a **leitura** funciona conforme RLS.
+4. **Given** cadastro bloqueado, **When** `admin` ou `super_admin` executa desbloqueio, **Then** a escrita volta a ser permitida para esse cadastro.
+5. **Given** bloqueio, desbloqueio ou tentativa de escrita bloqueada, **Then** o `audit_log` regista evento com identificação suficiente para compliance.
+6. **Given** qualquer ecrã ou email do fluxo, **Then** o texto menciona **retenção de 10 anos** (não 5) e deixa claro que **não há eliminação imediata de dados clínicos**.
 
-**And** nenhuma API permite acesso:
-```
-SELECT * FROM users WHERE id = '...' AND deleted_at IS NOT NULL;
--- Retorna erro 403 Forbidden
-```
+## Fora de escopo (explícito)
 
-### 5. Retenção Legal & Soft-delete
+- Firebase / FCM (push).
+- Hard delete de dados clínicos.
+- Automações complexas de purge ao fim do período (pode ficar story futura).
+- Implementação completa de “direito ao apagamento” com eliminação física — aqui o modelo é **bloqueio + retenção**.
 
-**Given** exclusão confirmada  
-**When** 5 anos passam  
-**Then** cron job automático executa:
+## Entregáveis esperados
 
-```sql
-UPDATE patients SET deleted_at = NOW() WHERE user_id = '...' AND deleted_at IS NOT NULL;
-UPDATE visits SET deleted_at = NOW() WHERE user_id = '...' AND deleted_at IS NOT NULL;
-UPDATE reports SET deleted_at = NOW() WHERE user_id = '...' AND deleted_at IS NOT NULL;
--- Mas audit_log é MANTIDO (nunca deletado, apenas mascarado)
-```
+- [ ] Esta story atualizada (ficheiro atual).
+- [ ] Migração SQL: colunas/índices de bloqueio em `profiles` e/ou `patients` (ou tabela de estado dedicada).
+- [ ] Ajustes RLS / policies: leitura admin em bloqueio; escrita negada para `user` em cadastro bloqueado.
+- [ ] Server actions: pedido de bloqueio pelo titular; `blockAccountLgpd` / `unblockAccountLgpd` (nomes finais à escolha da implementação) com auditoria.
+- [ ] UI `/configuracoes/deletar-conta`: copy e fluxo a refletir **bloqueio de acesso**, timeline **10 anos**, sem prometer “apagar já”.
+- [ ] UI admin: desbloqueio auditado (mínimo viável).
+- [ ] Testes: bloqueio, escrita negada, leitura admin, desbloqueio (Vitest e/ou RLS conforme padrão do repo).
+- [ ] `_bmad-output/implementation-artifacts/sprint-status.yaml` — manter `11-7-exclusao-conta-lgpd` coerente com o estado da sprint após implementação.
 
-### 6. Auditoria & Compliance
+## Qualidade obrigatória
 
-**Given** qualquer operação de exclusão  
-**When** executada  
-**Then** audit_log registra:
+- TypeScript strict sem `any`.
+- Não expor tokens sensíveis em respostas JSON ao cliente.
+- Mensagens de erro claras em português.
+- Dupla verificação: regras no servidor **e** RLS onde aplicável.
 
-```json
-{
-  "operation": "ACCOUNT_DELETION_REQUESTED",
-  "table_name": "users",
-  "record_id": "user_id",
-  "user_id": "user_id",
-  "old_values": { "deleted_at": null },
-  "new_values": { "deleted_at": "2026-04-10T...", "deletion_confirmed_at": null },
-  "change_reason": "User requested account deletion per LGPD Art. 18",
-  "timestamp": "2026-04-10T..."
-}
-```
+## Tarefas de implementação (checklist para o agente dev)
 
-**And** quando email é confirmado:
-```json
-{
-  "operation": "ACCOUNT_DELETION_CONFIRMED",
-  "table_name": "users",
-  "old_values": { "deletion_confirmed_at": null },
-  "new_values": { "deletion_confirmed_at": "2026-04-11T..." },
-  "change_reason": "User confirmed email for account deletion",
-  "timestamp": "2026-04-11T..."
-}
-```
+### Dados e RLS
 
-### 7. Isolamento Tenant
+- [ ] Modelar `blocked_*` / `unblocked_*` (e `blocked_reason`) no sítio certo do schema multi-tenant.
+- [ ] Políticas: INSERT/UPDATE/DELETE negados para dados clínicos do cadastro bloqueado quando `auth.uid()` é o profissional titular; leitura admin via claim/role já usado no projeto.
+- [ ] Triggers ou validação centralizada para tentativas de escrita (log `WRITE_BLOCKED_LGPD`).
 
-**Given** profissional A solicita exclusão  
-**When** exclusão confirmada  
-**Then** profissional B (outro tenant) vê:
-- Nenhum acesso aos dados do profissional A
-- Nenhuma visibilidade de que deletou conta
-- Continuidade normal de seus próprios dados
+### Backend
 
-### 8. Token de Cancelamento Seguro
-
-**Given** email com link de cancelamento  
-**When** profissional clica (dentro de 24h)  
-**Then** token validado:
-- Token contém: `user_id + timestamp + hash(secret)`
-- Válido por: 24 horas apenas
-- Uso único: Após usar, token é invalidado
-
-## Tarefas de Implementação
-
-### Backend / Banco de Dados
-
-- [ ] **Alteração de schema na tabela `users`:**
-  ```sql
-  ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
-  ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_confirmed_at TIMESTAMPTZ;
-  ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_confirmed_token VARCHAR UNIQUE;
-  ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_confirmed_token_expires_at TIMESTAMPTZ;
-  
-  -- Índice para encontrar contas pendentes de confirmação
-  CREATE INDEX idx_users_deletion_pending
-    ON users(deleted_at)
-    WHERE deleted_at IS NOT NULL AND deletion_confirmed_at IS NULL;
-  ```
-
-- [ ] **RLS Update:** Modificar policies existentes para excluir usuários deletados:
-  ```sql
-  -- Exemplo: quando um usuário tenta fazer query, validar que não está deleted_at
-  CREATE POLICY "users_not_deleted" ON users
-    FOR SELECT USING (auth.uid() = id AND deleted_at IS NULL);
-  ```
-
-- [ ] **Server Action:** `requestAccountDeletion(password: string)`
-  - Validar senha atual
-  - Inserir `deleted_at = NOW()`
-  - Gerar token de confirmação seguro
-  - Registar em `audit_log`
-  - Enviar email com link
-
-- [ ] **Server Action:** `confirmAccountDeletion(token: string)`
-  - Validar token (não expirado, matches user)
-  - Atualizar `deletion_confirmed_at = NOW()`
-  - Invalidar token
-  - Registar em `audit_log`
-  - Desativar auth user (via Supabase Admin API)
-
-- [ ] **Server Action:** `cancelAccountDeletion(token: string)`
-  - Validar token
-  - Restaurar `deleted_at = NULL`
-  - Remover token
-  - Registar em `audit_log`
-  - Reativar auth user
-
-- [ ] **Supabase Auth Update:**
-  - Via `supabase.auth.admin.updateUserById()`: setar `user.confirmed_at = NULL` ou custom claim `deleted=true`
-  - Isso bloqueia login sem deletar a conta da auth
-
-- [ ] **Cron Job:** Limpeza de dados após 5 anos
-  - Executar diariamente
-  - Query users com `deletion_confirmed_at < NOW() - '5 years'::INTERVAL`
-  - Soft-delete em cascata (patients, visits, reports, etc.)
-  - Manter audit_log intacto
+- [ ] Ajustar `lib/actions/account-deletion.ts` (ou renomear para ações de “bloqueio LGPD”) para não simular “delete imediato” nem devolver segredos.
+- [ ] Integração email (Resend): texto com retenção **10 anos** e links seguros (sem token em resposta HTTP).
+- [ ] `proxy.ts` / sessão: negar login ou marcar sessão inválida para conta bloqueada (definir com `profiles`).
 
 ### Frontend
 
-- [ ] **Componente:** `DeletionRequestModal`
-  - Dupla confirmação (checkbox + password)
-  - Loading state
-  - Error handling
+- [ ] Página `app/(app)/configuracoes/deletar-conta/page.tsx` + modais: copy e estados (pendente / bloqueado / desbloqueio admin).
+- [ ] Área admin: ação de desbloqueio com confirmação e motivo opcional.
 
-- [ ] **Componente:** `DeletionStatusCard`
-  - Exibir status (nenhuma, pendente, confirmado, deletado)
-  - Countdown se pendente
-  - Timeline visual
+### Testes
 
-- [ ] **Página:** `app/(app)/configuracoes/deletar-conta/page.tsx`
-  - Layout com warning card
-  - Timeline explicativa
-  - Status atual
-  - Botão de ação (Solicitar / Cancelar)
+- [ ] Testes unitários mínimos das regras de bloqueio (helpers).
+- [ ] Onde existir suite RLS, casos para escrita bloqueada vs leitura admin.
 
-- [ ] **Componente:** `DeletionStatusBadge`
-  - Exibir em dashboard/header se há solicitação pendente
+## Arquivos prováveis (ajustar na implementação)
 
-- [ ] **Email Template:** `account-deletion-confirmation.ts`
-  - HTML renderizado
-  - Links seguros com tokens
-  - Timeline clara
-  - Contato de suporte
-
-### Segurança & Compliance
-
-- [ ] **RLS:** Validar que contas deletadas não permitem acesso
-- [ ] **Token Security:** Tokens de confirmação são únicos, com hash, com expiração
-- [ ] **Email Verification:** Link no email é o ÚNICO meio de confirmar
-- [ ] **Password Verification:** Solicitar senha para iniciar process (defesa contra phishing)
-- [ ] **LGPD:** Timeline de retenção documentada em UI
-- [ ] **Audit Trail:** Todas as operações de deletion registadas
-- [ ] **Isolamento:** Validar que user_id é sempre do auth.uid()
-
-## Arquivos a Criar/Modificar
-
-### Migrações
-- `supabase/migrations/20260410150000_account_deletion.sql`
-
-### Tipos TypeScript
-- `lib/types/deletion.ts` — DeletionStatus, DeletionRequest types
-
-### Server Actions
-- `lib/actions/account-deletion.ts` — Request, confirm, cancel operations
-
-### Componentes
-- `components/settings/deletion-request-modal.tsx`
-- `components/settings/deletion-status-card.tsx`
-- `components/settings/deletion-status-badge.tsx`
-
-### Páginas
+- `supabase/migrations/*_lgpd_block_retention_10y.sql` (novo nome sugerido)
+- `lib/types/account-deletion.ts` ou `lib/types/lgpd-block.ts`
+- `lib/actions/account-deletion.ts` (refatorar semântica)
+- `lib/email/send-account-deletion-email-resend.ts` (copy 10 anos)
 - `app/(app)/configuracoes/deletar-conta/page.tsx`
+- `components/settings/deletion-request-modal.tsx`, `deletion-status-card.tsx`
+- `app/(admin)/admin/...` (desbloqueio, se aplicável)
+- `tests/...` (novos casos)
 
-### Email
-- `lib/email/templates/account-deletion-confirmation.ts`
+## Definição de pronto (DoD)
 
-### Cron/Background
-- `lib/cron/cleanup-deleted-accounts.ts` (to be called via Supabase Edge Function or external scheduler)
-
-### Atualizações a Arquivos Existentes
-- `middleware.ts` — Adicionar check: `if (user.deleted_at) return unauthorized`
-- `app/(app)/layout.tsx` — Adicionar badge se exclusão pendente
-- Environment: `SUPABASE_SERVICE_ROLE_KEY` (para admin API)
-
-## Definição de Pronto (DoD)
-
-- [ ] Código TypeScript sem erros (`npx tsc --noEmit`)
-- [ ] RLS: Conta deletada bloqueia completamente (SELECT, INSERT, UPDATE, DELETE)
-- [ ] Dupla confirmação funciona (modal + email)
-- [ ] Token de confirmação é seguro (único, expiração, hash)
-- [ ] Cancelamento dentro de 24h funciona
-- [ ] Email enviado corretamente com timeline clara
-- [ ] Auditoria: Todas as operações registadas em `audit_log`
-- [ ] Soft-delete: Dados de pacientes retidos (status='deleted' após 5 anos)
-- [ ] Isolamento tenant: Um tenant não vê dados de outro deletado
-- [ ] Sprint status atualizado para `done`
-- [ ] Documentação de retenção legal anexada ao PR
+- [ ] Todos os critérios de aceitação verificados.
+- [ ] `tsc` sem erros; lint limpo nos ficheiros tocados.
+- [ ] Documentação de retenção **10 anos** visível ao utilizador e refletida na story/implementação.
+- [ ] Sprint status atualizado quando a implementação for concluída.
 
 ---
 
-## Notas de Implementação
+## Dev Agent Record
 
-### Timeline Crítica
-- **T+0:** User solicita exclusão, email enviado
-- **T+24h:** Janela para cancelar (sem confirmação, ainda consegue reverter)
-- **T+24h+:** Conta desativada, auth blocked, dados soft-deleted
-- **T+5 anos:** Limpeza automática final de dados de saúde
-- **Sempre:** Audit log é mantido, nunca deletado (mascarado se necessário)
+### Debug Log
 
-### Considerações de UX
-- Modal de confirmação DEVE ser simples e claro
-- Email DEVE ter link de cancelamento bem visível
-- Status DEVE mostrar exatamente quanto tempo falta
-- Mensagens de erro DEVEM ser em português BR claro
+- (preencher durante implementação)
 
-### Considerações de Segurança
-- Nunca deletar irreversivelmente antes de 5 anos
-- Sempre verificar `deleted_at IS NOT NULL` em queries sensíveis
-- Tokens de confirmação são one-time-use
-- Audit log é imutável (never delete, only mask)
+### Completion Notes
 
-### Considerações LGPD
-- Story 11.7 implementa LGPD Art. 18 (Right to be Forgotten)
-- Retenção legal de 5 anos é conforme práticas de saúde brasileiras
-- Documentação clara de timeline é obrigatória
-- Direito de cancelar dentro de 24h é melhor prática
+- (preencher ao concluir)
+
+### File List
+
+- (preencher ao concluir)
+
+### Change Log
+
+- 2026-04-10 — Story reescrita: bloqueio LGPD, retenção 10 anos, sem apagar dados clínicos; fora de escopo Firebase.
+
+### Status
+
+- **Story spec:** `ready-for-dev` (conteúdo alinhado ao novo modelo; implementação pendente de refactor face ao código legado da 11.7 anterior)

@@ -40,7 +40,7 @@ export async function loadAuditLogs(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   const limit = filters?.limit ?? 50;
   const offset = filters?.offset ?? 0;
@@ -90,7 +90,7 @@ export async function loadPatientAccessHistory(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que o paciente pertence ao utilizador
   const { data: patient, error: patientError } = await supabase
@@ -133,7 +133,7 @@ export async function generateDsarReport(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   // Validar que o paciente pertence ao utilizador
   const { data: patient, error: patientError } = await supabase
@@ -204,7 +204,7 @@ export async function exportPatientAuditCsv(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   const rateLimitOk = await checkRateLimit(user.id);
   if (!rateLimitOk) {
@@ -284,7 +284,7 @@ export async function exportPatientAuditJson(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect('/auth/login');
+  if (!user) redirect('/login');
 
   const rateLimitOk = await checkRateLimit(user.id);
   if (!rateLimitOk) {

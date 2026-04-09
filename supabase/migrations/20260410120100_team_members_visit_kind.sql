@@ -33,6 +33,11 @@ create index if not exists team_members_owner_idx
 
 alter table public.team_members enable row level security;
 
+drop policy if exists "team_members_select_own" on public.team_members;
+drop policy if exists "team_members_insert_own" on public.team_members;
+drop policy if exists "team_members_update_own" on public.team_members;
+drop policy if exists "team_members_delete_own" on public.team_members;
+
 create policy "team_members_select_own"
   on public.team_members for select
   to authenticated
@@ -90,6 +95,9 @@ where visit_kind is null;
 
 alter table public.scheduled_visits
   alter column visit_kind set not null;
+
+alter table public.scheduled_visits
+  drop constraint if exists scheduled_visits_visit_kind_check;
 
 alter table public.scheduled_visits
   add constraint scheduled_visits_visit_kind_check check (

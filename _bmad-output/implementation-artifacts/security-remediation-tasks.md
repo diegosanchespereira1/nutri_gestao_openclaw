@@ -1,19 +1,138 @@
-# Tasks — correções de segurança (pós-auditoria NutriGestão)
+# Tarefas de execução — segurança (NutriGestão)
 
-**Origem:** auditoria estática (OWASP, RLS, Next.js, LGPD).  
-**Objetivo:** fechar gaps antes de exposição pública relevante.
+**Objetivo:** visibilidade única de tudo o que falta (e do que já foi feito) em segurança — alinhado à skill `nutrigestao-security` e auditorias OWASP/LGPD.
 
-**Implementado no código (2026-04-03):** SEC-01, SEC-02 (migração), SEC-03, SEC-05, SEC-06 (UI + nota `.env.example`), SEC-07 (`loadPatientById` + Zod em import), SEC-08, SEC-10 (CI + Dependabot).  
-**Pendente:** SEC-04 (rate limiting), SEC-09 (auditoria estruturada), SEC-11 (LGPD operacional). Migração SQL: aplicar com `supabase db push` / pipeline. Dashboard Supabase: política de password ≥12.
+**Última revisão do documento:** consolidar com código atual (`proxy.ts`, `lib/auth-paths.ts`, `next.config.ts`, migrações).
 
 ---
 
-## Legenda
+## Painel de visibilidade (estado)
 
-- **Bloqueante:** deve estar feito antes de produção pública.
-- **Alta:** na mesma sprint que o go-live ou imediatamente a seguir.
-- **Média:** próxima sprint.
-- **Contínua:** processo / backlog.
+| ID | Título | Prioridade | Estado | Notas |
+|----|--------|------------|--------|--------|
+| SEC-01 | Open redirect (`next` no login) | Bloqueante | **Feito** | `lib/auth/safe-next-path.ts` + login + callback |
+| SEC-02 | RLS `scheduled_visits` UPDATE | Bloqueante | **Feito** | Migração `20260411120000_scheduled_visits_update_rls_target.sql` — aplicar em remoto |
+| SEC-03 | Headers + CSP base | Bloqueante | **Feito** | `next.config.ts` |
+| SEC-04 | Rate limiting | Alta | **Backlog** | Login, recuperação, import, APIs |
+| SEC-05 | Middleware: prefixos `(app)` | Alta | **Parcial** | Inclui vários; faltam novos módulos — ver **SEC-12** |
+| SEC-06 | Palavra-passe ≥12 + registo neutro | Média | **Feito** | UI + nota `.env.example`; confirmar Dashboard Supabase |
+| SEC-07 | `getUser` + Zod (import) | Média | **Parcial** | Import validado; alargar Zod a outras actions (backlog) |
+| SEC-08 | MFA QR sem `dangerouslySetInnerHTML` | Média | **Feito** | `mfa-totp-qr.tsx` |
+| SEC-09 | Logging / auditoria estruturada | Média | **Backlog** | `audit_log` existe; integrar mutações sensíveis + sem PII em logs |
+| SEC-10 | CI + Dependabot + Node runtime | Média | **Feito** | `.github/workflows/ci.yml`, Dependabot, Node 24 / `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` |
+| SEC-11 | LGPD operacional (produto/legal) | Contínua | **Backlog** | DPO, incidentes, DSAR, retenção |
+| SEC-12 | Prefixos middleware em falta | Alta | **Backlog** | Ver secção dedicada |
+| SEC-13 | HTML contratos — anti-XSS | Alta | **Backlog** | `contract-generator-dialog` + `generateContractHtml` |
+| SEC-14 | `npm audit` — dependências transitivas | Média | **Backlog** | `hono` / `@hono/node-server` (moderate); `npm audit fix` + testes |
+| SEC-15 | Rotas `(portal)` — modelo de acesso | Média | **Backlog** | Confirmar público vs autenticado vs convidado |
+| SEC-16 | CSP com nonces (fase 2) | Baixa | **Backlog** | Reduzir `unsafe-inline` / `unsafe-eval` |
+| SEC-17 | Documentação entrypoint auth | Baixa | **Backlog** | Next 16: `proxy.ts` em vez de `middleware.ts` na raiz |
+
+**Legenda de prioridade:** Bloqueante → Alta → Média → Baixa → Contínua.
+
+---
+
+## SEC-12 — Completar `PROTECTED_PREFIXES` (middleware)
+
+| Campo | Valor |
+|--------|--------|
+| Prioridade | **Alta** |
+| OWASP | A01 |
+
+**Contexto:** O ficheiro de sessão é `proxy.ts` (Next.js 16); a lógica está em `lib/supabase/middleware.ts`. `lib/auth-paths.ts` define `PROTECTED_PREFIXES`.
+
+**Prefixos a acrescentar (auditoria 2026):**
+
+- `/notificacoes`
+- `/auditoria` (cobre `/auditoria/dsar`)
+- `/financeiro`
+- `/configuracoes` (cobre `deletar-conta`, `notificacoes` sob configuracoes, etc.)
+
+**Critérios de aceitação:**
+
+- [ ] Utilizador anónimo acede a qualquer URL acima → redirect `/login?next=...`
+- [ ] Revisão rápida de `app/(app)/` e novas rotas sempre que se mergeie feature nova
+- [ ] **Opcional:** comentário no topo de `auth-paths.ts`: “lista deve cobrir todos os segmentos de `app/(app)` exceto se deliberadamente públicos”
+
+**Não incluir sem decisão de produto:** `(portal)/portal` — tratar em **SEC-15**.
+
+---
+
+## SEC-13 — Sanitizar HTML de contratos (pré-visualização)
+
+| Campo | Valor |
+|--------|--------|
+| Prioridade | **Alta** |
+| OWASP | A08 / XSS |
+
+**Contexto:** `components/financeiro/contract-generator-dialog.tsx` usa `dangerouslySetInnerHTML` com HTML devolvido por `generateContractHtml`.
+
+**Descrição:** Sanitizar no **servidor** antes de enviar ao cliente (ex.: **DOMPurify** com lista de tags permitidas, ou gerar apenas texto/markdown seguro). Garantir escape de variáveis injectadas nos templates.
+
+**Critérios de aceitação:**
+
+- [ ] HTML mostrado na pré-visualização não executa scripts nem `javascript:` URLs
+- [ ] Fluxo “Imprimir / PDF” continua funcional
+- [ ] Teste manual com payload `<script>` no nome do cliente (se aplicável) não dispara XSS
+
+---
+
+## SEC-14 — Supply chain: `npm audit` e transitivas
+
+| Campo | Valor |
+|--------|--------|
+| Prioridade | **Média** |
+| OWASP | A03 / A06 |
+
+**Descrição:** Correr `npm audit` / `npm audit fix`; validar que `hono` e `@hono/node-server` sobem para versões sem advisory ou documentar excepção (origem: dependência transitiva — ex. tooling).
+
+**Critérios de aceitação:**
+
+- [ ] `npm audit --omit=dev` sem vulnerabilidades **high/critical** (política da equipa)
+- [ ] CI alinhado com essa política (ajustar `--audit-level` só se justificado e documentado)
+
+---
+
+## SEC-15 — Portal externo `(portal)`
+
+| Campo | Valor |
+|--------|--------|
+| Prioridade | **Média** |
+| OWASP | A01 |
+
+**Descrição:** Documentar e implementar: quem pode aceder a `/portal`, com que credenciais (Supabase Auth vs token externo), e se deve constar de `PROTECTED_PREFIXES` ou regras separadas.
+
+**Critérios de aceitação:**
+
+- [ ] Decisão registada (README interno ou ADR curto)
+- [ ] Comportamento do middleware alinhado à decisão
+
+---
+
+## SEC-16 — CSP endurecida (nonces)
+
+| Campo | Valor |
+|--------|--------|
+| Prioridade | **Baixa** |
+| OWASP | A02 / A08 |
+
+**Descrição:** Reduzir `unsafe-inline` / `unsafe-eval` na CSP com nonces do Next.js App Router (iterativo; pode partir por rota).
+
+---
+
+## SEC-17 — Documentação `proxy.ts` vs middleware
+
+| Campo | Valor |
+|--------|--------|
+| Prioridade | **Baixa** |
+
+**Descrição:** Nota no README ou `CONTRIBUTING`: em Next 16 o ficheiro na raiz pode ser `proxy.ts`; novos contribuidores procuram `middleware.ts`.
+
+---
+
+# Tarefas históricas (detalhe — já na primeira vaga)
+
+As secções **TASK-SEC-01 … SEC-11** abaixo mantêm critérios de aceitação; onde o **Painel** marca “Feito”, os checklists podem ser validados como concluídos.
 
 ---
 
@@ -24,16 +143,14 @@
 | Prioridade | Bloqueante |
 | OWASP | A01 / phishing |
 
-**Descrição:** Validar o parâmetro `next` no fluxo de login (e 2FA) como em `app/auth/callback/route.ts`: apenas path relativo seguro (`/` + não `//`), fallback `/inicio`.
-
-**Ficheiros prováveis:** `components/auth/login-form.tsx`; extrair helper partilhado (ex.: `lib/auth/safe-next-path.ts`) usado por callback e login.
+**Descrição:** Validar o parâmetro `next` no fluxo de login (e 2FA): apenas path relativo seguro, fallback `/inicio`.
 
 **Critérios de aceitação:**
 
-- [ ] `/login?next=https://evil.com` após autenticação com sucesso não redireciona para domínio externo.
-- [ ] `/login?next=//evil.com` rejeitado.
-- [ ] `/login?next=/visitas` continua a funcionar.
-- [ ] Mesma regra aplicada após verificação MFA (`window.location.assign` / navegação).
+- [x] `/login?next=https://evil.com` não redireciona para fora do site após login
+- [x] `/login?next=//evil.com` rejeitado
+- [x] `/login?next=/visitas` funciona
+- [x] MFA usa o mesmo destino seguro
 
 ---
 
@@ -42,198 +159,101 @@
 | Campo | Valor |
 |--------|--------|
 | Prioridade | Bloqueante |
-| OWASP | A01 (controlo de acesso / integridade) |
-
-**Descrição:** Nova migração SQL que substitui ou complementa a policy `scheduled_visits_update_own` para que o `WITH CHECK` exija as mesmas condições de `establishment_id` / `patient_id` / `target_type` que o `INSERT` (pertencer ao `owner` via `clients`).
-
-**Ficheiros prováveis:** `supabase/migrations/YYYYMMDDHHMMSS_scheduled_visits_update_policy.sql`
+| OWASP | A01 |
 
 **Critérios de aceitação:**
 
-- [ ] Utilizador A não consegue `UPDATE` uma visita própria para `patient_id` ou `establishment_id` de tenant B (teste manual ou teste SQL com dois `auth.uid()` simulados se existir harness).
-- [ ] `user_id` continua imutável em relação a outro utilizador (`WITH CHECK` mantém `user_id = auth.uid()`).
-- [ ] Fluxos UI existentes (editar visita, alterar alvo dentro do mesmo tenant) continuam a funcionar.
+- [ ] Migração aplicada em **todos** os ambientes (dev/staging/prod)
+- [ ] UPDATE não permite apontar alvo para outro tenant
 
 ---
 
 ## TASK-SEC-03 — Headers de segurança (Next.js)
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Bloqueante |
-| OWASP | A02 / A08 |
-
-**Descrição:** Configurar `headers` em `next.config.ts` (ou equivalente suportado pela versão em uso): `Strict-Transport-Security` (apenas em produção), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` restritiva. CSP: fase 1 permissiva com `upgrade-insecure-requests` + regras para `self` e domínios Supabase; evoluir para nonces quando viável.
-
-**Ficheiros prováveis:** `next.config.ts`
-
 **Critérios de aceitação:**
 
-- [ ] Respostas HTML da app incluem os headers acima (verificar com `curl -I` ou DevTools).
-- [ ] Login, callback Supabase e assets `_next` não ficam quebrados (ajustar CSP iterativamente).
-- [ ] HSTS não ativo em `development` local HTTP (evitar bloquear devs).
+- [x] Headers configurados em `next.config.ts`
+- [x] HSTS só em produção
 
 ---
 
 ## TASK-SEC-04 — Rate limiting (borda + rotas sensíveis)
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Alta |
-| OWASP | A04 / A07 |
-
-**Descrição:** Implementar limitação de taxa alinhada ao PRD/NFR: login/signup/recuperação, API routes relevantes, Server Actions pesadas (import). Opções: Upstash Redis + `@upstash/ratelimit`, ou Vercel Edge Config + KV, ou Cloudflare Rules (documentar onde vive a política).
-
-**Ficheiros prováveis:** `middleware.ts` (ou wrappers por rota), `.env.example`, documentação de variáveis.
+(Ver painel — Backlog.)
 
 **Critérios de aceitação:**
 
-- [ ] Limite aplicado a tentativas de login por IP (ex.: 5/min — ajustar ao PRD).
-- [ ] Limite para `forgot-password` / fluxo de email (ex.: 3/hora por IP ou por email conforme desenho).
-- [ ] Import / uploads com limite por utilizador autenticado (ex.: NFR13 escrita/upload).
-- [ ] Resposta `429` clara, sem vazar estado interno.
-- [ ] Variáveis de ambiente documentadas em `.env.example`.
+- [ ] Limites login / recuperação / import / upload conforme PRD
+- [ ] `429` sem fugas de informação
+- [ ] `.env.example` atualizado
 
 ---
 
-## TASK-SEC-05 — Middleware: todas as rotas `(app)` protegidas
+## TASK-SEC-05 — Middleware: rotas `(app)` protegidas
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Alta |
-| OWASP | A01 |
-
-**Descrição:** Incluir em `PROTECTED_PREFIXES` todos os prefixos da área autenticada hoje em falta: `/pacientes`, `/checklists`, `/importar`, `/equipe` (e qualquer novo prefixo sob `app/(app)/`).
-
-**Ficheiros prováveis:** `lib/auth-paths.ts`
-
-**Critérios de aceitação:**
-
-- [ ] Acesso anónimo a `/pacientes`, `/checklists`, `/importar`, `/equipe` redireciona para `/login?next=...`.
-- [ ] Rotas públicas (`/`, `/login`, `/register`, `/forgot-password`, `/auth/*`) inalteradas.
-- [ ] Comentário no ficheiro: ao adicionar nova rota em `(app)`, atualizar lista ou migrar para estratégia “default deny” para segmento `(app)`.
+**Estado:** Parcial — completar com **SEC-12**.
 
 ---
 
 ## TASK-SEC-06 — Política de palavras-passe e enumeração no registo
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Média |
-| OWASP | A07 |
-
-**Descrição:** (1) Aumentar mínimo da palavra-passe no UI para **12** caracteres (alinhar OWASP/skill); espelhar política no **Supabase Dashboard** (Authentication → Password). (2) Registo: mensagem genérica para email já existente (mesmo texto que “email disponível — confirme caixa de entrada”), sem revelar se o email está registado.
-
-**Ficheiros prováveis:** `components/auth/register-form.tsx`; nota em `.env.example` ou doc interna sobre Dashboard.
-
 **Critérios de aceitação:**
 
-- [ ] Registo com palavra-passe &lt; 12 caracteres rejeitado no cliente com mensagem clara.
-- [ ] Supabase rejeita palavras-passe abaixo do mínimo configurado (confirmar após alterar Dashboard).
-- [ ] Tentativa de registo com email duplicado não mostra “já está registado” de forma distinta do fluxo de sucesso genérico.
+- [x] Mínimo 12 caracteres no cliente
+- [ ] Dashboard Supabase com política alinhada (verificação manual)
 
 ---
 
-## TASK-SEC-07 — Defesa em profundidade nas Server Actions (auth + validação)
-
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Média |
-| OWASP | A04 / A08 |
-
-**Descrição:** (1) `loadPatientById` (e loaders similares sem `getUser`): chamar `getUser()` e retornar vazio/redirect consistente. (2) Plano incremental: introduzir **Zod** nas actions de maior risco (import, pacientes, clientes, visitas) com schemas partilhados em `lib/validators/` ou similar.
-
-**Ficheiros prováveis:** `lib/actions/patients.ts`, outras actions identificadas por grep `createClient` sem `getUser` imediato.
+## TASK-SEC-07 — Defesa em profundidade nas Server Actions
 
 **Critérios de aceitação:**
 
-- [ ] `loadPatientById` não devolve dados sem sessão autenticada (comportamento explícito, não só RLS).
-- [ ] Pelo menos **uma** action de escrita de alto risco validada com Zod (definir qual na implementação).
-- [ ] Lista curta no PR de outras actions candidatas a Zod na sprint seguinte.
+- [x] `loadPatientById` com sessão explícita (implementação anterior)
+- [x] Import com Zod
+- [ ] Alargar Zod a outras actions de risco (backlog incremental)
 
 ---
 
-## TASK-SEC-08 — MFA: eliminar `dangerouslySetInnerHTML` no QR
-
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Média |
-| OWASP | A03 / XSS |
-
-**Descrição:** Garantir que o QR TOTP é sempre renderizado via `data:` URL (`<img>`) ou SVG inline seguro; remover ramo `dangerouslySetInnerHTML` ou sanitizar com biblioteca adequada se a API exigir HTML.
-
-**Ficheiros prováveis:** `components/mfa-settings.tsx`
+## TASK-SEC-08 — MFA: QR sem HTML inseguro
 
 **Critérios de aceitação:**
 
-- [ ] Sem `dangerouslySetInnerHTML` para conteúdo derivado de API, ou sanitização auditável.
-- [ ] Fluxo “Ativar 2FA” continua funcional.
+- [x] Componente dedicado sem `dangerouslySetInnerHTML` para o QR
 
 ---
 
 ## TASK-SEC-09 — Logging e auditoria (fase 1)
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Média |
-| OWASP | A09 / LGPD |
-
-**Descrição:** Substituir `console.error` solto em paths sensíveis por logger estruturado (nível, código, `requestId` quando existir). Definir eventos mínimos de auditoria para mutações em dados de paciente (quem, quando, recurso, ação) — tabela `audit_log` ou serviço externo; FR62.
-
-**Ficheiros prováveis:** `lib/actions/import.ts`, novos `lib/audit/*`, migração se persistir em BD.
-
-**Critérios de aceitação:**
-
-- [ ] Logs de servidor não incluem PII em claro (CPF, notas clínicas); mascarar ou omitir.
-- [ ] Documento ou comentário de retenção alinhado a NFR15 (12 meses) — implementação completa pode ser TASK-SEC-09b.
+(Ver painel — Backlog.)
 
 ---
 
 ## TASK-SEC-10 — CI e Dependabot
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Média |
-| OWASP | A03 / A06 |
-
-**Descrição:** Workflow GitHub Actions: `npm ci`, `npm run lint`, `npm audit` (falha em high/critical configurável). Ativar **Dependabot** para `npm` (e opcionalmente GitHub Security advisories).
-
-**Ficheiros prováveis:** `.github/workflows/ci.yml`, `.github/dependabot.yml`
-
 **Critérios de aceitação:**
 
-- [ ] PRs bloqueados ou alertados conforme política de vulnerabilidades.
-- [ ] `npm run build` opcional no CI se o tempo for aceitável.
+- [x] Workflow CI (lint, test, audit, build)
+- [x] Dependabot npm
+- [x] Node 24 + variável de migração JS Actions (changelog GitHub)
 
 ---
 
-## TASK-SEC-11 — LGPD operacional (backlog produto + legal)
+## TASK-SEC-11 — LGPD operacional
 
-| Campo | Valor |
-|--------|--------|
-| Prioridade | Contínua |
-| OWASP / LGPD | A09 + Art. 11 |
-
-**Descrição:** Itens não só código: consentimento explícito dados de saúde, DPO, plano de incidente (72h ANPD), exportação/portabilidade/exclusão de conta (FR64–FR69), retenção 5 anos pós-contrato (NFR27). Mapear cada FR a story/epic existente ou criar novas.
-
-**Critérios de aceitação:**
-
-- [ ] Matriz FR ↔ implementação ↔ responsável.
-- [ ] “Definition of Done” de produção inclui checklist LGPD mínimo.
+(Ver painel — Contínua.)
 
 ---
 
-## Ordem sugerida de execução
+## Ordem sugerida (o que falta)
 
-1. TASK-SEC-01, TASK-SEC-02, TASK-SEC-03 (bloqueantes rápidos de alto impacto).  
-2. TASK-SEC-05, TASK-SEC-04 (superfície de ataque e abuso).  
-3. TASK-SEC-06, TASK-SEC-07, TASK-SEC-08.  
-4. TASK-SEC-09, TASK-SEC-10 em paralelo.  
-5. TASK-SEC-11 contínuo com PM/legal.
+1. **SEC-12** (prefixos middleware) + **SEC-13** (HTML contratos) — maior impacto imediato.  
+2. **SEC-04** (rate limit) + **SEC-14** (audit npm).  
+3. **SEC-09** (auditoria aplicacional) + **SEC-15** (portal).  
+4. **SEC-16**, **SEC-17**, **SEC-11** em paralelo / contínuo.
 
 ---
 
-## Após conclusão
+## Após conclusão do backlog crítico
 
-- [ ] Reexecutar checklist da skill `nutrigestao-security` (fases 1–4 mínimo).  
-- [ ] Agendar pentest externo antes de lançamento com dados reais de pacientes.
+- [ ] Reexecutar checklist da skill `nutrigestao-security` (fases 1–4).  
+- [ ] Pentest externo antes de dados reais de pacientes em produção.

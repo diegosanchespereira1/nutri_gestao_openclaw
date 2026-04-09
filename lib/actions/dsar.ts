@@ -32,7 +32,7 @@ export async function generateCompletePatientDsar(
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     // 1. Carregar dados do paciente
     const { data: patient, error: patientError } = await supabase
@@ -203,7 +203,7 @@ export async function exportDsarAsJson(patientId: string): Promise<DsarExportRes
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     const filename = `DSAR_${patientId}_${new Date().toISOString().split('T')[0]}.json`;
     const content = JSON.stringify(response.report, null, 2);
@@ -247,7 +247,7 @@ export async function exportDsarAsCsv(patientId: string): Promise<DsarExportResu
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     const report = response.report;
     const csvSections: string[] = [];
@@ -332,7 +332,7 @@ export async function sendDsarByEmail(
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) redirect('/auth/login');
+    if (!user) redirect('/login');
 
     // Validar que paciente pertence ao utilizador
     const { data: patient } = await supabase

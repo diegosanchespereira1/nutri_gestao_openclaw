@@ -22,7 +22,7 @@ export default async function NotificacoesPage() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/auth/login');
+    redirect('/login');
   }
 
   return (

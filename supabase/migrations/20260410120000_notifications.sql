@@ -127,10 +127,22 @@ CREATE POLICY "notification_preferences_delete_own" ON notification_preferences
   USING (auth.uid() = user_id);
 
 -- Trigger para atualizar updated_at
+CREATE OR REPLACE FUNCTION public.notification_preferences_touch_updated_at ()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS notification_preferences_update_timestamp ON notification_preferences;
+
 CREATE TRIGGER notification_preferences_update_timestamp
   BEFORE UPDATE ON notification_preferences
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
+  EXECUTE FUNCTION public.notification_preferences_touch_updated_at ();
 
 -- ============================================================================
 -- 3. FCM_TOKENS TABLE

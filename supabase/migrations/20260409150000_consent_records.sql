@@ -104,10 +104,22 @@ create policy "consent_update_own"
 -- 3. Trigger para updated_at
 -- ──────────────────────────────────────────────────────────────────────────────
 
-create or replace trigger consent_records_update_at
+create or replace function public.consent_records_touch_updated_at ()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists consent_records_update_at on public.consent_records;
+
+create trigger consent_records_update_at
   before update on public.consent_records
   for each row
-  execute function public.update_updated_at();
+  execute function public.consent_records_touch_updated_at ();
 
 -- ──────────────────────────────────────────────────────────────────────────────
 -- 4. Função para validar consentimento parental obrigatório para menores

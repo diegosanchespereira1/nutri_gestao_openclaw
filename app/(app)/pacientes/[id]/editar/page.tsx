@@ -46,11 +46,20 @@ export default async function EditarPacientePage({
       )
     : undefined;
 
-  const backHref = row.establishment_id
-    ? `/clientes/${row.client_id}/estabelecimentos/${row.establishment_id}/editar`
-    : `/clientes/${row.client_id}/editar`;
+  // Retroceder ao contexto correto — paciente pode ser independente (sem cliente)
+  const backHref =
+    row.establishment_id && row.client_id
+      ? `/clientes/${row.client_id}/estabelecimentos/${row.establishment_id}/editar`
+      : row.client_id
+        ? `/clientes/${row.client_id}/editar`
+        : "/pacientes";
 
-  const backLabel = row.establishment_id ? "Estabelecimento" : "Cliente";
+  const backLabel =
+    row.establishment_id && row.client_id
+      ? "Estabelecimento"
+      : row.client_id
+        ? "Cliente"
+        : "Pacientes";
 
   return (
     <PageLayout variant="form">

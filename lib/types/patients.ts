@@ -4,7 +4,10 @@ export type PatientSex = "female" | "male" | "other";
 
 export type PatientRow = {
   id: string;
-  client_id: string;
+  /** Tenant directo. Sempre populado. */
+  user_id: string;
+  /** Nullable — paciente pode ser independente (sem cliente associado). */
+  client_id: string | null;
   establishment_id: string | null;
   full_name: string;
   birth_date: string | null;

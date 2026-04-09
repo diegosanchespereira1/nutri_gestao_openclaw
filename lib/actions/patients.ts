@@ -19,21 +19,25 @@ export type PatientFormResult =
   | { ok: true }
   | { ok: false; error: string };
 
+/** Revalida rotas relacionadas com o paciente.
+ *  clientId pode ser null (paciente independente). */
 function revalidatePatientPaths(
-  clientId: string,
+  clientId: string | null,
   establishmentId: string | null,
   patientId?: string,
 ) {
   revalidatePath("/pacientes");
-  revalidatePath(`/clientes/${clientId}/editar`);
-  revalidatePath(`/clientes/${clientId}/pacientes/novo`);
-  if (establishmentId) {
-    revalidatePath(
-      `/clientes/${clientId}/estabelecimentos/${establishmentId}/editar`,
-    );
-    revalidatePath(
-      `/clientes/${clientId}/estabelecimentos/${establishmentId}/pacientes/novo`,
-    );
+  if (clientId) {
+    revalidatePath(`/clientes/${clientId}/editar`);
+    revalidatePath(`/clientes/${clientId}/pacientes/novo`);
+    if (establishmentId) {
+      revalidatePath(
+        `/clientes/${clientId}/estabelecimentos/${establishmentId}/editar`,
+      );
+      revalidatePath(
+        `/clientes/${clientId}/estabelecimentos/${establishmentId}/pacientes/novo`,
+      );
+    }
   }
   if (patientId) {
     revalidatePath(`/pacientes/${patientId}/editar`);
@@ -67,6 +71,10 @@ function parsePatientDocument(raw: string):
   return { ok: true, value: digits };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Queries
+// ─────────────────────────────────────────────────────────────────────────────
+
 export async function loadPatientsForScope(
   scope:
     | { variant: "client_pf"; clientId: string }
@@ -98,16 +106,18 @@ export async function loadPatientsForScope(
   return { rows: data as PatientRow[] };
 }
 
-export async function loadAllPatientsForOwner(): Promise<{
-  rows: PatientWithContext[];
-}> {
+/** Lista todos os pacientes do profissional autenticado, com joins de contexto.
+ *  Suporta filtro por nome/CPF (q) e por cliente (clientId). */
+export async function loadAllPatientsForOwner(
+  filters?: { q?: string; clientId?: string },
+): Promise<{ rows: PatientWithContext[] }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
 
-  const { data, error } = await supabase
+  let q = supabase
     .from("patients")
     .select(
       `
@@ -116,8 +126,18 @@ export async function loadAllPatientsForOwner(): Promise<{
       establishments ( name )
     `,
     )
-    .order("created_at", { ascending: false });
+    .order("full_name", { ascending: true });
 
+  const search = filters?.q?.trim() ?? "";
+  if (search) {
+    // ilike no nome e no document_id (CPF)
+    q = q.or(`full_name.ilike.%${search}%,document_id.ilike.%${search}%`);
+  }
+  if (filters?.clientId) {
+    q = q.eq("client_id", filters.clientId);
+  }
+
+  const { data, error } = await q;
   if (error || !data) return { rows: [] };
 
   return { rows: data as unknown as PatientWithContext[] };
@@ -141,6 +161,13 @@ export async function loadPatientById(
   return { row: data as PatientRow };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Mutations
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Cria um paciente PF.
+ *  client_id é OPCIONAL — paciente pode existir sem cliente associado.
+ *  Quando fornecido, valida que o cliente pertence ao utilizador autenticado. */
 export async function createPatientAction(
   _prev: PatientFormResult | undefined,
   formData: FormData,
@@ -151,10 +178,9 @@ export async function createPatientAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const clientId = String(formData.get("client_id") ?? "").trim();
-  if (!clientId) {
-    return { ok: false, error: "Cliente em falta." };
-  }
+  // client_id é opcional (Story 2.1b — paciente pode ser independente)
+  const clientIdRaw = String(formData.get("client_id") ?? "").trim();
+  const client_id = clientIdRaw.length > 0 ? clientIdRaw : null;
 
   const establishmentRaw = String(
     formData.get("establishment_id") ?? "",
@@ -162,36 +188,42 @@ export async function createPatientAction(
   const establishment_id =
     establishmentRaw.length > 0 ? establishmentRaw : null;
 
-  const { data: clientRow } = await supabase
-    .from("clients")
-    .select("id, kind, owner_user_id")
-    .eq("id", clientId)
-    .maybeSingle();
-
-  if (!clientRow || clientRow.owner_user_id !== user.id) {
-    return { ok: false, error: "Cliente inválido." };
-  }
-
-  const kind = clientRow.kind as ClientKind;
-  if (kind === "pf" && establishment_id !== null) {
-    return { ok: false, error: "Paciente PF não pode ter estabelecimento." };
-  }
-  if (kind === "pj" && establishment_id === null) {
-    return {
-      ok: false,
-      error: "Selecione o estabelecimento para paciente deste cliente PJ.",
-    };
-  }
-
-  if (establishment_id) {
-    const { data: est } = await supabase
-      .from("establishments")
-      .select("id, client_id")
-      .eq("id", establishment_id)
+  // Validar cliente se fornecido
+  if (client_id) {
+    const { data: clientRow } = await supabase
+      .from("clients")
+      .select("id, kind, owner_user_id")
+      .eq("id", client_id)
       .maybeSingle();
-    if (!est || est.client_id !== clientId) {
-      return { ok: false, error: "Estabelecimento inválido." };
+
+    if (!clientRow || clientRow.owner_user_id !== user.id) {
+      return { ok: false, error: "Cliente inválido." };
     }
+
+    const kind = clientRow.kind as ClientKind;
+    if (kind === "pf" && establishment_id !== null) {
+      return { ok: false, error: "Paciente PF não pode ter estabelecimento." };
+    }
+    if (kind === "pj" && establishment_id === null) {
+      return {
+        ok: false,
+        error: "Selecione o estabelecimento para paciente deste cliente PJ.",
+      };
+    }
+
+    if (establishment_id) {
+      const { data: est } = await supabase
+        .from("establishments")
+        .select("id, client_id")
+        .eq("id", establishment_id)
+        .maybeSingle();
+      if (!est || est.client_id !== client_id) {
+        return { ok: false, error: "Estabelecimento inválido." };
+      }
+    }
+  } else if (establishment_id) {
+    // Sem cliente não pode ter estabelecimento
+    return { ok: false, error: "Selecione primeiro um cliente para o estabelecimento." };
   }
 
   const full_name = String(formData.get("full_name") ?? "").trim();
@@ -228,7 +260,8 @@ export async function createPatientAction(
   const { data, error } = await supabase
     .from("patients")
     .insert({
-      client_id: clientId,
+      user_id: user.id,
+      client_id,
       establishment_id,
       full_name,
       birth_date,
@@ -245,7 +278,7 @@ export async function createPatientAction(
     return { ok: false, error: "Não foi possível criar o paciente." };
   }
 
-  revalidatePatientPaths(clientId, establishment_id, data.id);
+  revalidatePatientPaths(client_id, establishment_id, data.id);
   redirect(`/pacientes/${data.id}/editar`);
 }
 
@@ -323,8 +356,8 @@ export async function updatePatientAction(
   }
 
   revalidatePatientPaths(
-    existing.client_id,
-    existing.establishment_id,
+    existing.client_id as string | null,
+    existing.establishment_id as string | null,
     id,
   );
   return { ok: true };
@@ -350,12 +383,19 @@ export async function deletePatientAction(formData: FormData) {
 
   await supabase.from("patients").delete().eq("id", id);
 
-  revalidatePatientPaths(row.client_id, row.establishment_id, id);
+  const clientId = row.client_id as string | null;
+  const establishmentId = row.establishment_id as string | null;
 
-  if (row.establishment_id) {
+  revalidatePatientPaths(clientId, establishmentId, id);
+
+  // Redirecionar de volta ao contexto correto
+  if (clientId && establishmentId) {
     redirect(
-      `/clientes/${row.client_id}/estabelecimentos/${row.establishment_id}/editar`,
+      `/clientes/${clientId}/estabelecimentos/${establishmentId}/editar`,
     );
+  } else if (clientId) {
+    redirect(`/clientes/${clientId}/editar`);
+  } else {
+    redirect("/pacientes");
   }
-  redirect(`/clientes/${row.client_id}/editar`);
 }

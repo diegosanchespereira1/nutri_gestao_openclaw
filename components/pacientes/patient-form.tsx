@@ -8,6 +8,7 @@ import {
   updatePatientAction,
 } from "@/lib/actions/patients";
 import type { PatientSex } from "@/lib/types/patients";
+import type { ClientRow } from "@/lib/types/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,14 +29,19 @@ const selectClass =
 export function PatientForm({
   mode,
   patientId,
+  /** Quando fornecido, o cliente fica fixo (contexto de cliente/estabelecimento).
+   *  Quando omitido, o formulário oferece seletor de cliente (opcional). */
   clientId,
   establishmentId,
+  /** Lista de clientes PJ disponíveis para o seletor (só relevante em create sem clientId fixo). */
+  clients,
   defaults,
 }: {
   mode: "create" | "edit";
   patientId?: string;
-  clientId: string;
-  establishmentId: string | null;
+  clientId?: string | null;
+  establishmentId?: string | null;
+  clients?: Pick<ClientRow, "id" | "legal_name" | "trade_name">[];
   defaults: {
     full_name: string;
     birth_date: string;
@@ -53,9 +59,19 @@ export function PatientForm({
   const sexDefault = defaults.sex ?? "";
   const [sex, setSex] = useState<string>(sexDefault);
 
+  // Para o seletor de cliente no modo "independente"
+  const showClientSelector = mode === "create" && clientId == null;
+  const [selectedClientId, setSelectedClientId] = useState<string>("");
+
   return (
     <form action={formAction} className="space-y-6">
-      <input type="hidden" name="client_id" value={clientId} />
+      {/* Campos ocultos de contexto */}
+      {clientId ? (
+        <input type="hidden" name="client_id" value={clientId} />
+      ) : showClientSelector ? (
+        // Seletor visível — o valor seleccionado vai como client_id
+        <input type="hidden" name="client_id" value={selectedClientId} />
+      ) : null}
       {establishmentId ? (
         <input type="hidden" name="establishment_id" value={establishmentId} />
       ) : (
@@ -129,8 +145,42 @@ export function PatientForm({
         </div>
       </fieldset>
 
-      {/* ── Separador visual ─────────────────────────────────── */}
       <div className="border-t border-border" />
+
+      {/* ── Grupo 1b: Associação a cliente (opcional, só create independente) ── */}
+      {showClientSelector && clients && clients.length > 0 ? (
+        <>
+          <fieldset className="space-y-4">
+            <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Associação (opcional)
+            </legend>
+            <div className="space-y-2">
+              <Label htmlFor="patient-client">Cliente</Label>
+              <select
+                id="patient-client"
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+                className={cn(
+                  selectClass,
+                  selectedClientId === "" && "text-muted-foreground",
+                )}
+              >
+                <option value="">— Nenhum (paciente independente) —</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.legal_name}
+                    {c.trade_name ? ` · ${c.trade_name}` : ""}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Pode associar ou alterar o cliente mais tarde.
+              </p>
+            </div>
+          </fieldset>
+          <div className="border-t border-border" />
+        </>
+      ) : null}
 
       {/* ── Grupo 2: Contacto ────────────────────────────────── */}
       <fieldset className="space-y-4">
@@ -164,7 +214,6 @@ export function PatientForm({
         </div>
       </fieldset>
 
-      {/* ── Separador visual ─────────────────────────────────── */}
       <div className="border-t border-border" />
 
       {/* ── Grupo 3: Notas clínicas ──────────────────────────── */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   type NutritionAssessmentFormResult,
@@ -13,12 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const initial: NutritionAssessmentFormResult | undefined = undefined;
 
 // Dentro do Card (bg-card = branco), select e textarea usam bg-card para consistência
 const selectClass =
-  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
+  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
 
 const textareaClass =
   "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
@@ -31,6 +32,7 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
     createNutritionAssessmentAction,
     initial,
   );
+  const [activityLevel, setActivityLevel] = useState("");
 
   return (
     <form action={formAction} className="space-y-6">
@@ -96,8 +98,9 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
           <select
             id="na-activity"
             name="activity_level"
-            className={selectClass}
-            defaultValue=""
+            className={cn(selectClass, activityLevel === "" && "text-muted-foreground")}
+            value={activityLevel}
+            onChange={(e) => setActivityLevel(e.target.value)}
           >
             <option value="">— selecionar —</option>
             {ACTIVITY_LEVELS.map((lvl) => (

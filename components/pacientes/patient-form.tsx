@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   type PatientFormResult,
@@ -11,6 +11,7 @@ import type { PatientSex } from "@/lib/types/patients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const initial: PatientFormResult | undefined = undefined;
 
@@ -50,6 +51,7 @@ export function PatientForm({
   const [state, formAction] = useActionState(action, initial);
 
   const sexDefault = defaults.sex ?? "";
+  const [sex, setSex] = useState<string>(sexDefault);
 
   return (
     <form action={formAction} className="space-y-6">
@@ -99,8 +101,9 @@ export function PatientForm({
             <select
               id="patient-sex"
               name="sex"
-              defaultValue={sexDefault}
-              className={selectClass}
+              value={sex}
+              onChange={(e) => setSex(e.target.value)}
+              className={cn(selectClass, sex === "" && "text-muted-foreground")}
             >
               <option value="">— opcional —</option>
               {sexOptions.map((o) => (

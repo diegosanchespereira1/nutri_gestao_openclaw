@@ -14,7 +14,7 @@ html[data-theme="nutri-teal-v2"] {
   --card-foreground:     hsl(172 46% 10%);
 
   --muted:               hsl(168 20% 94%);   /* #EDF4F3 */
-  --muted-foreground:    hsl(168 14% 40%);   /* #516361 */
+  --muted-foreground:    hsl(168 10% 60%);   /* #8FA8A5 — placeholder claramente mais claro que o texto digitado */
 
   --border:              hsl(168 22% 85%);   /* #C8DDD9 */
   --input:               hsl(168 22% 85%);

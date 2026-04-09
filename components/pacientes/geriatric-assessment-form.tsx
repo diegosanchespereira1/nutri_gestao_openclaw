@@ -15,11 +15,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const initial: GeriatricAssessmentFormResult | undefined = undefined;
 
 const selectClass =
-  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
+  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
+
+// Selects com opção vazia: texto claro (muted) quando nada selecionado, escuro quando preenchido
+function selectValueClass(value: string) {
+  return cn(selectClass, value === "" && "text-muted-foreground");
+}
 
 const legendClass =
   "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
@@ -470,7 +476,7 @@ export function GeriatricAssessmentForm({
             <select
               id="ga-risk"
               name="nutritional_risk"
-              className={selectClass}
+              className={selectValueClass(risk)}
               value={risk}
               onChange={(e) => setRisk(e.target.value)}
             >

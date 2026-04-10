@@ -4,16 +4,31 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { deleteTechnicalRecipeAction } from "@/lib/actions/technical-recipes";
+import {
+  deleteTechnicalRecipeAction,
+  toggleTemplateStatusAction,
+} from "@/lib/actions/technical-recipes";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+import { Star } from "lucide-react";
 
-type Props = { recipeId: string };
+type Props = { recipeId: string; isTemplate?: boolean };
 
-export function RecipeListRowActions({ recipeId }: Props) {
+export function RecipeListRowActions({ recipeId, isTemplate = false }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+
+  function onToggleTemplate() {
+    startTransition(async () => {
+      const result = await toggleTemplateStatusAction(recipeId, !isTemplate);
+      if (!result.ok) {
+        window.alert(result.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   function onDelete() {
     if (
@@ -49,6 +64,19 @@ export function RecipeListRowActions({ recipeId }: Props) {
       >
         PDF
       </Link>
+      <Button
+        type="button"
+        variant={isTemplate ? "default" : "outline"}
+        size="sm"
+        disabled={pending}
+        onClick={onToggleTemplate}
+        title={isTemplate ? "Remover de templates" : "Marcar como template"}
+        aria-label={
+          isTemplate ? "Remover de templates" : "Marcar como template"
+        }
+      >
+        <Star className="size-4" />
+      </Button>
       <Button
         type="button"
         variant="ghost"

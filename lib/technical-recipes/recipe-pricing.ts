@@ -11,6 +11,18 @@ export type RecipePricingBreakdown = {
   suggestedPriceWithTaxPerPortionBrl: number;
 };
 
+/**
+ * Formação de preço baseado em CMV%:
+ * - Preço Venda Receita = Custo Total / CMV%
+ * - Preço Venda Porção = Preço Venda Receita / Porções
+ * - Custo Porção = Custo Total / Porções
+ */
+export type CMVPricingBreakdown = {
+  costPerPortionBrl: number;
+  salesPricePerPortionBrl: number;
+  totalSalesPriceBrl: number;
+};
+
 export function computeRecipePricingBreakdown(input: {
   totalMaterialCostBrl: number;
   portionsYield: number;
@@ -38,6 +50,30 @@ export function computeRecipePricingBreakdown(input: {
     suggestedPriceWithTaxPerPortionBrl: roundMoney(
       suggestedPriceWithTaxPerPortionBrl,
     ),
+  };
+}
+
+export function computeCMVPricingBreakdown(input: {
+  totalMaterialCostBrl: number;
+  portionsYield: number;
+  cmvPercent: number;
+}): CMVPricingBreakdown {
+  const portions = input.portionsYield;
+  const safePortions =
+    Number.isFinite(portions) && portions >= 1 ? portions : 1;
+  const cmv = clampPercent(input.cmvPercent, 0.1, 100);
+  const total = Number.isFinite(input.totalMaterialCostBrl)
+    ? Math.max(0, input.totalMaterialCostBrl)
+    : 0;
+
+  const costPerPortionBrl = total / safePortions;
+  const totalSalesPriceBrl = cmv > 0 ? total / (cmv / 100) : total;
+  const salesPricePerPortionBrl = totalSalesPriceBrl / safePortions;
+
+  return {
+    costPerPortionBrl: roundMoney(costPerPortionBrl),
+    salesPricePerPortionBrl: roundMoney(salesPricePerPortionBrl),
+    totalSalesPriceBrl: roundMoney(totalSalesPriceBrl),
   };
 }
 

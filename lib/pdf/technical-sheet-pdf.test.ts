@@ -11,6 +11,7 @@ const minimalRecipe: TechnicalRecipeWithLines = {
   portions_yield: 4,
   margin_percent: 10,
   tax_percent: 5,
+  is_template: false,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   lines: [

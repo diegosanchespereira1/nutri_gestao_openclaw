@@ -29,3 +29,6 @@ export type EstablishmentWithClientNames = EstablishmentRow & {
     lifecycle_status: ClientLifecycleStatus;
   };
 };
+
+/** Estabelecimento simples para listas (ex.: seletor em modais). */
+export type EstablishmentListItem = EstablishmentRow;

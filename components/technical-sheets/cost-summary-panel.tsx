@@ -2,7 +2,10 @@ import {
   divideRecipeNutritionByPortions,
   type RecipeNutritionTotals,
 } from "@/lib/technical-recipes/recipe-nutrition";
-import { computeRecipePricingBreakdown } from "@/lib/technical-recipes/recipe-pricing";
+import {
+  computeRecipePricingBreakdown,
+  computeCMVPricingBreakdown,
+} from "@/lib/technical-recipes/recipe-pricing";
 import {
   Card,
   CardContent,
@@ -31,6 +34,8 @@ export type CostSummaryPanelProps = {
   onMarginPercentInputChange: (value: string) => void;
   taxPercentInput: string;
   onTaxPercentInputChange: (value: string) => void;
+  cmvPercentInput: string;
+  onCmvPercentInputChange: (value: string) => void;
 };
 
 function parsePositiveInt(s: string, fallback: number): number {
@@ -56,16 +61,25 @@ export function CostSummaryPanel({
   onMarginPercentInputChange,
   taxPercentInput,
   onTaxPercentInputChange,
+  cmvPercentInput,
+  onCmvPercentInputChange,
 }: CostSummaryPanelProps) {
   const portions = parsePositiveInt(portionsYieldInput, 1);
   const marginPct = Math.min(1000, parsePercentLoose(marginPercentInput));
   const taxPct = Math.min(100, parsePercentLoose(taxPercentInput));
+  const cmvPct = Math.min(100, Math.max(0.1, parsePercentLoose(cmvPercentInput)));
 
   const pricing = computeRecipePricingBreakdown({
     totalMaterialCostBrl,
     portionsYield: portions,
     marginPercent: marginPct,
     taxPercent: taxPct,
+  });
+
+  const cmvPricing = computeCMVPricingBreakdown({
+    totalMaterialCostBrl,
+    portionsYield: portions,
+    cmvPercent: cmvPct,
   });
 
   const perPortionNutrition = divideRecipeNutritionByPortions(
@@ -108,7 +122,7 @@ export function CostSummaryPanel({
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="recipe-portions-yield">Rendimento (porções)</Label>
             <Input
@@ -139,11 +153,21 @@ export function CostSummaryPanel({
               placeholder="0"
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="recipe-cmv-pct">CMV (%)</Label>
+            <Input
+              id="recipe-cmv-pct"
+              inputMode="decimal"
+              value={cmvPercentInput}
+              onChange={(e) => onCmvPercentInputChange(e.target.value)}
+              placeholder="25"
+            />
+          </div>
         </div>
 
         <div className="bg-muted/40 space-y-2 rounded-lg p-3">
           <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
-            Por porção
+            Por porção (Margem + Impostos)
           </p>
           <dl className="grid gap-2 sm:grid-cols-2">
             <div className="flex justify-between gap-2 sm:block">
@@ -165,6 +189,29 @@ export function CostSummaryPanel({
               </dd>
             </div>
           </dl>
+        </div>
+
+        <div className="bg-blue-50 dark:bg-blue-950/30 space-y-2 rounded-lg p-3">
+          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+            Por porção (CMV%)
+          </p>
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <div className="flex justify-between gap-2 sm:block">
+              <dt className="text-muted-foreground">Custo</dt>
+              <dd className="text-foreground font-medium tabular-nums sm:mt-0.5">
+                {formatBrl(cmvPricing.costPerPortionBrl)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2 sm:col-span-2 sm:block">
+              <dt className="text-muted-foreground">Preço venda (baseado em {cmvPct}% CMV)</dt>
+              <dd className="text-foreground text-lg font-semibold tabular-nums sm:mt-0.5">
+                {formatBrl(cmvPricing.salesPricePerPortionBrl)}
+              </dd>
+            </div>
+          </dl>
+          <p className="text-muted-foreground text-xs pt-2 border-t border-blue-200">
+            Total da receita: {formatBrl(cmvPricing.totalSalesPriceBrl)}
+          </p>
         </div>
 
         <div className="space-y-2 border-t pt-4">

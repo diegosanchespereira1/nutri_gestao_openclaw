@@ -2,16 +2,15 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { RecipeListRowActions } from "@/components/technical-sheets/recipe-list-row-actions";
+import { TemplateUseButton } from "@/components/technical-sheets/template-use-button";
 import { RecipePagination } from "@/components/technical-sheets/recipe-pagination";
 import { RecipeSearchInput } from "@/components/technical-sheets/recipe-search-input";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
+import { loadTemplatesForOwner } from "@/lib/actions/technical-recipes";
 import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
-import { loadTechnicalRecipesForOwner } from "@/lib/actions/technical-recipes";
 import { cn } from "@/lib/utils";
 import type { TechnicalRecipeListItem } from "@/lib/types/technical-recipes";
-
-// ── helpers ──────────────────────────────────────────────────────────────────
 
 function recipeContextLabel(row: TechnicalRecipeListItem): string {
   const est = row.establishments;
@@ -33,11 +32,9 @@ function formatUpdatedAt(iso: string): string {
   }
 }
 
-// ── page ─────────────────────────────────────────────────────────────────────
-
 type SearchParams = Promise<{ q?: string; page?: string }>;
 
-export default async function FichaTecnicaPage({
+export default async function TemplatesPage({
   searchParams,
 }: {
   searchParams: SearchParams;
@@ -46,9 +43,9 @@ export default async function FichaTecnicaPage({
   const q = (params.q ?? "").trim();
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const [{ rows: recipes, total, totalPages }, { rows: establishments }] =
+  const [{ rows: templates, total, totalPages }, { rows: establishments }] =
     await Promise.all([
-      loadTechnicalRecipesForOwner({ q, page, pageSize: RECIPE_LIST_PAGE_SIZE }),
+      loadTemplatesForOwner({ q, page, pageSize: RECIPE_LIST_PAGE_SIZE }),
       loadEstablishmentsForOwner(),
     ]);
 
@@ -60,49 +57,20 @@ export default async function FichaTecnicaPage({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Ficha técnica
+            Templates de fichas técnicas
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Receitas com ingredientes, TACO e custo por matéria-prima. Exporte
-            PDF a partir de cada linha ou na edição da receita.
+            Use um template como base para criar uma nova receita. Os valores e
+            fórmulas serão copiados para você editar.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/ficha-tecnica/templates"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Ver templates
-          </Link>
-          <Link
-            href="/ficha-tecnica/materias-primas"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Matérias-primas
-          </Link>
-          <Link
-            href="/ficha-tecnica/nova"
-            className={cn(
-              buttonVariants(),
-              !hasEstablishments && "pointer-events-none opacity-50",
-            )}
-            aria-disabled={!hasEstablishments}
-          >
-            Nova receita
-          </Link>
-        </div>
+        <Link
+          href="/ficha-tecnica"
+          className={buttonVariants({ variant: "outline" })}
+        >
+          ← Minhas receitas
+        </Link>
       </div>
-
-      {/* ── Sem estabelecimento ── */}
-      {!hasEstablishments && (
-        <p className="text-muted-foreground text-sm">
-          Precisa de pelo menos um estabelecimento (cliente PJ) para criar
-          receitas.{" "}
-          <Link href="/clientes/novo" className="text-primary underline">
-            Criar cliente
-          </Link>
-        </p>
-      )}
 
       {/* ── Barra de busca ── */}
       <Suspense fallback={null}>
@@ -110,18 +78,18 @@ export default async function FichaTecnicaPage({
       </Suspense>
 
       {/* ── Lista vazia ── */}
-      {recipes.length === 0 ? (
+      {templates.length === 0 ? (
         <div className="text-muted-foreground py-12 text-center text-sm">
           {q.length > 0 ? (
             <>
-              Nenhuma ficha técnica encontrada para{" "}
+              Nenhum template encontrado para{" "}
               <span className="text-foreground font-medium">
                 &ldquo;{q}&rdquo;
               </span>
               .
             </>
           ) : (
-            "Ainda não há receitas. Use «Nova receita» para adicionar ingredientes e guardar um rascunho."
+            "Nenhum template disponível."
           )}
         </div>
       ) : (
@@ -132,24 +100,24 @@ export default async function FichaTecnicaPage({
               <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
                 <tr>
                   <th className="text-foreground px-4 py-3 text-left font-bold">
-                    Receita
+                    Template
                   </th>
                   <th className="text-foreground px-4 py-3 text-left font-bold">
                     Contexto
                   </th>
                   <th className="text-foreground px-4 py-3 text-left font-bold">
-                    Estado
+                    Porções
                   </th>
                   <th className="text-foreground px-4 py-3 text-left font-bold">
                     Atualizado
                   </th>
                   <th className="text-foreground px-4 py-3 text-right font-bold">
-                    Ações
+                    Ação
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {recipes.map((row) => (
+                {templates.map((row) => (
                   <tr
                     key={row.id}
                     className="border-b border-foreground/5 last:border-0"
@@ -160,19 +128,25 @@ export default async function FichaTecnicaPage({
                     <td className="text-muted-foreground px-4 py-3">
                       {recipeContextLabel(row)}
                     </td>
-                    <td className="px-4 py-3">
-                      <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 text-xs capitalize">
-                        {row.status === "draft" ? "Rascunho" : "Publicado"}
-                      </span>
+                    <td className="text-muted-foreground px-4 py-3">
+                      {row.portions_yield}
                     </td>
                     <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
                       {formatUpdatedAt(row.updated_at)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <RecipeListRowActions
-                        recipeId={row.id}
-                        isTemplate={row.is_template}
-                      />
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <TemplateUseButton
+                          templateId={row.id}
+                          templateName={row.name}
+                          establishments={establishments}
+                          hasEstablishments={hasEstablishments}
+                        />
+                        <RecipeListRowActions
+                          recipeId={row.id}
+                          isTemplate={row.is_template}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}

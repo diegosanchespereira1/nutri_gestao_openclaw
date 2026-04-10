@@ -15,6 +15,14 @@ export type TechnicalRecipeRow = {
   margin_percent: number;
   /** Impostos incidentes sobre o preço sugerido (%). */
   tax_percent: number;
+  /** Classificação do prato (bebida, entrada, prato-principal, sobremesa). */
+  classification?: string | null;
+  /** Setor/departamento onde a receita é preparada. */
+  sector?: string | null;
+  /** Custo dos Materiais Vendidos (%). Padrão: 25%. */
+  cmv_percent?: number;
+  /** Flag para indicar se é um template reutilizável. */
+  is_template: boolean;
   created_at: string;
   updated_at: string;
 };

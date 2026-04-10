@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
 import { RECIPE_LINE_UNITS } from "@/lib/constants/recipe-line-units";
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
 import { createClient } from "@/lib/supabase/server";
@@ -44,6 +45,8 @@ const saveDraftSchema = z.object({
   recipeId: z.string().uuid().optional(),
   establishmentId: z.string().uuid(),
   name: z.string().trim().min(1).max(200),
+  classification: z.string().max(50).optional(),
+  sector: z.string().max(100).optional(),
   portions_yield: z.coerce
     .number()
     .int("Rendimento deve ser um número inteiro.")
@@ -57,6 +60,10 @@ const saveDraftSchema = z.object({
     .number()
     .min(0, "Impostos não podem ser negativos.")
     .max(100, "Impostos: máximo 100%."),
+  cmv_percent: z.coerce
+    .number()
+    .min(0.1, "CMV deve ser maior que 0%.")
+    .max(100, "CMV: máximo 100%."),
   lines: z.array(lineSchema).min(1, "Adicione pelo menos um ingrediente."),
 });
 
@@ -146,6 +153,19 @@ function mapRecipeHeader(raw: Record<string, unknown>): TechnicalRecipeRow {
       Math.min(1000, toNumUnknown(raw.margin_percent, 0)),
     ),
     tax_percent: Math.max(0, Math.min(100, toNumUnknown(raw.tax_percent, 0))),
+    classification:
+      typeof raw.classification === "string" && raw.classification.length > 0
+        ? raw.classification
+        : null,
+    sector:
+      typeof raw.sector === "string" && raw.sector.length > 0
+        ? raw.sector
+        : null,
+    cmv_percent: Math.max(
+      0.1,
+      Math.min(100, toNumUnknown(raw.cmv_percent, 25)),
+    ),
+    is_template: Boolean(raw.is_template ?? false),
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
   };
@@ -195,16 +215,41 @@ function mapLineRow(row: {
   };
 }
 
-export async function loadTechnicalRecipesForOwner(): Promise<{
+export type LoadTechnicalRecipesResult = {
   rows: TechnicalRecipeListItem[];
-}> {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};
+
+export async function loadTechnicalRecipesForOwner(opts?: {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<LoadTechnicalRecipesResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
 
-  const { data, error } = await supabase
+  const empty: LoadTechnicalRecipesResult = {
+    rows: [],
+    total: 0,
+    page: 1,
+    pageSize: RECIPE_LIST_PAGE_SIZE,
+    totalPages: 0,
+  };
+  if (!user) return empty;
+
+  const pageSize = Math.max(1, opts?.pageSize ?? RECIPE_LIST_PAGE_SIZE);
+  const page = Math.max(1, opts?.page ?? 1);
+  const q = opts?.q?.trim() ?? "";
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
     .from("technical_recipes")
     .select(
       `
@@ -215,11 +260,29 @@ export async function loadTechnicalRecipesForOwner(): Promise<{
         clients ( legal_name, trade_name )
       )
     `,
+      { count: "exact" },
     )
-    .order("updated_at", { ascending: false });
+    .order("updated_at", { ascending: false })
+    .range(from, to);
 
-  if (error || !data) return { rows: [] };
-  return { rows: data as unknown as TechnicalRecipeListItem[] };
+  if (q.length > 0) {
+    query = query.ilike("name", `%${q}%`);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error || !data) return { ...empty, page, pageSize };
+
+  const total = count ?? 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  return {
+    rows: data as unknown as TechnicalRecipeListItem[],
+    total,
+    page,
+    pageSize,
+    totalPages,
+  };
 }
 
 export async function loadTechnicalRecipeById(
@@ -321,9 +384,12 @@ export async function saveTechnicalRecipeDraftAction(
     recipeId,
     establishmentId,
     name,
+    classification,
+    sector,
     portions_yield,
     margin_percent,
     tax_percent,
+    cmv_percent,
     lines: rawLines,
   } = parsed.data;
   const lines = rawLines.map((l) => ({
@@ -419,10 +485,13 @@ export async function saveTechnicalRecipeDraftAction(
       .from("technical_recipes")
       .update({
         name,
+        classification: classification || null,
+        sector: sector || null,
         status: "draft",
         portions_yield,
         margin_percent,
         tax_percent,
+        cmv_percent,
       })
       .eq("id", recipeId);
 
@@ -444,10 +513,13 @@ export async function saveTechnicalRecipeDraftAction(
       .insert({
         establishment_id: establishmentId,
         name,
+        classification: classification || null,
+        sector: sector || null,
         status: "draft",
         portions_yield,
         margin_percent,
         tax_percent,
+        cmv_percent,
       })
       .select("id")
       .single();
@@ -514,4 +586,198 @@ export async function deleteTechnicalRecipeAction(
 
   revalidatePath("/ficha-tecnica");
   return { ok: true };
+}
+
+// ── Templates ──────────────────────────────────────────────────────────────
+
+export async function loadTemplatesForOwner(opts?: {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<LoadTechnicalRecipesResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const empty: LoadTechnicalRecipesResult = {
+    rows: [],
+    total: 0,
+    page: 1,
+    pageSize: RECIPE_LIST_PAGE_SIZE,
+    totalPages: 0,
+  };
+  if (!user) return empty;
+
+  const pageSize = Math.max(1, opts?.pageSize ?? RECIPE_LIST_PAGE_SIZE);
+  const page = Math.max(1, opts?.page ?? 1);
+  const q = opts?.q?.trim() ?? "";
+
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let query = supabase
+    .from("technical_recipes")
+    .select(
+      `
+      *,
+      establishments (
+        name,
+        client_id,
+        clients ( legal_name, trade_name )
+      )
+    `,
+      { count: "exact" },
+    )
+    .eq("is_template", true)
+    .order("updated_at", { ascending: false })
+    .range(from, to);
+
+  if (q.length > 0) {
+    query = query.ilike("name", `%${q}%`);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error || !data) return { ...empty, page, pageSize };
+
+  const total = count ?? 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  return {
+    rows: data as unknown as TechnicalRecipeListItem[],
+    total,
+    page,
+    pageSize,
+    totalPages,
+  };
+}
+
+export async function toggleTemplateStatusAction(
+  recipeId: string,
+  isTemplate: boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const { error } = await supabase
+    .from("technical_recipes")
+    .update({ is_template: isTemplate })
+    .eq("id", recipeId);
+
+  if (error) {
+    return { ok: false, error: error.message || "Erro ao atualizar." };
+  }
+
+  revalidatePath("/ficha-tecnica");
+  revalidatePath("/ficha-tecnica/templates");
+  return { ok: true };
+}
+
+export async function createRecipeFromTemplateAction(
+  templateId: string,
+  establishmentId: string,
+  recipeName: string,
+): Promise<{ ok: true; recipeId: string } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  // Validar estabelecimento e permissão
+  const { data: estRow } = await supabase
+    .from("establishments")
+    .select("id, client_id")
+    .eq("id", establishmentId)
+    .maybeSingle();
+
+  if (!estRow) {
+    return { ok: false, error: "Estabelecimento inválido." };
+  }
+
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("owner_user_id, kind")
+    .eq("id", estRow.client_id)
+    .maybeSingle();
+
+  if (
+    !clientRow ||
+    clientRow.owner_user_id !== user.id ||
+    clientRow.kind !== "pj"
+  ) {
+    return { ok: false, error: "Sem permissão para este estabelecimento." };
+  }
+
+  // Buscar template
+  const { data: template } = await supabase
+    .from("technical_recipes")
+    .select("*")
+    .eq("id", templateId)
+    .eq("is_template", true)
+    .maybeSingle();
+
+  if (!template) {
+    return { ok: false, error: "Template não encontrado." };
+  }
+
+  // Buscar linhas do template
+  const { data: templateLines } = await supabase
+    .from("technical_recipe_lines")
+    .select("*")
+    .eq("recipe_id", templateId)
+    .order("sort_order", { ascending: true });
+
+  // Criar nova receita (draft, não template)
+  const { data: newRecipe, error: recipeErr } = await supabase
+    .from("technical_recipes")
+    .insert({
+      establishment_id: establishmentId,
+      name: recipeName.trim(),
+      classification: template.classification || null,
+      sector: template.sector || null,
+      status: "draft",
+      portions_yield: template.portions_yield,
+      margin_percent: template.margin_percent,
+      tax_percent: template.tax_percent,
+      cmv_percent: template.cmv_percent || 25,
+      is_template: false,
+    })
+    .select("id")
+    .single();
+
+  if (recipeErr || !newRecipe) {
+    return { ok: false, error: recipeErr?.message || "Erro ao criar receita." };
+  }
+
+  // Copiar linhas (se houver)
+  if (templateLines && templateLines.length > 0) {
+    const newLines = templateLines.map((line) => ({
+      recipe_id: (newRecipe as { id: string }).id,
+      sort_order: line.sort_order,
+      ingredient_name: line.ingredient_name,
+      quantity: line.quantity,
+      unit: line.unit,
+      notes: line.notes,
+      taco_food_id: line.taco_food_id,
+      raw_material_id: line.raw_material_id,
+      correction_factor: line.correction_factor,
+      cooking_factor: line.cooking_factor,
+    }));
+
+    const { error: linesErr } = await supabase
+      .from("technical_recipe_lines")
+      .insert(newLines);
+
+    if (linesErr) {
+      return { ok: false, error: linesErr.message || "Erro ao copiar ingredientes." };
+    }
+  }
+
+  revalidatePath("/ficha-tecnica");
+  return { ok: true, recipeId: (newRecipe as { id: string }).id };
 }

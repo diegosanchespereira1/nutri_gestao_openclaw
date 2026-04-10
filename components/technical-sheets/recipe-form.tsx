@@ -34,6 +34,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { RecipeFormIntroductionSections } from "@/components/technical-sheets/recipe-form-introduction-sections";
 import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
 import { CostSummaryPanel } from "@/components/technical-sheets/cost-summary-panel";
 
@@ -137,6 +138,11 @@ export function RecipeForm({
     String(recipe?.tax_percent ?? 0),
   );
   const [scaleTargetInput, setScaleTargetInput] = useState("");
+  const [classification, setClassification] = useState(recipe?.classification ?? "");
+  const [sector, setSector] = useState(recipe?.sector ?? "");
+  const [cmvPercentInput, setCmvPercentInput] = useState(() =>
+    String(recipe?.cmv_percent ?? 25),
+  );
 
   const parsedForTotals = useMemo(() => {
     const parsed: { quantity: number; unit: RecipeLineUnit }[] = [];
@@ -275,15 +281,23 @@ export function RecipeForm({
       if (!Number.isFinite(n) || n < 0) return 0;
       return Math.min(100, n);
     })();
+    const cmv_percent = (() => {
+      const n = parseFloat(cmvPercentInput.replace(",", "."));
+      if (!Number.isFinite(n) || n < 0.1) return 25;
+      return Math.min(100, n);
+    })();
 
     startTransition(async () => {
       const result = await saveTechnicalRecipeDraftAction({
         recipeId: recipe?.id,
         establishmentId,
         name: name.trim(),
+        classification: classification || undefined,
+        sector: sector.trim() || undefined,
         portions_yield,
         margin_percent,
         tax_percent,
+        cmv_percent,
         lines: payloadLines,
       });
 
@@ -326,6 +340,8 @@ export function RecipeForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <RecipeFormIntroductionSections />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="recipe-name">Nome da receita</Label>
@@ -369,6 +385,54 @@ export function RecipeForm({
               ))}
             </select>
           )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="recipe-classification">Classificação</Label>
+          <select
+            id="recipe-classification"
+            className={selectClassName}
+            value={classification}
+            onChange={(e) => setClassification(e.target.value)}
+          >
+            <option value="">— Selecione —</option>
+            <option value="bebida">Bebida</option>
+            <option value="entrada">Entrada</option>
+            <option value="prato-principal">Prato principal</option>
+            <option value="sobremesa">Sobremesa</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="recipe-sector">Setor</Label>
+          <Input
+            id="recipe-sector"
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+            placeholder="Ex.: Cozinha fria, Cozinha quente"
+            maxLength={100}
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="recipe-cmv">CMV% (Custo dos Materiais Vendidos)</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              id="recipe-cmv"
+              inputMode="decimal"
+              value={cmvPercentInput}
+              onChange={(e) => setCmvPercentInput(e.target.value)}
+              placeholder="25"
+              className="flex-1"
+            />
+            <span className="text-muted-foreground">%</span>
+          </div>
+          <p className="text-muted-foreground text-xs">
+            Padrão: 25%. Ajuste conforme sua margem desejada (20%, 30%, etc).
+          </p>
         </div>
       </div>
 
@@ -771,6 +835,8 @@ export function RecipeForm({
             onMarginPercentInputChange={setMarginPercentInput}
             taxPercentInput={taxPercentInput}
             onTaxPercentInputChange={setTaxPercentInput}
+            cmvPercentInput={cmvPercentInput}
+            onCmvPercentInputChange={setCmvPercentInput}
           />
         </aside>
       </div>

@@ -74,14 +74,25 @@ export function ContractGeneratorDialog({
     if (!preview) return;
     const win = window.open("", "_blank");
     if (!win) return;
+
+    // Escapar clientName para prevenir injeção de atributo
+    const escaped = String(clientName)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
     win.document.write(`<!DOCTYPE html><html><head>
       <meta charset="utf-8"/>
-      <title>Contrato — ${clientName}</title>
+      <title>Contrato — ${escaped}</title>
       <style>
         body { font-family: Georgia, serif; max-width: 800px; margin: 40px auto; padding: 0 24px; color: #111; }
         h1 { font-size: 1.25rem; text-align: center; margin-bottom: 24px; }
         h2 { font-size: 1rem; margin-top: 24px; }
         p { line-height: 1.7; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+        td, th { border: 1px solid #ccc; padding: 8px; text-align: left; }
         @media print { body { margin: 0; } }
       </style>
     </head><body>${preview}</body></html>`);

@@ -1,0 +1,151 @@
+================================================================================
+NUTRIGESTÃO SAAS — SECURITY AUDIT SUMMARY (9 de Abril de 2026)
+================================================================================
+
+⛔ STATUS: BLOQUEADOR CRÍTICO IDENTIFICADO — NÃO RECOMENDADO PARA PRODUÇÃO
+
+================================================================================
+SCORE GERAL: 35/100
+================================================================================
+
+VULNS CRÍTICAS: 1 (CSP)
+VULNS ALTAS: 2 (Hono packages)
+VULNS MÉDIAS: 3 (rate limit, uploads, monitoring)
+VULNS BAIXAS: 2 (Error Boundaries, correlation IDs)
+
+================================================================================
+ACHADOS CRÍTICOS (BLOQUEADORES)
+================================================================================
+
+🔴 #1 — CSP with 'unsafe-inline' + 'unsafe-eval' (A02)
+   Location: next.config.ts:39-40
+   Impact: Derrota XSS protection; qualquer injeção HTML torna-se RCE
+   Impacto Estimado: Data breach (pacientes), LGPD violation
+   Fix Time: 2-4 horas
+   Action: Remover unsafe-inline, implementar nonce-based CSP
+
+🔴 #2 — 2 Hono Package Vulnerabilities (A03, A06)
+   Packages: @hono/node-server, hono
+   CVEs: GHSA-92pp-h63x-v22m, GHSA-26pp-8wgv-hjvm, GHSA-xf4j-xp2r-rqqx
+   Impact: Middleware bypass, path traversal, cookie bypass
+   Fix: npm audit fix && npm update hono
+   Fix Time: 1-2 horas
+
+================================================================================
+ACHADOS ALTOS (1 SPRINT)
+================================================================================
+
+🟠 #3 — dangerouslySetInnerHTML sem sanitização (A08)
+   Location: components/financeiro/contract-generator-dialog.tsx:87
+   Impact: XSS em contratos gerados
+   Fix: DOMPurify.sanitize() antes de render
+   Fix Time: 4-6 horas
+
+🟠 #4 — Rate Limiting incompleto (A04, A07)
+   Missing: /auth/login, /auth/signup, /auth/forgot-password rate limits
+   Has: audit.ts rate limiting apenas
+   Impact: Credential stuffing, brute force unprotected
+   Fix Time: 6-8 horas
+
+================================================================================
+O QUE ESTÁ BOM ✅
+================================================================================
+
+✅ RLS Implementation Perfeito
+   - 40/40 tables com RLS habilitado
+   - 152 RLS policies criadas e corretas
+   - Auth.uid() filtering em todos as tabelas
+   - Impossível IDOR attack
+
+✅ Middleware Protection
+   - Todas rotas protegidas (app)/ e (admin)/
+   - Session refresh via @supabase/ssr
+   - LGPD block enforcement
+   - Onboarding checks
+
+✅ Server Actions Security
+   - 145 auth.getUser() calls (validation)
+   - Sem secrets em código
+   - Redirect() usando hardcoded paths (sem open redirect)
+   - Input validation com Zod
+
+✅ LGPD Compliance (Partially)
+   - Consentimento explícito
+   - Account deletion workflow (10 anos retention)
+   - Audit logging completo
+   - Data subject access requests (DSAR)
+
+================================================================================
+RECOMENDAÇÕES TIMELINE
+================================================================================
+
+SEMANA 1 (CRÍTICO):
+  - Fix CSP (2-4h)
+  - Update Hono (1-2h)
+  - Total: 4-6 horas
+
+SEMANA 2 (ALTO):
+  - Fix dangerouslySetInnerHTML (4-6h)
+  - Complete rate limiting (6-8h)
+  - Total: 10-14 horas
+
+SEMANA 3 (MÉDIO):
+  - File upload validation (2-3h)
+  - CSP report-uri endpoint (4-6h)
+  - LGPD incident plan (2-3h)
+  - Total: 8-12 horas
+
+SEMANA 4:
+  - CI/CD hardening (4-6h)
+  - Re-auditoria (2-3h)
+  - Total: 6-9 horas
+
+TOTAL ESFORÇO: 28-41 horas
+
+================================================================================
+QUICK FIX CHECKLIST
+================================================================================
+
+[ ] 1. Remove 'unsafe-inline' from CSP script-src (next.config.ts:39)
+[ ] 2. Remove 'unsafe-eval' from CSP script-src
+[ ] 3. Run: npm audit fix
+[ ] 4. Run: npm update hono @hono/node-server
+[ ] 5. Add DOMPurify to contract-generator (sanitizeHtml())
+[ ] 6. Implement Upstash rate limit on auth endpoints
+[ ] 7. Add MIME type validation to file uploads
+[ ] 8. Test CSP with: curl -I https://nutrigestao.app
+[ ] 9. Verify: npm audit --omit=dev (expect zero)
+[ ] 10. Re-run security audit after fixes
+
+================================================================================
+FOR PRODUCTION APPROVAL
+================================================================================
+
+DO NOT DEPLOY to production until:
+
+❌ BLOCKER: CSP vulnerability is fixed
+❌ BLOCKER: Hono packages are updated
+❌ BLOCKER: dangerouslySetInnerHTML is sanitized
+❌ HIGH: Rate limiting is complete
+❌ HIGH: File upload validation is implemented
+
+After fixes:
+✓ Re-audit security (this report)
+✓ Run full test suite including RLS tests
+✓ Schedule external pentest (recommended)
+✓ Document incident response plan (LGPD)
+✓ Setup CSP violation monitoring
+
+================================================================================
+CONTACT & NEXT STEPS
+================================================================================
+
+Auditor: Security Agent (Paranoid Mode)
+Date: 9 Abril 2026
+Severity: CRÍTICA — Bloqueador para Produção
+
+Next audit: 23 Abril 2026 (pos-fixes)
+Timeline: 28-41 horas de trabalho
+
+Questions? Review _security-audit-report.md for detailed findings.
+================================================================================

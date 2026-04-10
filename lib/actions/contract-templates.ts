@@ -1,5 +1,6 @@
 "use server";
 
+import DOMPurify from "isomorphic-dompurify";
 import { createClient } from "@/lib/supabase/server";
 import type { BillingRecurrence } from "@/lib/types/client-contracts";
 
@@ -121,5 +122,17 @@ export async function generateContractHtml(opts: {
   };
 
   const html = renderContractTemplate(tpl.body_html as string, vars);
-  return { html, error: null };
+
+  // Sanitizar HTML para prevenir XSS — permitir apenas tags de formatação seguras
+  const sanitized = DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: [
+      'b', 'i', 'em', 'strong', 'p', 'br', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot',
+      'div', 'span', 'section', 'article', 'hr', 'blockquote'
+    ],
+    ALLOWED_ATTR: ['class', 'id', 'style', 'align'],
+    ALLOW_DATA_ATTR: false,
+  });
+
+  return { html: sanitized, error: null };
 }

@@ -16,8 +16,9 @@
 # Segredos server-only: definir no Portainer (Environment ou Secrets), nunca no build nem em NEXT_PUBLIC_*.
 #
 # SUPABASE_SERVICE_ROLE_KEY — obrigatória em runtime para criar membro da equipe (auth.admin.createUser).
-#   Supabase Dashboard → Project Settings → API → service_role (secret). Deve existir no ambiente do
-#   container (Portainer); não use no docker build — o código lê em runtime.
+#   Supabase Dashboard → Project Settings → API → service_role (secret). Nome exato da variável.
+#   No Portainer: Environment do serviço/stack (não só do build). Após alterar: Recreate / redeploy
+#   do container para o Node receber o process.env — não use no docker build.
 # RESEND_API_KEY, DOSSIER_EMAIL_FROM — envio de email (dossiê, etc.)
 #
 # Volume nomeado: persiste cache em disco do Next (.next/cache) entre recriações do container

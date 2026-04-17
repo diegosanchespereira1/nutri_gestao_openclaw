@@ -1,14 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
+import { env as nodeEnv } from "node:process";
 
 /**
- * Chave só em runtime (Docker/Portainer). Não usar `process.env.SUPABASE_SERVICE_ROLE_KEY`
- * diretamente: o Next.js inlinha isso no build e o valor fica vazio no bundle, ignorando
- * variáveis definidas no container em produção.
+ * Chave só em runtime (Docker/Portainer).
+ *
+ * O Next.js pode substituir `process.env.NOME` no bundle por valores do build.
+ * Usamos `node:process` + nome da variável montado em runtime + `Reflect.get`
+ * para ler o valor real injetado pelo container em produção.
  */
 function readServiceRoleKey(): string | undefined {
-  if (typeof process === "undefined") return undefined;
-  const name = "SUPABASE" + "_SERVICE_ROLE_KEY";
-  const raw = process.env[name];
+  const key = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
+  const raw = Reflect.get(nodeEnv, key);
   return typeof raw === "string" ? raw.trim() : undefined;
 }
 
@@ -17,6 +19,15 @@ export function createServiceRoleClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = readServiceRoleKey();
   if (!url || !key) {
+    if (!key && process.env.NODE_ENV === "production") {
+      const hasAnySupabaseEnv = Object.keys(nodeEnv).some((k) =>
+        k.includes("SUPABASE"),
+      );
+      console.error(
+        "[service-role] SUPABASE_SERVICE_ROLE_KEY ausente no process.env do Node.",
+        { hasAnySupabaseEnvKey: hasAnySupabaseEnv },
+      );
+    }
     const missing: string[] = [];
     if (!url) missing.push("NEXT_PUBLIC_SUPABASE_URL (build)");
     if (!key) missing.push("SUPABASE_SERVICE_ROLE_KEY (runtime no servidor)");

@@ -298,7 +298,7 @@ export async function createTeamMemberAction(
       "auth_create",
       detail.includes("NEXT_PUBLIC_SUPABASE_URL")
         ? "URL do Supabase em falta no build da aplicação."
-        : "Defina SUPABASE_SERVICE_ROLE_KEY no ambiente do container (Portainer) e faça redeploy — não basta o build da imagem.",
+        : "A chave de serviço não chegou ao Node (veja logs do container: [service-role]). No Portainer use o nome exato SUPABASE_SERVICE_ROLE_KEY no ambiente do serviço e faça Recreate/redeploy do container.",
     );
   }
 

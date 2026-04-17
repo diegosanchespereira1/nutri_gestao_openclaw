@@ -9,7 +9,7 @@ export async function register() {
   // Só corre no runtime Node.js (não no Edge runtime nem no build).
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
-  const { env } = await import("node:process");
+  const env = process.env;
 
   // ── 1. SUPABASE_SERVICE_ROLE_KEY ────────────────────────────────────────
   const srKeyName = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");

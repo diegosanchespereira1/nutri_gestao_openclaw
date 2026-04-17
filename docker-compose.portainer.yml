@@ -1,20 +1,21 @@
-# Stack Portainer + Traefik — NutriGestao_stratosTech
+# Stack Portainer + Traefik — NutriGestão (StratosTech)
 #
-# ANTES DO DEPLOY:
-# 1) Build e push da imagem (NEXT_PUBLIC_* como --build-arg):
+# ANTES DO DEPLOY
+# 1) Build e push (NEXT_PUBLIC_* no build da imagem):
 #    docker buildx build --platform linux/amd64 --push \
 #      --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
 #      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... \
 #      --build-arg NEXT_PUBLIC_SITE_URL=https://nutricao.stratostech.com.br \
-#      -t seuusuario/nutricao-stratostech:latest .
+#      -t stratostech/nutricao-stratostech:latest .
 #
-# 2) No Portainer, aba "Environment variables" da STACK, definir:
-#    NUTRICAO_IMAGE            = seuusuario/nutricao-stratostech:latest
-#    SUPABASE_SERVICE_ROLE_KEY = eyJ... (Supabase > Project Settings > API > service_role)
-#    RESEND_API_KEY            = re_... (opcional)
-#    DOSSIER_EMAIL_FROM        = noreply@... (opcional)
+# 2) No Portainer → Stack → Environment, definir no mínimo:
+#    NUTRICAO_IMAGE=stratostech/nutricao-stratostech:latest
+#    SUPABASE_SERVICE_ROLE_KEY=<Project Settings → API → service_role>
+#    (Opcional) repetir NEXT_PUBLIC_* aqui se quiseres mudar projeto sem rebuild.
 #
-# 3) Apos definir as variaveis: Recreate o container (nao so Update/Save).
+# 3) Após alterar env: Recreate do serviço (não só Save).
+#
+# Segredos server-only nunca vão para ARG do build nem para NEXT_PUBLIC_*.
 
 services:
   nutricao_app:
@@ -24,21 +25,26 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:-}"
-      RESEND_API_KEY: "${RESEND_API_KEY:-}"
-      DOSSIER_EMAIL_FROM: "${DOSSIER_EMAIL_FROM:-}"
+      # Runtime: permitem trocar projeto / diagnóstico sem rebuild (valores vazios = usa o que está na imagem).
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
+    # / redireciona (307); healthcheck deve usar rota que devolve 200 (página estática).
     healthcheck:
       test:
         [
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 40s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     volumes:
       - nutricao_next_cache:/app/.next/cache
     labels:

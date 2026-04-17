@@ -93,7 +93,7 @@ export async function updateProfileAction(
       details: updateError.details,
       hint: updateError.hint,
     });
-    return { ok: false, error: "Não foi possível guardar. Tente novamente." };
+    return { ok: false, error: "Não foi possível salvar. Tente novamente." };
   }
 
   if (!updatedProfile) {
@@ -109,19 +109,19 @@ export async function updateProfileAction(
         details: insertError.details,
         hint: insertError.hint,
       });
-      return { ok: false, error: "Não foi possível guardar. Tente novamente." };
+      return { ok: false, error: "Não foi possível salvar. Tente novamente." };
     }
   }
 
   const currentEmail = (user.email ?? "").trim().toLowerCase();
   if (email !== currentEmail) {
     const origin = getServerAppOrigin();
-    const { error: emailError } = await supabase.auth.updateUser({
-      email,
-      options: {
+    const { error: emailError } = await supabase.auth.updateUser(
+      { email },
+      {
         emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/perfil")}`,
       },
-    });
+    );
     if (emailError) {
       return {
         ok: false,

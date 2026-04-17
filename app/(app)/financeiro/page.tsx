@@ -64,7 +64,7 @@ import { cn } from "@/lib/utils";
 const errMessages: Record<string, string> = {
   invalid: "Preencha cliente, valor válido e data de vencimento.",
   client: "Cliente inválido ou sem permissão.",
-  save: "Não foi possível guardar. Tente novamente.",
+  save: "Não foi possível salvar. Tente novamente.",
 };
 
 function chargeClientName(row: FinancialChargeListRow): string {
@@ -668,7 +668,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                     </CardContent>
                     <CardFooter className="border-border flex flex-col items-stretch gap-2 border-t bg-muted/30 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-muted-foreground text-xs">
-                        Ao guardar, a cobrança fica em aberto até marcar como
+                        Ao salvar, a cobrança fica em aberto até marcar como
                         paga.
                       </p>
                       <Button type="submit" className="sm:w-auto">

@@ -198,7 +198,7 @@ export function ClientForm({
           (PF ou PJ). Em PF, o separador{" "}
           <strong className="text-foreground font-medium">Pessoa atendida e saúde</strong>{" "}
           concentra dados clínicos iniciais. Em PJ, use os separadores para estado do
-          contrato, fiscal, web, marca e responsáveis. Um clique em guardar grava tudo.
+          contrato, fiscal, web, marca e responsáveis. Um clique em salvar grava tudo.
         </CardDescription>
       </CardHeader>
       <form action={formAction}>
@@ -970,7 +970,7 @@ export function ClientForm({
           ) : null}
           <div className="flex flex-wrap justify-end gap-2 sm:ms-auto">
             <Button type="submit" className="min-w-[9rem]">
-              {mode === "create" ? "Criar cliente" : "Guardar alterações"}
+              {mode === "create" ? "Criar cliente" : "Salvar alterações"}
             </Button>
           </div>
         </CardFooter>

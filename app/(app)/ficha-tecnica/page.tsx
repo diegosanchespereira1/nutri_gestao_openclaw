@@ -58,7 +58,7 @@ export default async function FichaTecnicaPage({
           <AlertTitle>Cliente PJ necessário</AlertTitle>
           <AlertDescription>
             Precisa de um cliente pessoa jurídica para criar receitas (pode
-            associar a um estabelecimento ou guardar no repositório de
+            associar a um estabelecimento ou salvar no repositório de
             receitas).{" "}
             <Link
               href="/clientes/novo"

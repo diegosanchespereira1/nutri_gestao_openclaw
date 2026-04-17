@@ -352,7 +352,7 @@ export async function updatePatientAction(
     .eq("id", id);
 
   if (error) {
-    return { ok: false, error: "Não foi possível guardar as alterações." };
+    return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 
   revalidatePatientPaths(

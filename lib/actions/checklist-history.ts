@@ -7,6 +7,7 @@ import type { EstablishmentType } from "@/lib/types/establishments";
 
 export type ChecklistSessionSummary = {
   id: string;
+  started_by_label: string;
   created_at: string;
   updated_at: string;
   dossier_approved_at: string | null;
@@ -68,6 +69,13 @@ export async function loadChecklistSessionsForClient(input: {
   } = await supabase.auth.getUser();
   if (!user) return empty;
 
+  const { data: ownProfile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const ownUserLabel = String(ownProfile?.full_name ?? "").trim() || "Você";
+
   // VALIDAÇÃO DE POSSE — obrigatória antes de qualquer query de dados.
   const owned = await assertClientOwned(supabase, user.id, input.clientId);
   if (!owned) return empty;
@@ -103,7 +111,10 @@ export async function loadChecklistSessionsForClient(input: {
   // 2. Buscar sessões para esses estabelecimentos
   let sessionQuery = supabase
     .from("checklist_fill_sessions")
-    .select("id, establishment_id, template_id, custom_template_id, dossier_approved_at, created_at, updated_at", { count: "exact" })
+    .select(
+      "id, user_id, establishment_id, template_id, custom_template_id, dossier_approved_at, created_at, updated_at",
+      { count: "exact" },
+    )
     .in("establishment_id", estIds)
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
@@ -244,9 +255,11 @@ export async function loadChecklistSessionsForClient(input: {
 
     const answeredCount = counts.conforme + counts.nc + counts.na;
     const pendingCount = Math.max(0, totalItems - answeredCount);
+    const startedByLabel = sess.user_id === user.id ? ownUserLabel : "Membro da equipe";
 
     return {
       id: sess.id,
+      started_by_label: startedByLabel,
       created_at: sess.created_at,
       updated_at: sess.updated_at,
       dossier_approved_at: sess.dossier_approved_at ?? null,

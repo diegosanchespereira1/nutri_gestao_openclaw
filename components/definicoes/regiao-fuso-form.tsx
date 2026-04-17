@@ -92,7 +92,7 @@ export function RegiaoFusoForm({ defaultTimeZone }: { defaultTimeZone: string })
         </p>
       ) : null}
 
-      <Button type="submit">Guardar</Button>
+      <Button type="submit">Salvar</Button>
     </form>
   );
 }

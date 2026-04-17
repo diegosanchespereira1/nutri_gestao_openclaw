@@ -38,7 +38,7 @@ export async function updateTimeZoneAction(
   if (error) {
     return {
       ok: false,
-      error: "Não foi possível guardar. Tente novamente.",
+      error: "Não foi possível salvar. Tente novamente.",
     };
   }
 

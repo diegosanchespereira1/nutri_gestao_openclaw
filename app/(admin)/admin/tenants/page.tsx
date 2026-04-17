@@ -50,7 +50,7 @@ export default async function TenantsPage({
   };
   const errMessages: Record<string, string> = {
     invalid: "Dados inválidos.",
-    save: "Erro ao guardar. Tente novamente.",
+    save: "Erro ao salvar. Tente novamente.",
   };
 
   return (

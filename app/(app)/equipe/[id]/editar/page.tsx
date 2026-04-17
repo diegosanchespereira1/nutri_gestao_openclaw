@@ -16,7 +16,7 @@ import { deleteTeamMemberAction, loadTeamMemberById } from "@/lib/actions/team-m
 const errMessages: Record<string, string> = {
   missing: "Preencha nome, área e cargo.",
   crn: "Na área da nutrição, o CRN é obrigatório.",
-  save: "Não foi possível guardar. Tente novamente.",
+  save: "Não foi possível salvar. Tente novamente.",
 };
 
 type Props = {

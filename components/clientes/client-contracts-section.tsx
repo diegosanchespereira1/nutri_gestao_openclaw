@@ -222,9 +222,9 @@ function ContractForm({
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" disabled={pending}>
           {pending
-            ? "A guardar…"
+            ? "Salvando…"
             : initial
-              ? "Guardar alterações"
+              ? "Salvar alterações"
               : "Criar contrato"}
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
@@ -253,7 +253,7 @@ export function ClientContractsSection({
   const errMessages: Record<string, string> = {
     invalid: "Preencha os campos obrigatórios corretamente.",
     client: "Cliente inválido ou sem permissão.",
-    save: "Não foi possível guardar o contrato. Tente novamente.",
+    save: "Não foi possível salvar o contrato. Tente novamente.",
   };
 
   const errorMsg = contractErr ? (errMessages[contractErr] ?? errMessages.save) : undefined;

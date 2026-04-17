@@ -15,7 +15,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             NutriGestão
           </p>
           <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
-            Autenticação segura por email e palavra-passe — alinhado ao produto
+            Autenticação segura por email e senha — alinhado ao produto
             (sem login social nesta fase).
           </p>
         </div>

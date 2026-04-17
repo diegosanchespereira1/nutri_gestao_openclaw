@@ -78,7 +78,7 @@ export function PopEditForm({
         <span className="text-foreground font-medium tabular-nums">
           {currentVersionNumber}
         </span>
-        . Ao guardar, só é criada uma{" "}
+        . Ao salvar, só é criada uma{" "}
         <span className="text-foreground font-medium">nova versão</span> se o
         título ou o conteúdo tiverem mudado em relação a esta versão (histórico
         em «Versões»).
@@ -129,7 +129,7 @@ export function PopEditForm({
 
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={pending}>
-          {pending ? "A guardar…" : "Guardar nova versão"}
+          {pending ? "Salvando…" : "Salvar nova versão"}
         </Button>
         <Link
           href={`/pops/${popId}/historico`}

@@ -396,7 +396,7 @@ export async function savePopNewVersionAction(input: {
   });
 
   if (insErr) {
-    return { ok: false, error: "Não foi possível guardar a nova versão." };
+    return { ok: false, error: "Não foi possível salvar a nova versão." };
   }
 
   const { error: uErr } = await supabase

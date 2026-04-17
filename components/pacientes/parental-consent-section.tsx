@@ -63,7 +63,7 @@ export function ParentalConsentSection({
     invalid:
       "Preencha todos os campos obrigatórios e confirme o consentimento.",
     unauthorized: "Sem permissão para registar consentimento neste paciente.",
-    save: "Não foi possível guardar. Tente novamente.",
+    save: "Não foi possível salvar. Tente novamente.",
   };
 
   const errorMsg = consentErr

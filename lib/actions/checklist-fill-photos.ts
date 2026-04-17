@@ -319,7 +319,7 @@ export async function uploadChecklistFillPhotoAction(
 
   if (insErr || !inserted) {
     await supabase.storage.from(CHECKLIST_FILL_PHOTOS_BUCKET).remove([storagePath]);
-    return { ok: false, error: "Não foi possível guardar o registo da foto." };
+    return { ok: false, error: "Não foi possível salvar o registro da foto." };
   }
 
   const url = await signPhotoUrl(supabase, storagePath);

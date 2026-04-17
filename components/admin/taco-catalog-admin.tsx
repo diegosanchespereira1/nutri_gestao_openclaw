@@ -353,7 +353,7 @@ export function TacoCatalogAdmin() {
               onClick={submitForm}
               disabled={pending}
             >
-              Guardar
+              Salvar
             </Button>
           </div>
         </DialogContent>

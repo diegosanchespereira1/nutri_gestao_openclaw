@@ -62,7 +62,7 @@ export function ExternalPortalSection({ users, portalErr, portalOk }: Props) {
   const errMessages: Record<string, string> = {
     invalid: "Preencha nome, e-mail e perfil corretamente.",
     patient: "Paciente inválido ou sem permissão.",
-    save: "Não foi possível guardar. Tente novamente.",
+    save: "Não foi possível salvar. Tente novamente.",
     unauthorized: "Sem permissão para esta ação.",
   };
 

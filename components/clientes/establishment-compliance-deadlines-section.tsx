@@ -187,7 +187,7 @@ export function EstablishmentComplianceDeadlinesSection({
           </p>
         ) : null}
         <Button type="submit" disabled={createPending}>
-          {createPending ? "A guardar…" : "Adicionar prazo"}
+          {createPending ? "Salvando…" : "Adicionar prazo"}
         </Button>
       </form>
     </section>

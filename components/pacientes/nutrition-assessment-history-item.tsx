@@ -149,7 +149,7 @@ function EditForm({
       <div className="flex items-center gap-2">
         <Button type="submit" size="sm" disabled={pending}>
           {pending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
-          Guardar
+          Salvar
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
           <X className="mr-1.5 h-3.5 w-3.5" />

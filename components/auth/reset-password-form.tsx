@@ -66,7 +66,7 @@ export function ResetPasswordForm() {
       return;
     }
     if (password.length < 8) {
-      setError("A palavra-passe deve ter pelo menos 8 caracteres.");
+      setError("A senha deve ter pelo menos 8 caracteres.");
       return;
     }
     setLoading(true);
@@ -105,16 +105,16 @@ export function ResetPasswordForm() {
     <div className="space-y-8">
       <div>
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Nova palavra-passe
+          Nova senha
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Defina uma nova palavra-passe para a sua conta.
+          Defina uma nova senha para a sua conta.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-2">
-          <Label htmlFor="np-password">Nova palavra-passe</Label>
+          <Label htmlFor="np-password">Nova senha</Label>
           <Input
             id="np-password"
             type="password"
@@ -143,7 +143,7 @@ export function ResetPasswordForm() {
           </p>
         ) : null}
         <Button type="submit" className="w-full" disabled={loading}>
-          {loading ? "A guardar…" : "Guardar"}
+          {loading ? "Salvando…" : "Salvar"}
         </Button>
       </form>
     </div>

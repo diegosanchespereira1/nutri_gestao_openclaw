@@ -114,7 +114,7 @@ export async function createNutritionAssessmentAction(
   });
 
   if (error) {
-    return { ok: false, error: "Não foi possível guardar a avaliação." };
+    return { ok: false, error: "Não foi possível salvar a avaliação." };
   }
 
   revalidatePath(`/pacientes/${patientId}/editar`);
@@ -197,7 +197,7 @@ export async function updateNutritionAssessmentAction(
     .update({ height_cm, weight_kg, waist_cm, activity_level, diet_notes, clinical_notes, goals })
     .eq("id", assessmentId);
 
-  if (error) return { ok: false, error: "Não foi possível guardar as alterações." };
+  if (error) return { ok: false, error: "Não foi possível salvar as alterações." };
 
   revalidatePath(`/pacientes/${check.patientId}/editar`);
   revalidatePath(`/pacientes/${check.patientId}/historico`);

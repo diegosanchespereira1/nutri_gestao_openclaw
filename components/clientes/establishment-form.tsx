@@ -174,7 +174,7 @@ export function EstablishmentForm({
 
       <div className="pt-2">
         <Button type="submit">
-          {mode === "create" ? "Criar estabelecimento" : "Guardar alterações"}
+          {mode === "create" ? "Criar estabelecimento" : "Salvar alterações"}
         </Button>
       </div>
     </form>

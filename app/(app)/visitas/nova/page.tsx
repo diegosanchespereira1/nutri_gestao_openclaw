@@ -11,7 +11,7 @@ const errMessages: Record<string, string> = {
   missing:
     "Preencha o tipo de visita, o destino, a data e a hora.",
   date: "Data ou hora inválida.",
-  save: "Não foi possível guardar. Tente novamente.",
+  save: "Não foi possível salvar. Tente novamente.",
   dossier_email:
     "Revise os emails para envio do dossiê (válidos, separados por vírgula ou linha; no máximo 5).",
   client_inativo:

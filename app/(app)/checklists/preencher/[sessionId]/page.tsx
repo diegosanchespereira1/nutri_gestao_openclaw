@@ -6,10 +6,14 @@ import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 
 export default async function ChecklistPreencherPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
+  searchParams: Promise<{ view?: string }>;
 }) {
   const { sessionId } = await params;
+  const sp = await searchParams;
+  const viewOnlyDossier = sp.view === "dossie";
   const bundle = await loadFillSessionPageData(sessionId);
   if (!bundle) {
     notFound();
@@ -52,6 +56,7 @@ export default async function ChecklistPreencherPage({
         initialItemPhotos={bundle.itemPhotos}
         initialDossierApprovedAt={bundle.session.dossier_approved_at ?? null}
         initialPdfExport={bundle.latestPdfExport}
+        viewOnlyDossier={viewOnlyDossier}
       />
     </div>
   );

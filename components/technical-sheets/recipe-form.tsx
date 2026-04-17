@@ -760,7 +760,7 @@ export function RecipeForm({
           <CardTitle>Sem clientes PJ</CardTitle>
           <CardDescription>
             As receitas de ficha técnica usam clientes pessoa jurídica: pode
-            associar a um estabelecimento ou guardar no repositório de receitas
+            associar a um estabelecimento ou salvar no repositório de receitas
             (reutilizável entre estabelecimentos). Crie um cliente PJ para
             continuar.
           </CardDescription>

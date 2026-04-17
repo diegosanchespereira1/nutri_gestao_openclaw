@@ -410,7 +410,7 @@ export async function sendDsarByEmail(
       </p>
       <ul>
         <li>Transmitir com segurança (ex: email cifrado ou transferência segura)</li>
-        <li>Guardar com confidencialidade</li>
+        <li>Salvar com confidencialidade</li>
         <li>Verificar a integridade usando o hash SHA-256 fornecido</li>
       </ul>
     </div>

@@ -164,7 +164,7 @@ export async function createAdultNutritionAssessmentAction(
       process.env.NODE_ENV === "development"
         ? ` [${error.code ?? "?"}: ${error.message}]`
         : "";
-    return { ok: false, error: `Não foi possível guardar a avaliação.${detail}` };
+    return { ok: false, error: `Não foi possível salvar a avaliação.${detail}` };
   }
 
   revalidatePath(`/pacientes/${patientId}/editar`);

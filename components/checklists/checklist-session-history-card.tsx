@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
   CardContent,
@@ -19,12 +20,14 @@ import { cn } from "@/lib/utils";
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
-function formatDateBR(iso: string): string {
+function formatDateTimeBR(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString("pt-BR", {
+    return new Date(iso).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
     return iso;
@@ -80,7 +83,9 @@ export function ChecklistSessionHistoryCard({ session }: Props) {
             <p className="mt-0.5 text-xs text-muted-foreground">
               {session.establishment_name}
               {" · "}
-              {formatDateBR(session.updated_at)}
+              Iniciado por {session.started_by_label}
+              {" · "}
+              Última alteração em {formatDateTimeBR(session.updated_at)}
               {session.portaria_ref ? ` · ${session.portaria_ref}` : ""}
             </p>
           </div>
@@ -130,14 +135,28 @@ export function ChecklistSessionHistoryCard({ session }: Props) {
         {/* ── Rodapé: ações ── */}
         <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-2.5">
           <Link
-            href={`/checklists/preencher/${session.id}`}
-            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            href={`/checklists/preencher/${session.id}?view=dossie`}
             target="_blank"
             rel="noopener"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "h-7 gap-1 px-2 text-xs",
+            )}
           >
             Ver dossiê
             <ExternalLink className="size-3" aria-hidden />
           </Link>
+          {session.status === "em_andamento" ? (
+            <Link
+              href={`/checklists/preencher/${session.id}`}
+              target="_blank"
+              rel="noopener"
+              className={cn(buttonVariants({ size: "sm" }), "h-7 gap-1 px-2 text-xs")}
+            >
+              Continuar preenchimento
+              <ExternalLink className="size-3" aria-hidden />
+            </Link>
+          ) : null}
 
           {session.nc_count > 0 && (
             <Button

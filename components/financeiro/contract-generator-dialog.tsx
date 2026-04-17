@@ -189,7 +189,7 @@ export function ContractGeneratorDialog({
                 onClick={handlePrint}
                 size="sm"
                 variant="outline"
-                aria-label="Imprimir ou guardar como PDF"
+                aria-label="Imprimir ou salvar como PDF"
               >
                 <PrinterIcon className="mr-1.5 h-4 w-4" />
                 Imprimir / PDF

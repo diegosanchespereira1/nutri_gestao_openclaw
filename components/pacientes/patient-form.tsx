@@ -260,7 +260,7 @@ export function PatientForm({
 
       <div className="pt-2">
         <Button type="submit">
-          {mode === "create" ? "Criar paciente" : "Guardar alterações"}
+          {mode === "create" ? "Criar paciente" : "Salvar alterações"}
         </Button>
       </div>
     </form>

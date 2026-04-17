@@ -121,7 +121,7 @@ export function LoginForm() {
           Entrar
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Aceda com o email e a palavra-passe da sua conta.
+          Acesse com o email e a senha da sua conta.
         </p>
       </div>
 
@@ -173,7 +173,7 @@ export function LoginForm() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="login-password">Palavra-passe</Label>
+            <Label htmlFor="login-password">Senha</Label>
             <PasswordField
               id="login-password"
               name="password"
@@ -244,7 +244,7 @@ export function LoginForm() {
           href="/forgot-password"
           className="text-primary font-medium underline-offset-4 hover:underline focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
         >
-          Recuperar palavra-passe
+          Recuperar senha
         </Link>
       </p>
 

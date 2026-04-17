@@ -11,7 +11,7 @@ export function LogoutButton({ className }: { className?: string }) {
         type="submit"
         variant="ghost"
         size="sm"
-        className={cn("w-full justify-start", className)}
+        className={cn("w-full justify-start text-foreground", className)}
       >
         Sair
       </Button>

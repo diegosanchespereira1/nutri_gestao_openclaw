@@ -1,13 +1,16 @@
 # Stack para Portainer + Traefik (rede e certresolver alinhados ao Chatwoot na VPS).
 #
 # Antes do deploy:
-# 1) Build & push da imagem (com NEXT_PUBLIC_* no build), ex.:
-#    docker build \
+# 1) Build & push da imagem Linux/amd64 (com NEXT_PUBLIC_* no build), ex.:
+#    docker buildx build \
+#      --platform linux/amd64 \
+#      --push \
 #      --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
 #      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... \
 #      --build-arg NEXT_PUBLIC_SITE_URL=https://nutricao.stratostech.com.br \
 #      -t seu-registry/nutricao-stratostech:tag .
-#    docker push seu-registry/nutricao-stratostech:tag
+#    # (Opcional) Validar arquitetura publicada:
+#    docker buildx imagetools inspect seu-registry/nutricao-stratostech:tag
 # 2) No Portainer: definir NUTRICAO_IMAGE e (opcional) NUTRICAO_HOST; rede HMLStratosNetwork deve existir.
 #
 # Segredos server-only (Resend, etc.): adicionar em environment abaixo ou via Portainer secrets.
@@ -20,6 +23,7 @@
 services:
   nutricao_app:
     image: ${NUTRICAO_IMAGE:-stratostech/nutricao-stratostech:latest}
+    platform: ${NUTRICAO_PLATFORM:-linux/amd64}
     container_name: nutricao_stratostech
     restart: unless-stopped
     environment:

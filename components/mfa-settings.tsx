@@ -138,7 +138,7 @@ export function MfaSettings() {
       return;
     }
     setUnenrollConfirm(false);
-    setInfo("2FA desativado. O próximo login usará só palavra-passe.");
+    setInfo("2FA desativado. O próximo login usará só senha.");
     await refreshFactors();
   }
 

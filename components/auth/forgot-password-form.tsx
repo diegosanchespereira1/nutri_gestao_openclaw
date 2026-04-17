@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 /** Mensagem única — evita enumeração de emails (PRD / Story 1.7). */
 const GENERIC_SUCCESS =
-  "Se existir uma conta associada a este email, enviámos instruções para redefinir a palavra-passe.";
+  "Se existir uma conta associada a este email, enviamos instruções para redefinir a senha.";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");

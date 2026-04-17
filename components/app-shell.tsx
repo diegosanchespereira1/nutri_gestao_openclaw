@@ -159,7 +159,7 @@ export function AppShell({
         <Separator className="bg-sidebar-border opacity-40" />
 
         <div className="p-2">
-          <LogoutButton />
+          <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
         </div>
       </aside>
 
@@ -208,7 +208,7 @@ export function AppShell({
             />
             <Separator className="bg-border" />
             <div className="p-2">
-              <LogoutButton />
+              <LogoutButton className="text-foreground hover:bg-muted hover:text-foreground" />
             </div>
           </SheetContent>
         </Sheet>

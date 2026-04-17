@@ -250,7 +250,7 @@ export async function updateScheduledVisitDossierRecipientsFormAction(
     .eq("id", visitId)
     .eq("user_id", user.id);
 
-  if (error) return { ok: false, error: "Não foi possível guardar." };
+  if (error) return { ok: false, error: "Não foi possível salvar." };
 
   revalidatePath(`/visitas/${visitId}`);
   revalidatePath("/visitas");

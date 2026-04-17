@@ -15,7 +15,7 @@ export function mapSupabaseLoginError(err: SupabaseAuthLikeError): string {
     return "Confirme o email antes de entrar (use a ligação enviada para a sua caixa de entrada).";
   }
   if (code === "invalid_credentials") {
-    return "Email ou palavra-passe incorretos.";
+    return "Email ou senha incorretos.";
   }
   if (
     code === "over_request_rate_limit" ||
@@ -34,7 +34,7 @@ export function mapSupabaseLoginError(err: SupabaseAuthLikeError): string {
     m.includes("invalid credentials") ||
     m.includes("wrong password")
   ) {
-    return "Email ou palavra-passe incorretos.";
+    return "Email ou senha incorretos.";
   }
   if (m.includes("too many requests") || m.includes("rate limit")) {
     return "Demasiadas tentativas. Aguarde um pouco e tente novamente.";

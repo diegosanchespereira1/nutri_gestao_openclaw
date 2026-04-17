@@ -32,7 +32,7 @@ export function RegisterForm() {
       return;
     }
     if (password.length < 12) {
-      setError("A palavra-passe deve ter pelo menos 12 caracteres.");
+      setError("A senha deve ter pelo menos 12 caracteres.");
       return;
     }
 
@@ -59,7 +59,7 @@ export function RegisterForm() {
           m.includes("minimum"));
       if (weak) {
         setError(
-          "A palavra-passe não cumpre os requisitos mínimos (comprimento ou complexidade).",
+          "A senha não cumpre os requisitos mínimos (comprimento ou complexidade).",
         );
         setLoading(false);
         return;
@@ -102,7 +102,7 @@ export function RegisterForm() {
           Criar conta
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Registo apenas com email e palavra-passe (sem redes sociais).
+          Cadastro apenas com email e senha (sem redes sociais).
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export function RegisterForm() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="reg-password">Palavra-passe</Label>
+          <Label htmlFor="reg-password">Senha</Label>
           <PasswordField
             id="reg-password"
             name="password"
@@ -151,7 +151,7 @@ export function RegisterForm() {
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="reg-confirm">Confirmar palavra-passe</Label>
+          <Label htmlFor="reg-confirm">Confirmar senha</Label>
           <PasswordField
             id="reg-confirm"
             name="confirm"

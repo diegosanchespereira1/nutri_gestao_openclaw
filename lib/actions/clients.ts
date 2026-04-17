@@ -534,7 +534,7 @@ export async function updateClientAction(
     .eq("owner_user_id", user.id);
 
   if (error) {
-    return { ok: false, error: "Não foi possível guardar as alterações." };
+    return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 
   if (kind === "pf") {

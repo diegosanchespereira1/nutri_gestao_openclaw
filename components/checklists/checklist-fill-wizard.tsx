@@ -103,6 +103,8 @@ type Props = {
   initialDossierApprovedAt?: string | null;
   /** Último job de exportação PDF (se existir). */
   initialPdfExport?: ChecklistFillPdfExportRow | null;
+  /** Modo de visualização do dossiê, sem edição. */
+  viewOnlyDossier?: boolean;
 };
 
 export function ChecklistFillWizard({
@@ -117,6 +119,7 @@ export function ChecklistFillWizard({
   initialItemPhotos = {},
   initialDossierApprovedAt = null,
   initialPdfExport = null,
+  viewOnlyDossier = false,
 }: Props) {
   const router = useRouter();
   const sections = template.sections;
@@ -350,6 +353,54 @@ export function ChecklistFillWizard({
   if (!section) {
     return (
       <p className="text-muted-foreground text-sm">Modelo sem secções.</p>
+    );
+  }
+
+  if (viewOnlyDossier) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-muted-foreground text-sm">{establishmentLabel}</p>
+            <h2 className="text-foreground text-xl font-semibold tracking-tight">
+              {template.name}
+            </h2>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Visualização do dossiê desta sessão.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {!dossierApprovedAt ? (
+              <Link
+                href={`/checklists/preencher/${sessionId}`}
+                className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
+              >
+                Continuar preenchendo
+              </Link>
+            ) : null}
+            <Link
+              href={backHref}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              {backLabel}
+            </Link>
+          </div>
+        </div>
+
+        <ChecklistFillDossierPreview
+          template={template}
+          responses={responses}
+          itemPhotos={livePhotos}
+          reviewEditable={false}
+          dossierApprovedAt={dossierApprovedAt}
+          heading={dossierApprovedAt ? "Dossiê aprovado" : "Dossiê em andamento"}
+          intro={
+            dossierApprovedAt
+              ? "Este dossiê já foi aprovado e está em modo somente leitura."
+              : "Modo de visualização. Use \"Continuar preenchendo\" para editar esta sessão."
+          }
+        />
+      </div>
     );
   }
 

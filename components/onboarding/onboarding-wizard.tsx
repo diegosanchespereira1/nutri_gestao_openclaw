@@ -429,7 +429,7 @@ export function OnboardingWizard({ templates }: Props) {
                 Voltar
               </Button>
               <Button type="submit" disabled={isPending}>
-                {isPending ? "A guardar…" : "Concluir e ir ao início"}
+                {isPending ? "Salvando…" : "Concluir e ir ao início"}
               </Button>
             </CardFooter>
           </Card>

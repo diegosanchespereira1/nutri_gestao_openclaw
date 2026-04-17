@@ -12,6 +12,7 @@ export type TeamJobRole =
 export type TeamMemberRow = {
   id: string;
   owner_user_id: string;
+  member_user_id: string | null;
   full_name: string;
   email: string | null;
   phone: string | null;

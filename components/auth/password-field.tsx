@@ -30,7 +30,7 @@ export function PasswordField({ className, ...props }: PasswordFieldProps) {
           className="text-muted-foreground hover:text-foreground"
           onClick={() => setVisible((v) => !v)}
           aria-label={
-            visible ? "Ocultar palavra-passe" : "Mostrar palavra-passe"
+            visible ? "Ocultar senha" : "Mostrar senha"
           }
           aria-pressed={visible}
         >

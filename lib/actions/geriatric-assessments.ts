@@ -151,7 +151,7 @@ export async function createGeriatricAssessmentAction(
       process.env.NODE_ENV === "development"
         ? ` [${error.code ?? "?"}: ${error.message}]`
         : "";
-    return { ok: false, error: `Não foi possível guardar a avaliação.${detail}` };
+    return { ok: false, error: `Não foi possível salvar a avaliação.${detail}` };
   }
 
   revalidatePath(`/pacientes/${patientId}/editar`);
@@ -253,7 +253,7 @@ export async function updateGeriatricAssessmentAction(
 
   if (error) {
     console.error("[geriatric-assessments] update error:", error);
-    return { ok: false, error: "Não foi possível guardar as alterações." };
+    return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 
   revalidatePath(`/pacientes/${check.patientId}/editar`);

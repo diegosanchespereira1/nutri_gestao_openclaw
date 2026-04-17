@@ -135,7 +135,7 @@ export function VisitDossierEmailPanel({
           </p>
         ) : null}
         <Button type="submit" disabled={pendingSave} size="sm">
-          {pendingSave ? "A guardar…" : "Guardar destinatários"}
+          {pendingSave ? "Salvando…" : "Salvar destinatários"}
         </Button>
         <p className="text-muted-foreground text-xs">
           Se alterar os endereços, guarde antes de usar «{sendButtonLabel}».

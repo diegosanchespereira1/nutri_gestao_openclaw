@@ -292,7 +292,7 @@ export async function registerChecklistEstablishmentOpenAction(
     );
 
   if (error) {
-    return { ok: false, error: "Não foi possível guardar estabelecimento recente." };
+    return { ok: false, error: "Não foi possível salvar estabelecimento recente." };
   }
 
   return { ok: true };
@@ -473,7 +473,7 @@ export async function updateEstablishmentAction(
     .eq("client_id", clientId);
 
   if (error) {
-    return { ok: false, error: "Não foi possível guardar as alterações." };
+    return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 
   revalidateClientEstablishmentPaths(clientId, id);

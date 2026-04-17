@@ -350,7 +350,7 @@ export async function saveFillItemResponse(input: {
           item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
         })
         .eq("id", existing.id as string);
-      if (error) return { ok: false, error: "Não foi possível guardar." };
+      if (error) return { ok: false, error: "Não foi possível salvar." };
     } else {
       const { error } = await supabase.from("checklist_fill_item_responses").insert({
         session_id: sessionId,
@@ -360,7 +360,7 @@ export async function saveFillItemResponse(input: {
         note: noteTrim.length > 0 ? noteTrim : null,
         item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
       });
-      if (error) return { ok: false, error: "Não foi possível guardar." };
+      if (error) return { ok: false, error: "Não foi possível salvar." };
     }
   } else {
     const { data: existing } = await supabase
@@ -379,7 +379,7 @@ export async function saveFillItemResponse(input: {
           item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
         })
         .eq("id", existing.id as string);
-      if (error) return { ok: false, error: "Não foi possível guardar." };
+      if (error) return { ok: false, error: "Não foi possível salvar." };
     } else {
       const { error } = await supabase.from("checklist_fill_item_responses").insert({
         session_id: sessionId,
@@ -389,7 +389,7 @@ export async function saveFillItemResponse(input: {
         note: noteTrim.length > 0 ? noteTrim : null,
         item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
       });
-      if (error) return { ok: false, error: "Não foi possível guardar." };
+      if (error) return { ok: false, error: "Não foi possível salvar." };
     }
   }
 

@@ -13,7 +13,12 @@
 #    docker buildx imagetools inspect seu-registry/nutricao-stratostech:tag
 # 2) No Portainer: definir NUTRICAO_IMAGE e (opcional) NUTRICAO_HOST; rede HMLStratosNetwork deve existir.
 #
-# Segredos server-only (Resend, etc.): adicionar em environment abaixo ou via Portainer secrets.
+# Segredos server-only: definir no Portainer (Environment ou Secrets), nunca no build nem em NEXT_PUBLIC_*.
+#
+# SUPABASE_SERVICE_ROLE_KEY — obrigatória para criar conta de membro da equipe (auth.admin.createUser).
+#   Supabase Dashboard → Project Settings → API → service_role (secret). Sem isto, o cadastro de membro
+#   falha com: "Configuração ausente: SUPABASE_SERVICE_ROLE_KEY."
+# RESEND_API_KEY, DOSSIER_EMAIL_FROM — envio de email (dossiê, etc.)
 #
 # Volume nomeado: persiste cache em disco do Next (.next/cache) entre recriações do container
 # (ISR, fetch cache, etc.). Gerido pela stack no Portainer.
@@ -28,10 +33,12 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      # Opcional no runtime (já embutido no build se usaste NEXT_PUBLIC_* no docker build):
+      # Runtime (recomendado mesmo com NEXT_PUBLIC_* no build — permite rodar a mesma imagem com outro projeto):
       # NEXT_PUBLIC_SUPABASE_URL=
       # NEXT_PUBLIC_SUPABASE_ANON_KEY=
       # NEXT_PUBLIC_SITE_URL=
+      # Obrigatório para equipe / operações admin no servidor (ver comentário no topo deste ficheiro):
+      # SUPABASE_SERVICE_ROLE_KEY=
       # RESEND_API_KEY=
       # DOSSIER_EMAIL_FROM=
     healthcheck:

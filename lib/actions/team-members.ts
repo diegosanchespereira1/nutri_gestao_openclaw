@@ -292,9 +292,13 @@ export async function createTeamMemberAction(
       ownerUserId: user.id,
       error,
     });
+    const detail =
+      error instanceof Error ? error.message : "Erro desconhecido ao iniciar cliente admin.";
     return createTeamMemberError(
       "auth_create",
-      "Configuração ausente: SUPABASE_SERVICE_ROLE_KEY.",
+      detail.includes("NEXT_PUBLIC_SUPABASE_URL")
+        ? "URL do Supabase em falta no build da aplicação."
+        : "Defina SUPABASE_SERVICE_ROLE_KEY no ambiente do container (Portainer) e faça redeploy — não basta o build da imagem.",
     );
   }
 

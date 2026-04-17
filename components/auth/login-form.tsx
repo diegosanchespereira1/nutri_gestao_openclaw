@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 export function LoginForm() {
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
+  const [requestId] = useState(() => crypto.randomUUID());
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,17 +27,71 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  function logAuthTroubleshootingEvent(input: {
+    event: string;
+    step?: "password" | "mfa";
+    outcome?: "attempt" | "success" | "error";
+    errorCode?: string;
+    errorMessage?: string;
+    userId?: string | null;
+    hasSession?: boolean;
+    metadata?: Record<string, string | number | boolean | null>;
+  }) {
+    void fetch("/api/auth/troubleshooting", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        requestId,
+        event: input.event,
+        step: input.step,
+        outcome: input.outcome,
+        email: email.trim().toLowerCase(),
+        userId: input.userId ?? null,
+        errorCode: input.errorCode ?? null,
+        errorMessage: input.errorMessage ?? null,
+        nextPath: next,
+        hasSession:
+          typeof input.hasSession === "boolean" ? input.hasSession : null,
+        metadata: {
+          ua: navigator.userAgent,
+          ...input.metadata,
+        },
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // Falha de log não deve bloquear login.
+    });
+  }
+
   async function beginMfaChallenge(supabase: ReturnType<typeof createClient>) {
+    await logAuthTroubleshootingEvent({
+      event: "mfa_challenge_start",
+      step: "mfa",
+      outcome: "attempt",
+    });
     const { data: factors, error: listErr } =
       await supabase.auth.mfa.listFactors();
     if (listErr) {
+      await logAuthTroubleshootingEvent({
+        event: "mfa_factor_list_failed",
+        step: "mfa",
+        outcome: "error",
+        errorCode: listErr.code,
+        errorMessage: listErr.message,
+      });
       setError(listErr.message);
       return false;
     }
     const totp = factors?.all?.find(
-      (f) => f.factor_type === "totp" && f.status === "verified",
+      (f: { factor_type?: string; status?: string }) =>
+        f.factor_type === "totp" && f.status === "verified",
     );
     if (!totp?.id) {
+      await logAuthTroubleshootingEvent({
+        event: "mfa_factor_missing",
+        step: "mfa",
+        outcome: "error",
+      });
       setError("2FA ativo mas fator TOTP não encontrado. Contacte suporte.");
       return false;
     }
@@ -44,9 +99,21 @@ export function LoginForm() {
       factorId: totp.id,
     });
     if (chErr || !ch?.id) {
+      await logAuthTroubleshootingEvent({
+        event: "mfa_challenge_failed",
+        step: "mfa",
+        outcome: "error",
+        errorCode: chErr?.code,
+        errorMessage: chErr?.message,
+      });
       setError(chErr?.message ?? "Não foi possível iniciar o desafio 2FA.");
       return false;
     }
+    await logAuthTroubleshootingEvent({
+      event: "mfa_challenge_started",
+      step: "mfa",
+      outcome: "success",
+    });
     setFactorId(totp.id);
     setChallengeId(ch.id);
     setStep("mfa");
@@ -58,32 +125,76 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
+    await logAuthTroubleshootingEvent({
+      event: "password_signin",
+      step: "password",
+      outcome: "attempt",
+    });
 
-    const { error: signErr } = await supabase.auth.signInWithPassword({
+    const {
+      data: signInData,
+      error: signErr,
+    } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (signErr) {
+      await logAuthTroubleshootingEvent({
+        event: "password_signin_failed",
+        step: "password",
+        outcome: "error",
+        errorCode: signErr.code,
+        errorMessage: signErr.message,
+      });
       setError(mapSupabaseLoginError(signErr));
       setLoading(false);
       return;
     }
+    await logAuthTroubleshootingEvent({
+      event: "password_signin_success",
+      step: "password",
+      outcome: "success",
+      userId: signInData.user?.id ?? null,
+    });
 
     const { data: aal, error: aalErr } =
       await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (aalErr) {
+      await logAuthTroubleshootingEvent({
+        event: "mfa_aal_check_failed",
+        step: "password",
+        outcome: "error",
+        errorCode: aalErr.code,
+        errorMessage: aalErr.message,
+        userId: signInData.user?.id ?? null,
+      });
       setError(aalErr.message);
       setLoading(false);
       return;
     }
 
     if (aal?.nextLevel === "aal2" && aal?.currentLevel === "aal1") {
+      await logAuthTroubleshootingEvent({
+        event: "mfa_required",
+        step: "password",
+        outcome: "success",
+        userId: signInData.user?.id ?? null,
+      });
       const ok = await beginMfaChallenge(supabase);
       setLoading(false);
       if (!ok) await supabase.auth.signOut();
       return;
     }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    await logAuthTroubleshootingEvent({
+      event: "post_signin_session_check",
+      step: "password",
+      outcome: sessionData.session ? "success" : "error",
+      hasSession: Boolean(sessionData.session),
+      userId: signInData.user?.id ?? null,
+    });
 
     setLoading(false);
     window.location.assign(next);
@@ -103,6 +214,13 @@ export function LoginForm() {
     });
 
     if (vErr) {
+      await logAuthTroubleshootingEvent({
+        event: "mfa_verify_failed",
+        step: "mfa",
+        outcome: "error",
+        errorCode: vErr.code,
+        errorMessage: vErr.message,
+      });
       setError(vErr.message);
       setLoading(false);
       setMfaCode("");
@@ -110,6 +228,13 @@ export function LoginForm() {
       return;
     }
 
+    const { data: sessionData } = await supabase.auth.getSession();
+    await logAuthTroubleshootingEvent({
+      event: "mfa_verify_success",
+      step: "mfa",
+      outcome: sessionData.session ? "success" : "error",
+      hasSession: Boolean(sessionData.session),
+    });
     setLoading(false);
     window.location.assign(next);
   }
@@ -226,6 +351,11 @@ export function LoginForm() {
             variant="ghost"
             className="w-full"
             onClick={async () => {
+              await logAuthTroubleshootingEvent({
+                event: "mfa_back_to_password",
+                step: "mfa",
+                outcome: "success",
+              });
               setStep("password");
               setMfaCode("");
               setFactorId(null);

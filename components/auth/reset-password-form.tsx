@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -22,26 +23,31 @@ export function ResetPasswordForm() {
   useEffect(() => {
     const supabase = createClient();
 
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (
-        session &&
-        (event === "PASSWORD_RECOVERY" ||
-          event === "SIGNED_IN" ||
-          event === "INITIAL_SESSION" ||
-          event === "TOKEN_REFRESHED")
-      ) {
-        setReady(true);
-        setError(null);
-      }
-    });
+    const { data: sub } = supabase.auth.onAuthStateChange(
+      (event: AuthChangeEvent, session: Session | null) => {
+        if (
+          session &&
+          (event === "PASSWORD_RECOVERY" ||
+            event === "SIGNED_IN" ||
+            event === "INITIAL_SESSION" ||
+            event === "TOKEN_REFRESHED")
+        ) {
+          setReady(true);
+          setError(null);
+        }
+      },
+    );
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth
+      .getSession()
+      .then((result: { data: { session: Session | null } }) => {
+        const session = result.data.session;
       if (session) {
         setReady(true);
         setError(null);
       }
       setSessionChecked(true);
-    });
+      });
 
     return () => sub.subscription.unsubscribe();
   }, []);

@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { AlertCircle, Download } from 'lucide-react';
 import type { PortabilityExportFormat } from '@/lib/types/portability';
 import { exportPortabilityAsJson, exportPortabilityAsCsv } from '@/lib/actions/portability';

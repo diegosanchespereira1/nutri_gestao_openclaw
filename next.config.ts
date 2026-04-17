@@ -34,17 +34,26 @@ const nextConfig: NextConfig = {
     if (supabaseOrigin) connectParts.push(supabaseOrigin);
     connectParts.push("https://*.supabase.co", "wss://*.supabase.co");
 
+    const isProd = process.env.NODE_ENV === "production";
+    // Next.js App Router injeta scripts inline (RSC, bootstrap). Em dev, Turbopack/HMR
+    // ainda precisa de 'unsafe-eval'. Sem isto, client navigations rebentam (página em branco).
+    const scriptSrc = isProd
+      ? "'self' 'unsafe-inline'"
+      : "'self' 'unsafe-inline' 'unsafe-eval'";
+    // Tailwind/shadcn e estilos de runtime usam inline styles.
+    const styleSrc = "'self' 'unsafe-inline'";
+
     const csp = [
       "default-src 'self'",
-      "script-src 'self'",
-      "style-src 'self'",
+      `script-src ${scriptSrc}`,
+      `style-src ${styleSrc}`,
       "img-src 'self' data: blob: https:",
       "font-src 'self'",
       `connect-src ${connectParts.join(" ")}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "upgrade-insecure-requests",
+      ...(isProd ? (["upgrade-insecure-requests"] as const) : []),
       "report-uri /api/security/csp-report",
     ].join("; ");
 

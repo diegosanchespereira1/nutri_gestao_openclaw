@@ -16,7 +16,6 @@ import {
   RegisterFcmTokenInput,
   FcmToken,
   NotificationEventType,
-  NotificationChannel,
 } from '@/lib/types/notification';
 
 // ============================================================================
@@ -169,6 +168,7 @@ export async function sendNotificationEmail(
   recipientEmail: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    void recipientEmail;
     const supabase = await createClient();
 
     // Verificar autenticação

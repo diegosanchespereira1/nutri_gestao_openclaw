@@ -73,10 +73,13 @@ export function FinancialChartCardTools({
   );
 
   useEffect(() => {
-    if (window.mode === "range") {
-      setLocalFrom(window.fromDayKey);
-      setLocalTo(window.toDayKey);
-    }
+    if (window.mode !== "range") return;
+    const from = window.fromDayKey;
+    const to = window.toDayKey;
+    queueMicrotask(() => {
+      setLocalFrom(from);
+      setLocalTo(to);
+    });
   }, [window]);
 
   function pushWindow(next: ResolvedChartWindow) {

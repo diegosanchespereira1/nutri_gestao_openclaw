@@ -23,9 +23,12 @@ export function RegiaoFusoForm({ defaultTimeZone }: { defaultTimeZone: string })
 
   useEffect(() => {
     if (state?.ok === true) {
-      lastCommittedTz.current = state.timeZone;
-      setTimeZone(state.timeZone);
-      router.refresh();
+      const tz = state.timeZone;
+      lastCommittedTz.current = tz;
+      queueMicrotask(() => {
+        setTimeZone(tz);
+        router.refresh();
+      });
     }
   }, [state, router]);
 
@@ -37,7 +40,9 @@ export function RegiaoFusoForm({ defaultTimeZone }: { defaultTimeZone: string })
     if (committed !== null && defaultTimeZone === committed) {
       lastCommittedTz.current = null;
     }
-    setTimeZone(defaultTimeZone);
+    queueMicrotask(() => {
+      setTimeZone(defaultTimeZone);
+    });
   }, [defaultTimeZone]);
 
   return (

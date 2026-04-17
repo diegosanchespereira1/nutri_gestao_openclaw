@@ -41,9 +41,19 @@ const lineSchema = z.object({
   cooking_factor: lineFactorSchema,
 });
 
-const saveDraftSchema = z.object({
+const uuidOpt = z.preprocess(
+  (val) =>
+    val === undefined || val === null || val === "" ? undefined : val,
+  z.string().uuid().optional(),
+);
+
+const saveDraftSchema = z
+  .object({
   recipeId: z.string().uuid().optional(),
-  establishmentId: z.string().uuid(),
+  /** Receita ligada a um estabelecimento (exclusiva desse local). */
+  establishmentId: uuidOpt,
+  /** Receita ao nível do cliente PJ (sem estabelecimento; reutilizável). */
+  clientId: uuidOpt,
   name: z.string().trim().min(1).max(200),
   classification: z.string().max(50).optional(),
   sector: z.string().max(100).optional(),
@@ -65,7 +75,23 @@ const saveDraftSchema = z.object({
     .min(0.1, "CMV deve ser maior que 0%.")
     .max(100, "CMV: máximo 100%."),
   lines: z.array(lineSchema).min(1, "Adicione pelo menos um ingrediente."),
-});
+  /** `draft` = trabalho em curso; `published` = receita pronta para uso. */
+  status: z.enum(["draft", "published"]).optional().default("draft"),
+})
+  .superRefine((data, ctx) => {
+    const hasEst = Boolean(data.establishmentId);
+    const hasCli = Boolean(data.clientId);
+    if (hasEst === hasCli) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message:
+          hasEst && hasCli
+            ? "Indique apenas estabelecimento ou apenas repositório de receitas, não ambos."
+            : "Indique o estabelecimento ou selecione repositório de receitas.",
+        path: ["establishmentId"],
+      });
+    }
+  });
 
 export type SaveTechnicalRecipeDraftResult =
   | {
@@ -73,6 +99,7 @@ export type SaveTechnicalRecipeDraftResult =
       recipeId: string;
       totalsLabel: string;
       totalsKind: "mass" | "volume" | "mixed" | "empty";
+      status: "draft" | "published";
     }
   | { ok: false; error: string };
 
@@ -142,9 +169,33 @@ function toNumUnknown(v: unknown, fallback: number): number {
 }
 
 function mapRecipeHeader(raw: Record<string, unknown>): TechnicalRecipeRow {
+  const estRaw = raw.establishment_id;
+  const establishment_id =
+    estRaw != null && String(estRaw).length > 0 ? String(estRaw) : null;
+
+  // FR-REC-001: derivar contexto do campo BD ou inferir pelo establishment_id
+  const rawContexto = raw.contexto;
+  const contexto: import("@/lib/types/technical-recipes").RecipeContext =
+    rawContexto === "REPOSITORIO"
+      ? "REPOSITORIO"
+      : rawContexto === "ESTABELECIMENTO"
+        ? "ESTABELECIMENTO"
+        : establishment_id != null
+          ? "ESTABELECIMENTO"
+          : "REPOSITORIO";
+
+  const origemRaw = raw.repository_origin_id;
+  const repository_origin_id =
+    origemRaw != null && String(origemRaw).length > 0
+      ? String(origemRaw)
+      : null;
+
   return {
     id: String(raw.id),
-    establishment_id: String(raw.establishment_id),
+    contexto,
+    establishment_id,
+    client_id: String(raw.client_id ?? ""),
+    repository_origin_id,
     name: String(raw.name),
     status: raw.status === "published" ? "published" : "draft",
     portions_yield: Math.max(1, toIntUnknown(raw.portions_yield, 1)),
@@ -223,6 +274,51 @@ export type LoadTechnicalRecipesResult = {
   totalPages: number;
 };
 
+function establishmentClientIdFromRow(
+  establishments: TechnicalRecipeListItem["establishments"],
+): string | undefined {
+  if (!establishments) return undefined;
+  if (Array.isArray(establishments)) {
+    return establishments[0]?.client_id;
+  }
+  return establishments.client_id;
+}
+
+function attachTemplateFavoriteFlags(
+  rows: TechnicalRecipeListItem[],
+  favoriteKeys: Set<string>,
+): TechnicalRecipeListItem[] {
+  return rows.map((row) => {
+    const cid =
+      typeof row.client_id === "string" && row.client_id.length > 0
+        ? row.client_id
+        : establishmentClientIdFromRow(row.establishments);
+    const key = cid ? `${cid}:${row.id}` : "";
+    return {
+      ...row,
+      is_template_favorite:
+        Boolean(row.is_template) && key.length > 0 && favoriteKeys.has(key),
+    };
+  });
+}
+
+async function loadTemplateFavoriteKeySet(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<Set<string>> {
+  const { data, error } = await supabase
+    .from("technical_recipe_template_favorites")
+    .select("client_id, recipe_id");
+  if (error) {
+    return new Set();
+  }
+  const set = new Set<string>();
+  for (const row of data ?? []) {
+    const r = row as { client_id: string; recipe_id: string };
+    set.add(`${r.client_id}:${r.recipe_id}`);
+  }
+  return set;
+}
+
 export async function loadTechnicalRecipesForOwner(opts?: {
   q?: string;
   page?: number;
@@ -258,6 +354,10 @@ export async function loadTechnicalRecipesForOwner(opts?: {
         name,
         client_id,
         clients ( legal_name, trade_name )
+      ),
+      recipe_scope_client:clients!technical_recipes_client_id_fkey (
+        legal_name,
+        trade_name
       )
     `,
       { count: "exact" },
@@ -276,8 +376,13 @@ export async function loadTechnicalRecipesForOwner(opts?: {
   const total = count ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 
+  const favoriteKeys = await loadTemplateFavoriteKeySet(supabase);
+
   return {
-    rows: data as unknown as TechnicalRecipeListItem[],
+    rows: attachTemplateFavoriteFlags(
+      data as unknown as TechnicalRecipeListItem[],
+      favoriteKeys,
+    ),
     total,
     page,
     pageSize,
@@ -383,6 +488,7 @@ export async function saveTechnicalRecipeDraftAction(
   const {
     recipeId,
     establishmentId,
+    clientId,
     name,
     classification,
     sector,
@@ -391,6 +497,7 @@ export async function saveTechnicalRecipeDraftAction(
     tax_percent,
     cmv_percent,
     lines: rawLines,
+    status: recipeStatus,
   } = parsed.data;
   const lines = rawLines.map((l) => ({
     ...l,
@@ -432,34 +539,53 @@ export async function saveTechnicalRecipeDraftAction(
     }
   }
 
-  const { data: estRow } = await supabase
-    .from("establishments")
-    .select("id, client_id")
-    .eq("id", establishmentId)
-    .maybeSingle();
+  if (establishmentId) {
+    const { data: estRow } = await supabase
+      .from("establishments")
+      .select("id, client_id")
+      .eq("id", establishmentId)
+      .maybeSingle();
 
-  if (!estRow) {
-    return {
-      ok: false,
-      error: "Estabelecimento inválido ou sem permissão.",
-    };
-  }
+    if (!estRow) {
+      return {
+        ok: false,
+        error: "Estabelecimento inválido ou sem permissão.",
+      };
+    }
 
-  const { data: clientRow } = await supabase
-    .from("clients")
-    .select("owner_user_id, kind")
-    .eq("id", estRow.client_id)
-    .maybeSingle();
+    const { data: estClientRow } = await supabase
+      .from("clients")
+      .select("owner_user_id, kind")
+      .eq("id", estRow.client_id)
+      .maybeSingle();
 
-  if (
-    !clientRow ||
-    clientRow.owner_user_id !== user.id ||
-    clientRow.kind !== "pj"
-  ) {
-    return {
-      ok: false,
-      error: "Estabelecimento inválido ou sem permissão.",
-    };
+    if (
+      !estClientRow ||
+      estClientRow.owner_user_id !== user.id ||
+      estClientRow.kind !== "pj"
+    ) {
+      return {
+        ok: false,
+        error: "Estabelecimento inválido ou sem permissão.",
+      };
+    }
+  } else if (clientId) {
+    const { data: orgClientRow } = await supabase
+      .from("clients")
+      .select("owner_user_id, kind")
+      .eq("id", clientId)
+      .maybeSingle();
+
+    if (
+      !orgClientRow ||
+      orgClientRow.owner_user_id !== user.id ||
+      orgClientRow.kind !== "pj"
+    ) {
+      return {
+        ok: false,
+        error: "Cliente inválido ou sem permissão.",
+      };
+    }
   }
 
   let finalRecipeId = recipeId;
@@ -467,18 +593,31 @@ export async function saveTechnicalRecipeDraftAction(
   if (recipeId) {
     const { data: existing } = await supabase
       .from("technical_recipes")
-      .select("id, establishment_id")
+      .select("id, establishment_id, client_id")
       .eq("id", recipeId)
       .maybeSingle();
 
     if (!existing) {
       return { ok: false, error: "Receita não encontrada." };
     }
-    if ((existing as { establishment_id: string }).establishment_id !== establishmentId) {
-      return {
-        ok: false,
-        error: "Não é permitido alterar o estabelecimento da receita.",
-      };
+    const ex = existing as {
+      establishment_id: string | null;
+      client_id: string;
+    };
+    if (ex.establishment_id) {
+      if (establishmentId !== ex.establishment_id || clientId != null) {
+        return {
+          ok: false,
+          error: "Não é permitido alterar o âmbito da receita.",
+        };
+      }
+    } else {
+      if (clientId !== ex.client_id || establishmentId != null) {
+        return {
+          ok: false,
+          error: "Não é permitido alterar o âmbito da receita.",
+        };
+      }
     }
 
     const { error: uErr } = await supabase
@@ -487,7 +626,7 @@ export async function saveTechnicalRecipeDraftAction(
         name,
         classification: classification || null,
         sector: sector || null,
-        status: "draft",
+        status: recipeStatus,
         portions_yield,
         margin_percent,
         tax_percent,
@@ -508,19 +647,38 @@ export async function saveTechnicalRecipeDraftAction(
       return { ok: false, error: dErr.message || "Erro ao atualizar linhas." };
     }
   } else {
+    // FR-REC-001: contexto explícito enviado para a BD (CHECK constraint valida coerência)
+    const insertRow =
+      establishmentId != null
+        ? {
+            establishment_id: establishmentId,
+            contexto: "ESTABELECIMENTO" as const,
+            name,
+            classification: classification || null,
+            sector: sector || null,
+            status: recipeStatus,
+            portions_yield,
+            margin_percent,
+            tax_percent,
+            cmv_percent,
+          }
+        : {
+            establishment_id: null as string | null,
+            client_id: clientId!,
+            contexto: "REPOSITORIO" as const,
+            name,
+            classification: classification || null,
+            sector: sector || null,
+            status: recipeStatus,
+            portions_yield,
+            margin_percent,
+            tax_percent,
+            cmv_percent,
+          };
+
     const { data: inserted, error: iErr } = await supabase
       .from("technical_recipes")
-      .insert({
-        establishment_id: establishmentId,
-        name,
-        classification: classification || null,
-        sector: sector || null,
-        status: "draft",
-        portions_yield,
-        margin_percent,
-        tax_percent,
-        cmv_percent,
-      })
+      .insert(insertRow)
       .select("id")
       .single();
 
@@ -551,7 +709,7 @@ export async function saveTechnicalRecipeDraftAction(
     .insert(lineRows);
 
   if (insErr) {
-    return { ok: false, error: insErr.message || "Erro ao guardar ingredientes." };
+    return { ok: false, error: insErr.message || "Erro ao salvar ingredientes." };
   }
 
   const totals = validateRecipeTotals(lines);
@@ -563,6 +721,7 @@ export async function saveTechnicalRecipeDraftAction(
     recipeId: finalRecipeId!,
     totalsLabel: totals.label,
     totalsKind: totals.kind,
+    status: recipeStatus,
   };
 }
 
@@ -625,11 +784,16 @@ export async function loadTemplatesForOwner(opts?: {
         name,
         client_id,
         clients ( legal_name, trade_name )
+      ),
+      recipe_scope_client:clients!technical_recipes_client_id_fkey (
+        legal_name,
+        trade_name
       )
     `,
       { count: "exact" },
     )
-    .eq("is_template", true)
+    // FR-REC-001: Repositório de Receitas = contexto REPOSITORIO (substitui is_template + establishment_id IS NULL)
+    .eq("contexto", "REPOSITORIO")
     .order("updated_at", { ascending: false })
     .range(from, to);
 
@@ -644,13 +808,283 @@ export async function loadTemplatesForOwner(opts?: {
   const total = count ?? 0;
   const totalPages = Math.ceil(total / pageSize);
 
+  const favoriteKeys = await loadTemplateFavoriteKeySet(supabase);
+
   return {
-    rows: data as unknown as TechnicalRecipeListItem[],
+    rows: attachTemplateFavoriteFlags(
+      data as unknown as TechnicalRecipeListItem[],
+      favoriteKeys,
+    ),
     total,
     page,
     pageSize,
     totalPages,
   };
+}
+
+export async function toggleTemplateFavoriteAction(
+  recipeId: string,
+): Promise<
+  { ok: true; favorited: boolean } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const { data: recipe } = await supabase
+    .from("technical_recipes")
+    .select("id, is_template, establishment_id, client_id")
+    .eq("id", recipeId)
+    .maybeSingle();
+
+  if (!recipe || !(recipe as { is_template?: boolean }).is_template) {
+    return { ok: false, error: "Apenas templates podem ser favoritos." };
+  }
+
+  const rec = recipe as {
+    establishment_id: string | null;
+    client_id: string;
+  };
+
+  let clientId = rec.client_id;
+  if (rec.establishment_id) {
+    const { data: est } = await supabase
+      .from("establishments")
+      .select("client_id")
+      .eq("id", rec.establishment_id)
+      .maybeSingle();
+    if (!est) return { ok: false, error: "Estabelecimento inválido." };
+    clientId = (est as { client_id: string }).client_id;
+  }
+
+  const { data: existing } = await supabase
+    .from("technical_recipe_template_favorites")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("recipe_id", recipeId)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("technical_recipe_template_favorites")
+      .delete()
+      .eq("client_id", clientId)
+      .eq("recipe_id", recipeId);
+    if (error) {
+      return { ok: false, error: error.message || "Erro ao remover favorito." };
+    }
+    revalidatePath("/ficha-tecnica");
+    revalidatePath("/ficha-tecnica/templates");
+    return { ok: true, favorited: false };
+  }
+
+  const { error } = await supabase
+    .from("technical_recipe_template_favorites")
+    .insert({ client_id: clientId, recipe_id: recipeId });
+  if (error) {
+    return { ok: false, error: error.message || "Erro ao adicionar favorito." };
+  }
+  revalidatePath("/ficha-tecnica");
+  revalidatePath("/ficha-tecnica/templates");
+  return { ok: true, favorited: true };
+}
+
+export type TemplatePickerRow = {
+  id: string;
+  name: string;
+  portions_yield: number;
+  updated_at: string;
+  is_favorite: boolean;
+  establishment_name: string;
+};
+
+export async function loadTemplatesForPickerAction(ctx: {
+  establishmentId?: string;
+  clientId?: string;
+}): Promise<
+  { ok: true; rows: TemplatePickerRow[] } | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  let targetClientId: string;
+
+  if (ctx.establishmentId?.trim()) {
+    const { data: est } = await supabase
+      .from("establishments")
+      .select("id, client_id")
+      .eq("id", ctx.establishmentId)
+      .maybeSingle();
+    if (!est) return { ok: false, error: "Estabelecimento inválido." };
+    targetClientId = (est as { client_id: string }).client_id;
+  } else if (ctx.clientId?.trim()) {
+    targetClientId = ctx.clientId.trim();
+  } else {
+    return { ok: false, error: "Indique estabelecimento ou cliente." };
+  }
+
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("owner_user_id, kind")
+    .eq("id", targetClientId)
+    .maybeSingle();
+  if (
+    !clientRow ||
+    (clientRow as { owner_user_id: string }).owner_user_id !== user.id ||
+    (clientRow as { kind: string }).kind !== "pj"
+  ) {
+    return { ok: false, error: "Sem permissão para este contexto." };
+  }
+
+  const { data: recipes, error } = await supabase
+    .from("technical_recipes")
+    .select(
+      `
+      id,
+      name,
+      portions_yield,
+      updated_at,
+      client_id,
+      establishments (
+        name,
+        client_id
+      )
+    `,
+    )
+    .eq("is_template", true)
+    .order("updated_at", { ascending: false });
+
+  if (error) {
+    return { ok: false, error: error.message || "Erro ao listar templates." };
+  }
+
+  type EstRow = { name: string; client_id: string };
+
+  type QRow = {
+    id: string;
+    name: string;
+    portions_yield: number;
+    updated_at: string;
+    client_id: string;
+    establishments: EstRow | EstRow[] | null;
+  };
+
+  function pickEstablishment(
+    e: EstRow | EstRow[] | null,
+  ): EstRow | null {
+    if (!e) return null;
+    return Array.isArray(e) ? (e[0] ?? null) : e;
+  }
+
+  const { data: favs, error: favErr } = await supabase
+    .from("technical_recipe_template_favorites")
+    .select("recipe_id")
+    .eq("client_id", targetClientId);
+
+  const favSet = favErr
+    ? new Set<string>()
+    : new Set(
+        (favs ?? []).map((f: { recipe_id: string }) => f.recipe_id),
+      );
+
+  const rows: TemplatePickerRow[] = (recipes ?? [])
+    .map((r) => r as unknown as QRow)
+    .map((r) => {
+      const est = pickEstablishment(r.establishments);
+      return { row: r, est };
+    })
+    .filter(({ row: r, est }) => {
+      if (r.client_id === targetClientId) return true;
+      return est?.client_id === targetClientId;
+    })
+    .map(({ row: r, est }) => ({
+      id: r.id,
+      name: r.name,
+      portions_yield: r.portions_yield,
+      updated_at: r.updated_at,
+      is_favorite: favSet.has(r.id),
+      establishment_name:
+        est?.name?.trim() && est.name.length > 0
+          ? est.name
+          : "Catálogo do cliente",
+    }));
+
+  return { ok: true, rows };
+}
+
+export async function loadTemplateDataForNewRecipeAction(
+  templateId: string,
+  ctx: { targetEstablishmentId?: string; targetClientId?: string },
+): Promise<
+  | { ok: true; recipe: TechnicalRecipeWithLines }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  let targetClientId: string;
+
+  if (ctx.targetEstablishmentId?.trim()) {
+    const { data: targetEst } = await supabase
+      .from("establishments")
+      .select("client_id")
+      .eq("id", ctx.targetEstablishmentId)
+      .maybeSingle();
+    if (!targetEst) return { ok: false, error: "Estabelecimento inválido." };
+    targetClientId = (targetEst as { client_id: string }).client_id;
+  } else if (ctx.targetClientId?.trim()) {
+    targetClientId = ctx.targetClientId.trim();
+  } else {
+    return {
+      ok: false,
+      error: "Indique o estabelecimento ou o cliente (catálogo).",
+    };
+  }
+
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("owner_user_id, kind")
+    .eq("id", targetClientId)
+    .maybeSingle();
+  if (
+    !clientRow ||
+    (clientRow as { owner_user_id: string }).owner_user_id !== user.id ||
+    (clientRow as { kind: string }).kind !== "pj"
+  ) {
+    return { ok: false, error: "Sem permissão para este contexto." };
+  }
+
+  const { data: tmpl } = await supabase
+    .from("technical_recipes")
+    .select("id, establishment_id, client_id, is_template")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!tmpl || !(tmpl as { is_template?: boolean }).is_template) {
+    return { ok: false, error: "Template não encontrado." };
+  }
+
+  const tmplClientId = String(
+    (tmpl as { client_id?: string | null }).client_id ?? "",
+  );
+  if (!tmplClientId || tmplClientId !== targetClientId) {
+    return {
+      ok: false,
+      error: "Este template não pertence ao mesmo cliente PJ.",
+    };
+  }
+
+  const { recipe } = await loadTechnicalRecipeById(templateId);
+  if (!recipe) return { ok: false, error: "Template não encontrado." };
+  return { ok: true, recipe };
 }
 
 export async function toggleTemplateStatusAction(
@@ -723,6 +1157,17 @@ export async function createRecipeFromTemplateAction(
 
   if (!template) {
     return { ok: false, error: "Template não encontrado." };
+  }
+
+  const tmplClientId = String(
+    (template as { client_id?: string | null }).client_id ?? "",
+  );
+  if (!tmplClientId || tmplClientId !== estRow.client_id) {
+    return {
+      ok: false,
+      error:
+        "Este template não pertence ao mesmo cliente que o estabelecimento escolhido.",
+    };
   }
 
   // Buscar linhas do template

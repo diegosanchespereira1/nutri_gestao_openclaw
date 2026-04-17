@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LayoutTemplate, Plus, Trash2 } from "lucide-react";
 
 import {
   RECIPE_LINE_UNIT_LABELS,
   RECIPE_LINE_UNITS,
   type RecipeLineUnit,
 } from "@/lib/constants/recipe-line-units";
+import type { ClientRow } from "@/lib/types/clients";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
@@ -22,7 +23,17 @@ import {
 import { computeRecipeNutritionTotals } from "@/lib/technical-recipes/recipe-nutrition";
 import { scaleIngredientQuantitiesForPortionYield } from "@/lib/technical-recipes/recipe-yield-scale";
 import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-totals";
-import { saveTechnicalRecipeDraftAction } from "@/lib/actions/technical-recipes";
+import {
+  loadTemplateDataForNewRecipeAction,
+  saveTechnicalRecipeDraftAction,
+} from "@/lib/actions/technical-recipes";
+import type { RecipeFormDraftV1 } from "@/lib/technical-recipes/recipe-form-draft";
+import {
+  readRecipeFormDraftFromStorage,
+  recipeFormDraftStorageKey,
+  removeRecipeFormDraftFromStorage,
+  writeRecipeFormDraftToStorage,
+} from "@/lib/technical-recipes/recipe-form-draft";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,9 +48,22 @@ import {
 import { RecipeFormIntroductionSections } from "@/components/technical-sheets/recipe-form-introduction-sections";
 import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
 import { CostSummaryPanel } from "@/components/technical-sheets/cost-summary-panel";
+import { RecipeTemplatePickerDialog } from "@/components/technical-sheets/recipe-template-picker-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+
+/** Labels mais subtis que o valor preenchido (design system — hierarquia). */
+const fieldLabelClassName = "text-muted-foreground";
 
 function formatBrl(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -105,25 +129,152 @@ function linesFromRecipe(recipe: TechnicalRecipeWithLines): LineDraft[] {
   }));
 }
 
+function serializeRecipeFormState(args: {
+  recipeScope: "establishment" | "org";
+  establishmentId: string;
+  clientIdForOrg: string;
+  name: string;
+  classification: string;
+  sector: string;
+  portionsYieldInput: string;
+  marginPercentInput: string;
+  taxPercentInput: string;
+  cmvPercentInput: string;
+  scaleTargetInput: string;
+  lines: LineDraft[];
+}): string {
+  const lineSnap = args.lines.map((l) => ({
+    ingredient_name: l.ingredient_name,
+    quantity: l.quantity,
+    unit: l.unit,
+    notes: l.notes,
+    taco_food_id: l.taco_food_id,
+    raw_material_id: l.raw_material_id,
+    correction_factor: l.correction_factor,
+    cooking_factor: l.cooking_factor,
+  }));
+  return JSON.stringify({
+    recipeScope: args.recipeScope,
+    establishmentId: args.establishmentId,
+    clientIdForOrg: args.clientIdForOrg,
+    name: args.name,
+    classification: args.classification,
+    sector: args.sector,
+    portionsYieldInput: args.portionsYieldInput,
+    marginPercentInput: args.marginPercentInput,
+    taxPercentInput: args.taxPercentInput,
+    cmvPercentInput: args.cmvPercentInput,
+    scaleTargetInput: args.scaleTargetInput,
+    lines: lineSnap,
+  });
+}
+
+function initialFormSnapshot(
+  recipe: TechnicalRecipeWithLines | null | undefined,
+  establishments: EstablishmentWithClientNames[],
+  pjClients: ClientRow[],
+): string {
+  const recipeScope: "establishment" | "org" = recipe
+    ? recipe.establishment_id
+      ? "establishment"
+      : "org"
+    : establishments.length > 0
+      ? "establishment"
+      : "org";
+  const establishmentId =
+    recipe?.establishment_id ?? establishments[0]?.id ?? "";
+  const clientIdForOrg =
+    recipe && !recipe.establishment_id
+      ? recipe.client_id
+      : (pjClients[0]?.id ?? "");
+  const name = recipe?.name ?? "";
+  const lines = recipe
+    ? linesFromRecipe(recipe)
+    : [newLine(INITIAL_LINE_KEY)];
+  return serializeRecipeFormState({
+    recipeScope,
+    establishmentId,
+    clientIdForOrg,
+    name,
+    classification: recipe?.classification ?? "",
+    sector: recipe?.sector ?? "",
+    portionsYieldInput: String(recipe?.portions_yield ?? 1),
+    marginPercentInput: String(recipe?.margin_percent ?? 0),
+    taxPercentInput: String(recipe?.tax_percent ?? 0),
+    cmvPercentInput: String(recipe?.cmv_percent ?? 25),
+    scaleTargetInput: "",
+    lines,
+  });
+}
+
+function linesFromStoredDraft(
+  draft: RecipeFormDraftV1,
+  rawMaterials: RawMaterialRow[],
+): LineDraft[] {
+  if (draft.lines.length === 0) return [newLine(INITIAL_LINE_KEY)];
+  return draft.lines.map((l, index) => {
+    const rm =
+      l.raw_material_id != null
+        ? (rawMaterials.find((m) => m.id === l.raw_material_id) ?? null)
+        : null;
+    return {
+      key: index === 0 ? INITIAL_LINE_KEY : crypto.randomUUID(),
+      ingredient_name: l.ingredient_name,
+      quantity: l.quantity,
+      unit: l.unit,
+      notes: l.notes,
+      taco_food_id: l.taco_food_id,
+      taco_food: l.taco_food,
+      raw_material_id: l.raw_material_id,
+      raw_material: rm,
+      correction_factor: l.correction_factor,
+      cooking_factor: l.cooking_factor,
+    };
+  });
+}
+
 type Props = {
   establishments: EstablishmentWithClientNames[];
+  /** Clientes PJ do owner (receitas ao nível do cliente / catálogo). */
+  pjClients: ClientRow[];
   recipe?: TechnicalRecipeWithLines | null;
   rawMaterials?: RawMaterialRow[];
 };
 
 export function RecipeForm({
   establishments,
+  pjClients,
   recipe,
   rawMaterials = [],
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const saveIntentRef = useRef<"draft" | "published">("draft");
+  const [saving, setSaving] = useState(false);
+  const [templateLoading, setTemplateLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastTotals, setLastTotals] = useState<string | null>(null);
 
-  const [establishmentId, setEstablishmentId] = useState(
-    recipe?.establishment_id ?? establishments[0]?.id ?? "",
+  const [recipeScope, setRecipeScope] = useState<
+    "establishment" | "org"
+  >(() =>
+    recipe
+      ? recipe.establishment_id
+        ? "establishment"
+        : "org"
+      : establishments.length > 0
+        ? "establishment"
+        : "org",
   );
+  const [clientIdForOrg, setClientIdForOrg] = useState(() =>
+    recipe && !recipe.establishment_id
+      ? recipe.client_id
+      : (pjClients[0]?.id ?? ""),
+  );
+  const [establishmentId, setEstablishmentId] = useState(() => {
+    if (recipe?.establishment_id) return recipe.establishment_id;
+    if (recipe && recipe.establishment_id == null) return "";
+    return establishments[0]?.id ?? "";
+  });
   const [name, setName] = useState(recipe?.name ?? "");
   const [lines, setLines] = useState<LineDraft[]>(() =>
     recipe ? linesFromRecipe(recipe) : [newLine(INITIAL_LINE_KEY)],
@@ -143,6 +294,135 @@ export function RecipeForm({
   const [cmvPercentInput, setCmvPercentInput] = useState(() =>
     String(recipe?.cmv_percent ?? 25),
   );
+
+  const isEdit = Boolean(recipe);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [draftPreviewOpen, setDraftPreviewOpen] = useState(false);
+  const [localDraftBanner, setLocalDraftBanner] = useState(false);
+  const [storedDraft, setStoredDraft] = useState<RecipeFormDraftV1 | null>(
+    null,
+  );
+  const [baseline, setBaseline] = useState(() =>
+    initialFormSnapshot(recipe, establishments, pjClients),
+  );
+
+  const draftStorageKey = recipeFormDraftStorageKey(
+    isEdit ? "edit" : "new",
+    recipe?.id,
+    recipeScope === "org"
+      ? {
+          kind: "org",
+          clientId: clientIdForOrg || pjClients[0]?.id || "__none__",
+        }
+      : {
+          kind: "establishment",
+          establishmentId:
+            establishmentId || establishments[0]?.id || "__none__",
+        },
+  );
+
+  const getSerialized = useCallback(() => {
+    return serializeRecipeFormState({
+      recipeScope,
+      establishmentId,
+      clientIdForOrg,
+      name,
+      classification,
+      sector,
+      portionsYieldInput,
+      marginPercentInput,
+      taxPercentInput,
+      cmvPercentInput,
+      scaleTargetInput,
+      lines,
+    });
+  }, [
+    recipeScope,
+    establishmentId,
+    clientIdForOrg,
+    name,
+    classification,
+    sector,
+    portionsYieldInput,
+    marginPercentInput,
+    taxPercentInput,
+    cmvPercentInput,
+    scaleTargetInput,
+    lines,
+  ]);
+
+  const isDirty = getSerialized() !== baseline;
+
+  useEffect(() => {
+    const d = readRecipeFormDraftFromStorage(draftStorageKey);
+    if (d) {
+      setStoredDraft(d);
+      setLocalDraftBanner(true);
+    } else {
+      setStoredDraft(null);
+      setLocalDraftBanner(false);
+    }
+  }, [draftStorageKey]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
+  const shouldPersistLocal =
+    name.trim().length > 0 ||
+    lines.some((l) => l.ingredient_name.trim().length > 0);
+
+  useEffect(() => {
+    if (!shouldPersistLocal) return;
+    const t = window.setTimeout(() => {
+      writeRecipeFormDraftToStorage(draftStorageKey, {
+        recipeScope,
+        clientIdForOrg,
+        establishmentId,
+        name,
+        classification,
+        sector,
+        portionsYieldInput,
+        marginPercentInput,
+        taxPercentInput,
+        cmvPercentInput,
+        scaleTargetInput,
+        lines: lines.map((l) => ({
+          ingredient_name: l.ingredient_name,
+          quantity: l.quantity,
+          unit: l.unit,
+          notes: l.notes,
+          taco_food_id: l.taco_food_id,
+          taco_food: l.taco_food,
+          raw_material_id: l.raw_material_id,
+          correction_factor: l.correction_factor,
+          cooking_factor: l.cooking_factor,
+        })),
+      });
+    }, 650);
+    return () => window.clearTimeout(t);
+  }, [
+    draftStorageKey,
+    shouldPersistLocal,
+    recipeScope,
+    clientIdForOrg,
+    establishmentId,
+    name,
+    classification,
+    sector,
+    portionsYieldInput,
+    marginPercentInput,
+    taxPercentInput,
+    cmvPercentInput,
+    scaleTargetInput,
+    lines,
+  ]);
 
   const parsedForTotals = useMemo(() => {
     const parsed: { quantity: number; unit: RecipeLineUnit }[] = [];
@@ -199,8 +479,6 @@ export function RecipeForm({
     return sumRecipeMaterialCostBrl(parsed);
   }, [lines]);
 
-  const isEdit = Boolean(recipe);
-
   function updateLine(
     key: string,
     patch: Partial<Omit<LineDraft, "key">>,
@@ -249,8 +527,118 @@ export function RecipeForm({
     setScaleTargetInput("");
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  function discardLocalDraft() {
+    removeRecipeFormDraftFromStorage(draftStorageKey);
+    setStoredDraft(null);
+    setLocalDraftBanner(false);
+    setDraftPreviewOpen(false);
+  }
+
+  function restoreLocalDraft() {
+    if (!storedDraft) return;
+    if (isDirty) {
+      if (
+        !window.confirm(
+          "Substituir as alterações atuais pelo rascunho guardado neste navegador?",
+        )
+      ) {
+        return;
+      }
+    }
+    const nextEstablishmentId = !isEdit
+      ? storedDraft.establishmentId
+      : establishmentId;
+    const nextScope = storedDraft.recipeScope ?? "establishment";
+    const nextClientOrg = storedDraft.clientIdForOrg ?? clientIdForOrg;
+    if (!isEdit) {
+      setRecipeScope(nextScope);
+      setClientIdForOrg(nextClientOrg);
+      setEstablishmentId(storedDraft.establishmentId);
+    }
+    const nextLines = linesFromStoredDraft(storedDraft, rawMaterials);
+    setName(storedDraft.name);
+    setClassification(storedDraft.classification);
+    setSector(storedDraft.sector);
+    setPortionsYieldInput(storedDraft.portionsYieldInput);
+    setMarginPercentInput(storedDraft.marginPercentInput);
+    setTaxPercentInput(storedDraft.taxPercentInput);
+    setCmvPercentInput(storedDraft.cmvPercentInput);
+    setScaleTargetInput(storedDraft.scaleTargetInput);
+    setLines(nextLines);
+    setError(null);
+      setBaseline(
+        serializeRecipeFormState({
+          recipeScope: !isEdit ? nextScope : recipeScope,
+          establishmentId: nextEstablishmentId,
+          clientIdForOrg: !isEdit ? nextClientOrg : clientIdForOrg,
+          name: storedDraft.name,
+          classification: storedDraft.classification,
+          sector: storedDraft.sector,
+          portionsYieldInput: storedDraft.portionsYieldInput,
+          marginPercentInput: storedDraft.marginPercentInput,
+          taxPercentInput: storedDraft.taxPercentInput,
+          cmvPercentInput: storedDraft.cmvPercentInput,
+          scaleTargetInput: storedDraft.scaleTargetInput,
+          lines: nextLines,
+        }),
+      );
+    setDraftPreviewOpen(false);
+  }
+
+  function applyTemplateFromPicker(templateId: string) {
+    setError(null);
+    if (templateLoading) return;
+    setTemplateLoading(true);
+    void (async () => {
+      try {
+        const result = await loadTemplateDataForNewRecipeAction(
+          templateId,
+          recipeScope === "establishment"
+            ? { targetEstablishmentId: establishmentId }
+            : { targetClientId: clientIdForOrg },
+        );
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        const tpl = result.recipe;
+        const nextLines = linesFromRecipe(tpl);
+        setName(tpl.name);
+        setClassification(tpl.classification ?? "");
+        setSector(tpl.sector ?? "");
+        setPortionsYieldInput(String(tpl.portions_yield));
+        setMarginPercentInput(String(tpl.margin_percent));
+        setTaxPercentInput(String(tpl.tax_percent));
+        setCmvPercentInput(String(tpl.cmv_percent ?? 25));
+        setScaleTargetInput("");
+        setLines(nextLines);
+        setBaseline(
+          serializeRecipeFormState({
+            recipeScope,
+            establishmentId,
+            clientIdForOrg,
+            name: tpl.name,
+            classification: tpl.classification ?? "",
+            sector: tpl.sector ?? "",
+            portionsYieldInput: String(tpl.portions_yield),
+            marginPercentInput: String(tpl.margin_percent),
+            taxPercentInput: String(tpl.tax_percent),
+            cmvPercentInput: String(tpl.cmv_percent ?? 25),
+            scaleTargetInput: "",
+            lines: nextLines,
+          }),
+        );
+      } finally {
+        setTemplateLoading(false);
+      }
+    })();
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (saving) return;
+    const targetStatus = saveIntentRef.current;
+    saveIntentRef.current = "draft";
     setError(null);
     setLastTotals(null);
 
@@ -287,10 +675,14 @@ export function RecipeForm({
       return Math.min(100, n);
     })();
 
-    startTransition(async () => {
+    setSaving(true);
+    let skipSavingReset = false;
+    try {
       const result = await saveTechnicalRecipeDraftAction({
         recipeId: recipe?.id,
-        establishmentId,
+        ...(recipeScope === "establishment"
+          ? { establishmentId }
+          : { clientId: clientIdForOrg }),
         name: name.trim(),
         classification: classification || undefined,
         sector: sector.trim() || undefined,
@@ -299,6 +691,7 @@ export function RecipeForm({
         tax_percent,
         cmv_percent,
         lines: payloadLines,
+        status: targetStatus,
       });
 
       if (!result.ok) {
@@ -306,24 +699,70 @@ export function RecipeForm({
         return;
       }
 
-      setLastTotals(result.totalsLabel);
+      removeRecipeFormDraftFromStorage(
+        recipeFormDraftStorageKey(
+          isEdit ? "edit" : "new",
+          recipe?.id,
+          recipeScope === "org"
+            ? {
+                kind: "org",
+                clientId: clientIdForOrg || pjClients[0]?.id || "__none__",
+              }
+            : {
+                kind: "establishment",
+                establishmentId:
+                  establishmentId || establishments[0]?.id || "__none__",
+              },
+        ),
+      );
+
       if (!isEdit) {
+        skipSavingReset = true;
         router.replace(`/ficha-tecnica/${result.recipeId}/editar`);
-      } else {
-        router.refresh();
+        return;
       }
-    });
+
+      setLocalDraftBanner(false);
+      setStoredDraft(null);
+      setLastTotals(
+        (result.status === "published"
+          ? "Receita publicada. "
+          : "Rascunho salvo. ") + result.totalsLabel,
+      );
+      setBaseline(
+        serializeRecipeFormState({
+          recipeScope,
+          establishmentId,
+          clientIdForOrg,
+          name: name.trim(),
+          classification,
+          sector,
+          portionsYieldInput,
+          marginPercentInput,
+          taxPercentInput,
+          cmvPercentInput,
+          scaleTargetInput,
+          lines,
+        }),
+      );
+      router.refresh();
+    } finally {
+      if (!skipSavingReset) {
+        setSaving(false);
+      }
+    }
   }
 
-  if (establishments.length === 0) {
+  if (establishments.length === 0 && pjClients.length === 0) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Sem estabelecimentos</CardTitle>
+          <CardTitle>Sem clientes PJ</CardTitle>
           <CardDescription>
-            As receitas ficam associadas a um estabelecimento de cliente PJ.
-            Crie um cliente pessoa jurídica e adicione um estabelecimento antes
-            de continuar.
+            As receitas de ficha técnica usam clientes pessoa jurídica: pode
+            associar a um estabelecimento ou guardar no repositório de receitas
+            (reutilizável entre estabelecimentos). Crie um cliente PJ para
+            continuar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -338,59 +777,296 @@ export function RecipeForm({
     );
   }
 
+  function pjClientLabel(c: ClientRow): string {
+    const t = c.trade_name?.trim();
+    return t && t.length > 0 ? t : c.legal_name;
+  }
+
+  const storedDraftEst = storedDraft
+    ? establishments.find((e) => e.id === storedDraft.establishmentId)
+    : undefined;
+  const storedDraftIsOrg =
+    storedDraft?.recipeScope === "org" ||
+    (!storedDraft?.establishmentId?.trim() &&
+      Boolean(storedDraft?.clientIdForOrg?.trim()));
+  const storedDraftOrgClient = storedDraftIsOrg
+    ? pjClients.find(
+        (c) => c.id === (storedDraft?.clientIdForOrg ?? "").trim(),
+      )
+    : undefined;
+  const storedDraftEstLabel = storedDraftEst
+    ? `${establishmentClientLabel(storedDraftEst)} — ${storedDraftEst.name}`
+    : storedDraftOrgClient
+      ? `${pjClientLabel(storedDraftOrgClient)} — repositório de receitas`
+      : (storedDraft?.establishmentId ??
+        storedDraft?.clientIdForOrg ??
+        "");
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <RecipeTemplatePickerDialog
+        pickerQuery={
+          recipeScope === "establishment"
+            ? { establishmentId }
+            : { clientId: clientIdForOrg }
+        }
+        open={templatePickerOpen}
+        onOpenChange={setTemplatePickerOpen}
+        onSelectTemplate={applyTemplateFromPicker}
+      />
+
+      <Dialog open={draftPreviewOpen} onOpenChange={setDraftPreviewOpen}>
+        <DialogContent className="max-h-[min(90dvh,560px)] gap-0 overflow-hidden p-0 sm:max-w-md">
+          <DialogHeader className="border-border shrink-0 border-b px-6 py-4">
+            <DialogTitle>Rascunho guardado no navegador</DialogTitle>
+            <DialogDescription>
+              Pré-visualização dos dados em cache local. Pode restaurar no
+              formulário ou descartar.
+            </DialogDescription>
+          </DialogHeader>
+          {storedDraft ? (
+            <div className="text-muted-foreground max-h-[50vh] space-y-3 overflow-y-auto px-6 py-4 text-sm">
+              <p>
+                <span className="text-foreground font-medium">Nome:</span>{" "}
+                {storedDraft.name || "—"}
+              </p>
+              <p>
+                <span className="text-foreground font-medium">Contexto:</span>{" "}
+                {storedDraftEstLabel ||
+                  storedDraft.establishmentId ||
+                  storedDraft.clientIdForOrg ||
+                  "—"}
+              </p>
+              <p>
+                <span className="text-foreground font-medium">
+                  Ingredientes ({storedDraft.lines.length}):
+                </span>
+              </p>
+              <ul className="border-border list-inside list-disc border-l-2 pl-3">
+                {storedDraft.lines.slice(0, 12).map((l, i) => (
+                  <li key={i}>
+                    {l.ingredient_name.trim() || "—"} — {l.quantity}{" "}
+                    {l.unit}
+                  </li>
+                ))}
+                {storedDraft.lines.length > 12 ? (
+                  <li className="list-none">…</li>
+                ) : null}
+              </ul>
+              <p className="text-xs opacity-80">
+                Guardado em:{" "}
+                {new Date(storedDraft.savedAt).toLocaleString("pt-BR")}
+              </p>
+            </div>
+          ) : null}
+          <DialogFooter className="border-border shrink-0 flex-col gap-2 border-t px-6 py-4 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDraftPreviewOpen(false)}
+            >
+              Fechar
+            </Button>
+            <Button type="button" variant="destructive" onClick={discardLocalDraft}>
+              Descartar rascunho local
+            </Button>
+            <Button type="button" onClick={restoreLocalDraft}>
+              Restaurar no formulário
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {localDraftBanner && storedDraft ? (
+        <Alert>
+          <AlertTitle>Rascunho local encontrado</AlertTitle>
+          <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <span className="min-w-0 flex-1">
+              Existem dados guardados neste navegador para este formulário (por
+              exemplo após perda de ligação). Pode pré-visualizar, restaurar ou
+              descartar.
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setDraftPreviewOpen(true)}
+              >
+                Ver conteúdo guardado
+              </Button>
+              <Button type="button" size="sm" onClick={restoreLocalDraft}>
+                Restaurar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={discardLocalDraft}
+              >
+                Descartar
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <RecipeFormIntroductionSections />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="recipe-name">Nome da receita</Label>
-          <Input
-            id="recipe-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ex.: Sopa de legumes — lote base"
-            required
-            maxLength={200}
-          />
+      {!isEdit ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setTemplatePickerOpen(true)}
+            disabled={
+              saving ||
+              templateLoading ||
+              (recipeScope === "establishment" && !establishmentId.trim()) ||
+              (recipeScope === "org" && !clientIdForOrg.trim())
+            }
+          >
+            <LayoutTemplate className="size-4" aria-hidden />
+            Utilizar template
+          </Button>
+          <p className="text-muted-foreground text-sm">
+            Preenche a partir de um template ou favorito do mesmo cliente PJ;
+            edite antes de salvar.
+          </p>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="recipe-establishment">Estabelecimento</Label>
-          {isEdit ? (
-            <p
-              id="recipe-establishment"
-              className="text-muted-foreground text-sm"
-            >
-              {(() => {
-                const est = establishments.find(
-                  (e) => e.id === establishmentId,
-                );
-                return est
-                  ? `${establishmentClientLabel(est)} — ${est.name}`
-                  : establishmentId;
-              })()}
-            </p>
-          ) : (
-            <select
-              id="recipe-establishment"
-              className={selectClassName}
-              value={establishmentId}
-              onChange={(e) => setEstablishmentId(e.target.value)}
-              required
-            >
-              {establishments.map((est) => (
-                <option key={est.id} value={est.id}>
-                  {establishmentClientLabel(est)} — {est.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-      </div>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados da receita</CardTitle>
+          <CardDescription>
+            Identificação e contexto (estabelecimento ou repositório de
+            receitas).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {!isEdit &&
+          establishments.length > 0 &&
+          pjClients.length > 0 ? (
+            <fieldset className="space-y-2">
+              <legend className={cn("text-sm font-medium", fieldLabelClassName)}>
+                Onde fica esta receita?
+              </legend>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <label className="border-input bg-background text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-xs has-[:checked]:ring-ring has-[:checked]:ring-2">
+                  <input
+                    type="radio"
+                    name="recipe-scope"
+                    className="accent-primary"
+                    checked={recipeScope === "establishment"}
+                    onChange={() => {
+                      setRecipeScope("establishment");
+                      setEstablishmentId((prev) =>
+                        prev.trim().length > 0
+                          ? prev
+                          : (establishments[0]?.id ?? ""),
+                      );
+                    }}
+                  />
+                  Estabelecimento
+                </label>
+                <label className="border-input bg-background text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-xs has-[:checked]:ring-ring has-[:checked]:ring-2">
+                  <input
+                    type="radio"
+                    name="recipe-scope"
+                    className="accent-primary"
+                    checked={recipeScope === "org"}
+                    onChange={() => {
+                      setRecipeScope("org");
+                      setEstablishmentId("");
+                      setClientIdForOrg((prev) =>
+                        prev.trim().length > 0
+                          ? prev
+                          : (pjClients[0]?.id ?? ""),
+                      );
+                    }}
+                  />
+                  Repositório de Receitas
+                </label>
+              </div>
+            </fieldset>
+          ) : null}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label
+                htmlFor="recipe-name"
+                className={fieldLabelClassName}
+              >
+                Nome da receita
+              </Label>
+              <Input
+                id="recipe-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex.: Sopa de legumes — lote base"
+                required
+                maxLength={200}
+              />
+            </div>
+            <div className="space-y-2">
+              {recipeScope === "org" ? (
+                // Repositório de Receitas — sem seleção de cliente.
+                // O client_id é preenchido automaticamente (FK obrigatória da BD)
+                // mas não é exposto ao utilizador: a receita fica acessível a todo o tenant.
+                <p className="text-muted-foreground pt-1 text-sm">
+                  Ficará disponível como modelo para todos os estabelecimentos.
+                </p>
+              ) : (
+                <>
+                  <Label
+                    htmlFor="recipe-establishment"
+                    className={fieldLabelClassName}
+                  >
+                    Estabelecimento
+                  </Label>
+                  {isEdit ? (
+                    <p
+                      id="recipe-establishment"
+                      className="text-foreground text-sm"
+                    >
+                      {(() => {
+                        const est = establishments.find(
+                          (e) => e.id === establishmentId,
+                        );
+                        return est
+                          ? `${establishmentClientLabel(est)} — ${est.name}`
+                          : establishmentId;
+                      })()}
+                    </p>
+                  ) : (
+                    <select
+                      id="recipe-establishment"
+                      className={selectClassName}
+                      value={establishmentId}
+                      onChange={(e) => setEstablishmentId(e.target.value)}
+                      required
+                    >
+                      {establishments.map((est) => (
+                        <option key={est.id} value={est.id}>
+                          {establishmentClientLabel(est)} — {est.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="recipe-classification">Classificação</Label>
+          <Label
+            htmlFor="recipe-classification"
+            className={fieldLabelClassName}
+          >
+            Classificação
+          </Label>
           <select
             id="recipe-classification"
             className={selectClassName}
@@ -405,7 +1081,9 @@ export function RecipeForm({
           </select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="recipe-sector">Setor</Label>
+          <Label htmlFor="recipe-sector" className={fieldLabelClassName}>
+            Setor
+          </Label>
           <Input
             id="recipe-sector"
             value={sector}
@@ -418,7 +1096,9 @@ export function RecipeForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="recipe-cmv">CMV% (Custo dos Materiais Vendidos)</Label>
+          <Label htmlFor="recipe-cmv" className={fieldLabelClassName}>
+            CMV% (Custo dos Materiais Vendidos)
+          </Label>
           <div className="flex items-center gap-2">
             <Input
               id="recipe-cmv"
@@ -435,35 +1115,39 @@ export function RecipeForm({
           </p>
         </div>
       </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-start xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="min-w-0 space-y-6">
-          <div className="space-y-3">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h2 className="text-foreground font-medium">Ingredientes</h2>
-                <p className="text-muted-foreground text-sm">
-                  Quantidade e unidade; associe{" "}
-                  <Link
-                    href="/ficha-tecnica/materias-primas"
-                    className="text-primary font-medium underline-offset-4 hover:underline"
-                  >
-                    matéria-prima
-                  </Link>{" "}
-                  para custo e TACO para nutrição.
-                </p>
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <CardTitle className="text-base">Ingredientes</CardTitle>
+                  <CardDescription>
+                    Quantidade e unidade; associe{" "}
+                    <Link
+                      href="/ficha-tecnica/materias-primas"
+                      className="text-primary font-medium underline-offset-4 hover:underline"
+                    >
+                      matéria-prima
+                    </Link>{" "}
+                    para custo e TACO para nutrição.
+                  </CardDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addLine}
+                >
+                  <Plus className="size-4" />
+                  Linha
+                </Button>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addLine}
-              >
-                <Plus className="size-4" />
-                Linha
-              </Button>
-            </div>
-
+            </CardHeader>
+            <CardContent className="space-y-6">
             <Card className="border-dashed">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base">
@@ -480,7 +1164,12 @@ export function RecipeForm({
               </CardHeader>
               <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <div className="space-y-1.5 sm:max-w-[12rem]">
-                  <Label htmlFor="recipe-scale-target">Novo rendimento (porções)</Label>
+                  <Label
+                    htmlFor="recipe-scale-target"
+                    className={fieldLabelClassName}
+                  >
+                    Novo rendimento (porções)
+                  </Label>
                   <Input
                     id="recipe-scale-target"
                     inputMode="numeric"
@@ -507,7 +1196,10 @@ export function RecipeForm({
               className="bg-card ring-foreground/10 flex flex-col gap-3 rounded-xl p-4 ring-1 sm:grid sm:grid-cols-[1fr_120px_140px_auto] sm:items-end"
             >
               <div className="space-y-1.5 sm:col-span-1">
-                <Label className="text-xs" htmlFor={`ing-${line.key}`}>
+                <Label
+                  className={cn("text-xs", fieldLabelClassName)}
+                  htmlFor={`ing-${line.key}`}
+                >
                   Ingrediente {index + 1}
                 </Label>
                 <Input
@@ -521,7 +1213,10 @@ export function RecipeForm({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs" htmlFor={`qty-${line.key}`}>
+                <Label
+                  className={cn("text-xs", fieldLabelClassName)}
+                  htmlFor={`qty-${line.key}`}
+                >
                   Quantidade
                 </Label>
                 <Input
@@ -536,7 +1231,10 @@ export function RecipeForm({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs" htmlFor={`unit-${line.key}`}>
+                <Label
+                  className={cn("text-xs", fieldLabelClassName)}
+                  htmlFor={`unit-${line.key}`}
+                >
                   Unidade
                 </Label>
                 <select
@@ -571,7 +1269,10 @@ export function RecipeForm({
               </div>
               <div className="flex flex-wrap items-end gap-4 sm:col-span-full">
                 <div className="w-full min-w-[7rem] space-y-1.5 sm:w-36">
-                  <Label className="text-xs" htmlFor={`corr-${line.key}`}>
+                  <Label
+                    className={cn("text-xs", fieldLabelClassName)}
+                    htmlFor={`corr-${line.key}`}
+                  >
                     Correção (custo)
                   </Label>
                   <Input
@@ -588,7 +1289,10 @@ export function RecipeForm({
                   />
                 </div>
                 <div className="w-full min-w-[7rem] space-y-1.5 sm:w-36">
-                  <Label className="text-xs" htmlFor={`cook-${line.key}`}>
+                  <Label
+                    className={cn("text-xs", fieldLabelClassName)}
+                    htmlFor={`cook-${line.key}`}
+                  >
                     Cocção (TACO)
                   </Label>
                   <Input
@@ -613,7 +1317,10 @@ export function RecipeForm({
                 matéria-prima; cocção multiplica na nutrição (TACO).
               </p>
               <div className="space-y-1.5 sm:col-span-full">
-                <Label className="text-xs" htmlFor={`notes-${line.key}`}>
+                <Label
+                  className={cn("text-xs", fieldLabelClassName)}
+                  htmlFor={`notes-${line.key}`}
+                >
                   Notas (opcional)
                 </Label>
                 <Input
@@ -628,7 +1335,10 @@ export function RecipeForm({
               <div className="space-y-1.5 sm:col-span-full">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div className="min-w-0 flex-1 space-y-1.5">
-                    <Label className="text-xs" htmlFor={`rm-${line.key}`}>
+                    <Label
+                      className={cn("text-xs", fieldLabelClassName)}
+                      htmlFor={`rm-${line.key}`}
+                    >
                       Matéria-prima (custo)
                     </Label>
                     <select
@@ -726,7 +1436,8 @@ export function RecipeForm({
             </div>
           ))}
             </div>
-          </div>
+            </CardContent>
+          </Card>
 
           {error ? (
             <p className="text-destructive text-sm" role="alert">
@@ -734,16 +1445,61 @@ export function RecipeForm({
             </p>
           ) : null}
 
-          <div className="flex flex-wrap gap-3">
-            <Button type="submit" disabled={pending}>
-              {pending ? "A guardar…" : "Guardar rascunho"}
+          <div className="space-y-2">
+            <p className="text-muted-foreground max-w-xl text-xs">
+              <span className="text-foreground font-medium">Salvar rascunho</span>{" "}
+              mantém a ficha em trabalho (não publicada).{" "}
+              <span className="text-foreground font-medium">Salvar receita</span>{" "}
+              publica a receita como pronta para uso.
+              {isEdit && recipe ? (
+                <>
+                  {" "}
+                  Estado neste momento:{" "}
+                  <span className="text-foreground font-medium">
+                    {recipe.status === "published" ? "publicada" : "rascunho"}
+                  </span>
+                  .
+                </>
+              ) : null}
+            </p>
+            <div className="flex flex-wrap gap-3">
+            <Button
+              type="submit"
+              variant="outline"
+              disabled={saving}
+              onClick={() => {
+                saveIntentRef.current = "draft";
+              }}
+            >
+              {saving ? "A salvar…" : "Salvar rascunho"}
+            </Button>
+            <Button
+              type="submit"
+              variant="default"
+              disabled={saving}
+              onClick={() => {
+                saveIntentRef.current = "published";
+              }}
+            >
+              {saving ? "A salvar…" : "Salvar receita"}
             </Button>
             <Link
               href="/ficha-tecnica"
               className={cn(buttonVariants({ variant: "outline" }))}
+              onClick={(e) => {
+                if (
+                  isDirty &&
+                  !window.confirm(
+                    "Tem alterações não salvas. Se sair, as alterações serão perdidas.",
+                  )
+                ) {
+                  e.preventDefault();
+                }
+              }}
             >
               Cancelar
             </Link>
+            </div>
           </div>
         </div>
 
@@ -760,7 +1516,7 @@ export function RecipeForm({
               <p className="text-foreground">{totalsPreview.label}</p>
               {lastTotals ? (
                 <p className="text-muted-foreground border-t pt-2">
-                  Último guardado: {lastTotals}
+                  Último salvo: {lastTotals}
                 </p>
               ) : null}
             </CardContent>

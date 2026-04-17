@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { DeleteEstablishmentButton } from "@/components/clientes/delete-establishment-button";
+import { EstablishmentChecklistHistorySection } from "@/components/clientes/establishment-checklist-history-section";
 import { EstablishmentComplianceDeadlinesSection } from "@/components/clientes/establishment-compliance-deadlines-section";
 import { EstablishmentForm } from "@/components/clientes/establishment-form";
 import { PatientsSection } from "@/components/pacientes/patients-section";
@@ -117,7 +118,23 @@ export default async function EditarEstabelecimentoPage({
         </CardContent>
       </Card>
 
-      {/* ── Seção 3: Pacientes ─────────────────────────────── */}
+      {/* ── Seção 3: Histórico de checklists ──────────────── */}
+      <Card>
+        <CardHeader className="border-b border-border pb-4">
+          <CardTitle className="text-base">Checklists realizados</CardTitle>
+          <CardDescription>
+            Últimos preenchimentos neste estabelecimento.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <EstablishmentChecklistHistorySection
+            clientId={clientId}
+            establishmentId={row.id}
+          />
+        </CardContent>
+      </Card>
+
+      {/* ── Seção 4: Pacientes ─────────────────────────────── */}
       <Card>
         <CardHeader className="border-b border-border pb-4">
           <CardTitle className="text-base">Pacientes</CardTitle>
@@ -141,7 +158,7 @@ export default async function EditarEstabelecimentoPage({
         </CardContent>
       </Card>
 
-      {/* ── Seção 4: Zona de perigo ────────────────────────── */}
+      {/* ── Seção 5: Zona de perigo ────────────────────────── */}
       <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
         <h2 className="text-sm font-semibold text-destructive">
           Zona de perigo

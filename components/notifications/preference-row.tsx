@@ -14,7 +14,6 @@ import {
   URGENCY_LABELS,
 } from '@/lib/types/notification';
 import { PreferenceEditModal } from './preference-edit-modal';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronRight } from 'lucide-react';
 
@@ -25,7 +24,6 @@ interface PreferenceRowProps {
 
 export function PreferenceRow({ preference, onUpdate }: PreferenceRowProps) {
   const [showModal, setShowModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   const eventLabel = NOTIFICATION_EVENT_LABELS[preference.event_type as NotificationEventType];
   const urgencyLabel = URGENCY_LABELS[preference.urgency_level as 1 | 2 | 3];
@@ -35,9 +33,9 @@ export function PreferenceRow({ preference, onUpdate }: PreferenceRowProps) {
   return (
     <>
       <button
+        type="button"
         onClick={() => setShowModal(true)}
-        disabled={isLoading}
-        className="w-full text-left p-4 border rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+        className="w-full text-left p-4 border rounded-lg hover:bg-gray-50 transition-colors"
       >
         <div className="flex items-center justify-between">
           <div className="flex-1">

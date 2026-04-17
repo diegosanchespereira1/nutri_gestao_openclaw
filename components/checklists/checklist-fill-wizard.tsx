@@ -3,7 +3,7 @@
 import { Eye } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
 import { ChecklistFillDossierPreview } from "@/components/checklists/checklist-fill-dossier-preview";
@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { cn } from "@/lib/utils";
 import { approveChecklistFillDossierAction, saveFillItemResponse } from "@/lib/actions/checklist-fill";
 import {
@@ -56,6 +57,31 @@ function formatDossierApprovedLabel(iso: string): string {
     return iso;
   }
 }
+
+/** Debounce simples via useRef+setTimeout — sem dependência externa. */
+function useDebouncedCallback(fn: () => void, delay = 800) {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
+
+  const debounced = useCallback(() => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      fnRef.current();
+    }, delay);
+  }, [delay]);
+
+  // Limpar ao desmontar
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  return debounced;
+}
+
+type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 type Props = {
   sessionId: string;
@@ -117,7 +143,37 @@ export function ChecklistFillWizard({
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
 
+  /* ── Task D: indicador de auto-save ── */
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function reportSaving() {
+    if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
+    setSaveStatus("saving");
+  }
+  function reportSaved() {
+    setSaveStatus("saved");
+    savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+  }
+  function reportSaveError() {
+    setSaveStatus("error");
+  }
+
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
   const formLocked = dossierPreviewConfirmed || Boolean(dossierApprovedAt);
+
+  /* ── Task B: guarda de navegação ── */
+  const { guardTriggered, confirmLeave, cancelLeave } = useNavigationGuard({
+    active: !formLocked,
+    onConfirmLeave: () => {
+      router.push(backHref);
+    },
+  });
 
   const showDossierPeekButton = useMemo(
     () => !dossierApprovedAt && !dossierPreviewConfirmed,
@@ -168,8 +224,9 @@ export function ChecklistFillWizard({
       ...prev,
       [itemId]: { outcome, note, annotation },
     }));
+    reportSaving();
     startTransition(async () => {
-      await saveFillItemResponse({
+      const result = await saveFillItemResponse({
         sessionId,
         itemId,
         itemResponseSource,
@@ -177,6 +234,11 @@ export function ChecklistFillWizard({
         note,
         annotation,
       });
+      if (result.ok) {
+        reportSaved();
+      } else {
+        reportSaveError();
+      }
     });
   }
 
@@ -190,11 +252,12 @@ export function ChecklistFillWizard({
     });
   }
 
-  function commitNoteBlur(itemId: string) {
+  function commitNote(itemId: string) {
     const cur = responses[itemId];
     if (!cur?.outcome) return;
+    reportSaving();
     startTransition(async () => {
-      await saveFillItemResponse({
+      const result = await saveFillItemResponse({
         sessionId,
         itemId,
         itemResponseSource,
@@ -202,7 +265,24 @@ export function ChecklistFillWizard({
         note: cur.note,
         annotation: cur.annotation ?? null,
       });
+      if (result.ok) {
+        reportSaved();
+      } else {
+        reportSaveError();
+      }
     });
+  }
+
+  /* Task A: factory de debounce por item para nota */
+  const debouncedNoteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  function scheduleNoteDebounce(itemId: string) {
+    if (debouncedNoteTimers.current[itemId]) {
+      clearTimeout(debouncedNoteTimers.current[itemId]);
+    }
+    debouncedNoteTimers.current[itemId] = setTimeout(() => {
+      commitNote(itemId);
+    }, 800);
   }
 
   function setAnnotation(itemId: string, annotation: string) {
@@ -215,11 +295,12 @@ export function ChecklistFillWizard({
     });
   }
 
-  function commitAnnotationBlur(itemId: string) {
+  function commitAnnotation(itemId: string) {
     const cur = responses[itemId];
     if (!cur?.outcome) return;
+    reportSaving();
     startTransition(async () => {
-      await saveFillItemResponse({
+      const result = await saveFillItemResponse({
         sessionId,
         itemId,
         itemResponseSource,
@@ -227,8 +308,33 @@ export function ChecklistFillWizard({
         note: cur.note,
         annotation: cur.annotation ?? null,
       });
+      if (result.ok) {
+        reportSaved();
+      } else {
+        reportSaveError();
+      }
     });
   }
+
+  /* Task A: factory de debounce por item para anotação */
+  const debouncedAnnotationTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  function scheduleAnnotationDebounce(itemId: string) {
+    if (debouncedAnnotationTimers.current[itemId]) {
+      clearTimeout(debouncedAnnotationTimers.current[itemId]);
+    }
+    debouncedAnnotationTimers.current[itemId] = setTimeout(() => {
+      commitAnnotation(itemId);
+    }, 800);
+  }
+
+  // Limpar timers de debounce ao desmontar
+  useEffect(() => {
+    return () => {
+      for (const t of Object.values(debouncedNoteTimers.current)) clearTimeout(t);
+      for (const t of Object.values(debouncedAnnotationTimers.current)) clearTimeout(t);
+    };
+  }, []);
 
   function handleNext() {
     setAdvanceError(null);
@@ -258,6 +364,34 @@ export function ChecklistFillWizard({
           <p className="text-muted-foreground mt-1 text-sm">
             Secção {sectionIndex + 1} de {sections.length}: {section.title}
           </p>
+          {/* Task D: indicador de auto-save */}
+          {saveStatus === "saving" && (
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
+              <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Salvando…
+            </span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-green-600" role="status" aria-live="polite">
+              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Salvo
+            </span>
+          )}
+          {saveStatus === "error" && (
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-destructive" role="alert" aria-live="assertive">
+              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              Erro ao salvar — verifique a conexão
+            </span>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {showDossierPeekButton ? (
@@ -433,8 +567,17 @@ export function ChecklistFillWizard({
                     id={`note-${item.id}`}
                     rows={3}
                     value={r.note ?? ""}
-                    onChange={(e) => setNote(item.id, e.target.value)}
-                    onBlur={() => commitNoteBlur(item.id)}
+                    onChange={(e) => {
+                      setNote(item.id, e.target.value);
+                      scheduleNoteDebounce(item.id); /* Task A */
+                    }}
+                    onBlur={() => {
+                      if (debouncedNoteTimers.current[item.id]) {
+                        clearTimeout(debouncedNoteTimers.current[item.id]);
+                        delete debouncedNoteTimers.current[item.id];
+                      }
+                      commitNote(item.id); /* flush imediato no blur */
+                    }}
                     className={textareaClass}
                     aria-invalid={Boolean(err)}
                     aria-describedby={
@@ -455,8 +598,17 @@ export function ChecklistFillWizard({
                     rows={3}
                     maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
                     value={r.annotation ?? ""}
-                    onChange={(e) => setAnnotation(item.id, e.target.value)}
-                    onBlur={() => commitAnnotationBlur(item.id)}
+                    onChange={(e) => {
+                      setAnnotation(item.id, e.target.value);
+                      scheduleAnnotationDebounce(item.id); /* Task A */
+                    }}
+                    onBlur={() => {
+                      if (debouncedAnnotationTimers.current[item.id]) {
+                        clearTimeout(debouncedAnnotationTimers.current[item.id]);
+                        delete debouncedAnnotationTimers.current[item.id];
+                      }
+                      commitAnnotation(item.id); /* flush imediato no blur */
+                    }}
                     className={textareaClass}
                     aria-describedby={`annotation-hint-${item.id}`}
                   />
@@ -645,6 +797,7 @@ export function ChecklistFillWizard({
         ) : null}
       </div>
 
+      {/* Dialog de finalização */}
       <Dialog
         open={finalizeDialogOpen}
         onOpenChange={(open) => {
@@ -701,6 +854,36 @@ export function ChecklistFillWizard({
         </DialogContent>
       </Dialog>
 
+      {/* Task B: Dialog de guarda de navegação */}
+      <Dialog open={guardTriggered} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Sair do preenchimento?</DialogTitle>
+            <DialogDescription>
+              Suas respostas foram salvas automaticamente. Você pode retomar
+              este preenchimento quando quiser — basta selecionar o mesmo
+              template e estabelecimento no catálogo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={cancelLeave}
+            >
+              Ficar na página
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmLeave}
+            >
+              Sair — rascunho salvo
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de peek do dossiê */}
       <Dialog open={dossierPeekOpen} onOpenChange={setDossierPeekOpen}>
         <DialogContent
           className="flex max-h-[min(88vh,840px)] w-[calc(100%-1.5rem)] max-w-3xl flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"

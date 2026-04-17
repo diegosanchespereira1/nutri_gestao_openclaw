@@ -32,3 +32,11 @@ export type EstablishmentWithClientNames = EstablishmentRow & {
 
 /** Estabelecimento simples para listas (ex.: seletor em modais). */
 export type EstablishmentListItem = EstablishmentRow;
+
+/** Opção pronta para picker/busca de estabelecimento na UI. */
+export type EstablishmentPickerOption = {
+  id: string;
+  label: string;
+  state: string | null;
+  establishment_type: EstablishmentType;
+};

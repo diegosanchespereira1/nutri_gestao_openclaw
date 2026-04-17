@@ -93,7 +93,7 @@ export function RawMaterialForm({ material }: Props) {
 
       <div className="flex flex-wrap gap-3">
         <Button type="submit">
-          {isEdit ? "Guardar alterações" : "Registar matéria-prima"}
+          {isEdit ? "Salvar alterações" : "Registar matéria-prima"}
         </Button>
         <Link
           href="/ficha-tecnica/materias-primas"

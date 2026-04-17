@@ -3,9 +3,6 @@
  * LGPD Art. 18 — Direito de Acesso do Titular
  */
 
-import type { AuditLogRow } from './audit';
-import type { ConsentRecord } from './consent';
-
 /**
  * Metadados do relatório DSAR
  */

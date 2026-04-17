@@ -4,7 +4,6 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type {
   PortabilityCompleteReport,
-  PortabilityExportFormat,
   PortabilityExportResult,
   PortabilityGenerationResponse,
 } from '@/lib/types/portability';

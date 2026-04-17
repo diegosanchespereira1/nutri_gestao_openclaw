@@ -5,12 +5,18 @@ import type { TechnicalRecipeWithLines } from "@/lib/types/technical-recipes";
 
 const minimalRecipe: TechnicalRecipeWithLines = {
   id: "00000000-0000-4000-8000-000000000001",
+  contexto: "ESTABELECIMENTO",
   establishment_id: "00000000-0000-4000-8000-000000000002",
+  client_id: "00000000-0000-4000-8000-000000000099",
+  repository_origin_id: null,
   name: "Sopa teste",
   status: "draft",
   portions_yield: 4,
   margin_percent: 10,
   tax_percent: 5,
+  classification: null,
+  sector: null,
+  cmv_percent: 25,
   is_template: false,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",

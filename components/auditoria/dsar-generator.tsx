@@ -10,7 +10,6 @@ import {
   exportDsarAsJson,
   exportDsarAsCsv,
   sendDsarByEmail,
-  generateCompletePatientDsar,
 } from '@/lib/actions/dsar';
 
 interface DsarGeneratorProps {

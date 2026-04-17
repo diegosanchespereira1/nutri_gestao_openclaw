@@ -5,7 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAuthRateLimit, getClientIp } from '@/lib/rate-limit';
+import { checkAuthRateLimit } from '@/lib/rate-limit';
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;

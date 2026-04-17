@@ -72,6 +72,35 @@ const ENTITY_LABELS: Record<ImportEntity, string> = {
   pacientes: "Pacientes",
 };
 
+function ImportStepIndicator({ step }: { step: WizardStep }) {
+  return (
+    <nav aria-label="Etapas do wizard" className="flex items-center gap-2 text-sm">
+      {(
+        [
+          [1, "Upload"],
+          [2, "Mapeamento"],
+          [3, "Pré-visualização"],
+        ] as [WizardStep, string][]
+      ).map(([s, label], idx) => (
+        <span key={s} className="flex items-center gap-2">
+          {idx > 0 && <span className="text-foreground/20">›</span>}
+          <span
+            className={
+              step === s
+                ? "font-medium text-primary"
+                : step > s
+                  ? "text-muted-foreground"
+                  : "text-muted-foreground/50"
+            }
+          >
+            {s}. {label}
+          </span>
+        </span>
+      ))}
+    </nav>
+  );
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export function ImportWizard() {
@@ -181,7 +210,7 @@ export function ImportWizard() {
   const handlePreview = () => {
     if (!upload) return;
     const rows = applyMappings(upload.rawRows, upload.headers, mappings);
-    const { valid: _, errors } = validateRows(entity, rows);
+    const { errors } = validateRows(entity, rows);
     const errMap = buildErrorMap(errors);
     setParsedRows(rows);
     setErrorsByRow(errMap);
@@ -210,7 +239,6 @@ export function ImportWizard() {
       (_, i) => !errorsByRow.has(i) && !ignoredRows.has(i),
     );
     const { valid: toImport } = validateRows(entity, cleanRows);
-    const skipped = parsedRows.length - toImport.length;
 
     let res: ImportResultState = null;
 
@@ -252,35 +280,6 @@ export function ImportWizard() {
     (_, i) => !errorsByRow.has(i) && !ignoredRows.has(i),
   ).length;
 
-  // ── Indicador de etapas ───────────────────────────────────────────────────
-
-  const StepIndicator = () => (
-    <nav aria-label="Etapas do wizard" className="flex items-center gap-2 text-sm">
-      {(
-        [
-          [1, "Upload"],
-          [2, "Mapeamento"],
-          [3, "Pré-visualização"],
-        ] as [WizardStep, string][]
-      ).map(([s, label], idx) => (
-        <span key={s} className="flex items-center gap-2">
-          {idx > 0 && <span className="text-foreground/20">›</span>}
-          <span
-            className={
-              step === s
-                ? "font-medium text-primary"
-                : step > s
-                  ? "text-muted-foreground"
-                  : "text-muted-foreground/50"
-            }
-          >
-            {s}. {label}
-          </span>
-        </span>
-      ))}
-    </nav>
-  );
-
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -292,7 +291,7 @@ export function ImportWizard() {
           CSV ou Excel.
         </CardDescription>
         <div className="mt-2">
-          <StepIndicator />
+          <ImportStepIndicator step={step} />
         </div>
       </CardHeader>
 

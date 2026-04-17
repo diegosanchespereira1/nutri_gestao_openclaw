@@ -1,10 +1,7 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { PageHeader } from '@/components/layout/page-header';
 import { PageLayout } from '@/components/layout/page-layout';
-import { buttonVariants } from '@/components/ui/button-variants';
-import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/server';
 import { DsarForm } from '@/components/auditoria/dsar-form';
 

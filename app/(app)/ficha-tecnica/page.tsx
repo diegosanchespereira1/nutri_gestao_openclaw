@@ -1,37 +1,21 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { ClipboardList } from "lucide-react";
 
-import { RecipeListRowActions } from "@/components/technical-sheets/recipe-list-row-actions";
+import { EmptyState } from "@/components/common/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { FichaTecnicaToolbar } from "@/components/technical-sheets/ficha-tecnica-toolbar";
 import { RecipePagination } from "@/components/technical-sheets/recipe-pagination";
 import { RecipeSearchInput } from "@/components/technical-sheets/recipe-search-input";
-import { buttonVariants } from "@/components/ui/button-variants";
+import { RecipeListTable } from "@/components/technical-sheets/recipe-list-table";
+import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
 import { loadTechnicalRecipesForOwner } from "@/lib/actions/technical-recipes";
 import { cn } from "@/lib/utils";
-import type { TechnicalRecipeListItem } from "@/lib/types/technical-recipes";
-
-// ── helpers ──────────────────────────────────────────────────────────────────
-
-function recipeContextLabel(row: TechnicalRecipeListItem): string {
-  const est = row.establishments;
-  if (!est?.name) return "—";
-  const client = est.clients ?? undefined;
-  const clientName =
-    client?.trade_name?.trim() || client?.legal_name?.trim() || "Cliente";
-  return `${clientName} — ${est.name}`;
-}
-
-function formatUpdatedAt(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString("pt-PT", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  } catch {
-    return iso;
-  }
-}
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
@@ -46,62 +30,44 @@ export default async function FichaTecnicaPage({
   const q = (params.q ?? "").trim();
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const [{ rows: recipes, total, totalPages }, { rows: establishments }] =
-    await Promise.all([
-      loadTechnicalRecipesForOwner({ q, page, pageSize: RECIPE_LIST_PAGE_SIZE }),
-      loadEstablishmentsForOwner(),
-    ]);
+  const [
+    { rows: recipes, total, totalPages },
+    { rows: establishments },
+    { rows: pjClients },
+  ] = await Promise.all([
+    loadTechnicalRecipesForOwner({ q, page, pageSize: RECIPE_LIST_PAGE_SIZE }),
+    loadEstablishmentsForOwner(),
+    loadClientsForOwner({ kind: "pj" }),
+  ]);
 
   const hasEstablishments = establishments.length > 0;
+  const canCreateRecipe = hasEstablishments || pjClients.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Ficha técnica
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Receitas com ingredientes, TACO e custo por matéria-prima. Exporte
-            PDF a partir de cada linha ou na edição da receita.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/ficha-tecnica/templates"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Ver templates
-          </Link>
-          <Link
-            href="/ficha-tecnica/materias-primas"
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Matérias-primas
-          </Link>
-          <Link
-            href="/ficha-tecnica/nova"
-            className={cn(
-              buttonVariants(),
-              !hasEstablishments && "pointer-events-none opacity-50",
-            )}
-            aria-disabled={!hasEstablishments}
-          >
-            Nova receita
-          </Link>
-        </div>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title="Ficha técnica"
+        description="Receitas com ingredientes, TACO e custo por matéria-prima. Exporte PDF a partir de cada linha ou na edição da receita."
+        actions={
+          <FichaTecnicaToolbar canCreateRecipe={canCreateRecipe} />
+        }
+      />
 
-      {/* ── Sem estabelecimento ── */}
-      {!hasEstablishments && (
-        <p className="text-muted-foreground text-sm">
-          Precisa de pelo menos um estabelecimento (cliente PJ) para criar
-          receitas.{" "}
-          <Link href="/clientes/novo" className="text-primary underline">
-            Criar cliente
-          </Link>
-        </p>
+      {!canCreateRecipe && (
+        <Alert>
+          <AlertTitle>Cliente PJ necessário</AlertTitle>
+          <AlertDescription>
+            Precisa de um cliente pessoa jurídica para criar receitas (pode
+            associar a um estabelecimento ou guardar no repositório de
+            receitas).{" "}
+            <Link
+              href="/clientes/novo"
+              className="text-primary font-medium underline underline-offset-4 hover:no-underline"
+            >
+              Criar cliente
+            </Link>
+          </AlertDescription>
+        </Alert>
       )}
 
       {/* ── Barra de busca ── */}
@@ -111,74 +77,47 @@ export default async function FichaTecnicaPage({
 
       {/* ── Lista vazia ── */}
       {recipes.length === 0 ? (
-        <div className="text-muted-foreground py-12 text-center text-sm">
-          {q.length > 0 ? (
-            <>
+        q.length > 0 ? (
+          <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
+            <p className="text-muted-foreground text-sm">
               Nenhuma ficha técnica encontrada para{" "}
               <span className="text-foreground font-medium">
                 &ldquo;{q}&rdquo;
               </span>
               .
-            </>
-          ) : (
-            "Ainda não há receitas. Use «Nova receita» para adicionar ingredientes e guardar um rascunho."
-          )}
-        </div>
+            </p>
+          </div>
+        ) : (
+          <EmptyState
+            icon={ClipboardList}
+            title="Ainda não há receitas"
+            description="Adicione ingredientes, ligações TACO e custos por matéria-prima. Pode começar por um template ou criar uma receita nova."
+            action={
+              <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+                <Link
+                  href="/ficha-tecnica/templates"
+                  className={cn(buttonVariants({ variant: "outline", size: "default" }))}
+                >
+                  Ver templates
+                </Link>
+                <Link
+                  href="/ficha-tecnica/nova"
+                  className={cn(
+                    buttonVariants({ size: "default" }),
+                    !canCreateRecipe && "pointer-events-none opacity-50",
+                  )}
+                  aria-disabled={!canCreateRecipe}
+                >
+                  Nova receita
+                </Link>
+              </div>
+            }
+          />
+        )
       ) : (
         <>
-          {/* ── Tabela ── */}
-          <div className="border-border overflow-x-auto rounded-xl border bg-white">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
-                <tr>
-                  <th className="text-foreground px-4 py-3 text-left font-bold">
-                    Receita
-                  </th>
-                  <th className="text-foreground px-4 py-3 text-left font-bold">
-                    Contexto
-                  </th>
-                  <th className="text-foreground px-4 py-3 text-left font-bold">
-                    Estado
-                  </th>
-                  <th className="text-foreground px-4 py-3 text-left font-bold">
-                    Atualizado
-                  </th>
-                  <th className="text-foreground px-4 py-3 text-right font-bold">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {recipes.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-foreground/5 last:border-0"
-                  >
-                    <td className="text-foreground px-4 py-3 font-medium">
-                      {row.name}
-                    </td>
-                    <td className="text-muted-foreground px-4 py-3">
-                      {recipeContextLabel(row)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="bg-muted text-muted-foreground rounded-md px-2 py-0.5 text-xs capitalize">
-                        {row.status === "draft" ? "Rascunho" : "Publicado"}
-                      </span>
-                    </td>
-                    <td className="text-muted-foreground whitespace-nowrap px-4 py-3">
-                      {formatUpdatedAt(row.updated_at)}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <RecipeListRowActions
-                        recipeId={row.id}
-                        isTemplate={row.is_template}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {/* ── Tabela com modal de detalhes ── */}
+          <RecipeListTable recipes={recipes} />
 
           {/* ── Paginação ── */}
           <Suspense fallback={null}>
@@ -191,6 +130,6 @@ export default async function FichaTecnicaPage({
           </Suspense>
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }

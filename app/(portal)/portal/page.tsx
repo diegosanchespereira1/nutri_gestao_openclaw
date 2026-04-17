@@ -1,8 +1,6 @@
 // Story 9.3 — Visualização no portal externo
 // Acesso por magic link token (?token=xxx). Mostra apenas dados autorizados pelo profissional.
 
-import { notFound } from "next/navigation";
-
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,

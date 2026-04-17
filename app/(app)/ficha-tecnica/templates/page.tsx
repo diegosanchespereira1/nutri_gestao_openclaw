@@ -1,25 +1,18 @@
-import Link from "next/link";
 import { Suspense } from "react";
 
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { RecipeListRowActions } from "@/components/technical-sheets/recipe-list-row-actions";
 import { TemplateUseButton } from "@/components/technical-sheets/template-use-button";
 import { RecipePagination } from "@/components/technical-sheets/recipe-pagination";
 import { RecipeSearchInput } from "@/components/technical-sheets/recipe-search-input";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadTemplatesForOwner } from "@/lib/actions/technical-recipes";
 import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
-import { cn } from "@/lib/utils";
-import type { TechnicalRecipeListItem } from "@/lib/types/technical-recipes";
-
-function recipeContextLabel(row: TechnicalRecipeListItem): string {
-  const est = row.establishments;
-  if (!est?.name) return "—";
-  const client = est.clients ?? undefined;
-  const clientName =
-    client?.trade_name?.trim() || client?.legal_name?.trim() || "Cliente";
-  return `${clientName} — ${est.name}`;
-}
+import {
+  recipeClientIdForListRow,
+  recipeContextLabel,
+} from "@/lib/utils/technical-recipe-list-labels";
 
 function formatUpdatedAt(iso: string): string {
   try {
@@ -52,25 +45,12 @@ export default async function TemplatesPage({
   const hasEstablishments = establishments.length > 0;
 
   return (
-    <div className="space-y-6">
-      {/* ── Header ── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Templates de fichas técnicas
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Use um template como base para criar uma nova receita. Os valores e
-            fórmulas serão copiados para você editar.
-          </p>
-        </div>
-        <Link
-          href="/ficha-tecnica"
-          className={buttonVariants({ variant: "outline" })}
-        >
-          ← Minhas receitas
-        </Link>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title="Repositório de Receitas"
+        description="Receitas genéricas e reutilizáveis. Use como modelo para criar uma nova receita num estabelecimento — os dados são copiados e ficam independentes."
+        back={{ href: "/ficha-tecnica", label: "Ficha técnica" }}
+      />
 
       {/* ── Barra de busca ── */}
       <Suspense fallback={null}>
@@ -95,7 +75,7 @@ export default async function TemplatesPage({
       ) : (
         <>
           {/* ── Tabela ── */}
-          <div className="border-border overflow-x-auto rounded-xl border bg-white">
+          <div className="border-border bg-card overflow-x-auto rounded-lg border shadow-sm">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
                 <tr>
@@ -112,7 +92,7 @@ export default async function TemplatesPage({
                     Atualizado
                   </th>
                   <th className="text-foreground px-4 py-3 text-right font-bold">
-                    Ação
+                    Ações
                   </th>
                 </tr>
               </thead>
@@ -122,7 +102,7 @@ export default async function TemplatesPage({
                     key={row.id}
                     className="border-b border-foreground/5 last:border-0"
                   >
-                    <td className="text-foreground px-4 py-3 font-medium">
+                    <td className="text-foreground px-4 py-3 text-base font-semibold">
                       {row.name}
                     </td>
                     <td className="text-muted-foreground px-4 py-3">
@@ -135,7 +115,11 @@ export default async function TemplatesPage({
                       {formatUpdatedAt(row.updated_at)}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex flex-wrap items-center justify-end gap-2">
+                      <div
+                        className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"
+                        role="group"
+                        aria-label="Ações do template"
+                      >
                         <TemplateUseButton
                           templateId={row.id}
                           templateName={row.name}
@@ -145,6 +129,8 @@ export default async function TemplatesPage({
                         <RecipeListRowActions
                           recipeId={row.id}
                           isTemplate={row.is_template}
+                          clientId={recipeClientIdForListRow(row)}
+                          isTemplateFavorite={row.is_template_favorite ?? false}
                         />
                       </div>
                     </td>
@@ -165,6 +151,6 @@ export default async function TemplatesPage({
           </Suspense>
         </>
       )}
-    </div>
+    </PageLayout>
   );
 }

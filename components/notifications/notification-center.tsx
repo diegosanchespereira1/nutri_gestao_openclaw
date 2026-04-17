@@ -6,7 +6,7 @@
  * Ações: Marcar tudo como lido, limpar histórico
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Notification, NOTIFICATION_EVENT_LABELS, NotificationEventType } from '@/lib/types/notification';
 import { listNotifications, markAllNotificationsAsRead, cleanupOldNotifications } from '@/lib/actions/notification';
 import { NotificationCard } from './notification-card';
@@ -47,12 +47,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
   const [total, setTotal] = useState(0);
   const PAGE_SIZE = 10;
 
-  // Carregar notificações
-  useEffect(() => {
-    loadNotifications();
-  }, [filterEventType, filterRead, filterDays, page]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -74,7 +69,13 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     }
 
     setLoading(false);
-  };
+  }, [filterEventType, filterRead, filterDays, page]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadNotifications();
+    });
+  }, [loadNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
   const totalPages = Math.ceil(total / PAGE_SIZE);

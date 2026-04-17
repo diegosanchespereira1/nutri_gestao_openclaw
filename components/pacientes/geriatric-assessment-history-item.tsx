@@ -6,7 +6,6 @@ import { Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
 import {
   deleteGeriatricAssessmentAction,
   updateGeriatricAssessmentAction,
-  type GeriatricAssessmentFormResult,
 } from "@/lib/actions/geriatric-assessments";
 import {
   PATIENT_GROUP_LABELS,

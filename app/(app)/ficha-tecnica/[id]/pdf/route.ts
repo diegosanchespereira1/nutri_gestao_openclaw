@@ -49,26 +49,54 @@ export async function GET(
     return new NextResponse("Não encontrado", { status: 404 });
   }
 
-  const [{ data: est }, { data: profile }] = await Promise.all([
-    supabase
-      .from("establishments")
-      .select("name, clients ( legal_name, trade_name )")
-      .eq("id", recipe.establishment_id)
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select("full_name, crn")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  const [{ data: est }, { data: clientOnly }, { data: profile }] =
+    await Promise.all([
+      recipe.establishment_id
+        ? supabase
+            .from("establishments")
+            .select("name, clients ( legal_name, trade_name )")
+            .eq("id", recipe.establishment_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      !recipe.establishment_id && recipe.client_id
+        ? supabase
+            .from("clients")
+            .select("legal_name, trade_name")
+            .eq("id", recipe.client_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("profiles")
+        .select("full_name, crn")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
 
   const estTyped = est as {
     name: string;
     clients: { legal_name: string; trade_name: string | null } | null;
   } | null;
 
+  const clientTyped = clientOnly as {
+    legal_name: string;
+    trade_name: string | null;
+  } | null;
+
+  const contextLabel =
+    recipe.establishment_id != null
+      ? establishmentLabel(estTyped)
+      : clientTyped
+        ? (() => {
+            const n =
+              clientTyped.trade_name?.trim() ||
+              clientTyped.legal_name?.trim() ||
+              "Cliente PJ";
+            return `${n} — catálogo (todos os estabelecimentos)`;
+          })()
+        : "—";
+
   const bytes = await buildTechnicalRecipePdfBytes(recipe, {
-    establishmentLabel: establishmentLabel(estTyped),
+    establishmentLabel: contextLabel,
     professionalName: String(profile?.full_name ?? "—"),
     professionalCrn: String(profile?.crn ?? ""),
   });

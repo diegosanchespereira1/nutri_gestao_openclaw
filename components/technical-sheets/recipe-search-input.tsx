@@ -15,9 +15,10 @@ export function RecipeSearchInput() {
   const [value, setValue] = useState(initialQ);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync input when browser back/forward changes params
+  // Sincronizar com a URL (ex.: voltar/avançar no browser) sem setState síncrono no effect
   useEffect(() => {
-    setValue(searchParams.get("q") ?? "");
+    const q = searchParams.get("q") ?? "";
+    queueMicrotask(() => setValue(q));
   }, [searchParams]);
 
   const pushQ = useCallback(

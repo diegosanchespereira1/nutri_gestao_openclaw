@@ -27,29 +27,28 @@ export function TacoLineLinker({
   const [hits, setHits] = useState<TacoReferenceFoodRow[]>([]);
   const [pending, setPending] = useState(false);
 
-  useEffect(() => {
-    const t = q.trim();
-    if (t.length < 2) {
-      setHits([]);
-      setPending(false);
-      return;
-    }
+  const trimmedQ = q.trim();
+  const shouldSearch = trimmedQ.length >= 2;
+  const displayHits = shouldSearch ? hits : [];
 
-    setPending(true);
+  useEffect(() => {
+    if (!shouldSearch) return;
+
+    queueMicrotask(() => setPending(true));
     const handle = setTimeout(() => {
-      void searchTacoFoodsAction(t).then((rows) => {
+      void searchTacoFoodsAction(trimmedQ).then((rows) => {
         setHits(rows);
         setPending(false);
       });
     }, 320);
 
     return () => clearTimeout(handle);
-  }, [q]);
+  }, [shouldSearch, trimmedQ]);
 
   if (linked) {
     return (
       <div className="space-y-1.5 sm:col-span-full">
-        <Label className="text-xs">TACO (referência)</Label>
+        <Label className="text-muted-foreground text-xs">TACO (referência)</Label>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-foreground">
             {linked.taco_code} — {linked.name}
@@ -69,7 +68,7 @@ export function TacoLineLinker({
 
   return (
     <div className="space-y-1.5 sm:col-span-full">
-      <Label className="text-xs" htmlFor={inputId}>
+      <Label className="text-muted-foreground text-xs" htmlFor={inputId}>
         Ligar à TACO (pesquisar, mín. 2 caracteres)
       </Label>
       <Input
@@ -79,16 +78,16 @@ export function TacoLineLinker({
         placeholder="Ex.: arroz, feijão, leite…"
         autoComplete="off"
       />
-      {pending ? (
+      {shouldSearch && pending ? (
         <p className="text-muted-foreground text-xs">A pesquisar…</p>
       ) : null}
-      {hits.length > 0 ? (
+      {displayHits.length > 0 ? (
         <ul
           className="border-border bg-background max-h-36 overflow-y-auto rounded-lg border text-sm"
           role="listbox"
           aria-label="Resultados TACO"
         >
-          {hits.map((h) => (
+          {displayHits.map((h) => (
             <li key={h.id} className="border-border border-b last:border-0">
               <button
                 type="button"

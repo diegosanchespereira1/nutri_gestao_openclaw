@@ -6,7 +6,6 @@ import { Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
 import {
   deleteNutritionAssessmentAction,
   updateNutritionAssessmentAction,
-  type NutritionAssessmentFormResult,
 } from "@/lib/actions/nutrition-assessments";
 import {
   ACTIVITY_LEVELS,

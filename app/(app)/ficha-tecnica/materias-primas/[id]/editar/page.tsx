@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const errMessages: Record<string, string> = {
   invalid: "Verifique nome e preço (maior que zero).",
-  save: "Não foi possível guardar. Tente novamente.",
+  save: "Não foi possível salvar. Tente novamente.",
 };
 
 type Props = {

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
 import type { AuditLogRow } from '@/lib/types/audit';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 function formatRelativeTime(date: Date): string {

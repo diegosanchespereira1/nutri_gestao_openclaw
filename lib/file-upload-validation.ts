@@ -30,7 +30,7 @@ export function validateImageFile(
   maxSize: number = MAX_FILE_SIZES.image
 ): FileValidationError | null {
   // Check MIME type
-  if (!ALLOWED_MIME_TYPES.images.includes(file.type as any)) {
+  if (!(ALLOWED_MIME_TYPES.images as readonly string[]).includes(file.type)) {
     return {
       field: 'file',
       error: `Tipo de ficheiro inválido. Aceites: JPEG, PNG, WebP. Recebido: ${file.type || 'desconhecido'}.`,
@@ -65,7 +65,7 @@ export function validateDocumentFile(
   maxSize: number = MAX_FILE_SIZES.document
 ): FileValidationError | null {
   // Check MIME type
-  if (!ALLOWED_MIME_TYPES.documents.includes(file.type as any)) {
+  if (!(ALLOWED_MIME_TYPES.documents as readonly string[]).includes(file.type)) {
     return {
       field: 'file',
       error: `Tipo de ficheiro inválido. Aceites: PDF, Word. Recebido: ${file.type || 'desconhecido'}.`,
@@ -99,7 +99,7 @@ export function validateSpreadsheetFile(
   maxSize: number = MAX_FILE_SIZES.document
 ): FileValidationError | null {
   // Check MIME type
-  if (!ALLOWED_MIME_TYPES.spreadsheets.includes(file.type as any)) {
+  if (!(ALLOWED_MIME_TYPES.spreadsheets as readonly string[]).includes(file.type)) {
     return {
       field: 'file',
       error: `Tipo de ficheiro inválido. Aceites: CSV, Excel. Recebido: ${file.type || 'desconhecido'}.`,

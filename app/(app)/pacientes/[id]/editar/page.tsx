@@ -39,9 +39,11 @@ export default async function EditarPacientePage({
     : "";
 
   // Idade aproximada para pré-preencher o campo na avaliação geriátrica
+  // Usar instante de render do servidor (evita Date.now em render — react-hooks/purity)
+  const serverNowMs = new Date().getTime();
   const defaultAge = birthSlice
     ? Math.floor(
-        (Date.now() - new Date(birthSlice).getTime()) /
+        (serverNowMs - new Date(birthSlice).getTime()) /
           (1000 * 60 * 60 * 24 * 365.25),
       )
     : undefined;

@@ -1,56 +1,62 @@
 /**
- * CSP Report URI endpoint — logs Content Security Policy violations
- * Called by browser when CSP policy is violated
+ * CSP Report URI endpoint — regista violações da Content-Security-Policy.
+ * O formato do corpo varia entre browsers (JSON legacy, Reporting API, vazio).
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
-interface CSPReport {
-  'csp-report': {
-    'document-uri': string;
-    'violated-directive': string;
-    'effective-directive': string;
-    'original-policy': string;
-    'disposition': string;
-    'blocked-uri'?: string;
-    'source-file'?: string;
-    'line-number'?: number;
-    'column-number'?: number;
-    'status-code'?: number;
+type LegacyCspReportBody = {
+  "csp-report"?: {
+    "document-uri"?: string;
+    "violated-directive"?: string;
+    "effective-directive"?: string;
+    "original-policy"?: string;
+    disposition?: string;
+    "blocked-uri"?: string;
+    "source-file"?: string;
+    "line-number"?: number;
+    "column-number"?: number;
+    "status-code"?: number;
   };
-}
+};
 
 export async function POST(request: NextRequest) {
   try {
-    const body: CSPReport = await request.json();
-    const report = body['csp-report'];
+    const raw = await request.text();
+    if (!raw.trim()) {
+      return new NextResponse(null, { status: 204 });
+    }
 
-    // Log CSP violation
-    console.error('[CSP Violation]', {
-      timestamp: new Date().toISOString(),
-      documentUri: report['document-uri'],
-      violatedDirective: report['violated-directive'],
-      effectiveDirective: report['effective-directive'],
-      blockedUri: report['blocked-uri'],
-      sourceFile: report['source-file'],
-      lineNumber: report['line-number'],
-      disposition: report['disposition'],
-    });
+    let body: unknown;
+    try {
+      body = JSON.parse(raw) as unknown;
+    } catch {
+      return new NextResponse(null, { status: 204 });
+    }
 
-    // TODO: Send to external monitoring service (Sentry, DataDog, etc)
-    // if (process.env.SENTRY_DSN) {
-    //   captureException(new Error('CSP Violation'), { extra: report });
-    // }
+    const legacy = body as LegacyCspReportBody;
+    const report = legacy["csp-report"];
+    if (report) {
+      console.error("[CSP Violation]", {
+        timestamp: new Date().toISOString(),
+        documentUri: report["document-uri"],
+        violatedDirective: report["violated-directive"],
+        effectiveDirective: report["effective-directive"],
+        blockedUri: report["blocked-uri"],
+        sourceFile: report["source-file"],
+        lineNumber: report["line-number"],
+        disposition: report.disposition,
+      });
+    } else {
+      console.error("[CSP Violation] (formato não legacy)", {
+        timestamp: new Date().toISOString(),
+        preview: raw.slice(0, 500),
+      });
+    }
 
-    return NextResponse.json(
-      { message: 'CSP report received' },
-      { status: 204 }
-    );
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('[CSP Report Error]', error);
-    return NextResponse.json(
-      { error: 'Failed to process CSP report' },
-      { status: 400 }
-    );
+    console.error("[CSP Report Error]", error);
+    return new NextResponse(null, { status: 204 });
   }
 }

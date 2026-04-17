@@ -6,7 +6,6 @@
  */
 
 import { Notification, NOTIFICATION_EVENT_LABELS } from '@/lib/types/notification';
-import { formatRelativeTime } from '@/lib/utils/date';
 import {
   Dialog,
   DialogContent,
@@ -38,7 +37,6 @@ interface NotificationDetailModalProps {
 export function NotificationDetailModal({
   notification,
   onClose,
-  onRefresh,
 }: NotificationDetailModalProps) {
   const eventLabel = NOTIFICATION_EVENT_LABELS[notification.event_type];
   const icon = EVENT_ICONS[notification.event_type] || '📬';

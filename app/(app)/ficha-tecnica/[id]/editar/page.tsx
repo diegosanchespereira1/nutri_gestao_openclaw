@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { RecipeForm } from "@/components/technical-sheets/recipe-form";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
 import {
@@ -16,11 +17,12 @@ export default async function EditarReceitaPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [{ recipe }, { rows: establishments }, { rows: rawMaterials }] =
+  const [{ recipe }, { rows: establishments }, { rows: rawMaterials }, { rows: pjClients }] =
     await Promise.all([
       loadTechnicalRecipeById(id),
       loadEstablishmentsForOwner(),
       loadRawMaterialsForOwner(),
+      loadClientsForOwner({ kind: "pj" }),
     ]);
 
   if (!recipe) notFound();
@@ -47,6 +49,7 @@ export default async function EditarReceitaPage({
       </div>
       <RecipeForm
         establishments={establishments}
+        pjClients={pjClients}
         recipe={recipe}
         rawMaterials={rawMaterials}
       />

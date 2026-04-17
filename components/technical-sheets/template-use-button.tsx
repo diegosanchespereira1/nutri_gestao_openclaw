@@ -1,13 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
 import { useState } from "react";
 
 import { createRecipeFromTemplateAction } from "@/lib/actions/technical-recipes";
 import type { EstablishmentListItem } from "@/lib/types/establishments";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +39,7 @@ export function TemplateUseButton({
   hasEstablishments,
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedEstId, setSelectedEstId] = useState<string>("");
   const [recipeName, setRecipeName] = useState<string>(templateName);
@@ -58,24 +56,28 @@ export function TemplateUseButton({
     }
 
     setError("");
-    startTransition(async () => {
-      const result = await createRecipeFromTemplateAction(
-        templateId,
-        selectedEstId,
-        recipeName,
-      );
-      if (!result.ok) {
-        setError(result.error);
-        return;
+    setPending(true);
+    void (async () => {
+      try {
+        const result = await createRecipeFromTemplateAction(
+          templateId,
+          selectedEstId,
+          recipeName,
+        );
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        router.push(`/ficha-tecnica/${result.recipeId}/editar`);
+      } finally {
+        setPending(false);
       }
-      // Redirecionar para editar a nova receita
-      router.push(`/ficha-tecnica/${result.recipeId}/editar`);
-    });
+    })();
   }
 
   if (!hasEstablishments) {
     return (
-      <Button variant="ghost" size="sm" disabled className="opacity-50">
+      <Button variant="outline" size="sm" disabled className="opacity-50">
         Usar template
       </Button>
     );
@@ -84,7 +86,7 @@ export function TemplateUseButton({
   return (
     <>
       <Button
-        variant="outline"
+        variant="default"
         size="sm"
         onClick={() => {
           setOpen(true);

@@ -5,7 +5,7 @@
  * Lista todas as preferências e permite edição individual
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { NotificationPreference } from '@/lib/types/notification';
 import { getNotificationPreferences } from '@/lib/actions/notification';
 import { PreferenceRow } from './preference-row';
@@ -19,11 +19,7 @@ export function PreferencesPanel({ className }: PreferencesPanelProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadPreferences();
-  }, []);
-
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     setLoading(true);
     setError(null);
 
@@ -36,7 +32,13 @@ export function PreferencesPanel({ className }: PreferencesPanelProps) {
     }
 
     setLoading(false);
-  };
+  }, []);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      void loadPreferences();
+    });
+  }, [loadPreferences]);
 
   const handlePreferenceUpdate = (updated: NotificationPreference) => {
     setPreferences((prev) =>

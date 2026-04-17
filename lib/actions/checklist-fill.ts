@@ -411,6 +411,81 @@ export async function saveFillItemResponse(input: {
   return { ok: true };
 }
 
+/* ─── Task C.2: checkExistingOpenFillSession ────────────────────────────── */
+
+export type ExistingOpenSession = {
+  id: string;
+  updated_at: string;
+  response_count: number;
+  started_by_me: boolean;
+};
+
+/**
+ * Verifica se já existe sessão em aberto (dossier_approved_at IS NULL) para o par
+ * estabelecimento + template, com ao menos 1 resposta salva.
+ * Escopo: qualquer sessão cujo estabelecimento pertence a um cliente do usuário atual
+ * (via join establishments → clients → owner_user_id).
+ * Retorna a sessão mais recente elegível, ou null se não houver nenhuma.
+ */
+export async function checkExistingOpenFillSession(input: {
+  establishmentId: string;
+  templateId: string | null;
+  customTemplateId: string | null;
+}): Promise<ExistingOpenSession | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  // Validar posse do estabelecimento (assertEstablishmentOwned como primeira verificação).
+  const ok = await assertEstablishmentOwned(supabase, user.id, input.establishmentId);
+  if (!ok) return null;
+
+  const { establishmentId, templateId, customTemplateId } = input;
+
+  // Buscar sessões abertas para esse par estabelecimento + template, ordenadas pela
+  // mais recente. A nova RLS policy permite ler sessões de qualquer membro da equipe
+  // que pertença ao mesmo tenant (client owner).
+  let query = supabase
+    .from("checklist_fill_sessions")
+    .select("id, user_id, updated_at")
+    .eq("establishment_id", establishmentId)
+    .is("dossier_approved_at", null)
+    .order("updated_at", { ascending: false });
+
+  if (templateId) {
+    query = query.eq("template_id", templateId);
+  } else if (customTemplateId) {
+    query = query.eq("custom_template_id", customTemplateId);
+  } else {
+    return null;
+  }
+
+  const { data: sessions } = await query;
+  if (!sessions || sessions.length === 0) return null;
+
+  // Para cada sessão, verificar se tem ao menos 1 resposta salva.
+  for (const sess of sessions) {
+    const { count } = await supabase
+      .from("checklist_fill_item_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("session_id", sess.id);
+
+    const responseCount = count ?? 0;
+    if (responseCount > 0) {
+      return {
+        id: sess.id,
+        updated_at: sess.updated_at,
+        response_count: responseCount,
+        started_by_me: sess.user_id === user.id,
+      };
+    }
+  }
+
+  return null;
+}
+
 export type ApproveDossierResult =
   | { ok: true; approvedAt: string }
   | { ok: false; error: string };

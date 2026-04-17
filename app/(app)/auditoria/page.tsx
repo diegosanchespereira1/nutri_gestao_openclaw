@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Eye, LogOut, Trash2 } from 'lucide-react';
+import { Eye } from 'lucide-react';
 
 import { PageHeader } from '@/components/layout/page-header';
 import { PageLayout } from '@/components/layout/page-layout';

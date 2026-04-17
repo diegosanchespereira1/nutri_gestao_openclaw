@@ -4,11 +4,9 @@ import { ChecklistCatalog } from "@/components/checklists/checklist-catalog";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
 import { startChecklistFill } from "@/lib/actions/checklist-fill";
-import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
+import { loadRecentChecklistEstablishmentsAction } from "@/lib/actions/establishments";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
-import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
 import { cn } from "@/lib/utils";
-import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { buttonVariants } from "@/components/ui/button-variants";
 
 export default async function ChecklistsPage({
@@ -22,20 +20,10 @@ export default async function ChecklistsPage({
     typeof sp.template === "string" && /^[0-9a-f-]{36}$/i.test(sp.template)
       ? sp.template
       : null;
-  const [{ templates }, { rows: establishments }] = await Promise.all([
+  const [{ templates }, { rows: recentEstablishments }] = await Promise.all([
     loadChecklistCatalog(),
-    loadEstablishmentsForOwner(),
+    loadRecentChecklistEstablishmentsAction(3),
   ]);
-
-  const establishmentOptions = establishments.map((e) => {
-    const uf = e.state?.toUpperCase() ?? "UF não definida";
-    return {
-      id: e.id,
-      label: `${e.name} — ${establishmentClientLabel(e)} (${uf} · ${establishmentTypeLabel[e.establishment_type]})`,
-      state: e.state,
-      establishment_type: e.establishment_type,
-    };
-  });
 
   return (
     <div className="space-y-6">
@@ -80,7 +68,7 @@ export default async function ChecklistsPage({
 
       <ChecklistCatalog
         key={focusTemplateId ?? "checklist-catalog-default"}
-        establishments={establishmentOptions}
+        recentEstablishments={recentEstablishments}
         templates={templates}
         startFillAction={startChecklistFill}
         duplicateTemplateAction={duplicateGlobalTemplateAction}

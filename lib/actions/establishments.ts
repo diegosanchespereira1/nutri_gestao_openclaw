@@ -4,12 +4,51 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
+import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
 import { createClient } from "@/lib/supabase/server";
-import type { EstablishmentRow, EstablishmentWithClientNames } from "@/lib/types/establishments";
+import type {
+  EstablishmentPickerOption,
+  EstablishmentRow,
+  EstablishmentWithClientNames,
+} from "@/lib/types/establishments";
 
 export type EstablishmentFormResult =
   | { ok: true }
   | { ok: false; error: string };
+
+type EstablishmentClientJoin = EstablishmentWithClientNames["clients"];
+
+type EstablishmentPickerDbRow = {
+  id: string;
+  name: string;
+  state: string | null;
+  establishment_type: EstablishmentRow["establishment_type"];
+  clients: EstablishmentClientJoin | EstablishmentClientJoin[] | null;
+};
+
+function pickClientJoin(
+  input: EstablishmentPickerDbRow["clients"],
+): EstablishmentClientJoin | null {
+  if (!input) return null;
+  if (Array.isArray(input)) return input[0] ?? null;
+  return input;
+}
+
+function mapRowToPickerOption(
+  row: EstablishmentPickerDbRow,
+): EstablishmentPickerOption | null {
+  const client = pickClientJoin(row.clients);
+  if (!client) return null;
+
+  const uf = row.state?.toUpperCase() ?? "UF não definida";
+  const clientLabel = client.trade_name?.trim() || client.legal_name;
+  return {
+    id: row.id,
+    label: `${row.name} — ${clientLabel} (${uf} · ${establishmentTypeLabel[row.establishment_type]})`,
+    state: row.state,
+    establishment_type: row.establishment_type,
+  };
+}
 
 function revalidateClientEstablishmentPaths(clientId: string, estId?: string) {
   revalidatePath("/clientes");
@@ -50,6 +89,177 @@ export async function loadEstablishmentsForOwner(): Promise<{
 
   if (error || !data) return { rows: [] };
   return { rows: data as EstablishmentWithClientNames[] };
+}
+
+export async function searchOwnerEstablishmentsAction(params: {
+  query: string;
+  limit?: number;
+}): Promise<{ rows: EstablishmentPickerOption[] }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { rows: [] };
+
+  const query = params.query.trim();
+  if (query.length < 3) return { rows: [] };
+
+  const limit = Math.min(15, Math.max(1, params.limit ?? 12));
+  const q = `%${query}%`;
+
+  const selectClause =
+    "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)";
+
+  const { data: byEstablishmentName, error: byEstErr } = await supabase
+    .from("establishments")
+    .select(selectClause)
+    .eq("clients.owner_user_id", user.id)
+    .eq("clients.kind", "pj")
+    .ilike("name", q)
+    .order("name", { ascending: true })
+    .limit(limit);
+
+  const { data: matchedClients, error: matchedClientsErr } = await supabase
+    .from("clients")
+    .select("id")
+    .eq("owner_user_id", user.id)
+    .eq("kind", "pj")
+    .or(`legal_name.ilike.${q},trade_name.ilike.${q}`)
+    .limit(limit);
+
+  let byClientNames: EstablishmentPickerDbRow[] = [];
+  if (!matchedClientsErr && matchedClients && matchedClients.length > 0) {
+    const clientIds = matchedClients.map((row) => row.id as string);
+    const { data, error } = await supabase
+      .from("establishments")
+      .select(selectClause)
+      .in("client_id", clientIds)
+      .order("name", { ascending: true })
+      .limit(limit);
+    if (!error && data) {
+      byClientNames = data as unknown as EstablishmentPickerDbRow[];
+    }
+  }
+
+  if (byEstErr || matchedClientsErr) return { rows: [] };
+
+  const merged = new Map<string, EstablishmentPickerOption>();
+  for (const row of (byEstablishmentName ?? []) as unknown as EstablishmentPickerDbRow[]) {
+    const mapped = mapRowToPickerOption(row);
+    if (mapped) merged.set(mapped.id, mapped);
+  }
+  for (const row of byClientNames) {
+    const mapped = mapRowToPickerOption(row);
+    if (mapped) merged.set(mapped.id, mapped);
+  }
+
+  const rows = Array.from(merged.values())
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }))
+    .slice(0, limit);
+
+  return { rows };
+}
+
+export async function loadRecentChecklistEstablishmentsAction(
+  limit = 3,
+): Promise<{ rows: EstablishmentPickerOption[] }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { rows: [] };
+
+  const safeLimit = Math.min(10, Math.max(1, limit));
+
+  const { data: recentRows, error: recentErr } = await supabase
+    .from("checklist_establishment_recent")
+    .select("establishment_id")
+    .eq("user_id", user.id)
+    .order("last_opened_at", { ascending: false })
+    .limit(safeLimit);
+
+  if (recentErr || !recentRows?.length) return { rows: [] };
+
+  const establishmentIds = recentRows.map((row) => row.establishment_id as string);
+
+  const { data: establishments, error: estErr } = await supabase
+    .from("establishments")
+    .select(
+      "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)",
+    )
+    .in("id", establishmentIds)
+    .eq("clients.owner_user_id", user.id)
+    .eq("clients.kind", "pj");
+
+  if (estErr || !establishments?.length) return { rows: [] };
+
+  const byId = new Map<string, EstablishmentPickerOption>();
+  for (const row of establishments as unknown as EstablishmentPickerDbRow[]) {
+    const mapped = mapRowToPickerOption(row);
+    if (mapped) byId.set(mapped.id, mapped);
+  }
+
+  const rows = establishmentIds
+    .map((id) => byId.get(id))
+    .filter((row): row is EstablishmentPickerOption => Boolean(row))
+    .slice(0, safeLimit);
+
+  return { rows };
+}
+
+export async function registerChecklistEstablishmentOpenAction(
+  establishmentId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const estId = establishmentId.trim();
+  if (!estId) return { ok: false, error: "Estabelecimento inválido." };
+
+  const { data: establishment, error: estErr } = await supabase
+    .from("establishments")
+    .select("id, client_id")
+    .eq("id", estId)
+    .maybeSingle();
+
+  if (estErr || !establishment) {
+    return { ok: false, error: "Estabelecimento inválido." };
+  }
+
+  const { data: clientRow, error: cErr } = await supabase
+    .from("clients")
+    .select("owner_user_id, kind")
+    .eq("id", establishment.client_id)
+    .maybeSingle();
+
+  if (
+    cErr ||
+    !clientRow ||
+    clientRow.owner_user_id !== user.id ||
+    clientRow.kind !== "pj"
+  ) {
+    return { ok: false, error: "Sem permissão para este estabelecimento." };
+  }
+
+  const { error } = await supabase
+    .from("checklist_establishment_recent")
+    .upsert(
+      {
+        user_id: user.id,
+        establishment_id: estId,
+        last_opened_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,establishment_id" },
+    );
+
+  if (error) {
+    return { ok: false, error: "Não foi possível guardar estabelecimento recente." };
+  }
+
+  return { ok: true };
 }
 
 export async function loadEstablishmentsForClient(

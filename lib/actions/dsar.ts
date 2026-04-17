@@ -6,17 +6,12 @@ import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import type {
   DsarCompleteReport,
-  DsarExportFormat,
   DsarExportResult,
   DsarGenerationResponse,
   DsarAccessEntry,
   DsarConsentEntry,
   DsarAssessment,
-  DsarVisit,
 } from '@/lib/types/dsar';
-import type { AuditLogRow } from '@/lib/types/audit';
-import type { ConsentRecord } from '@/lib/types/consent';
-import Papa from 'papaparse';
 
 const uuidSchema = z.string().uuid('ID deve ser um UUID válido');
 

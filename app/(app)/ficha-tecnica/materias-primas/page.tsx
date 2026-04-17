@@ -86,7 +86,7 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
           role="status"
           className="border-primary/35 bg-primary/10 text-foreground rounded-lg border px-4 py-3 text-sm"
         >
-          Preço guardado.
+          Preço salvo.
           {recipesN > 0 ? (
             <>
               {" "}

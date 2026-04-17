@@ -2,7 +2,13 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import type { ConsentRecord, RecordConsentInput, RevokeConsentInput, PatientConsentSummary } from '@/lib/types/consent';
+import type {
+  ConsentRecord,
+  ConsentType,
+  RecordConsentInput,
+  RevokeConsentInput,
+  PatientConsentSummary,
+} from '@/lib/types/consent';
 import { headers } from 'next/headers';
 
 /**
@@ -244,7 +250,9 @@ export async function loadPatientConsentSummary(patientId: string): Promise<Pati
     created_at: string;
   }>;
 
-  const consentTypes = [...new Set(activeConsents.map(c => c.consent_type))] as any[];
+  const consentTypes = [
+    ...new Set(activeConsents.map((c) => c.consent_type)),
+  ] as ConsentType[];
   const hasParentalConsent = activeConsents.some(c => c.is_parental_consent);
   const lastConsentDate = activeConsents[0]?.created_at ?? null;
 

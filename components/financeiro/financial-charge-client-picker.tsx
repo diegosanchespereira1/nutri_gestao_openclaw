@@ -89,11 +89,11 @@ export function FinancialChargeClientPicker({
     );
   }, [clients, segmentFilter, search]);
 
-  useEffect(() => {
-    if (selectedId && !filtered.some((c) => c.id === selectedId)) {
-      setSelectedId("");
-    }
-  }, [filtered, selectedId]);
+  const resolvedSelectedId = useMemo(
+    () =>
+      selectedId && filtered.some((c) => c.id === selectedId) ? selectedId : "",
+    [filtered, selectedId],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -107,12 +107,12 @@ export function FinancialChargeClientPicker({
     return () => document.removeEventListener("mousedown", onDocMouseDown);
   }, [open]);
 
-  const selected = clients.find((c) => c.id === selectedId);
+  const selected = clients.find((c) => c.id === resolvedSelectedId);
   const triggerLabel = selected ? pickLabel(selected) : "Abrir lista e escolher cliente…";
 
   return (
     <div ref={rootRef} className={cn("space-y-4", className)}>
-      <input type="hidden" name="client_id" value={selectedId} required={required} />
+      <input type="hidden" name="client_id" value={resolvedSelectedId} required={required} />
 
       <div className="space-y-2">
         <Label htmlFor={`${id}-segmento`} className="text-sm font-medium">
@@ -207,7 +207,7 @@ export function FinancialChargeClientPicker({
               </li>
             ) : (
               filtered.map((c) => {
-                const active = c.id === selectedId;
+                const active = c.id === resolvedSelectedId;
                 const seg = c.business_segment
                   ? clientBusinessSegmentLabel[c.business_segment]
                   : "Sem categoria";

@@ -4,9 +4,19 @@ import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
 
 export type TechnicalRecipeStatus = "draft" | "published";
 
+/** FR-REC-001: Contexto explícito de armazenamento da receita. */
+export type RecipeContext = "ESTABELECIMENTO" | "REPOSITORIO";
+
 export type TechnicalRecipeRow = {
   id: string;
-  establishment_id: string;
+  /** FR-REC-001: Contexto da receita. ESTABELECIMENTO = vinculada a um local; REPOSITORIO = genérica e reutilizável. */
+  contexto: RecipeContext;
+  /** Obrigatório quando contexto = ESTABELECIMENTO. Null quando contexto = REPOSITORIO. */
+  establishment_id: string | null;
+  /** Cliente PJ dono da receita (obrigatório na BD). */
+  client_id: string;
+  /** FR-REC-001: ID da receita do Repositório usada como origem. Null se criada do zero. */
+  repository_origin_id: string | null;
   name: string;
   status: TechnicalRecipeStatus;
   /** Número de porções que a receita rende (preço e nutrição por porção). */
@@ -39,7 +49,7 @@ export type TechnicalRecipeLineRow = {
   /** Preenchido quando a linha vem do servidor com join TACO. */
   taco_food: TacoReferenceFoodRow | null;
   raw_material_id: string | null;
-  /** Join `professional_raw_materials` quando guardado. */
+  /** Join `professional_raw_materials` quando salvo. */
   raw_material: RawMaterialRow | null;
   /** Multiplicador na quantidade para custo de matéria-prima (perdas / limpeza). */
   correction_factor: number;
@@ -57,4 +67,11 @@ export type TechnicalRecipeListItem = TechnicalRecipeRow & {
     client_id: string;
     clients: { legal_name: string; trade_name: string | null } | null;
   } | null;
+  /** Join opcional quando `establishment_id` é null (catálogo do cliente). */
+  recipe_scope_client?: {
+    legal_name: string;
+    trade_name: string | null;
+  } | null;
+  /** Favorito do template ao nível do cliente PJ (partilhado entre estabelecimentos do mesmo cliente). */
+  is_template_favorite?: boolean;
 };

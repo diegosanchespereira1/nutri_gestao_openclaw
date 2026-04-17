@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { PasswordField } from "@/components/auth/password-field";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
@@ -26,6 +26,16 @@ export function LoginForm() {
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const submitLockRef = useRef(false);
+
+  function isInvalidRefreshTokenError(message?: string): boolean {
+    if (!message) return false;
+    const normalized = message.toLowerCase();
+    return (
+      normalized.includes("invalid refresh token") ||
+      normalized.includes("refresh token not found")
+    );
+  }
 
   function logAuthTroubleshootingEvent(input: {
     event: string;
@@ -122,6 +132,8 @@ export function LoginForm() {
 
   async function handlePasswordSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setError(null);
     setLoading(true);
     const supabase = createClient();
@@ -131,13 +143,39 @@ export function LoginForm() {
       outcome: "attempt",
     });
 
-    const {
-      data: signInData,
-      error: signErr,
-    } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    let signInData:
+      | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"]
+      | null = null;
+    let signErr:
+      | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"]
+      | null = null;
+
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const result = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      signInData = result.data;
+      signErr = result.error;
+
+      if (!signErr) break;
+
+      const staleRefreshToken = isInvalidRefreshTokenError(signErr.message);
+      if (attempt === 1 && staleRefreshToken) {
+        await logAuthTroubleshootingEvent({
+          event: "password_signin_stale_refresh_recovery",
+          step: "password",
+          outcome: "error",
+          errorCode: signErr.code,
+          errorMessage: signErr.message,
+        });
+        // Limpa sessão local potencialmente corrompida e tenta novamente.
+        await supabase.auth.signOut();
+        continue;
+      }
+
+      break;
+    }
 
     if (signErr) {
       await logAuthTroubleshootingEvent({
@@ -149,6 +187,7 @@ export function LoginForm() {
       });
       setError(mapSupabaseLoginError(signErr));
       setLoading(false);
+      submitLockRef.current = false;
       return;
     }
     await logAuthTroubleshootingEvent({
@@ -171,6 +210,7 @@ export function LoginForm() {
       });
       setError(aalErr.message);
       setLoading(false);
+      submitLockRef.current = false;
       return;
     }
 
@@ -184,25 +224,45 @@ export function LoginForm() {
       const ok = await beginMfaChallenge(supabase);
       setLoading(false);
       if (!ok) await supabase.auth.signOut();
+      submitLockRef.current = false;
       return;
     }
 
-    const { data: sessionData } = await supabase.auth.getSession();
+    let sessionData: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] | null =
+      null;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const result = await supabase.auth.getSession();
+      sessionData = result.data;
+      if (sessionData.session) break;
+      await new Promise((resolve) => window.setTimeout(resolve, 120));
+    }
     await logAuthTroubleshootingEvent({
       event: "post_signin_session_check",
       step: "password",
-      outcome: sessionData.session ? "success" : "error",
-      hasSession: Boolean(sessionData.session),
+      outcome: sessionData?.session ? "success" : "error",
+      hasSession: Boolean(sessionData?.session),
       userId: signInData.user?.id ?? null,
     });
 
+    if (!sessionData?.session) {
+      setError(
+        "Não foi possível concluir a sessão neste dispositivo. Tente novamente.",
+      );
+      setLoading(false);
+      submitLockRef.current = false;
+      return;
+    }
+
     setLoading(false);
+    submitLockRef.current = false;
     window.location.assign(next);
   }
 
   async function handleMfaSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!factorId || !challengeId) return;
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setError(null);
     setLoading(true);
     const supabase = createClient();
@@ -225,6 +285,7 @@ export function LoginForm() {
       setLoading(false);
       setMfaCode("");
       await beginMfaChallenge(supabase);
+      submitLockRef.current = false;
       return;
     }
 
@@ -236,6 +297,7 @@ export function LoginForm() {
       hasSession: Boolean(sessionData.session),
     });
     setLoading(false);
+    submitLockRef.current = false;
     window.location.assign(next);
   }
 
@@ -265,7 +327,7 @@ export function LoginForm() {
                 .
               </>
             ) : (
-              "Ligação de autenticação inválida ou expirada. Tente novamente."
+              "Link de autenticação inválido ou expirado. Tente novamente."
             )}
           </p>
           {searchParams.get("error_description") ? (
@@ -281,6 +343,7 @@ export function LoginForm() {
           onSubmit={handlePasswordSubmit}
           className="space-y-4"
           noValidate
+          aria-busy={loading}
         >
           <div className="space-y-2">
             <Label htmlFor="login-email">Email</Label>
@@ -292,6 +355,7 @@ export function LoginForm() {
               required
               value={email}
               onChange={(ev) => setEmail(ev.target.value)}
+              disabled={loading}
               className={cn(error && "border-destructive")}
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
@@ -306,6 +370,7 @@ export function LoginForm() {
               required
               value={password}
               onChange={(ev) => setPassword(ev.target.value)}
+              disabled={loading}
               className={cn(error && "border-destructive")}
               aria-invalid={!!error}
               aria-describedby={error ? "login-error" : undefined}
@@ -317,13 +382,23 @@ export function LoginForm() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "A entrar…" : "Entrar"}
+            {loading ? "Entrando…" : "Entrar"}
           </Button>
+          {loading ? (
+            <p className="text-muted-foreground text-center text-xs">
+              Validando suas credenciais...
+            </p>
+          ) : null}
         </form>
       ) : (
-        <form onSubmit={handleMfaSubmit} className="space-y-4" noValidate>
+        <form
+          onSubmit={handleMfaSubmit}
+          className="space-y-4"
+          noValidate
+          aria-busy={loading}
+        >
           <p className="text-muted-foreground text-sm">
-            Introduza o código de 6 dígitos da sua aplicação de autenticação.
+            Digite o código de 6 dígitos do seu aplicativo de autenticação.
           </p>
           <div className="space-y-2">
             <Label htmlFor="mfa-code">Código 2FA</Label>
@@ -334,6 +409,7 @@ export function LoginForm() {
               required
               value={mfaCode}
               onChange={(ev) => setMfaCode(ev.target.value)}
+              disabled={loading}
               aria-invalid={!!error}
               aria-describedby={error ? "mfa-error" : undefined}
             />
@@ -344,7 +420,7 @@ export function LoginForm() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "A verificar…" : "Confirmar"}
+            {loading ? "Verificando…" : "Confirmar"}
           </Button>
           <Button
             type="button"
@@ -363,6 +439,7 @@ export function LoginForm() {
               setError(null);
               await createClient().auth.signOut();
             }}
+            disabled={loading}
           >
             Voltar
           </Button>
@@ -384,7 +461,7 @@ export function LoginForm() {
           href="/register"
           className="text-primary font-medium underline-offset-4 hover:underline focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
         >
-          Criar registo
+          Criar cadastro
         </Link>
       </p>
     </div>

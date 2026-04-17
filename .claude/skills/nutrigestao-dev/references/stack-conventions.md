@@ -1,5 +1,15 @@
 # Stack Conventions — NutriGestão
 
+## Convenção de Linguagem (obrigatória)
+
+- Todo texto visível para utilizadores finais (labels, botões, mensagens de erro, toasts, empty states e emails) deve usar **português do Brasil (pt-BR)**.
+- Evitar termos de português de Portugal, por exemplo:
+  - usar **senha** em vez de *palavra-passe*
+  - usar **salvar** em vez de *guardar*
+  - usar **cadastro** em vez de *registo*
+  - usar **link** em vez de *ligação* (quando for URL/ação de email)
+- Em reviews, qualquer regressão para pt-PT deve ser tratada como ajuste obrigatório antes do merge.
+
 ## Supabase Client Patterns
 
 ### Server Component (leitura)

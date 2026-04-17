@@ -160,6 +160,42 @@ export async function searchOwnerEstablishmentsAction(params: {
   return { rows };
 }
 
+export async function loadOwnerChecklistEstablishmentsDropdownAction(params?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ rows: EstablishmentPickerOption[]; total: number }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { rows: [], total: 0 };
+
+  const limit = Math.min(120, Math.max(20, params?.limit ?? 80));
+  const offset = Math.max(0, params?.offset ?? 0);
+
+  const selectClause =
+    "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)";
+
+  const { data, error, count } = await supabase
+    .from("establishments")
+    .select(selectClause, { count: "exact" })
+    .eq("clients.owner_user_id", user.id)
+    .eq("clients.kind", "pj")
+    .order("name", { ascending: true })
+    .order("id", { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (error || !data?.length) {
+    return { rows: [], total: count ?? 0 };
+  }
+
+  const rows = (data as unknown as EstablishmentPickerDbRow[])
+    .map(mapRowToPickerOption)
+    .filter((row): row is EstablishmentPickerOption => Boolean(row));
+
+  return { rows, total: count ?? rows.length };
+}
+
 export async function loadRecentChecklistEstablishmentsAction(
   limit = 3,
 ): Promise<{ rows: EstablishmentPickerOption[] }> {

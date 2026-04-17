@@ -35,6 +35,7 @@ import {
   type ExistingOpenSession,
 } from "@/lib/actions/checklist-fill";
 import {
+  loadOwnerChecklistEstablishmentsDropdownAction,
   registerChecklistEstablishmentOpenAction,
   searchOwnerEstablishmentsAction,
 } from "@/lib/actions/establishments";
@@ -56,6 +57,8 @@ type Props = {
   /** Abre e faz scroll ao cartão deste template (ex.: link do dashboard). */
   focusTemplateId?: string | null;
 };
+
+const DROPDOWN_PAGE_SIZE = 80;
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
@@ -135,7 +138,14 @@ export function ChecklistCatalog({
   const [searchResults, setSearchResults] = useState<EstablishmentPickerOption[]>([]);
   const [isSearchingEstablishments, setIsSearchingEstablishments] = useState(false);
   const [establishmentSearchError, setEstablishmentSearchError] = useState("");
+  const [dropdownLoadError, setDropdownLoadError] = useState("");
   const [isEstablishmentInputFocused, setIsEstablishmentInputFocused] = useState(false);
+  const [alphabeticalDropdownOptions, setAlphabeticalDropdownOptions] = useState<
+    EstablishmentPickerOption[]
+  >([]);
+  const [dropdownTotal, setDropdownTotal] = useState(0);
+  const [dropdownOffset, setDropdownOffset] = useState(0);
+  const [isLoadingDropdownOptions, setIsLoadingDropdownOptions] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     focusTemplateId ?? null,
   );
@@ -206,6 +216,24 @@ export function ChecklistCatalog({
     [selectedTemplateId, templates],
   );
 
+  const establishmentDropdownOptions = useMemo(() => {
+    const map = new Map<string, EstablishmentPickerOption>();
+    for (const option of alphabeticalDropdownOptions) {
+      map.set(option.id, option);
+    }
+    for (const option of searchResults) {
+      map.set(option.id, option);
+    }
+    if (selectedEstablishment) {
+      map.set(selectedEstablishment.id, selectedEstablishment);
+    }
+    return Array.from(map.values()).sort((a, b) =>
+      a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }),
+    );
+  }, [alphabeticalDropdownOptions, searchResults, selectedEstablishment]);
+
+  const hasMoreDropdownOptions = dropdownOffset < dropdownTotal;
+
   const step1Done = Boolean(establishmentId);
   const step2Done = Boolean(selectedTemplateId);
   const hasActiveFilters = Boolean(search || typeFilter || ufFilter);
@@ -219,6 +247,11 @@ export function ChecklistCatalog({
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   }, [focusTemplateId]);
+
+  useEffect(() => {
+    void loadDropdownOptions(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const query = establishmentSearchTerm.trim();
@@ -292,6 +325,35 @@ export function ChecklistCatalog({
     setEstablishmentSearchTerm(option.label);
     setEstablishmentSearchError("");
     setSearchResults([]);
+  }
+
+  async function loadDropdownOptions(reset = false) {
+    if (isLoadingDropdownOptions) return;
+    setIsLoadingDropdownOptions(true);
+    setDropdownLoadError("");
+    const nextOffset = reset ? 0 : dropdownOffset;
+    try {
+      const { rows, total } = await loadOwnerChecklistEstablishmentsDropdownAction({
+        limit: DROPDOWN_PAGE_SIZE,
+        offset: nextOffset,
+      });
+      setDropdownTotal(total);
+      setDropdownOffset(nextOffset + rows.length);
+      setAlphabeticalDropdownOptions((prev) => {
+        const merged = new Map<string, EstablishmentPickerOption>();
+        if (!reset) {
+          for (const option of prev) merged.set(option.id, option);
+        }
+        for (const option of rows) merged.set(option.id, option);
+        return Array.from(merged.values()).sort((a, b) =>
+          a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }),
+        );
+      });
+    } catch {
+      setDropdownLoadError("Não foi possível carregar a lista de empresas.");
+    } finally {
+      setIsLoadingDropdownOptions(false);
+    }
   }
 
   async function registerEstablishmentOpen() {
@@ -400,105 +462,51 @@ export function ChecklistCatalog({
                 Necessário para filtrar templates aplicáveis e iniciar o preenchimento
               </p>
             </div>
-            <div className="relative w-full max-w-md">
-              <input
-                id="checklist-establishment-search"
-                type="search"
-                autoComplete="off"
-                className={cn(
-                  "h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none",
-                  "border-input bg-background text-foreground placeholder:text-muted-foreground",
-                  "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
-                  !step1Done && "border-primary/40",
-                )}
-                placeholder="Digite nome do estabelecimento ou cliente…"
-                value={establishmentSearchTerm}
-                onFocus={() => setIsEstablishmentInputFocused(true)}
-                onBlur={() => {
-                  window.setTimeout(() => setIsEstablishmentInputFocused(false), 120);
-                }}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setEstablishmentSearchTerm(next);
-                  setEstablishmentSearchError("");
-                  if (
-                    selectedEstablishment &&
-                    next.trim() !== selectedEstablishment.label
-                  ) {
-                    setEstablishmentId("");
-                    setSelectedEstablishment(null);
-                  }
-                }}
-                aria-label="Pesquisar estabelecimento para filtrar checklists"
-              />
-              {isEstablishmentInputFocused ? (
-                <div className="border-border bg-background absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-lg border shadow-md">
-                  <div className="max-h-80 overflow-y-auto py-2">
-                    {recentOptions.length > 0 && (
-                      <div className="space-y-1 px-2 pb-2">
-                        <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Últimos abertos
-                        </p>
-                        {recentOptions.map((option) => {
-                          const active = option.id === establishmentId;
-                          return (
-                            <button
-                              key={`recent-${option.id}`}
-                              type="button"
-                              className={cn(
-                                "hover:bg-muted/70 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                                active && "bg-primary/10",
-                              )}
-                              onMouseDown={() => selectEstablishment(option)}
-                            >
-                              <span
-                                className={cn(
-                                  "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border",
-                                  active
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border",
-                                )}
-                              >
-                                {active ? <Check className="size-3" /> : null}
-                              </span>
-                              <span className="min-w-0 truncate">{option.label}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {establishmentSearchTerm.trim().length > 0 &&
-                      establishmentSearchTerm.trim().length < 3 && (
-                        <p className="px-4 py-2 text-xs text-muted-foreground">
-                          Digite ao menos 3 caracteres para pesquisar.
-                        </p>
-                      )}
-                    {establishmentSearchError ? (
-                      <p className="px-4 py-2 text-xs text-destructive" role="alert">
-                        {establishmentSearchError}
-                      </p>
-                    ) : null}
-
-                    {establishmentSearchTerm.trim().length >= 3 && (
-                      <div className="space-y-1 px-2">
-                        <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Resultados
-                        </p>
-                        {isSearchingEstablishments ? (
-                          <p className="px-2 py-2 text-xs text-muted-foreground">
-                            Pesquisando…
+            <div className="w-full max-w-md">
+              <div className="relative">
+                <input
+                  id="checklist-establishment-search"
+                  type="search"
+                  autoComplete="off"
+                  className={cn(
+                    "h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none",
+                    "border-input bg-background text-foreground placeholder:text-muted-foreground",
+                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
+                    !step1Done && "border-primary/40",
+                  )}
+                  placeholder="Digite nome do estabelecimento ou cliente…"
+                  value={establishmentSearchTerm}
+                  onFocus={() => setIsEstablishmentInputFocused(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setIsEstablishmentInputFocused(false), 120);
+                  }}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setEstablishmentSearchTerm(next);
+                    setEstablishmentSearchError("");
+                    if (
+                      selectedEstablishment &&
+                      next.trim() !== selectedEstablishment.label
+                    ) {
+                      setEstablishmentId("");
+                      setSelectedEstablishment(null);
+                    }
+                  }}
+                  aria-label="Pesquisar estabelecimento para filtrar checklists"
+                />
+                {isEstablishmentInputFocused ? (
+                  <div className="border-border bg-background absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-lg border shadow-md">
+                    <div className="max-h-80 overflow-y-auto py-2">
+                      {recentOptions.length > 0 && (
+                        <div className="space-y-1 px-2 pb-2">
+                          <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Últimos abertos
                           </p>
-                        ) : searchResults.length === 0 ? (
-                          <p className="px-2 py-2 text-xs text-muted-foreground">
-                            Nenhum estabelecimento encontrado.
-                          </p>
-                        ) : (
-                          searchResults.map((option) => {
+                          {recentOptions.map((option) => {
                             const active = option.id === establishmentId;
                             return (
                               <button
-                                key={`search-${option.id}`}
+                                key={`recent-${option.id}`}
                                 type="button"
                                 className={cn(
                                   "hover:bg-muted/70 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
@@ -519,12 +527,119 @@ export function ChecklistCatalog({
                                 <span className="min-w-0 truncate">{option.label}</span>
                               </button>
                             );
-                          })
+                          })}
+                        </div>
+                      )}
+
+                      {establishmentSearchTerm.trim().length > 0 &&
+                        establishmentSearchTerm.trim().length < 3 && (
+                          <p className="px-4 py-2 text-xs text-muted-foreground">
+                            Digite ao menos 3 caracteres para pesquisar.
+                          </p>
                         )}
-                      </div>
-                    )}
+                      {establishmentSearchError ? (
+                        <p className="px-4 py-2 text-xs text-destructive" role="alert">
+                          {establishmentSearchError}
+                        </p>
+                      ) : null}
+
+                      {establishmentSearchTerm.trim().length >= 3 && (
+                        <div className="space-y-1 px-2">
+                          <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Resultados
+                          </p>
+                          {isSearchingEstablishments ? (
+                            <p className="px-2 py-2 text-xs text-muted-foreground">
+                              Pesquisando…
+                            </p>
+                          ) : searchResults.length === 0 ? (
+                            <p className="px-2 py-2 text-xs text-muted-foreground">
+                              Nenhum estabelecimento encontrado.
+                            </p>
+                          ) : (
+                            searchResults.map((option) => {
+                              const active = option.id === establishmentId;
+                              return (
+                                <button
+                                  key={`search-${option.id}`}
+                                  type="button"
+                                  className={cn(
+                                    "hover:bg-muted/70 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
+                                    active && "bg-primary/10",
+                                  )}
+                                  onMouseDown={() => selectEstablishment(option)}
+                                >
+                                  <span
+                                    className={cn(
+                                      "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border",
+                                      active
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-border",
+                                    )}
+                                  >
+                                    {active ? <Check className="size-3" /> : null}
+                                  </span>
+                                  <span className="min-w-0 truncate">{option.label}</span>
+                                </button>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                ) : null}
+              </div>
+              <select
+                value={establishmentId}
+                onChange={(e) => {
+                  const nextId = e.target.value;
+                  if (!nextId) {
+                    setEstablishmentId("");
+                    setSelectedEstablishment(null);
+                    setEstablishmentSearchTerm("");
+                    return;
+                  }
+                  const option = establishmentDropdownOptions.find((row) => row.id === nextId);
+                  if (option) {
+                    selectEstablishment(option);
+                  }
+                }}
+                className={cn(
+                  "mt-2 h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none",
+                  "border-input bg-background text-foreground",
+                  "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
+                )}
+                aria-label="Selecionar estabelecimento"
+              >
+                <option value="">Selecione um estabelecimento</option>
+                {establishmentDropdownOptions.map((option) => (
+                  <option key={`dropdown-${option.id}`} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <p className="text-[11px] text-muted-foreground">
+                  {isLoadingDropdownOptions
+                    ? "Carregando empresas..."
+                    : `${alphabeticalDropdownOptions.length} de ${dropdownTotal || alphabeticalDropdownOptions.length} empresas carregadas (A-Z)`}
+                </p>
+                {hasMoreDropdownOptions ? (
+                  <button
+                    type="button"
+                    onClick={() => void loadDropdownOptions(false)}
+                    className="text-[11px] font-medium text-primary transition-colors hover:underline disabled:cursor-not-allowed disabled:no-underline"
+                    disabled={isLoadingDropdownOptions}
+                  >
+                    Carregar mais
+                  </button>
+                ) : null}
+              </div>
+              {dropdownLoadError ? (
+                <p className="mt-1 text-xs text-destructive" role="alert">
+                  {dropdownLoadError}
+                </p>
               ) : null}
             </div>
             {step1Done && (

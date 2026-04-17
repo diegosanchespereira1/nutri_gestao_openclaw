@@ -34,14 +34,20 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      # Runtime (recomendado mesmo com NEXT_PUBLIC_* no build — permite rodar a mesma imagem com outro projeto):
-      # NEXT_PUBLIC_SUPABASE_URL=
-      # NEXT_PUBLIC_SUPABASE_ANON_KEY=
-      # NEXT_PUBLIC_SITE_URL=
-      # Obrigatório para equipe / operações admin no servidor (ver comentário no topo deste ficheiro):
-      # SUPABASE_SERVICE_ROLE_KEY=
-      # RESEND_API_KEY=
-      # DOSSIER_EMAIL_FROM=
+      # ── Vars de build (NEXT_PUBLIC_*) ────────────────────────────────────
+      # Recomendado redefinir aqui também: permite rodar a mesma imagem com outro projeto
+      # sem rebuild. Se deixar vazio o Docker passa a var em branco; preencha no Portainer.
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+      # ── Vars obrigatórias em runtime (servidor apenas) ───────────────────
+      # SUPABASE_SERVICE_ROLE_KEY: Supabase Dashboard → Project Settings → API → service_role
+      # Defina no Portainer: Service → Environment → "SUPABASE_SERVICE_ROLE_KEY" + valor.
+      # Após adicionar ou alterar: Recreate (não só Update/Save) para o Node receber o valor.
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      # ── Vars opcionais (email) ────────────────────────────────────────────
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
     healthcheck:
       test:
         [

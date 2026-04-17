@@ -1,30 +1,20 @@
-# Stack para Portainer + Traefik (rede e certresolver alinhados ao Chatwoot na VPS).
+# Stack Portainer + Traefik — NutriGestao_stratosTech
 #
-# Antes do deploy:
-# 1) Build & push da imagem Linux/amd64 (com NEXT_PUBLIC_* no build), ex.:
-#    docker buildx build \
-#      --platform linux/amd64 \
-#      --push \
+# ANTES DO DEPLOY:
+# 1) Build e push da imagem (NEXT_PUBLIC_* como --build-arg):
+#    docker buildx build --platform linux/amd64 --push \
 #      --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
 #      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... \
 #      --build-arg NEXT_PUBLIC_SITE_URL=https://nutricao.stratostech.com.br \
-#      -t seu-registry/nutricao-stratostech:tag .
-#    # (Opcional) Validar arquitetura publicada:
-#    docker buildx imagetools inspect seu-registry/nutricao-stratostech:tag
-# 2) No Portainer: definir NUTRICAO_IMAGE e (opcional) NUTRICAO_HOST; rede HMLStratosNetwork deve existir.
+#      -t seuusuario/nutricao-stratostech:latest .
 #
-# Segredos server-only: definir no Portainer (Environment ou Secrets), nunca no build nem em NEXT_PUBLIC_*.
+# 2) No Portainer, aba "Environment variables" da STACK, definir:
+#    NUTRICAO_IMAGE            = seuusuario/nutricao-stratostech:latest
+#    SUPABASE_SERVICE_ROLE_KEY = eyJ... (Supabase > Project Settings > API > service_role)
+#    RESEND_API_KEY            = re_... (opcional)
+#    DOSSIER_EMAIL_FROM        = noreply@... (opcional)
 #
-# SUPABASE_SERVICE_ROLE_KEY — obrigatória em runtime para criar membro da equipe (auth.admin.createUser).
-#   Supabase Dashboard → Project Settings → API → service_role (secret). Nome exato da variável.
-#   No Portainer: Environment do serviço/stack (não só do build). Após alterar: Recreate / redeploy
-#   do container para o Node receber o process.env — não use no docker build.
-# RESEND_API_KEY, DOSSIER_EMAIL_FROM — envio de email (dossiê, etc.)
-#
-# Volume nomeado: persiste cache em disco do Next (.next/cache) entre recriações do container
-# (ISR, fetch cache, etc.). Gerido pela stack no Portainer.
-
-
+# 3) Apos definir as variaveis: Recreate o container (nao so Update/Save).
 
 services:
   nutricao_app:
@@ -34,20 +24,9 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      # ── Vars de build (NEXT_PUBLIC_*) ────────────────────────────────────
-      # Recomendado redefinir aqui também: permite rodar a mesma imagem com outro projeto
-      # sem rebuild. Se deixar vazio o Docker passa a var em branco; preencha no Portainer.
-      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
-      # ── Vars obrigatórias em runtime (servidor apenas) ───────────────────
-      # SUPABASE_SERVICE_ROLE_KEY: Supabase Dashboard → Project Settings → API → service_role
-      # Defina no Portainer: Service → Environment → "SUPABASE_SERVICE_ROLE_KEY" + valor.
-      # Após adicionar ou alterar: Recreate (não só Update/Save) para o Node receber o valor.
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
-      # ── Vars opcionais (email) ────────────────────────────────────────────
-      RESEND_API_KEY: ${RESEND_API_KEY:-}
-      DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
+      SUPABASE_SERVICE_ROLE_KEY: "${SUPABASE_SERVICE_ROLE_KEY:-}"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      DOSSIER_EMAIL_FROM: "${DOSSIER_EMAIL_FROM:-}"
     healthcheck:
       test:
         [

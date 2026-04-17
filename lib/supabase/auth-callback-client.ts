@@ -1,8 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest, NextResponse } from "next/server";
 
+import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
+
 /**
- * Cliente Supabase para GET /auth/callback: grava cookies de sessão no mesmo
+ * Cliente Supabase para GET /api/auth/callback: grava cookies de sessão no mesmo
  * {@link NextResponse} do redirect (necessário no App Router).
  */
 export function createSupabaseAuthCallbackClient(
@@ -16,6 +18,7 @@ export function createSupabaseAuthCallbackClient(
   }
 
   return createServerClient(url, anonKey, {
+    cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

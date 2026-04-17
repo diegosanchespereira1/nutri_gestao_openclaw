@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
 import {
   isAdminPath,
   isPathAllowedWhenLgpdBlocked,
@@ -42,6 +43,7 @@ export async function updateSession(request: NextRequest) {
   let supabaseResponse = nextWithPathname(request);
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: getSupabaseCookieOptions(),
     cookies: {
       getAll() {
         return request.cookies.getAll();

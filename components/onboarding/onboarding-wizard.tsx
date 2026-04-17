@@ -4,8 +4,10 @@ import { useActionState, useMemo, useState } from "react";
 
 import {
   completeOnboardingAction,
+  skipOnboardingDetailsAction,
   type CompleteOnboardingResult,
   type OnboardingWorkContext,
+  type SkipOnboardingDetailsResult,
 } from "@/lib/actions/onboarding";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 import { ESTABLISHMENT_TYPES, establishmentTypeLabel } from "@/lib/constants/establishment-types";
@@ -38,12 +40,12 @@ const workOptionCopy: Record<
   { title: string; description: string }
 > = {
   institutional: {
-    title: "Sobretudo institucional",
+    title: "Contexto institucional",
     description:
       "Escolas, hospitais, empresas — visitas técnicas e portarias por UF.",
   },
   clinical: {
-    title: "Sobretudo clínico",
+    title: "Contexto clínico",
     description:
       "Particulares e acompanhamento nutricional; sem foco imediato em inspeções.",
   },
@@ -88,6 +90,11 @@ export function OnboardingWizard({ templates }: Props) {
     CompleteOnboardingResult | undefined,
     FormData
   >(completeOnboardingAction, undefined);
+
+  const [skipState, skipFormAction, isSkipPending] = useActionState<
+    SkipOnboardingDetailsResult | undefined,
+    FormData
+  >(skipOnboardingDetailsAction, undefined);
 
   function canAdvanceFromStep2(): boolean {
     if (!legalName.trim()) return false;
@@ -134,6 +141,11 @@ export function OnboardingWizard({ templates }: Props) {
       {actionState?.ok === false ? (
         <p className="text-destructive text-center text-sm sm:text-left" role="alert">
           {actionState.error}
+        </p>
+      ) : null}
+      {skipState?.ok === false ? (
+        <p className="text-destructive text-center text-sm sm:text-left" role="alert">
+          {skipState.error}
         </p>
       ) : null}
 
@@ -292,6 +304,24 @@ export function OnboardingWizard({ templates }: Props) {
               </div>
             </div>
           ) : null}
+
+          <form action={skipFormAction} className="flex flex-col gap-2">
+            <input type="hidden" name="work_context" value={workContext ?? ""} />
+            <Button
+              type="submit"
+              variant="outline"
+              size="lg"
+              className="border-primary/70 bg-primary/8 hover:bg-primary/12 text-foreground w-full font-semibold shadow-sm"
+              disabled={!workContext || isSkipPending || isPending}
+            >
+              {isSkipPending ? "A concluir…" : "Preencher depois — ir ao início"}
+            </Button>
+            <p className="text-muted-foreground text-center text-xs leading-relaxed sm:text-left">
+              Sem obrigatoriedade neste passo — completa os dados do cliente em{" "}
+              <span className="text-foreground font-medium">Clientes</span> quando
+              quiseres.
+            </p>
+          </form>
 
           <div className="flex justify-between gap-2">
             <Button type="button" variant="outline" onClick={() => setStep(1)}>

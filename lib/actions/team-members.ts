@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { parseTeamJobRole } from "@/lib/constants/team-roles";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
 
 function parseProfessionalArea(raw: unknown): ProfessionalArea | null {
@@ -179,10 +180,12 @@ export async function loadTeamMembersForOwner(): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
 
+  const ownerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data, error } = await supabase
     .from("team_members")
     .select("*")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", ownerId)
     .order("full_name", { ascending: true });
 
   if (error || !data) return { rows: [] };
@@ -198,11 +201,13 @@ export async function loadTeamMemberById(
   } = await supabase.auth.getUser();
   if (!user) return { row: null };
 
+  const ownerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data, error } = await supabase
     .from("team_members")
     .select("*")
     .eq("id", id)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", ownerId)
     .maybeSingle();
 
   if (error || !data) return { row: null };
@@ -233,6 +238,14 @@ export async function createTeamMemberAction(
     return createTeamMemberError("missing");
   }
 
+  const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (accountOwnerId !== user.id) {
+    return createTeamMemberError(
+      "auth_create",
+      "Apenas o titular da conta pode adicionar ou alterar membros da equipe.",
+    );
+  }
+
   if (password !== confirmPassword) {
     return createTeamMemberError("password_mismatch");
   }
@@ -248,7 +261,7 @@ export async function createTeamMemberAction(
   const { data: existingTeamEmail, error: existingTeamEmailError } = await supabase
     .from("team_members")
     .select("id")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", accountOwnerId)
     .ilike("email", email)
     .maybeSingle();
 
@@ -352,7 +365,7 @@ export async function createTeamMemberAction(
     await supabase
       .from("team_members")
       .select("id")
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", accountOwnerId)
       .eq("member_user_id", linkedMemberUserId)
       .maybeSingle();
 
@@ -374,7 +387,7 @@ export async function createTeamMemberAction(
   }
 
   const { error } = await supabase.from("team_members").insert({
-    owner_user_id: user.id,
+    owner_user_id: accountOwnerId,
     member_user_id: linkedMemberUserId,
     full_name: persistedFullName,
     email,
@@ -416,6 +429,11 @@ export async function updateTeamMemberAction(formData: FormData): Promise<void> 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (accountOwnerId !== user.id) {
+    redirect("/equipe?err=forbidden");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/equipe?err=missing");
@@ -469,6 +487,11 @@ export async function deleteTeamMemberAction(formData: FormData): Promise<void> 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (accountOwnerId !== user.id) {
+    redirect("/equipe?err=forbidden");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/equipe");

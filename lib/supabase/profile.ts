@@ -21,7 +21,25 @@ export async function fetchProfileRole(
   return isProfileRole(data.role) ? data.role : null;
 }
 
-/** True quando o perfil existe e ainda não concluiu o wizard (Story 2.7). */
+/** Contagem de clientes do titular (RLS aplica-se ao pedido autenticado). */
+export async function countClientsForOwner(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("clients")
+    .select("*", { count: "exact", head: true })
+    .eq("owner_user_id", userId);
+
+  if (error || count == null) return 0;
+  return count;
+}
+
+/**
+ * True quando o utilizador ainda deve ver o wizard de onboarding:
+ * onboarding não concluído e sem nenhum cliente na conta.
+ * Se já existir cliente (ex.: importação), não forçamos o passo a passo.
+ */
 export async function profileNeedsOnboarding(
   supabase: SupabaseClient,
   userId: string,
@@ -33,7 +51,12 @@ export async function profileNeedsOnboarding(
     .maybeSingle();
 
   if (error || !data) return false;
-  return data.onboarding_completed_at === null;
+  if (data.onboarding_completed_at !== null) return false;
+
+  const clientCount = await countClientsForOwner(supabase, userId);
+  if (clientCount > 0) return false;
+
+  return true;
 }
 
 export async function fetchProfileTimeZone(

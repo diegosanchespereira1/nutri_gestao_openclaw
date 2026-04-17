@@ -10,6 +10,7 @@ import {
   resolveClientLogoPathFromForm,
 } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type {
   ClientKind,
   ClientLifecycleStatus,
@@ -321,6 +322,8 @@ export async function createClientAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const kind = parseKind(formData.get("kind"));
   if (!kind) {
     return { ok: false, error: "Selecione o tipo de cliente." };
@@ -366,7 +369,7 @@ export async function createClientAction(
   const { data, error } = await supabase
     .from("clients")
     .insert({
-      owner_user_id: user.id,
+      owner_user_id: workspaceOwnerId,
       kind,
       legal_name,
       trade_name,
@@ -389,7 +392,7 @@ export async function createClientAction(
   if (kind === "pj") {
     const logoRes = await resolveClientLogoPathFromForm({
       supabase,
-      userId: user.id,
+      userId: workspaceOwnerId,
       clientId: newId,
       formData,
       previousPath: null,
@@ -399,7 +402,7 @@ export async function createClientAction(
         .from("clients")
         .delete()
         .eq("id", newId)
-        .eq("owner_user_id", user.id);
+        .eq("owner_user_id", workspaceOwnerId);
       return { ok: false, error: logoRes.error };
     }
     if (logoRes.path !== null) {
@@ -407,12 +410,12 @@ export async function createClientAction(
         .from("clients")
         .update({ logo_storage_path: logoRes.path })
         .eq("id", newId)
-        .eq("owner_user_id", user.id);
+        .eq("owner_user_id", workspaceOwnerId);
     }
   }
 
   if (kind === "pf") {
-    await appendClientExamUploads(supabase, user.id, newId, formData);
+    await appendClientExamUploads(supabase, workspaceOwnerId, newId, formData);
   }
 
   revalidatePathsAfterClientMutation(newId);
@@ -438,6 +441,8 @@ export async function updateClientAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     return { ok: false, error: "Identificador em falta." };
@@ -449,7 +454,7 @@ export async function updateClientAction(
     .eq("id", id)
     .maybeSingle();
 
-  if (exErr || !existing || existing.owner_user_id !== user.id) {
+  if (exErr || !existing || existing.owner_user_id !== workspaceOwnerId) {
     return { ok: false, error: "Cliente não encontrado." };
   }
 
@@ -494,7 +499,7 @@ export async function updateClientAction(
   if (kind === "pj") {
     const logoRes = await resolveClientLogoPathFromForm({
       supabase,
-      userId: user.id,
+      userId: workspaceOwnerId,
       clientId: id,
       formData,
       previousPath: previousLogo,
@@ -531,14 +536,14 @@ export async function updateClientAction(
     .from("clients")
     .update(baseUpdate)
     .eq("id", id)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
     return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 
   if (kind === "pf") {
-    await appendClientExamUploads(supabase, user.id, id, formData);
+    await appendClientExamUploads(supabase, workspaceOwnerId, id, formData);
   }
 
   revalidatePathsAfterClientMutation(id);
@@ -552,6 +557,8 @@ export async function deleteClientAction(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/clientes");
 
@@ -559,7 +566,7 @@ export async function deleteClientAction(formData: FormData) {
     .from("clients")
     .select("logo_storage_path")
     .eq("id", id)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
 
   const logoPath =
@@ -572,7 +579,7 @@ export async function deleteClientAction(formData: FormData) {
     .from("clients")
     .delete()
     .eq("id", id)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", workspaceOwnerId);
 
   revalidatePath("/clientes");
   revalidatePath("/pacientes");
@@ -594,10 +601,12 @@ export async function loadClientsForOwner(options: {
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   let q = supabase
     .from("clients")
     .select("*")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .order("created_at", { ascending: false });
 
   const kindFilter = options.kind;

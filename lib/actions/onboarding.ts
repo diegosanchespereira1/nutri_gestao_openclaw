@@ -237,3 +237,63 @@ export async function completeOnboardingAction(
   revalidatePath("/visitas/nova");
   redirect("/inicio?bemvindo=1");
 }
+
+export type SkipOnboardingDetailsResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Conclui o onboarding sem criar cliente/estabelecimento — apenas grava o contexto de trabalho.
+ * O utilizador pode completar dados em Clientes depois.
+ */
+export async function skipOnboardingDetailsAction(
+  _prev: SkipOnboardingDetailsResult | undefined,
+  formData: FormData,
+): Promise<SkipOnboardingDetailsResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("onboarding_completed_at")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (profile?.onboarding_completed_at) {
+    redirect("/inicio");
+  }
+
+  const work_context = parseWorkContext(formData.get("work_context"));
+  if (!work_context) {
+    return {
+      ok: false,
+      error:
+        "Selecione como trabalha (institucional, clínico ou ambos) antes de continuar.",
+    };
+  }
+
+  const { error: profErr } = await supabase
+    .from("profiles")
+    .update({
+      work_context,
+      onboarding_completed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("user_id", user.id);
+
+  if (profErr) {
+    return {
+      ok: false,
+      error: "Não foi possível concluir o onboarding. Tente novamente.",
+    };
+  }
+
+  revalidatePath("/inicio");
+  revalidatePath("/onboarding");
+  revalidatePath("/clientes");
+  revalidatePath("/visitas/nova");
+  redirect("/inicio?bemvindo=1&onboarding=minimal");
+}

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { AppTimeZoneProvider } from "@/components/app-timezone-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -35,6 +36,7 @@ export default async function AppAreaLayout({
 
   return (
     <AppTimeZoneProvider timeZone={timeZone}>
+      <Toaster />
       {onboardingOnly ? (
         <div className="bg-background min-h-screen">{children}</div>
       ) : (

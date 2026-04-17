@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ClientKind } from "@/lib/types/clients";
 import type {
   PatientRow,
@@ -178,6 +179,8 @@ export async function createPatientAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   // client_id é opcional (Story 2.1b — paciente pode ser independente)
   const clientIdRaw = String(formData.get("client_id") ?? "").trim();
   const client_id = clientIdRaw.length > 0 ? clientIdRaw : null;
@@ -196,7 +199,7 @@ export async function createPatientAction(
       .eq("id", client_id)
       .maybeSingle();
 
-    if (!clientRow || clientRow.owner_user_id !== user.id) {
+    if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
       return { ok: false, error: "Cliente inválido." };
     }
 
@@ -260,7 +263,7 @@ export async function createPatientAction(
   const { data, error } = await supabase
     .from("patients")
     .insert({
-      user_id: user.id,
+      user_id: workspaceOwnerId,
       client_id,
       establishment_id,
       full_name,

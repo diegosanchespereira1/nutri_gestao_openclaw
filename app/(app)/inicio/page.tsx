@@ -24,8 +24,12 @@ import { buildWeeklyBriefing } from "@/lib/dashboard/weekly-briefing";
 import { loadScheduledVisitsForOwner } from "@/lib/actions/visits";
 import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
+import { FirstClientReminderToast } from "@/components/dashboard/first-client-reminder-toast";
 import { createClient } from "@/lib/supabase/server";
-import { fetchProfileTimeZone } from "@/lib/supabase/profile";
+import {
+  countClientsForOwner,
+  fetchProfileTimeZone,
+} from "@/lib/supabase/profile";
 import { cn } from "@/lib/utils";
 
 const clinicalQuickLinkClass =
@@ -38,6 +42,7 @@ export default async function InicioPage({
 }) {
   const sp = await searchParams;
   const bemvindo = sp.bemvindo === "1";
+  const onboardingMinimal = sp.onboarding === "minimal";
 
   const supabase = await createClient();
   const {
@@ -46,7 +51,11 @@ export default async function InicioPage({
   if (!user) {
     redirect("/login");
   }
-  const tz = await fetchProfileTimeZone(supabase, user.id);
+  const [tz, clientCount] = await Promise.all([
+    fetchProfileTimeZone(supabase, user.id),
+    countClientsForOwner(supabase, user.id),
+  ]);
+  const hasClients = clientCount > 0;
   const [{ rows }, complianceAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([
     loadScheduledVisitsForOwner(),
     loadComplianceDashboardAlerts(tz),
@@ -67,27 +76,54 @@ export default async function InicioPage({
 
   return (
     <PageLayout>
+      <FirstClientReminderToast hasClients={hasClients} />
       {bemvindo ? (
         <div
           className="border-primary/40 bg-primary/5 rounded-xl border p-4"
           role="status"
         >
-          <p className="text-foreground text-sm font-medium">
-            Está tudo pronto para agendar a primeira visita
-          </p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            O primeiro cliente já está na tua carteira. Usa o fluxo de visitas
-            para marcar quando fores ao terreno.
-          </p>
-          <Link
-            href="/visitas/nova"
-            className={cn(
-              buttonVariants({ size: "sm" }),
-              "mt-4 inline-flex w-full justify-center sm:w-auto",
-            )}
-          >
-            Agendar visita
-          </Link>
+          {onboardingMinimal || !hasClients ? (
+            <>
+              <p className="text-foreground text-sm font-medium">
+                Conta configurada
+              </p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                {hasClients
+                  ? "Podes explorar a app à vontade."
+                  : "Ainda não há clientes na carteira — adiciona o primeiro quando for conveniente."}
+              </p>
+              {!hasClients ? (
+                <Link
+                  href="/clientes/novo"
+                  className={cn(
+                    buttonVariants({ size: "sm" }),
+                    "mt-4 inline-flex w-full justify-center sm:w-auto",
+                  )}
+                >
+                  Novo cliente
+                </Link>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <p className="text-foreground text-sm font-medium">
+                Está tudo pronto para agendar a primeira visita
+              </p>
+              <p className="text-muted-foreground mt-1 text-sm">
+                O primeiro cliente já está na tua carteira. Usa o fluxo de visitas
+                para marcar quando fores ao terreno.
+              </p>
+              <Link
+                href="/visitas/nova"
+                className={cn(
+                  buttonVariants({ size: "sm" }),
+                  "mt-4 inline-flex w-full justify-center sm:w-auto",
+                )}
+              >
+                Agendar visita
+              </Link>
+            </>
+          )}
         </div>
       ) : null}
 

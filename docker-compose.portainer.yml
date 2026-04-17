@@ -1,52 +1,41 @@
-# Stack Portainer + Traefik — NutriGestão (StratosTech)
+# NutriGestão — Portainer + Traefik
 #
-# ANTES DO DEPLOY
-# 1) Build e push (NEXT_PUBLIC_* no build da imagem):
-#    docker buildx build --platform linux/amd64 --push \
-#      --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co \
-#      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ... \
-#      --build-arg NEXT_PUBLIC_SITE_URL=https://nutricao.stratostech.com.br \
-#      -t stratostech/nutricao-stratostech:latest .
+# NOTAS IMPORTANTES
+# ─────────────────
+# 1) Rede externa: cria antes (ou o deploy falha):
+#    docker network create HMLStratosNetwork
 #
-# 2) No Portainer → Stack → Environment, definir no mínimo:
-#    NUTRICAO_IMAGE=stratostech/nutricao-stratostech:latest
-#    SUPABASE_SERVICE_ROLE_KEY=<Project Settings → API → service_role>
-#    (Opcional) repetir NEXT_PUBLIC_* aqui se quiseres mudar projeto sem rebuild.
+# 2) Não uses volume em /app/.next/cache com USER nextjs na imagem: o volume fica
+#    root-owned e o Next não consegue escrever → erro 500 em runtime.
 #
-# 3) Após alterar env: Recreate do serviço (não só Save).
+# 3) Em Docker Swarm (stack), não uses `container_name` (não suportado).
 #
-# Segredos server-only nunca vão para ARG do build nem para NEXT_PUBLIC_*.
+# 4) Build da imagem com NEXT_PUBLIC_* em --build-arg; no Portainer define também
+#    SUPABASE_SERVICE_ROLE_KEY na stack e Recreate após alterar.
 
 services:
   nutricao_app:
     image: ${NUTRICAO_IMAGE:-stratostech/nutricao-stratostech:latest}
-    platform: ${NUTRICAO_PLATFORM:-linux/amd64}
-    container_name: nutricao_stratostech
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      # Runtime: permitem trocar projeto / diagnóstico sem rebuild (valores vazios = usa o que está na imagem).
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
       NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
-    # / redireciona (307); healthcheck deve usar rota que devolve 200 (página estática).
+    # Rota estática com 200 (evita 307 de /)
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "CMD-SHELL",
+          'node -e "fetch(\"http://127.0.0.1:3000/login\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
         ]
       interval: 30s
-      timeout: 10s
+      timeout: 15s
       retries: 5
-      start_period: 60s
-    volumes:
-      - nutricao_next_cache:/app/.next/cache
+      start_period: 90s
     labels:
       - traefik.enable=true
       - "traefik.http.routers.nutricao_app.rule=Host(`nutricao.stratostech.com.br`)"
@@ -61,10 +50,6 @@ services:
       - traefik.docker.network=HMLStratosNetwork
     networks:
       - HMLStratosNetwork
-
-volumes:
-  nutricao_next_cache:
-    driver: local
 
 networks:
   HMLStratosNetwork:

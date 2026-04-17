@@ -399,7 +399,7 @@ export function TeamMemberForm({ mode, initial }: Props) {
           onChange={
             isCreate
               ? (event) => {
-                  const value = event.target.value;
+                  const value = event.target.value as TeamMemberRow["job_role"];
                   setJobRoleValue(value);
                   if (attemptedSubmit) {
                     runCreateValidation({ jobRole: value });

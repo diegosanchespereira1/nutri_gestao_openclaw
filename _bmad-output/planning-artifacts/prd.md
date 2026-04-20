@@ -536,7 +536,7 @@ Plataforma SaaS B2B multi-tenant com componente B2C (portal de acesso externo). 
 ### 2. Gestão de Clientes, Estabelecimentos e Pacientes
 
 - **FR6:** Profissional pode cadastrar clientes pessoa física ou jurídica
-- **FR7:** Profissional pode cadastrar estabelecimentos vinculados a clientes PJ, classificados por tipo (escola, hospital, clínica, lar de idosos, empresa)
+- **FR7:** Profissional pode cadastrar **exatamente 1 estabelecimento** vinculado a cada cliente PJ, classificado por tipo (escola, hospital, clínica, lar de idosos, empresa). Relação 1:1 — cada CNPJ é único, portanto cada cliente corresponde a um único estabelecimento. Para múltiplas unidades de uma mesma empresa, criar um cliente distinto por unidade.
 - **FR8:** Profissional pode cadastrar pacientes vinculados a estabelecimentos ou diretamente a clientes PF
 - **FR9:** Profissional pode registrar perfil completo do paciente com formulários de avaliação nutricional
 - **FR10:** Profissional pode visualizar histórico consolidado de um paciente atendido em múltiplos estabelecimentos

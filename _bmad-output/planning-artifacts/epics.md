@@ -29,7 +29,7 @@ FR3: Profissional pode ativar e gerenciar autenticação de dois fatores
 FR4: Profissional pode cadastrar e manter seu perfil incluindo número de inscrição no CRN
 FR5: Sistema insere identificação CRN automaticamente em todos os documentos e prescrições gerados
 FR6: Profissional pode cadastrar clientes pessoa física ou jurídica
-FR7: Profissional pode cadastrar estabelecimentos vinculados a clientes PJ, classificados por tipo (escola, hospital, clínica, lar de idosos, empresa)
+FR7: Profissional pode cadastrar exatamente 1 estabelecimento por cliente PJ (relação 1:1 — 1 CNPJ = 1 cliente = 1 estabelecimento), classificado por tipo (escola, hospital, clínica, lar de idosos, empresa). Para múltiplas unidades, criar um cliente distinto por unidade.
 FR8: Profissional pode cadastrar pacientes vinculados a estabelecimentos ou diretamente a clientes PF
 FR9: Profissional pode registrar perfil completo do paciente com formulários de avaliação nutricional
 FR10: Profissional pode visualizar histórico consolidado de um paciente atendido em múltiplos estabelecimentos

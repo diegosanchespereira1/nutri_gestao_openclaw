@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { EstablishmentForm } from "@/components/clientes/establishment-form";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +23,17 @@ export default async function NovoEstabelecimentoPage({
     notFound();
   }
 
+  // Regra 1:1 — se já existe um estabelecimento, redireciona direto para edição.
+  const { data: existing } = await supabase
+    .from("establishments")
+    .select("id")
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (existing) {
+    redirect(`/clientes/${clientId}/estabelecimentos/${existing.id}/editar`);
+  }
+
   return (
     <div className="space-y-6">
       <Link
@@ -40,6 +51,10 @@ export default async function NovoEstabelecimentoPage({
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
           Cliente: <span className="text-foreground">{client.legal_name}</span>
+        </p>
+        <p className="text-muted-foreground mt-1 text-xs">
+          Cada cliente representa um único estabelecimento (1 CNPJ = 1 cadastro).
+          Para registar outra unidade, crie um novo cliente.
         </p>
       </div>
       <EstablishmentForm

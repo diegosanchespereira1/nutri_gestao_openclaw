@@ -14,10 +14,10 @@ Objetivo: **um contrato na carteira** não é a mesma coisa que **uma pessoa no 
 | **Cliente** (lista *Clientes*) | Registo de **contrato / carteira** com o teu serviço — PF ou PJ. É o “ficheiro comercial + contexto” onde depois ligas unidades e pessoas. | Não confundir com “só o paciente”. Um cliente PF pode ser uma família ou um titular que paga por outrem. |
 | **Pessoa física (PF)** | Contrato com **uma pessoa** (particular). Muitas vezes titular = quem come consultas; pode ser diferente (ex.: pai titular, criança atendida). | Não é um “tipo de paciente”; é o **tipo de contrato**. |
 | **Pessoa jurídica (PJ)** | **Empresa ou organização** que contrata (escola, clínica, empresa, associação). É a **entidade contratante**, não o lugar físico nem uma pessoa. | O PJ **não** é o estabelecimento. O PJ *tem* estabelecimentos. |
-| **Estabelecimento** | **Unidade / local de atuação** vinculado a um **cliente PJ** (ex.: “Escola X — unidade Sul”). Serve portarias, visitas e pacientes institucionais. | Não é o cliente PJ; são **vários estabelecimentos** possíveis por um PJ. |
+| **Estabelecimento** | **Unidade / local de atuação** vinculado a um **cliente PJ** (ex.: “Escola X — unidade Sul”). Serve portarias, visitas e pacientes institucionais. | Relação 1:1 — cada cliente PJ tem **exatamente 1 estabelecimento** (1 CNPJ = 1 cliente = 1 estabelecimento). Para múltiplas unidades físicas, criar um cliente distinto por unidade. |
 | **Paciente** | **Pessoa com ficha clínica** no sistema (evolução, avaliações, histórico). Pode estar ligada a um cliente PF **sem** estabelecimento ou a um **estabelecimento** de um PJ. | “Ter paciente” não exige PJ: em PF, o fluxo típico é criar o cliente e depois **Pacientes** no mesmo registo. |
 
-**Regra mental para o utilizador:** *Primeiro defines **com quem é o contrato** (PF ou PJ). Se for PJ, adicionas **estabelecimentos**; em qualquer caso, as **pessoas com ficha clínica** são **Pacientes** ligados a esse contexto.*
+**Regra mental para o utilizador:** *Primeiro defines **com quem é o contrato** (PF ou PJ). Se for PJ, adicionas **o estabelecimento** (exatamente 1 por cliente — 1 CNPJ = 1 cliente); se uma empresa tiver 3 unidades físicas, cadastra 3 clientes distintos. Em qualquer caso, as **pessoas com ficha clínica** são **Pacientes** ligados a esse contexto.*
 
 ### 0.1 Fluxo de cadastro (visão em degraus)
 

@@ -349,6 +349,20 @@ export async function createEstablishmentAction(
     };
   }
 
+  // Regra 1:1 — cada cliente só pode ter 1 estabelecimento.
+  const { count: existingCount, error: countErr } = await supabase
+    .from("establishments")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", clientId);
+
+  if (!countErr && (existingCount ?? 0) > 0) {
+    return {
+      ok: false,
+      error:
+        "Este cliente já possui um estabelecimento. Cada cliente só pode ter 1 estabelecimento (1 CNPJ = 1 cliente). Para registar uma nova unidade, crie um novo cliente.",
+    };
+  }
+
   const establishment_type = parseEstablishmentType(
     formData.get("establishment_type"),
   );

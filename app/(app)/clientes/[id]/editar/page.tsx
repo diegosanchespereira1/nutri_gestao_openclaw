@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { loadContractsByClient } from "@/lib/actions/client-contracts";
+import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { normalizeClientRow } from "@/lib/clients/normalize-client-row";
 import { todayKey } from "@/lib/datetime/calendar-tz";
@@ -85,6 +86,7 @@ export default async function EditarClientePage({
   );
   const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
   const { rows: contracts } = await loadContractsByClient(row.id);
+  const customSegments = await loadCustomSegmentsAction();
 
   const statusLabel =
     row.lifecycle_status === "ativo"
@@ -158,6 +160,7 @@ export default async function EditarClientePage({
         defaultTechnicalRepEmail={row.technical_rep_email ?? ""}
         defaultTechnicalRepPhone={row.technical_rep_phone ?? ""}
         defaultBusinessSegment={row.business_segment ?? ""}
+        defaultCustomSegments={customSegments}
         defaultEstName={estData?.name ?? ""}
         defaultEstAddressLine1={estData?.address_line1 ?? ""}
         defaultEstAddressLine2={estData?.address_line2 ?? ""}

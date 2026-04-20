@@ -8,6 +8,7 @@ import {
   markFinancialChargePaidAction,
 } from "@/lib/actions/financial-charges";
 import { loadClientsForOwner } from "@/lib/actions/clients";
+import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 import { FinancialIssuedPaidBarChart } from "@/components/financeiro/financial-issued-paid-bar-chart";
 import { FinancialReceivedBarChart } from "@/components/financeiro/financial-received-bar-chart";
 import { FinancialTopOverdueBarChart } from "@/components/financeiro/financial-top-overdue-bar-chart";
@@ -143,9 +144,10 @@ export default async function FinanceiroPage({ searchParams }: Props) {
   const filterStatus = parseChargeFilterStatus(sp.status);
   const filterClientId = parseChargeFilterClientId(sp.client);
 
-  const [{ rows: charges }, { rows: clients }] = await Promise.all([
+  const [{ rows: charges }, { rows: clients }, customSegments] = await Promise.all([
     loadFinancialChargesForOwner(),
     loadClientsForOwner({}),
+    loadCustomSegmentsAction(),
   ]);
 
   const filteredCharges = applyFinancialChargeFilters(
@@ -587,6 +589,7 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                             business_segment: c.business_segment,
                             kind: c.kind,
                           }))}
+                          customSegments={customSegments}
                         />
                       </div>
 

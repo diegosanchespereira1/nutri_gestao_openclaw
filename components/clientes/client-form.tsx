@@ -7,18 +7,24 @@ import {
   HeartPulse,
   IdCard,
   ImageIcon,
+  Loader2,
   MapPin,
+  Plus,
   StickyNote,
   UserCircle,
   Users,
 } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 
 import {
   type ClientFormResult,
   createClientAction,
   updateClientAction,
 } from "@/lib/actions/clients";
+import {
+  type ClientCustomSegment,
+  createCustomSegmentAction,
+} from "@/lib/actions/client-segments";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -28,6 +34,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -122,6 +135,7 @@ export function ClientForm({
   defaultTechnicalRepEmail,
   defaultTechnicalRepPhone,
   defaultBusinessSegment,
+  defaultCustomSegments = [],
   defaultEstName = "",
   defaultEstAddressLine1 = "",
   defaultEstAddressLine2 = "",
@@ -175,6 +189,8 @@ export function ClientForm({
   defaultTechnicalRepPhone: string;
   /** Valor do select `business_segment`; vazio = sem categoria. */
   defaultBusinessSegment: string;
+  /** Categorias personalizadas já criadas no workspace. */
+  defaultCustomSegments?: ClientCustomSegment[];
   /** Campos do estabelecimento 1:1 (apenas PJ). */
   defaultEstName?: string;
   defaultEstAddressLine1?: string;
@@ -189,6 +205,35 @@ export function ClientForm({
   const [kind, setKind] = useState<ClientKind>(defaultKind);
   const [tab, setTab] = useState<ClientFormTab>("identificacao");
 
+  const [segmentValue, setSegmentValue] = useState(defaultBusinessSegment);
+  const [customSegments, setCustomSegments] =
+    useState<ClientCustomSegment[]>(defaultCustomSegments);
+  const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
+  const [newSegmentLabel, setNewSegmentLabel] = useState("");
+  const [newSegmentError, setNewSegmentError] = useState<string | null>(null);
+  const [segmentPending, startSegmentTransition] = useTransition();
+  const newSegmentInputRef = useRef<HTMLInputElement>(null);
+
+  function handleCreateSegment() {
+    setNewSegmentError(null);
+    startSegmentTransition(async () => {
+      const result = await createCustomSegmentAction(newSegmentLabel);
+      if (!result.ok) {
+        setNewSegmentError(result.error);
+        return;
+      }
+      setCustomSegments((prev) => {
+        const already = prev.some((s) => s.id === result.segment.id);
+        return already ? prev : [...prev, result.segment].sort((a, b) =>
+          a.label.localeCompare(b.label, "pt", { sensitivity: "base" }),
+        );
+      });
+      setSegmentValue(result.segment.label);
+      setNewSegmentLabel("");
+      setSegmentDialogOpen(false);
+    });
+  }
+
   function setKindAndTab(next: ClientKind) {
     setKind(next);
     if (next !== "pf" && PF_ONLY_TABS.includes(tab)) {
@@ -202,6 +247,7 @@ export function ClientForm({
   const hasLogoPreview = Boolean(defaultLogoPreviewUrl);
 
   return (
+    <>
     <Card className="max-w-3xl">
       <CardHeader className="border-b border-foreground/10 pb-4">
         <CardTitle className="text-base">
@@ -370,22 +416,50 @@ export function ClientForm({
                     <Label htmlFor="business-segment">
                       Categoria do negócio (opcional)
                     </Label>
-                    <select
-                      id="business-segment"
-                      name="business_segment"
-                      defaultValue={defaultBusinessSegment}
-                      className={selectClassName}
-                    >
-                      <option value="">— Indefinida —</option>
-                      {CLIENT_BUSINESS_SEGMENTS.map((s) => (
-                        <option key={s} value={s}>
-                          {clientBusinessSegmentLabel[s]}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        id="business-segment"
+                        name="business_segment"
+                        value={segmentValue}
+                        onChange={(e) => setSegmentValue(e.target.value)}
+                        className={selectClassName}
+                      >
+                        <option value="">— Indefinida —</option>
+                        {CLIENT_BUSINESS_SEGMENTS.map((s) => (
+                          <option key={s} value={s}>
+                            {clientBusinessSegmentLabel[s]}
+                          </option>
+                        ))}
+                        {customSegments.length > 0 && (
+                          <optgroup label="Personalizadas">
+                            {customSegments.map((s) => (
+                              <option key={s.id} value={s.label}>
+                                {s.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        title="Criar nova categoria"
+                        aria-label="Criar nova categoria de negócio"
+                        onClick={() => {
+                          setNewSegmentLabel("");
+                          setNewSegmentError(null);
+                          setSegmentDialogOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                     <p className="text-muted-foreground text-xs">
                       Aparece na lista de clientes (ex.: padaria, escola,
-                      hospital). Pode definir mais tarde.
+                      hospital). Use <strong>+</strong> para criar uma nova
+                      categoria caso não esteja na lista.
                     </p>
                   </div>
                 ) : null}
@@ -1071,5 +1145,68 @@ export function ClientForm({
         </CardFooter>
       </form>
     </Card>
+
+    <Dialog
+      open={segmentDialogOpen}
+      onOpenChange={(open) => {
+        if (!segmentPending) setSegmentDialogOpen(open);
+      }}
+    >
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Nova categoria de negócio</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="new-segment-label">Nome da categoria</Label>
+            <Input
+              id="new-segment-label"
+              ref={newSegmentInputRef}
+              value={newSegmentLabel}
+              onChange={(e) => {
+                setNewSegmentLabel(e.target.value);
+                setNewSegmentError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleCreateSegment();
+                }
+              }}
+              placeholder="Ex.: Creche, UBS, Catering…"
+              maxLength={80}
+              disabled={segmentPending}
+              autoFocus
+            />
+            {newSegmentError ? (
+              <p className="text-destructive text-xs" role="alert">
+                {newSegmentError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setSegmentDialogOpen(false)}
+            disabled={segmentPending}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={handleCreateSegment}
+            disabled={segmentPending || newSegmentLabel.trim().length === 0}
+          >
+            {segmentPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />
+            ) : null}
+            Criar e selecionar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

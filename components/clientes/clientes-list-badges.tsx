@@ -1,8 +1,11 @@
-import { clientBusinessSegmentLabel } from "@/lib/constants/client-business-segment";
+import {
+  type ClientBusinessSegment,
+  clientBusinessSegmentLabel,
+  isClientBusinessSegment,
+} from "@/lib/constants/client-business-segment";
 import { clientLifecycleBadgeLabel } from "@/lib/constants/client-lifecycle";
 import { cn } from "@/lib/utils";
 import type {
-  ClientBusinessSegment,
   ClientKind,
   ClientLifecycleStatus,
 } from "@/lib/types/clients";
@@ -58,7 +61,7 @@ function badgeBase() {
 
 function categoryBadgeContent(
   kind: ClientKind,
-  businessSegment: ClientBusinessSegment | null,
+  businessSegment: string | null,
 ): { label: string; title: string; className: string } {
   if (kind === "pf") {
     return {
@@ -68,10 +71,17 @@ function categoryBadgeContent(
     };
   }
   if (businessSegment) {
+    if (isClientBusinessSegment(businessSegment)) {
+      return {
+        label: clientBusinessSegmentLabel[businessSegment],
+        title: clientBusinessSegmentLabel[businessSegment],
+        className: segmentBadgeClass[businessSegment],
+      };
+    }
     return {
-      label: clientBusinessSegmentLabel[businessSegment],
-      title: clientBusinessSegmentLabel[businessSegment],
-      className: segmentBadgeClass[businessSegment],
+      label: businessSegment,
+      title: businessSegment,
+      className: segmentBadgeClass.outro,
     };
   }
   return {
@@ -87,7 +97,7 @@ export function ClientesListBadges({
   lifecycleStatus,
 }: {
   kind: ClientKind;
-  businessSegment: ClientBusinessSegment | null;
+  businessSegment: string | null;
   lifecycleStatus: ClientLifecycleStatus;
 }) {
   const cat = categoryBadgeContent(kind, businessSegment);

@@ -19,9 +19,6 @@ import type {
 } from "@/lib/types/clients";
 import type { PatientSex } from "@/lib/types/patients";
 import {
-  isClientBusinessSegment,
-} from "@/lib/constants/client-business-segment";
-import {
   establishmentTypeFromSegment,
 } from "@/lib/constants/establishment-types";
 import {
@@ -252,8 +249,8 @@ function parsePjFields(formData: FormData):
   const segRaw = String(formData.get("business_segment") ?? "").trim();
   let business_segment: string | null = null;
   if (segRaw.length > 0) {
-    if (!isClientBusinessSegment(segRaw)) {
-      return { ok: false, error: "Categoria do negócio inválida." };
+    if (segRaw.length > 80) {
+      return { ok: false, error: "Categoria do negócio muito longa." };
     }
     business_segment = segRaw;
   }

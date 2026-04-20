@@ -1,8 +1,11 @@
 import { ClientForm } from "@/components/clientes/client-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 
-export default function NovoClientePage() {
+export default async function NovoClientePage() {
+  const customSegments = await loadCustomSegmentsAction();
+
   return (
     <PageLayout variant="form">
       <PageHeader
@@ -52,6 +55,7 @@ export default function NovoClientePage() {
         defaultTechnicalRepEmail=""
         defaultTechnicalRepPhone=""
         defaultBusinessSegment=""
+        defaultCustomSegments={customSegments}
         defaultEstName=""
         defaultEstAddressLine1=""
         defaultEstAddressLine2=""

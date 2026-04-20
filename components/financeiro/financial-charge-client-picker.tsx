@@ -9,18 +9,16 @@ import { Label } from "@/components/ui/label";
 import {
   CLIENT_BUSINESS_SEGMENTS,
   clientBusinessSegmentLabel,
+  isClientBusinessSegment,
 } from "@/lib/constants/client-business-segment";
 import { cn } from "@/lib/utils";
-import type {
-  ClientBusinessSegment,
-  ClientKind,
-} from "@/lib/types/clients";
+import type { ClientKind } from "@/lib/types/clients";
 
 export type FinancialChargeClientPickerItem = {
   id: string;
   legal_name: string;
   trade_name: string | null;
-  business_segment: ClientBusinessSegment | null;
+  business_segment: string | null;
   kind: ClientKind;
 };
 
@@ -45,6 +43,8 @@ const segmentSelectClassName =
 type Props = {
   id: string;
   clients: FinancialChargeClientPickerItem[];
+  /** Categorias personalizadas do workspace para o filtro. */
+  customSegments?: { id: string; label: string }[];
   required?: boolean;
   className?: string;
 };
@@ -56,6 +56,7 @@ type Props = {
 export function FinancialChargeClientPicker({
   id,
   clients,
+  customSegments = [],
   required = false,
   className,
 }: Props) {
@@ -131,12 +132,7 @@ export function FinancialChargeClientPicker({
                 ? SEGMENT_NONE
                 : segmentFilter
           }
-          onChange={(e) => {
-            const v = e.target.value;
-            if (v === SEGMENT_ALL) setSegmentFilter(SEGMENT_ALL);
-            else if (v === SEGMENT_NONE) setSegmentFilter(SEGMENT_NONE);
-            else setSegmentFilter(v as ClientBusinessSegment);
-          }}
+          onChange={(e) => setSegmentFilter(e.target.value)}
           aria-label="Filtrar clientes por categoria"
         >
           <option value={SEGMENT_ALL}>Todas as categorias</option>
@@ -146,6 +142,15 @@ export function FinancialChargeClientPicker({
               {clientBusinessSegmentLabel[seg]}
             </option>
           ))}
+          {customSegments.length > 0 && (
+            <optgroup label="Personalizadas">
+              {customSegments.map((seg) => (
+                <option key={seg.id} value={seg.label}>
+                  {seg.label}
+                </option>
+              ))}
+            </optgroup>
+          )}
         </select>
       </div>
 
@@ -209,7 +214,9 @@ export function FinancialChargeClientPicker({
               filtered.map((c) => {
                 const active = c.id === resolvedSelectedId;
                 const seg = c.business_segment
-                  ? clientBusinessSegmentLabel[c.business_segment]
+                  ? (isClientBusinessSegment(c.business_segment)
+                      ? clientBusinessSegmentLabel[c.business_segment]
+                      : c.business_segment)
                   : "Sem categoria";
                 return (
                   <li key={c.id}>

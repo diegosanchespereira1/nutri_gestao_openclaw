@@ -12,7 +12,10 @@ import type {
   PatientImportRow,
   ParsedRow,
 } from "@/lib/types/import";
+import type { ClientBusinessSegment } from "@/lib/constants/client-business-segment";
+import { isClientBusinessSegment } from "@/lib/constants/client-business-segment";
 import type { ClientKind } from "@/lib/types/clients";
+import type { PatientSex } from "@/lib/types/patients";
 import type { EstablishmentType } from "@/lib/types/establishments";
 
 export const MAX_ROWS = 500;
@@ -133,12 +136,17 @@ const VALID_EST_TYPES = new Set<EstablishmentType>([
   "lar_idosos",
   "empresa",
 ]);
-const VALID_SEX = new Set(["female", "male", "other"]);
+const VALID_SEX = new Set<PatientSex>(["female", "male", "other"]);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function nullIfEmpty(v: string | undefined): string | null {
   const s = (v ?? "").trim();
   return s.length > 0 ? s : null;
+}
+
+function parseSex(raw: string | undefined): PatientSex | null {
+  const s = (raw ?? "").trim().toLowerCase() as PatientSex;
+  return VALID_SEX.has(s) ? s : null;
 }
 
 export function validateClientRows(rows: ParsedRow[]): ParseResult<ClientImportRow> {
@@ -161,6 +169,36 @@ export function validateClientRows(rows: ParsedRow[]): ParseResult<ClientImportR
       return;
     }
 
+    const segRaw = (row.business_segment ?? "").trim().toLowerCase();
+    const business_segment: ClientBusinessSegment | null =
+      segRaw && isClientBusinessSegment(segRaw) ? segRaw : null;
+
+    if (segRaw && !isClientBusinessSegment(segRaw)) {
+      errors.push({
+        rowIndex: i,
+        message: `Categoria do negócio inválida: "${row.business_segment}". Use: padaria, mercado, escola, hospital, clinica, restaurante, hotel, industria_alimenticia, lar_idosos, empresa, outro.`,
+      });
+      return;
+    }
+
+    const birthDate = nullIfEmpty(row.birth_date);
+    if (birthDate && !DATE_RE.test(birthDate)) {
+      errors.push({
+        rowIndex: i,
+        message: `Data de nascimento inválida: "${row.birth_date}". Use o formato AAAA-MM-DD.`,
+      });
+      return;
+    }
+
+    const sexRaw = (row.sex ?? "").trim().toLowerCase();
+    if (sexRaw && !VALID_SEX.has(sexRaw as PatientSex)) {
+      errors.push({
+        rowIndex: i,
+        message: `Sexo inválido: "${row.sex}". Use female, male ou other.`,
+      });
+      return;
+    }
+
     valid.push({
       legal_name: name,
       kind,
@@ -168,6 +206,12 @@ export function validateClientRows(rows: ParsedRow[]): ParseResult<ClientImportR
       trade_name: nullIfEmpty(row.trade_name),
       email: nullIfEmpty(row.email),
       phone: nullIfEmpty(row.phone),
+      business_segment,
+      attended_full_name: nullIfEmpty(row.attended_full_name),
+      birth_date: birthDate,
+      sex: parseSex(row.sex),
+      dietary_restrictions: nullIfEmpty(row.dietary_restrictions),
+      chronic_medications: nullIfEmpty(row.chronic_medications),
     });
   });
 
@@ -183,7 +227,6 @@ export function validateEstablishmentRows(
   rows.forEach((row, i) => {
     const name = (row.name ?? "").trim();
     const type = (row.establishment_type ?? "").trim().toLowerCase() as EstablishmentType;
-    const address = (row.address_line1 ?? "").trim();
 
     if (!name) {
       errors.push({ rowIndex: i, message: "Nome do estabelecimento é obrigatório." });
@@ -196,15 +239,11 @@ export function validateEstablishmentRows(
       });
       return;
     }
-    if (!address) {
-      errors.push({ rowIndex: i, message: "Endereço é obrigatório." });
-      return;
-    }
 
     valid.push({
       name,
       establishment_type: type,
-      address_line1: address,
+      address_line1: nullIfEmpty(row.address_line1),
       city: nullIfEmpty(row.city),
       state: nullIfEmpty(row.state),
       postal_code: nullIfEmpty(row.postal_code),
@@ -235,12 +274,7 @@ export function validatePatientRows(rows: ParsedRow[]): ParseResult<PatientImpor
     }
 
     const sexRaw = (row.sex ?? "").trim().toLowerCase();
-    const sex =
-      sexRaw && VALID_SEX.has(sexRaw)
-        ? (sexRaw as "female" | "male" | "other")
-        : null;
-
-    if (sexRaw && !VALID_SEX.has(sexRaw)) {
+    if (sexRaw && !VALID_SEX.has(sexRaw as PatientSex)) {
       errors.push({
         rowIndex: i,
         message: `Sexo inválido: "${row.sex}". Use female, male ou other.`,
@@ -252,7 +286,7 @@ export function validatePatientRows(rows: ParsedRow[]): ParseResult<PatientImpor
       full_name: name,
       birth_date: birthDate,
       document_id: nullIfEmpty(row.document_id),
-      sex,
+      sex: parseSex(row.sex),
       email: nullIfEmpty(row.email),
       phone: nullIfEmpty(row.phone),
     });
@@ -276,9 +310,9 @@ export function validateRows(
 
 export const CSV_TEMPLATES: Record<ImportEntity, string> = {
   clientes:
-    "legal_name,kind,document_id,trade_name,email,phone\n" +
-    "João Silva,pf,12345678901,,joao@email.com,11999990000\n" +
-    "Empresa LTDA,pj,12345678000199,Empresa Fantasia,contato@empresa.com,1133330000",
+    "legal_name,kind,document_id,trade_name,email,phone,business_segment,attended_full_name,birth_date,sex,dietary_restrictions,chronic_medications\n" +
+    "João Silva,pf,12345678901,,joao@email.com,11999990000,,João (apelido),1985-03-15,male,sem lactose,metformina\n" +
+    "Escola Modelo LTDA,pj,12345678000199,Escola Modelo,contato@escola.com,1133330000,escola,,,,, ",
   estabelecimentos:
     "name,establishment_type,address_line1,city,state,postal_code\n" +
     "Escola Municipal,escola,Rua das Flores 100,São Paulo,SP,01310100\n" +

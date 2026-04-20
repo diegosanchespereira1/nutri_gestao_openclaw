@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { CLIENT_BUSINESS_SEGMENTS } from "@/lib/constants/client-business-segment";
+
 export const MAX_IMPORT_ROWS = 500;
 
 function emptyToNull(val: unknown) {
@@ -17,10 +19,18 @@ const establishmentTypeSchema = z.enum([
   "empresa",
 ]);
 
-const patientSexSchema = z
-  .enum(["female", "male", "other"])
-  .nullable()
-  .optional();
+const businessSegmentSchema = z.preprocess(
+  emptyToNull,
+  z.union([
+    z.null(),
+    z.enum(CLIENT_BUSINESS_SEGMENTS as [string, ...string[]]),
+  ]),
+);
+
+const sexOrNull = z.preprocess(
+  emptyToNull,
+  z.union([z.null(), z.enum(["female", "male", "other"])]),
+);
 
 const emailOrNull = z.preprocess(
   emptyToNull,
@@ -33,6 +43,11 @@ const optionalText = (max: number) =>
     z.union([z.null(), z.string().max(max)]),
   );
 
+const birthDateOrNull = z.preprocess(
+  emptyToNull,
+  z.union([z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
+);
+
 export const clientImportRowSchema = z.object({
   legal_name: z.string().min(1).max(2000),
   kind: clientKindSchema,
@@ -40,27 +55,29 @@ export const clientImportRowSchema = z.object({
   trade_name: optionalText(2000),
   email: emailOrNull,
   phone: optionalText(64),
+  business_segment: businessSegmentSchema,
+  attended_full_name: optionalText(500),
+  birth_date: birthDateOrNull,
+  sex: sexOrNull,
+  dietary_restrictions: optionalText(2000),
+  chronic_medications: optionalText(2000),
 });
 
 export const establishmentImportRowSchema = z.object({
   name: z.string().min(1).max(500),
   establishment_type: establishmentTypeSchema,
-  address_line1: z.string().min(1).max(2000),
+  /** Nullable desde a migração 20260420110000: address_line1 pode ser preenchido depois. */
+  address_line1: optionalText(2000),
   city: optionalText(200),
   state: optionalText(8),
   postal_code: optionalText(32),
 });
 
-const birthDateOrNull = z.preprocess(
-  emptyToNull,
-  z.union([z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
-);
-
 export const patientImportRowSchema = z.object({
   full_name: z.string().min(1).max(500),
   birth_date: birthDateOrNull,
   document_id: optionalText(32),
-  sex: patientSexSchema,
+  sex: sexOrNull,
   email: emailOrNull,
   phone: optionalText(64),
 });

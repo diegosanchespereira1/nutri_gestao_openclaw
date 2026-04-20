@@ -1,3 +1,4 @@
+import { Info } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
@@ -18,6 +19,15 @@ export default async function ChecklistPreencherPage({
   if (!bundle) {
     notFound();
   }
+
+  const createdAt = new Date(bundle.session.created_at);
+  const createdAtLabel = createdAt.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <div className="space-y-6">
@@ -46,6 +56,18 @@ export default async function ChecklistPreencherPage({
           </PageHelpHint>
         </div>
       </div>
+
+      {bundle.createdByName && (
+        <div className="bg-muted/60 border-border flex items-start gap-3 rounded-lg border px-4 py-3 text-sm">
+          <Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p className="text-muted-foreground">
+            Este rascunho foi iniciado por{" "}
+            <span className="text-foreground font-medium">{bundle.createdByName}</span> em{" "}
+            <span className="text-foreground font-medium">{createdAtLabel}</span>. Você está
+            continuando o preenchimento.
+          </p>
+        </div>
+      )}
 
       <ChecklistFillWizard
         sessionId={bundle.session.id}

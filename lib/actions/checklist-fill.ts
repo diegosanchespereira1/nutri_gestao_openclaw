@@ -135,6 +135,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   itemResponseSource: "global" | "custom";
   itemPhotos: Record<string, ChecklistFillPhotoView[]>;
   latestPdfExport: ChecklistFillPdfExportRow | null;
+  /** Info do utilizador que criou o rascunho (pode ser diferente do utilizador atual). */
+  createdByName: string | null;
 } | null> {
   const supabase = await createClient();
   const {
@@ -146,7 +148,6 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     .from("checklist_fill_sessions")
     .select("*")
     .eq("id", sessionId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (sErr || !session) return null;
@@ -212,6 +213,16 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
       ? (pdfRes.data as ChecklistFillPdfExportRow)
       : null;
 
+  let createdByName: string | null = null;
+  if (row.user_id !== user.id) {
+    const { data: creatorProfile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", row.user_id)
+      .maybeSingle();
+    createdByName = creatorProfile?.full_name ?? null;
+  }
+
   return {
     session: row,
     template,
@@ -220,6 +231,7 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     itemResponseSource,
     itemPhotos,
     latestPdfExport,
+    createdByName,
   };
 }
 

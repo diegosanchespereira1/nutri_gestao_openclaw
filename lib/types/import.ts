@@ -1,6 +1,8 @@
 // Story 2.6: Importação CSV/Excel — tipos para o wizard de importação
 
+import type { ClientBusinessSegment } from "@/lib/constants/client-business-segment";
 import type { ClientKind } from "@/lib/types/clients";
+import type { PatientSex } from "@/lib/types/patients";
 import type { EstablishmentType } from "@/lib/types/establishments";
 
 /** Entidade alvo da importação. */
@@ -34,12 +36,25 @@ export type ClientImportRow = {
   trade_name: string | null;
   email: string | null;
   phone: string | null;
+  /** PJ: categoria do negócio (usada para derivar establishment_type automaticamente). */
+  business_segment: ClientBusinessSegment | null;
+  /** PF: nome da pessoa atendida se diferente do titular. */
+  attended_full_name: string | null;
+  /** PF: data de nascimento (AAAA-MM-DD). */
+  birth_date: string | null;
+  /** PF: sexo biológico. */
+  sex: PatientSex | null;
+  /** PF: restrições alimentares. */
+  dietary_restrictions: string | null;
+  /** PF: medicamentos em uso contínuo. */
+  chronic_medications: string | null;
 };
 
 export type EstablishmentImportRow = {
   name: string;
   establishment_type: EstablishmentType;
-  address_line1: string;
+  /** Nullable desde a migração 20260420110000 — preenchimento posterior é permitido. */
+  address_line1: string | null;
   city: string | null;
   state: string | null;
   postal_code: string | null;
@@ -49,7 +64,7 @@ export type PatientImportRow = {
   full_name: string;
   birth_date: string | null;
   document_id: string | null;
-  sex: "female" | "male" | "other" | null;
+  sex: PatientSex | null;
   email: string | null;
   phone: string | null;
 };
@@ -79,9 +94,19 @@ export const CLIENT_FIELDS: FieldDef[] = [
   { key: "legal_name", label: "Nome / Razão Social", required: true },
   { key: "kind", label: "Tipo (pf ou pj)", required: true },
   { key: "document_id", label: "CPF / CNPJ", required: false },
-  { key: "trade_name", label: "Nome Fantasia", required: false },
+  { key: "trade_name", label: "Nome Fantasia (PJ)", required: false },
   { key: "email", label: "Email", required: false },
   { key: "phone", label: "Telefone", required: false },
+  {
+    key: "business_segment",
+    label: "Categoria do negócio (PJ: padaria/mercado/escola/hospital/clinica/restaurante/hotel/industria_alimenticia/lar_idosos/empresa/outro)",
+    required: false,
+  },
+  { key: "attended_full_name", label: "Nome do atendido (PF, se diferente do titular)", required: false },
+  { key: "birth_date", label: "Data de nascimento (PF, AAAA-MM-DD)", required: false },
+  { key: "sex", label: "Sexo (PF: female/male/other)", required: false },
+  { key: "dietary_restrictions", label: "Restrições alimentares (PF)", required: false },
+  { key: "chronic_medications", label: "Medicamentos crônicos (PF)", required: false },
 ];
 
 export const ESTABLISHMENT_FIELDS: FieldDef[] = [
@@ -91,7 +116,7 @@ export const ESTABLISHMENT_FIELDS: FieldDef[] = [
     label: "Tipo (escola/hospital/clinica/lar_idosos/empresa)",
     required: true,
   },
-  { key: "address_line1", label: "Endereço", required: true },
+  { key: "address_line1", label: "Endereço (opcional)", required: false },
   { key: "city", label: "Cidade", required: false },
   { key: "state", label: "Estado (UF)", required: false },
   { key: "postal_code", label: "CEP", required: false },

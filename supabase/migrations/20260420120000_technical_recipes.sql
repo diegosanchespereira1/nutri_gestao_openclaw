@@ -18,6 +18,7 @@ create index if not exists technical_recipes_establishment_created_idx
 
 alter table public.technical_recipes enable row level security;
 
+drop policy if exists "technical_recipes_select_own" on public.technical_recipes;
 create policy "technical_recipes_select_own"
   on public.technical_recipes for select
   to authenticated
@@ -32,6 +33,7 @@ create policy "technical_recipes_select_own"
     )
   );
 
+drop policy if exists "technical_recipes_insert_own" on public.technical_recipes;
 create policy "technical_recipes_insert_own"
   on public.technical_recipes for insert
   to authenticated
@@ -47,6 +49,7 @@ create policy "technical_recipes_insert_own"
     )
   );
 
+drop policy if exists "technical_recipes_update_own" on public.technical_recipes;
 create policy "technical_recipes_update_own"
   on public.technical_recipes for update
   to authenticated
@@ -72,6 +75,7 @@ create policy "technical_recipes_update_own"
     )
   );
 
+drop policy if exists "technical_recipes_delete_own" on public.technical_recipes;
 create policy "technical_recipes_delete_own"
   on public.technical_recipes for delete
   to authenticated
@@ -107,6 +111,7 @@ create index if not exists technical_recipe_lines_recipe_sort_idx
 
 alter table public.technical_recipe_lines enable row level security;
 
+drop policy if exists "technical_recipe_lines_select_own" on public.technical_recipe_lines;
 create policy "technical_recipe_lines_select_own"
   on public.technical_recipe_lines for select
   to authenticated
@@ -122,6 +127,7 @@ create policy "technical_recipe_lines_select_own"
     )
   );
 
+drop policy if exists "technical_recipe_lines_insert_own" on public.technical_recipe_lines;
 create policy "technical_recipe_lines_insert_own"
   on public.technical_recipe_lines for insert
   to authenticated
@@ -138,6 +144,7 @@ create policy "technical_recipe_lines_insert_own"
     )
   );
 
+drop policy if exists "technical_recipe_lines_update_own" on public.technical_recipe_lines;
 create policy "technical_recipe_lines_update_own"
   on public.technical_recipe_lines for update
   to authenticated
@@ -165,6 +172,7 @@ create policy "technical_recipe_lines_update_own"
     )
   );
 
+drop policy if exists "technical_recipe_lines_delete_own" on public.technical_recipe_lines;
 create policy "technical_recipe_lines_delete_own"
   on public.technical_recipe_lines for delete
   to authenticated

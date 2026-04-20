@@ -52,6 +52,12 @@ export default function NovoClientePage() {
         defaultTechnicalRepEmail=""
         defaultTechnicalRepPhone=""
         defaultBusinessSegment=""
+        defaultEstName=""
+        defaultEstAddressLine1=""
+        defaultEstAddressLine2=""
+        defaultEstCity=""
+        defaultEstState=""
+        defaultEstPostalCode=""
       />
     </PageLayout>
   );

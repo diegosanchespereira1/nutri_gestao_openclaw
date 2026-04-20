@@ -25,31 +25,19 @@ export async function EstablishmentsSection({
         >
           Estabelecimento
         </h2>
-        {/* Botão de adicionar só aparece quando ainda não existe estabelecimento */}
-        {!establishment ? (
-          <Link
-            href={`/clientes/${clientId}/estabelecimentos/novo`}
-            className={cn(buttonVariants())}
-          >
-            Adicionar estabelecimento
-          </Link>
-        ) : null}
       </div>
       <p className="text-muted-foreground text-sm">
-        Unidade deste cliente PJ. O tipo orienta portarias e visitas.
-        Cada cliente representa um único estabelecimento (1 CNPJ = 1 cadastro).
+        Unidade deste cliente PJ. O endereço e tipo são editados no formulário
+        acima (aba <strong className="text-foreground font-medium">Identificação</strong>).
+        Clique no card abaixo para gerir compliance, checklists e pacientes.
       </p>
       {!establishment ? (
         <div className="border-border bg-muted/30 rounded-lg border border-dashed p-6 text-center">
           <p className="text-muted-foreground text-sm">
-            Ainda não há estabelecimento cadastrado. Adicione os dados da unidade.
+            Ainda sem estabelecimento. Preencha os campos de endereço na aba
+            <strong className="text-foreground font-medium"> Identificação</strong>{" "}
+            e clique em <strong className="text-foreground font-medium">Salvar alterações</strong>.
           </p>
-          <Link
-            href={`/clientes/${clientId}/estabelecimentos/novo`}
-            className={cn(buttonVariants(), "mt-3 inline-flex")}
-          >
-            Adicionar estabelecimento
-          </Link>
         </div>
       ) : (
         <div className="border-border overflow-hidden rounded-lg border">
@@ -59,14 +47,30 @@ export async function EstablishmentsSection({
           >
             <span className="text-foreground font-medium">{establishment.name}</span>
             <span className="text-muted-foreground mt-1 block text-sm">
-              {establishmentTypeLabel[establishment.establishment_type]} ·{" "}
-              {establishment.address_line1}
+              {establishmentTypeLabel[establishment.establishment_type]}
+              {establishment.address_line1 ? ` · ${establishment.address_line1}` : ""}
               {establishment.city ? ` · ${establishment.city}` : ""}
               {establishment.state ? ` (${establishment.state})` : ""}
+            </span>
+            <span className="text-muted-foreground mt-1 block text-xs">
+              Clique para compliance, checklists e pacientes →
             </span>
           </Link>
         </div>
       )}
+
+      {establishment ? (
+        <p className="text-muted-foreground text-xs">
+          Para editar nome, tipo ou endereço use a aba{" "}
+          <Link
+            href={`/clientes/${clientId}/editar`}
+            className={cn(buttonVariants({ variant: "link" }), "h-auto p-0 text-xs")}
+          >
+            Identificação
+          </Link>
+          {" "}acima.
+        </p>
+      ) : null}
     </section>
   );
 }

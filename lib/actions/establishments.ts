@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type {
   EstablishmentPickerOption,
   EstablishmentRow,
@@ -71,10 +72,12 @@ export async function loadEstablishmentsForOwner(): Promise<{
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: clientRows, error: cErr } = await supabase
     .from("clients")
     .select("id")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("kind", "pj");
 
   if (cErr || !clientRows?.length) return { rows: [] };
@@ -101,6 +104,8 @@ export async function searchOwnerEstablishmentsAction(params: {
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const query = params.query.trim();
   if (query.length < 3) return { rows: [] };
 
@@ -113,7 +118,7 @@ export async function searchOwnerEstablishmentsAction(params: {
   const { data: byEstablishmentName, error: byEstErr } = await supabase
     .from("establishments")
     .select(selectClause)
-    .eq("clients.owner_user_id", user.id)
+    .eq("clients.owner_user_id", workspaceOwnerId)
     .eq("clients.kind", "pj")
     .ilike("name", q)
     .order("name", { ascending: true })
@@ -122,7 +127,7 @@ export async function searchOwnerEstablishmentsAction(params: {
   const { data: matchedClients, error: matchedClientsErr } = await supabase
     .from("clients")
     .select("id")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("kind", "pj")
     .or(`legal_name.ilike.${q},trade_name.ilike.${q}`)
     .limit(limit);
@@ -170,6 +175,8 @@ export async function loadOwnerChecklistEstablishmentsDropdownAction(params?: {
   } = await supabase.auth.getUser();
   if (!user) return { rows: [], total: 0 };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const limit = Math.min(120, Math.max(20, params?.limit ?? 80));
   const offset = Math.max(0, params?.offset ?? 0);
 
@@ -179,7 +186,7 @@ export async function loadOwnerChecklistEstablishmentsDropdownAction(params?: {
   const { data, error, count } = await supabase
     .from("establishments")
     .select(selectClause, { count: "exact" })
-    .eq("clients.owner_user_id", user.id)
+    .eq("clients.owner_user_id", workspaceOwnerId)
     .eq("clients.kind", "pj")
     .order("name", { ascending: true })
     .order("id", { ascending: true })
@@ -218,13 +225,15 @@ export async function loadRecentChecklistEstablishmentsAction(
 
   const establishmentIds = recentRows.map((row) => row.establishment_id as string);
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: establishments, error: estErr } = await supabase
     .from("establishments")
     .select(
       "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)",
     )
     .in("id", establishmentIds)
-    .eq("clients.owner_user_id", user.id)
+    .eq("clients.owner_user_id", workspaceOwnerId)
     .eq("clients.kind", "pj");
 
   if (estErr || !establishments?.length) return { rows: [] };

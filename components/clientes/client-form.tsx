@@ -7,6 +7,7 @@ import {
   HeartPulse,
   IdCard,
   ImageIcon,
+  MapPin,
   StickyNote,
   UserCircle,
   Users,
@@ -121,6 +122,12 @@ export function ClientForm({
   defaultTechnicalRepEmail,
   defaultTechnicalRepPhone,
   defaultBusinessSegment,
+  defaultEstName = "",
+  defaultEstAddressLine1 = "",
+  defaultEstAddressLine2 = "",
+  defaultEstCity = "",
+  defaultEstState = "",
+  defaultEstPostalCode = "",
 }: {
   mode: "create" | "edit";
   clientId?: string;
@@ -168,6 +175,13 @@ export function ClientForm({
   defaultTechnicalRepPhone: string;
   /** Valor do select `business_segment`; vazio = sem categoria. */
   defaultBusinessSegment: string;
+  /** Campos do estabelecimento 1:1 (apenas PJ). */
+  defaultEstName?: string;
+  defaultEstAddressLine1?: string;
+  defaultEstAddressLine2?: string;
+  defaultEstCity?: string;
+  defaultEstState?: string;
+  defaultEstPostalCode?: string;
 }) {
   const action =
     mode === "create" ? createClientAction : updateClientAction;
@@ -457,6 +471,87 @@ export function ClientForm({
                           name="activated_at"
                           type="date"
                           defaultValue={defaultActivatedAt}
+                        />
+                      </div>
+                    </div>
+
+                    <Separator />
+                    <div>
+                      <p className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                        <MapPin className="size-4 text-muted-foreground" aria-hidden />
+                        Estabelecimento
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        Unidade física onde o serviço é prestado. Cada cliente PJ
+                        representa 1 CNPJ = 1 estabelecimento.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="est-name">
+                        Nome do estabelecimento (opcional)
+                      </Label>
+                      <Input
+                        id="est-name"
+                        name="est_name"
+                        defaultValue={defaultEstName}
+                        placeholder="Se vazio, usa a razão social acima"
+                        autoComplete="organization"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="est-address1">
+                        Endereço (linha 1) (opcional)
+                      </Label>
+                      <Input
+                        id="est-address1"
+                        name="est_address_line1"
+                        defaultValue={defaultEstAddressLine1}
+                        placeholder="Rua, número, complemento…"
+                        autoComplete="street-address"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="est-address2">
+                        Endereço (linha 2) (opcional)
+                      </Label>
+                      <Input
+                        id="est-address2"
+                        name="est_address_line2"
+                        defaultValue={defaultEstAddressLine2}
+                        placeholder="Bairro, bloco, andar…"
+                      />
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="space-y-2 sm:col-span-1">
+                        <Label htmlFor="est-city">Cidade (opcional)</Label>
+                        <Input
+                          id="est-city"
+                          name="est_city"
+                          defaultValue={defaultEstCity}
+                          autoComplete="address-level2"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="est-state">UF (opcional)</Label>
+                        <Input
+                          id="est-state"
+                          name="est_state"
+                          defaultValue={defaultEstState}
+                          maxLength={2}
+                          placeholder="SP"
+                          className="uppercase"
+                          autoComplete="address-level1"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="est-postal">CEP (opcional)</Label>
+                        <Input
+                          id="est-postal"
+                          name="est_postal_code"
+                          defaultValue={defaultEstPostalCode}
+                          inputMode="numeric"
+                          placeholder="00000-000"
+                          autoComplete="postal-code"
                         />
                       </div>
                     </div>

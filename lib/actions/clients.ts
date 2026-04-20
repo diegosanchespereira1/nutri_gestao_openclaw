@@ -22,6 +22,9 @@ import {
   isClientBusinessSegment,
 } from "@/lib/constants/client-business-segment";
 import {
+  establishmentTypeFromSegment,
+} from "@/lib/constants/establishment-types";
+import {
   isValidCnpj,
   isValidCpf,
   onlyDigits,
@@ -279,6 +282,46 @@ function parsePjFields(formData: FormData):
   };
 }
 
+/** Lê os campos `est_*` do FormData e retorna payload pronto para inserir/atualizar. */
+function parseEstablishmentInlineFields(
+  formData: FormData,
+  fallbackName: string,
+) {
+  const rawName = String(formData.get("est_name") ?? "").trim();
+  const name = rawName.length > 0 ? rawName : fallbackName;
+
+  // Deriva o tipo de estabelecimento automaticamente da categoria do negócio.
+  const segmentRaw = String(formData.get("business_segment") ?? "").trim();
+  const establishment_type = establishmentTypeFromSegment(segmentRaw);
+
+  const address_line1 =
+    String(formData.get("est_address_line1") ?? "").trim() || "";
+
+  const addr2Raw = String(formData.get("est_address_line2") ?? "").trim();
+  const address_line2 = addr2Raw.length > 0 ? addr2Raw : null;
+
+  const cityRaw = String(formData.get("est_city") ?? "").trim();
+  const city = cityRaw.length > 0 ? cityRaw : null;
+
+  const stateRaw = String(formData.get("est_state") ?? "")
+    .trim()
+    .toUpperCase();
+  const state = stateRaw.length === 2 ? stateRaw : null;
+
+  const postalRaw = String(formData.get("est_postal_code") ?? "").trim();
+  const postal_code = postalRaw.length > 0 ? postalRaw : null;
+
+  return {
+    name,
+    establishment_type,
+    address_line1,
+    address_line2,
+    city,
+    state,
+    postal_code,
+  };
+}
+
 export type ClientFormResult =
   | { ok: true }
   | { ok: false; error: string };
@@ -414,6 +457,19 @@ export async function createClientAction(
     }
   }
 
+  if (kind === "pj") {
+    const estPayload = parseEstablishmentInlineFields(formData, legal_name);
+    const { error: estErr } = await supabase.from("establishments").insert({
+      client_id: newId,
+      ...estPayload,
+    });
+    if (estErr) {
+      // Estabelecimento não criado: cliente existe mas sem estabelecimento.
+      // Redireciona para edição onde o utilizador pode corrigir.
+      console.error("[createClientAction] establishment insert failed:", estErr.message);
+    }
+  }
+
   if (kind === "pf") {
     await appendClientExamUploads(supabase, workspaceOwnerId, newId, formData);
   }
@@ -429,6 +485,8 @@ function revalidatePathsAfterClientMutation(clientId: string) {
   revalidatePath("/visitas");
   revalidatePath("/pacientes");
   revalidatePath("/inicio");
+  revalidatePath("/estabelecimentos");
+  revalidatePath("/checklists");
 }
 
 export async function updateClientAction(
@@ -540,6 +598,33 @@ export async function updateClientAction(
 
   if (error) {
     return { ok: false, error: "Não foi possível salvar as alterações." };
+  }
+
+  if (kind === "pj") {
+    const estPayload = parseEstablishmentInlineFields(formData, legal_name);
+    const { data: existingEst } = await supabase
+      .from("establishments")
+      .select("id")
+      .eq("client_id", id)
+      .maybeSingle();
+
+    if (existingEst) {
+      const { error: estErr } = await supabase
+        .from("establishments")
+        .update(estPayload)
+        .eq("id", existingEst.id);
+      if (estErr) {
+        console.error("[updateClientAction] establishment update failed:", estErr.message);
+      }
+    } else {
+      const { error: estErr } = await supabase.from("establishments").insert({
+        client_id: id,
+        ...estPayload,
+      });
+      if (estErr) {
+        console.error("[updateClientAction] establishment insert failed:", estErr.message);
+      }
+    }
   }
 
   if (kind === "pf") {

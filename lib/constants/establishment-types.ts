@@ -1,3 +1,4 @@
+import type { ClientBusinessSegment } from "@/lib/constants/client-business-segment";
 import type { EstablishmentType } from "@/lib/types/establishments";
 
 /** Valores persistidos em `establishments.establishment_type` (PRD FR7). */
@@ -24,4 +25,22 @@ export function parseEstablishmentType(
   return ESTABLISHMENT_TYPES.includes(raw as EstablishmentType)
     ? (raw as EstablishmentType)
     : null;
+}
+
+/** Deriva o tipo de estabelecimento a partir da categoria do negócio do cliente PJ. */
+export function establishmentTypeFromSegment(
+  segment: ClientBusinessSegment | string | null | undefined,
+): EstablishmentType {
+  switch (segment) {
+    case "escola":
+      return "escola";
+    case "hospital":
+      return "hospital";
+    case "clinica":
+      return "clinica";
+    case "lar_idosos":
+      return "lar_idosos";
+    default:
+      return "empresa";
+  }
 }

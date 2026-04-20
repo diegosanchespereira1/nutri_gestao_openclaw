@@ -59,6 +59,15 @@ export default async function EditarClientePage({
   }
 
   const row = normalizeClientRow(data as Record<string, unknown>);
+
+  const { data: estData } = row.kind === "pj"
+    ? await supabase
+        .from("establishments")
+        .select("*")
+        .eq("client_id", id)
+        .maybeSingle()
+    : { data: null };
+
   const logoPreviewUrl = await getClientLogoSignedUrl(
     supabase,
     row.logo_storage_path,
@@ -149,6 +158,12 @@ export default async function EditarClientePage({
         defaultTechnicalRepEmail={row.technical_rep_email ?? ""}
         defaultTechnicalRepPhone={row.technical_rep_phone ?? ""}
         defaultBusinessSegment={row.business_segment ?? ""}
+        defaultEstName={estData?.name ?? ""}
+        defaultEstAddressLine1={estData?.address_line1 ?? ""}
+        defaultEstAddressLine2={estData?.address_line2 ?? ""}
+        defaultEstCity={estData?.city ?? ""}
+        defaultEstState={estData?.state ?? ""}
+        defaultEstPostalCode={estData?.postal_code ?? ""}
       />
 
       <Separator />

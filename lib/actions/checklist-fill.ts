@@ -8,6 +8,7 @@ import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-phot
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
@@ -28,7 +29,7 @@ export type FillActionResult =
 
 async function assertEstablishmentOwned(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  workspaceOwnerId: string,
   establishmentId: string,
 ): Promise<boolean> {
   const { data: est } = await supabase
@@ -44,7 +45,7 @@ async function assertEstablishmentOwned(
     .eq("id", est.client_id)
     .maybeSingle();
 
-  return Boolean(cl && cl.owner_user_id === userId);
+  return Boolean(cl && cl.owner_user_id === workspaceOwnerId);
 }
 
 export async function startChecklistFill(formData: FormData): Promise<void> {
@@ -54,6 +55,8 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const templateId = String(formData.get("template_id") ?? "").trim();
   const establishmentId = String(formData.get("establishment_id") ?? "").trim();
 
@@ -61,7 +64,7 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
     redirect("/checklists?err=missing");
   }
 
-  const ok = await assertEstablishmentOwned(supabase, user.id, establishmentId);
+  const ok = await assertEstablishmentOwned(supabase, workspaceOwnerId, establishmentId);
   if (!ok) redirect("/checklists?err=forbidden");
 
   const { data: template } = await supabase
@@ -438,8 +441,10 @@ export async function checkExistingOpenFillSession(input: {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   // Validar posse do estabelecimento (assertEstablishmentOwned como primeira verificação).
-  const ok = await assertEstablishmentOwned(supabase, user.id, input.establishmentId);
+  const ok = await assertEstablishmentOwned(supabase, workspaceOwnerId, input.establishmentId);
   if (!ok) return null;
 
   const { establishmentId, templateId, customTemplateId } = input;

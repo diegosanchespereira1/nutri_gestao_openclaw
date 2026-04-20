@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
 export type CustomEditItem = {
@@ -34,7 +35,7 @@ export type CustomTemplateListRow = {
 
 async function assertEstablishmentOwned(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  workspaceOwnerId: string,
   establishmentId: string,
 ): Promise<boolean> {
   const { data: est } = await supabase
@@ -48,7 +49,7 @@ async function assertEstablishmentOwned(
     .select("owner_user_id")
     .eq("id", est.client_id)
     .maybeSingle();
-  return Boolean(cl && cl.owner_user_id === userId);
+  return Boolean(cl && cl.owner_user_id === workspaceOwnerId);
 }
 
 /** Dados para o editor (inclui flag de item extra). */
@@ -282,13 +283,15 @@ export async function duplicateGlobalTemplateAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const templateId = String(formData.get("template_id") ?? "").trim();
   const establishmentId = String(formData.get("establishment_id") ?? "").trim();
   if (!templateId || !establishmentId) {
     redirect("/checklists?err=missing");
   }
 
-  const ok = await assertEstablishmentOwned(supabase, user.id, establishmentId);
+  const ok = await assertEstablishmentOwned(supabase, workspaceOwnerId, establishmentId);
   if (!ok) redirect("/checklists?err=forbidden");
 
   const bundle = await loadChecklistTemplateBundleById(templateId);

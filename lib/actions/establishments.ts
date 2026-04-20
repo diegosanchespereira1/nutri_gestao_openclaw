@@ -280,10 +280,12 @@ export async function registerChecklistEstablishmentOpenAction(
     .eq("id", establishment.client_id)
     .maybeSingle();
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   if (
     cErr ||
     !clientRow ||
-    clientRow.owner_user_id !== user.id ||
+    clientRow.owner_user_id !== workspaceOwnerId ||
     clientRow.kind !== "pj"
   ) {
     return { ok: false, error: "Sem permissão para este estabelecimento." };
@@ -347,9 +349,11 @@ export async function createEstablishmentAction(
     .eq("id", clientId)
     .maybeSingle();
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   if (
     !clientRow ||
-    clientRow.owner_user_id !== user.id ||
+    clientRow.owner_user_id !== workspaceOwnerId ||
     clientRow.kind !== "pj"
   ) {
     return {

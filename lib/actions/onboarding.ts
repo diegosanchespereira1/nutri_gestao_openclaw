@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import {
   isValidCnpj,
   isValidCpf,
@@ -56,6 +57,8 @@ export async function completeOnboardingAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -138,7 +141,7 @@ export async function completeOnboardingAction(
     const { data: clientRow, error: clientErr } = await supabase
       .from("clients")
       .insert({
-        owner_user_id: user.id,
+        owner_user_id: workspaceOwnerId,
         kind: "pj",
         legal_name,
         trade_name: null,
@@ -197,7 +200,7 @@ export async function completeOnboardingAction(
     }
   } else {
     const { error: clientErr } = await supabase.from("clients").insert({
-      owner_user_id: user.id,
+      owner_user_id: workspaceOwnerId,
       kind: "pf",
       legal_name,
       trade_name: null,

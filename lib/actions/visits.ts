@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { parseVisitPriority } from "@/lib/constants/visit-priorities";
 import { parseVisitKind } from "@/lib/constants/visit-kinds";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ScheduledVisitWithTargets, VisitTargetType } from "@/lib/types/visits";
 import { parseDossierRecipientEmailsFromText } from "@/lib/validators/dossier-email-recipients";
 
@@ -76,6 +77,8 @@ export async function createScheduledVisitAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const targetType = parseTargetType(formData.get("target_type"));
   const establishmentId = String(
     formData.get("establishment_id") ?? "",
@@ -138,7 +141,7 @@ export async function createScheduledVisitAction(
       estErr ||
       !est ||
       !client ||
-      client.owner_user_id !== user.id
+      client.owner_user_id !== workspaceOwnerId
     ) {
       redirect("/visitas/nova?err=missing");
     }
@@ -168,7 +171,7 @@ export async function createScheduledVisitAction(
       patErr ||
       !pat ||
       !client ||
-      client.owner_user_id !== user.id
+      client.owner_user_id !== workspaceOwnerId
     ) {
       redirect("/visitas/nova?err=missing");
     }

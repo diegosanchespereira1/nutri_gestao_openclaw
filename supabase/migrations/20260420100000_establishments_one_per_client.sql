@@ -15,8 +15,19 @@
 --   GROUP BY client_id
 --   HAVING COUNT(*) > 1;
 
-alter table public.establishments
-  add constraint establishments_one_per_client unique (client_id);
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'establishments_one_per_client'
+      and conrelid = 'public.establishments'::regclass
+  ) then
+    alter table public.establishments
+      add constraint establishments_one_per_client unique (client_id);
+  end if;
+end;
+$$;
 
 comment on constraint establishments_one_per_client on public.establishments
   is 'Cada cliente PJ pode ter no máximo 1 estabelecimento (regra de negócio: 1 CNPJ = 1 estabelecimento = 1 cliente).';

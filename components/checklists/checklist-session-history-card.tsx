@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AlertCircle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
+import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -183,6 +184,17 @@ export function ChecklistSessionHistoryCard({ session }: Props) {
             </Button>
           )}
         </div>
+
+        {/* ── PDF Card para dossiés aprovados ── */}
+        {session.status === "aprovado" && session.dossier_approved_at ? (
+          <div className="border-t border-border/50 px-4 py-3">
+            <ChecklistFillDossierPdfCard
+              sessionId={session.id}
+              dossierApprovedAt={session.dossier_approved_at}
+              initialJob={session.latestPdfExport ?? null}
+            />
+          </div>
+        ) : null}
 
         {/* ── Seção lazy de itens NC ── */}
         {ncOpen && ncItems && ncItems.length > 0 && (

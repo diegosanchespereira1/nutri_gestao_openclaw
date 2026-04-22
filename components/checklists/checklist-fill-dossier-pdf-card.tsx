@@ -1,6 +1,6 @@
 "use client";
 
-import { FileDown, Loader2, RefreshCw } from "lucide-react";
+import { Eye, FileDown, Loader2, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -60,7 +60,7 @@ export function ChecklistFillDossierPdfCard({
     });
   }
 
-  async function handleDownload() {
+  async function handleView() {
     if (!job?.id) return;
     setLocalErr(null);
     startDownload(async () => {
@@ -73,6 +73,25 @@ export function ChecklistFillDossierPdfCard({
     });
   }
 
+  async function handleDownload() {
+    if (!job?.id) return;
+    setLocalErr(null);
+    startDownload(async () => {
+      const r = await downloadDossierPdfAction(job.id);
+      if (!r.ok) {
+        setLocalErr(r.error);
+        return;
+      }
+      // Forçar download em vez de abrir no navegador
+      const a = document.createElement("a");
+      a.href = r.downloadUrl;
+      a.download = `dossier-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    });
+  }
+
   const showProcessing =
     job?.status === "processing" || job?.status === "pending";
 
@@ -80,8 +99,7 @@ export function ChecklistFillDossierPdfCard({
     <div className="border-border rounded-lg border bg-background p-4 text-sm">
       <p className="text-foreground font-medium">PDF do relatório</p>
       <p className="text-muted-foreground mt-1 text-xs">
-        Gera um ficheiro com o texto do dossié e a identificação do profissional (CRN). As
-        fotos de evidência não são embutidas no PDF.
+        Relatório com texto do dossié, identificação do profissional (CRN) e fotos de evidência embutidas no PDF.
       </p>
 
       {showProcessing ? (
@@ -126,21 +144,39 @@ export function ChecklistFillDossierPdfCard({
         </Button>
 
         {job?.status === "ready" ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={downloadPending}
-            onClick={() => void handleDownload()}
-            className="gap-1.5"
-          >
-            {downloadPending ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden />
-            ) : (
-              <FileDown className="size-4" aria-hidden />
-            )}
-            Transferir PDF
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={downloadPending}
+              onClick={() => void handleView()}
+              className="gap-1.5"
+            >
+              {downloadPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <Eye className="size-4" aria-hidden />
+              )}
+              Visualizar PDF
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={downloadPending}
+              onClick={() => void handleDownload()}
+              className="gap-1.5"
+            >
+              {downloadPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <FileDown className="size-4" aria-hidden />
+              )}
+              Transferir PDF
+            </Button>
+          </>
         ) : null}
       </div>
     </div>

@@ -23,6 +23,16 @@ export type ChecklistSessionSummary = {
   na_count: number;
   pending_count: number;
   total_items: number;
+  latestPdfExport?: {
+    id: string;
+    user_id: string;
+    session_id: string;
+    status: "pending" | "processing" | "ready" | "failed";
+    created_at: string;
+    updated_at: string;
+    storage_path: string | null;
+    error_message: string | null;
+  } | null;
 };
 
 export type NcItemDetail = {
@@ -233,6 +243,29 @@ export async function loadChecklistSessionsForClient(input: {
     }
   }
 
+  // 5.5. Carregar últimos PDF exports por sessão
+  const { data: pdfExports } = await supabase
+    .from("checklist_fill_pdf_exports")
+    .select("id, user_id, session_id, status, created_at, updated_at, storage_path, error_message")
+    .in("session_id", sessionIds)
+    .order("created_at", { ascending: false });
+
+  const latestPdfBySession = new Map<string, { id: string; user_id: string; session_id: string; status: "pending" | "processing" | "ready" | "failed"; created_at: string; updated_at: string; storage_path: string | null; error_message: string | null }>();
+  for (const pdf of pdfExports ?? []) {
+    if (!latestPdfBySession.has(pdf.session_id)) {
+      latestPdfBySession.set(pdf.session_id, {
+        id: pdf.id,
+        user_id: pdf.user_id,
+        session_id: pdf.session_id,
+        status: pdf.status as "pending" | "processing" | "ready" | "failed",
+        created_at: pdf.created_at,
+        updated_at: pdf.updated_at,
+        storage_path: pdf.storage_path,
+        error_message: pdf.error_message,
+      });
+    }
+  }
+
   // 6. Montar resultados
   const rows: ChecklistSessionSummary[] = sessions.map((sess) => {
     const est = estMap.get(sess.establishment_id) ?? {
@@ -276,6 +309,7 @@ export async function loadChecklistSessionsForClient(input: {
       na_count: counts.na,
       pending_count: pendingCount,
       total_items: totalItems,
+      latestPdfExport: latestPdfBySession.get(sess.id) ?? null,
     };
   });
 

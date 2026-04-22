@@ -66,6 +66,7 @@ export async function generateDossierPdfAction(
       responses: bundle.responses,
       establishmentLabel: bundle.establishmentLabel,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
+      itemPhotos: bundle.itemPhotos,
     });
 
     const { error: upErr } = await supabase.storage

@@ -108,6 +108,16 @@ export function ChecklistFillWizard({
   const [responses, setResponses] = useState<FillResponsesMap>(() => ({
     ...initialResponses,
   }));
+  const responsesRef = useRef<FillResponsesMap>(responses);
+  const sectionIndexRef = useRef(sectionIndex);
+
+  useEffect(() => {
+    responsesRef.current = responses;
+  }, [responses]);
+
+  useEffect(() => {
+    sectionIndexRef.current = sectionIndex;
+  }, [sectionIndex]);
 
   const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [finalizeDialogError, setFinalizeDialogError] = useState<string | null>(null);
@@ -242,46 +252,46 @@ export function ChecklistFillWizard({
     });
   }
 
-  /* Salvar todos os campos de nota e anotação quando muda de seção */
-  useEffect(() => {
-    const saveAllPendingFields = () => {
-      for (const itemId in responses) {
-        const cur = responses[itemId];
-        if (cur?.outcome) {
-          reportSaving();
-          startTransition(async () => {
-            const result = await saveFillItemResponse({
-              sessionId,
-              itemId,
-              itemResponseSource,
-              outcome: cur.outcome,
-              note: cur.note ?? null,
-              annotation: cur.annotation ?? null,
-            });
-            if (result.ok) {
-              reportSaved();
-            } else {
-              reportSaveError();
-            }
-          });
-        }
-      }
-    };
-
-    return () => {
-      saveAllPendingFields();
-    };
-  }, [sectionIndex, sessionId, itemResponseSource, responses]);
-
   function handleNext() {
     setAdvanceError(null);
     if (!section || isLast) return;
+    
+    // Salvar campos antes de ir para próxima seção
+    saveCurrentSectionFields();
     setSectionIndex((i) => i + 1);
   }
 
   function handlePrev() {
     setAdvanceError(null);
+    
+    // Salvar campos antes de ir para seção anterior
+    saveCurrentSectionFields();
     setSectionIndex((i) => Math.max(0, i - 1));
+  }
+
+  function saveCurrentSectionFields() {
+    // Salvar todos os campos da seção atual
+    for (const itemId in responsesRef.current) {
+      const cur = responsesRef.current[itemId];
+      if (cur?.outcome && (cur.note || cur.annotation)) {
+        reportSaving();
+        startTransition(async () => {
+          const result = await saveFillItemResponse({
+            sessionId,
+            itemId,
+            itemResponseSource,
+            outcome: cur.outcome,
+            note: cur.note ?? null,
+            annotation: cur.annotation ?? null,
+          });
+          if (result.ok) {
+            reportSaved();
+          } else {
+            reportSaveError();
+          }
+        });
+      }
+    }
   }
 
   if (!section) {
@@ -620,6 +630,7 @@ export function ChecklistFillWizard({
                   setAdvanceError(null);
                   const next = Number.parseInt(e.target.value, 10);
                   if (!Number.isFinite(next)) return;
+                  saveCurrentSectionFields();
                   setSectionIndex(Math.min(Math.max(0, next), sections.length - 1));
                 }}
                 aria-label="Escolher secção do checklist"

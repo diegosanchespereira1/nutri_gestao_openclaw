@@ -38,6 +38,7 @@ export type DossierPdfSectionInput = {
     outcome: ChecklistFillOutcome | null;
     note: string | null;
     annotation: string | null;
+    photoBuffers?: Buffer[];
   }>;
 };
 
@@ -115,13 +116,65 @@ export async function buildDossierPdfBytes(
       if ((it.annotation ?? "").trim().length > 0) {
         drawLines(`  Anotacao: ${foldTextForPdf((it.annotation ?? "").trim())}`, bodySize);
       }
+      
+      // Renderizar imagens
+      if (it.photoBuffers && it.photoBuffers.length > 0) {
+        drawLines(`  Fotos de evidencia (${it.photoBuffers.length}):`, bodySize);
+        y -= 4;
+        
+        let photoX = margin;
+        const photoSize = 80; // 80x80 pixels
+        const photoGap = 10;
+        
+        for (const photoBuffer of it.photoBuffers) {
+          try {
+            // Garantir espaço na página
+            if (y < margin + photoSize) {
+              page = pdf.addPage([595.28, 841.89]);
+              y = height - margin;
+              photoX = margin;
+            }
+            
+            // Embed a imagem
+            const image = await pdf.embedJpg(photoBuffer);
+            const imgHeight = image.height;
+            const imgWidth = image.width;
+            const scale = photoSize / imgHeight;
+            const scaledWidth = imgWidth * scale;
+            
+            // Desenhar a imagem
+            page.drawImage(image, {
+              x: photoX,
+              y: y - photoSize,
+              width: scaledWidth,
+              height: photoSize,
+            });
+            
+            photoX += scaledWidth + photoGap;
+            
+            // Se não há mais espaço na linha, ir para próxima
+            if (photoX + photoSize > 595.28 - margin) {
+              y -= photoSize + photoGap;
+              photoX = margin;
+            }
+          } catch (e) {
+            console.error("Erro ao renderizar imagem:", e);
+          }
+        }
+        
+        if (photoX > margin) {
+          y -= photoSize + photoGap;
+        }
+        y -= 4;
+      }
+      
       y -= 2;
     }
     y -= 4;
   }
 
   drawLines(
-    "Documento gerado eletronicamente. As fotos de evidencia permanecem na plataforma.",
+    "Documento gerado eletronicamente. As fotos de evidencia estao anexadas.",
     8,
   );
 

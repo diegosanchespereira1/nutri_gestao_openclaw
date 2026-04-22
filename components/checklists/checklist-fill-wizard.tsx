@@ -58,29 +58,6 @@ function formatDossierApprovedLabel(iso: string): string {
   }
 }
 
-/** Debounce simples via useRef+setTimeout — sem dependência externa. */
-function useDebouncedCallback(fn: () => void, delay = 800) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fnRef = useRef(fn);
-  fnRef.current = fn;
-
-  const debounced = useCallback(() => {
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      fnRef.current();
-    }, delay);
-  }, [delay]);
-
-  // Limpar ao desmontar
-  useEffect(() => {
-    return () => {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  return debounced;
-}
-
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 type Props = {
@@ -255,39 +232,6 @@ export function ChecklistFillWizard({
     });
   }
 
-  function commitNote(itemId: string) {
-    const cur = responses[itemId];
-    if (!cur?.outcome) return;
-    reportSaving();
-    startTransition(async () => {
-      const result = await saveFillItemResponse({
-        sessionId,
-        itemId,
-        itemResponseSource,
-        outcome: cur.outcome,
-        note: cur.note,
-        annotation: cur.annotation ?? null,
-      });
-      if (result.ok) {
-        reportSaved();
-      } else {
-        reportSaveError();
-      }
-    });
-  }
-
-  /* Task A: factory de debounce por item para nota */
-  const debouncedNoteTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  function scheduleNoteDebounce(itemId: string) {
-    if (debouncedNoteTimers.current[itemId]) {
-      clearTimeout(debouncedNoteTimers.current[itemId]);
-    }
-    debouncedNoteTimers.current[itemId] = setTimeout(() => {
-      commitNote(itemId);
-    }, 800);
-  }
-
   function setAnnotation(itemId: string, annotation: string) {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
@@ -298,46 +242,36 @@ export function ChecklistFillWizard({
     });
   }
 
-  function commitAnnotation(itemId: string) {
-    const cur = responses[itemId];
-    if (!cur?.outcome) return;
-    reportSaving();
-    startTransition(async () => {
-      const result = await saveFillItemResponse({
-        sessionId,
-        itemId,
-        itemResponseSource,
-        outcome: cur.outcome,
-        note: cur.note,
-        annotation: cur.annotation ?? null,
-      });
-      if (result.ok) {
-        reportSaved();
-      } else {
-        reportSaveError();
-      }
-    });
-  }
-
-  /* Task A: factory de debounce por item para anotação */
-  const debouncedAnnotationTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-
-  function scheduleAnnotationDebounce(itemId: string) {
-    if (debouncedAnnotationTimers.current[itemId]) {
-      clearTimeout(debouncedAnnotationTimers.current[itemId]);
-    }
-    debouncedAnnotationTimers.current[itemId] = setTimeout(() => {
-      commitAnnotation(itemId);
-    }, 800);
-  }
-
-  // Limpar timers de debounce ao desmontar
+  /* Salvar todos os campos de nota e anotação quando muda de seção */
   useEffect(() => {
-    return () => {
-      for (const t of Object.values(debouncedNoteTimers.current)) clearTimeout(t);
-      for (const t of Object.values(debouncedAnnotationTimers.current)) clearTimeout(t);
+    const saveAllPendingFields = () => {
+      for (const itemId in responses) {
+        const cur = responses[itemId];
+        if (cur?.outcome) {
+          reportSaving();
+          startTransition(async () => {
+            const result = await saveFillItemResponse({
+              sessionId,
+              itemId,
+              itemResponseSource,
+              outcome: cur.outcome,
+              note: cur.note ?? null,
+              annotation: cur.annotation ?? null,
+            });
+            if (result.ok) {
+              reportSaved();
+            } else {
+              reportSaveError();
+            }
+          });
+        }
+      }
     };
-  }, []);
+
+    return () => {
+      saveAllPendingFields();
+    };
+  }, [sectionIndex, sessionId, itemResponseSource, responses]);
 
   function handleNext() {
     setAdvanceError(null);
@@ -620,14 +554,6 @@ export function ChecklistFillWizard({
                     value={r.note ?? ""}
                     onChange={(e) => {
                       setNote(item.id, e.target.value);
-                      scheduleNoteDebounce(item.id); /* Task A */
-                    }}
-                    onBlur={() => {
-                      if (debouncedNoteTimers.current[item.id]) {
-                        clearTimeout(debouncedNoteTimers.current[item.id]);
-                        delete debouncedNoteTimers.current[item.id];
-                      }
-                      commitNote(item.id); /* flush imediato no blur */
                     }}
                     className={textareaClass}
                     aria-invalid={Boolean(err)}
@@ -651,14 +577,6 @@ export function ChecklistFillWizard({
                     value={r.annotation ?? ""}
                     onChange={(e) => {
                       setAnnotation(item.id, e.target.value);
-                      scheduleAnnotationDebounce(item.id); /* Task A */
-                    }}
-                    onBlur={() => {
-                      if (debouncedAnnotationTimers.current[item.id]) {
-                        clearTimeout(debouncedAnnotationTimers.current[item.id]);
-                        delete debouncedAnnotationTimers.current[item.id];
-                      }
-                      commitAnnotation(item.id); /* flush imediato no blur */
                     }}
                     className={textareaClass}
                     aria-describedby={`annotation-hint-${item.id}`}

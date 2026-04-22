@@ -31,4 +31,4 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "(test -n \"$SUPABASE_URL\" || test -n \"$NEXT_PUBLIC_SUPABASE_URL\") && (test -n \"$SUPABASE_ANON_KEY\" || test -n \"$NEXT_PUBLIC_SUPABASE_ANON_KEY\") && node server.js || (echo \"Missing Supabase env: set SUPABASE_URL/SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY\" && exit 1)"]

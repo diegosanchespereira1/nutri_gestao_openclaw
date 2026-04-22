@@ -1,15 +1,17 @@
 import { createBrowserClient } from "@supabase/ssr";
 
+import { assertSupabasePublicRuntimeEnv } from "@/lib/env/public-runtime";
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
 
 let browserClient: ReturnType<typeof createBrowserClient> | null = null;
 
 export function createClient() {
   if (browserClient) return browserClient;
+  const env = assertSupabasePublicRuntimeEnv();
 
   browserClient = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    env.supabaseUrl,
+    env.supabaseAnonKey,
     { cookieOptions: getSupabaseCookieOptions() },
   );
   return browserClient;

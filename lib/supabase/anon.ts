@@ -1,9 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
+import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
 
 /** Cliente anon (sem cookies) para RPC públicas, ex.: cancelar pedido LGPD pelo token do email. */
 export function createAnonSupabaseClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = readSupabaseUrl();
+  const key = readSupabaseAnonKey();
   if (!url || !key) {
     throw new Error("Variáveis Supabase em falta.");
   }

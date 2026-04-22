@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import type { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
+import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
 
 /**
  * Cliente Supabase para GET /api/auth/callback: grava cookies de sessão no mesmo
@@ -11,10 +12,12 @@ export function createSupabaseAuthCallbackClient(
   request: NextRequest,
   redirectResponse: NextResponse,
 ) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = readSupabaseUrl();
+  const anonKey = readSupabaseAnonKey();
   if (!url || !anonKey) {
-    throw new Error("NEXT_PUBLIC_SUPABASE_URL ou NEXT_PUBLIC_SUPABASE_ANON_KEY em falta.");
+    throw new Error(
+      "SUPABASE_URL/SUPABASE_ANON_KEY (ou NEXT_PUBLIC_*) em falta no servidor.",
+    );
   }
 
   return createServerClient(url, anonKey, {

@@ -914,6 +914,7 @@ export async function loadTemplatesForPickerAction(ctx: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   let targetClientId: string;
 
@@ -1126,6 +1127,7 @@ export async function createRecipeFromTemplateAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   // Validar estabelecimento e permissão
   const { data: estRow } = await supabase

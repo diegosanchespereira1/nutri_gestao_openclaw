@@ -1,5 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { env as nodeEnv } from "node:process";
+import {
+  readSupabaseServiceRoleKey,
+  readSupabaseUrl,
+} from "@/lib/supabase/runtime-env";
 
 /**
  * Chave só em runtime (Docker/Portainer).
@@ -8,16 +12,10 @@ import { env as nodeEnv } from "node:process";
  * Usamos `node:process` + nome da variável montado em runtime + `Reflect.get`
  * para ler o valor real injetado pelo container em produção.
  */
-function readServiceRoleKey(): string | undefined {
-  const key = ["SUPABASE", "SERVICE", "ROLE", "KEY"].join("_");
-  const raw = Reflect.get(nodeEnv, key);
-  return typeof raw === "string" ? raw.trim() : undefined;
-}
-
 /** Apenas server actions / route handlers. Nunca importar em Client Components. */
 export function createServiceRoleClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = readServiceRoleKey();
+  const url = readSupabaseUrl();
+  const key = readSupabaseServiceRoleKey();
   if (!url || !key) {
     if (!key && process.env.NODE_ENV === "production") {
       const hasAnySupabaseEnv = Object.keys(nodeEnv).some((k) =>

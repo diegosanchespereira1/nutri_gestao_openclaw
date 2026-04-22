@@ -13,6 +13,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import { sanitizeStorageFilename } from "@/lib/utils/storage-filename";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 type FillActionResult =
   | { ok: true; photo: ChecklistFillPhotoView }
@@ -90,7 +91,7 @@ async function verifyCustomItemInSession(
 
 async function assertSessionItem(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  workspaceOwnerId: string,
   sessionId: string,
   itemId: string,
   itemResponseSource: "global" | "custom",
@@ -100,12 +101,28 @@ async function assertSessionItem(
 > {
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("id, user_id, template_id, custom_template_id")
+    .select("id, template_id, custom_template_id, establishment_id")
     .eq("id", sessionId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (!sess) return { ok: false };
+
+  const establishmentId = sess.establishment_id as string | null;
+  if (!establishmentId) return { ok: false };
+
+  const { data: est } = await supabase
+    .from("establishments")
+    .select("client_id")
+    .eq("id", establishmentId)
+    .maybeSingle();
+  if (!est?.client_id) return { ok: false };
+
+  const { data: cl } = await supabase
+    .from("clients")
+    .select("owner_user_id")
+    .eq("id", est.client_id)
+    .maybeSingle();
+  if (!cl || cl.owner_user_id !== workspaceOwnerId) return { ok: false };
 
   if (itemResponseSource === "global") {
     const tid = sess.template_id as string | null;
@@ -208,6 +225,7 @@ export async function uploadChecklistFillPhotoAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const sessionId = String(formData.get("session_id") ?? "").trim();
   const itemId = String(formData.get("item_id") ?? "").trim();
@@ -237,7 +255,7 @@ export async function uploadChecklistFillPhotoAction(
 
   const sessionOk = await assertSessionItem(
     supabase,
-    user.id,
+    workspaceOwnerId,
     sessionId,
     itemId,
     itemResponseSource,
@@ -353,6 +371,7 @@ export async function deleteChecklistFillPhotoAction(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { photoId, sessionId } = input;
 
@@ -367,11 +386,31 @@ export async function deleteChecklistFillPhotoAction(input: {
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("user_id")
+    .select("establishment_id")
     .eq("id", sessionId)
     .maybeSingle();
 
-  if (!sess || sess.user_id !== user.id) {
+  const establishmentId = sess?.establishment_id as string | null;
+  if (!establishmentId) {
+    return { ok: false, error: "Sem permissão." };
+  }
+
+  const { data: est } = await supabase
+    .from("establishments")
+    .select("client_id")
+    .eq("id", establishmentId)
+    .maybeSingle();
+  if (!est?.client_id) {
+    return { ok: false, error: "Sem permissão." };
+  }
+
+  const { data: cl } = await supabase
+    .from("clients")
+    .select("owner_user_id")
+    .eq("id", est.client_id)
+    .maybeSingle();
+
+  if (!cl || cl.owner_user_id !== workspaceOwnerId) {
     return { ok: false, error: "Sem permissão." };
   }
 

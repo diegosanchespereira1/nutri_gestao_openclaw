@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { env as nodeEnv } from "node:process";
 import { createClient } from "@/lib/supabase/server";
+import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
 
 export async function GET() {
   // Exige sessão — não expõe nada a utilizadores anónimos.
@@ -36,6 +37,10 @@ export async function GET() {
       : "❌ AUSENTE",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       ? "✅ presente"
+      : "❌ AUSENTE",
+    SUPABASE_URL: readSupabaseUrl() ? "✅ presente (runtime/fallback)" : "❌ AUSENTE",
+    SUPABASE_ANON_KEY: readSupabaseAnonKey()
+      ? "✅ presente (runtime/fallback)"
       : "❌ AUSENTE",
     RESEND_API_KEY:
       typeof nodeEnv["RESEND_API_KEY"] === "string" &&

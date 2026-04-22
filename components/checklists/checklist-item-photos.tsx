@@ -134,11 +134,14 @@ export function ChecklistItemPhotos({
         return;
       }
 
-      setPhotos((prev) => {
-        const next = [...prev, res.photo];
-        onPhotosChange?.(next);
-        return next;
-      });
+      setPhotos((prev) => [...prev, res.photo]);
+      // Atualizar photos do pai assincrono para evitar setState durante render
+      setTimeout(() => {
+        setPhotos((prev) => {
+          onPhotosChange?.(prev);
+          return prev;
+        });
+      }, 0);
     },
     [atLimit, disabled, itemId, itemResponseSource, onPhotosChange, sessionId],
   );
@@ -154,11 +157,14 @@ export function ChecklistItemPhotos({
         setUploadError(r.error);
         return;
       }
-      setPhotos((prev) => {
-        const next = prev.filter((p) => p.id !== photoId);
-        onPhotosChange?.(next);
-        return next;
-      });
+      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
+      // Atualizar photos do pai assincrono para evitar setState durante render
+      setTimeout(() => {
+        setPhotos((prev) => {
+          onPhotosChange?.(prev);
+          return prev;
+        });
+      }, 0);
     },
     [disabled, onPhotosChange, sessionId],
   );

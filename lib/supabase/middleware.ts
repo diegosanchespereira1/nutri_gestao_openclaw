@@ -13,6 +13,7 @@ import {
   profileLgpdBlocked,
   profileNeedsOnboarding,
 } from "@/lib/supabase/profile";
+import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
 
 /** Preserva path, maxAge, sameSite, etc. — sem isto a sessão pode perder-se nos redirects. */
 function copyCookies(from: NextResponse, to: NextResponse) {
@@ -32,8 +33,8 @@ function nextWithPathname(request: NextRequest): NextResponse {
 }
 
 export async function updateSession(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = readSupabaseUrl();
+  const anonKey = readSupabaseAnonKey();
   const pathname = request.nextUrl.pathname;
 
   if (!url || !anonKey) {

@@ -5,6 +5,7 @@ import type { ConsolidatedNutritionEvent } from "@/lib/types/patient-history";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
 import { buildAssessmentSummaryLine } from "@/lib/utils/nutrition-assessment-display";
 import { onlyDigits } from "@/lib/validators/br-document";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 type PatientEmbed = {
   id: string;
@@ -53,6 +54,7 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
       events: [],
     };
   }
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data: anchor, error: anchorErr } = await supabase
     .from("patients")
@@ -76,7 +78,7 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
     .eq("id", anchor.client_id)
     .maybeSingle();
 
-  if (!clientRow || clientRow.owner_user_id !== user.id) {
+  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
     return {
       patientFullName: null,
       mergeByDocument: false,
@@ -89,7 +91,7 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
   const { data: myClients } = await supabase
     .from("clients")
     .select("id")
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", workspaceOwnerId);
 
   const clientIds = (myClients ?? []).map((c) => c.id);
   if (clientIds.length === 0) {

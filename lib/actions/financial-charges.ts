@@ -13,6 +13,7 @@ import type {
   FinancialChargeListRow,
   FinancialChargeStatus,
 } from "@/lib/types/financial-charges";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 function parseDueDate(raw: string): string | null {
   const s = raw.trim();
@@ -45,11 +46,12 @@ export async function loadFinancialDashboardSummary(timeZone: string): Promise<{
       overdueTotalLabel: formatBRLFromCents(0),
     };
   }
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data, error } = await supabase
     .from("financial_charges")
     .select("due_date, amount_cents, status")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("status", "open");
 
   if (error || !data) {
@@ -85,6 +87,7 @@ export async function loadFinancialChargesForOwner(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data, error } = await supabase
     .from("financial_charges")
@@ -101,7 +104,7 @@ export async function loadFinancialChargesForOwner(): Promise<{
       clients ( legal_name, trade_name )
     `,
     )
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .order("due_date", { ascending: true });
 
   if (error || !data) return { rows: [] };
@@ -116,12 +119,13 @@ export async function loadFinancialChargesForClient(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data: clientOk } = await supabase
     .from("clients")
     .select("id")
     .eq("id", clientId)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
 
   if (!clientOk) return { rows: [] };
@@ -141,7 +145,7 @@ export async function loadFinancialChargesForClient(
       clients ( legal_name, trade_name )
     `,
     )
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("client_id", clientId)
     .order("due_date", { ascending: true });
 
@@ -157,6 +161,7 @@ export async function createFinancialChargeAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const clientId = String(formData.get("client_id") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
@@ -172,7 +177,7 @@ export async function createFinancialChargeAction(
     .from("clients")
     .select("id")
     .eq("id", clientId)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
 
   if (clientErr || !clientOk) {
@@ -180,7 +185,7 @@ export async function createFinancialChargeAction(
   }
 
   const { error } = await supabase.from("financial_charges").insert({
-    owner_user_id: user.id,
+    owner_user_id: workspaceOwnerId,
     client_id: clientId,
     description: description.length > 0 ? description : "",
     amount_cents: cents,
@@ -206,6 +211,7 @@ export async function markFinancialChargePaidAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/financeiro?err=invalid&tab=operacoes");
@@ -214,7 +220,7 @@ export async function markFinancialChargePaidAction(
     .from("financial_charges")
     .select("client_id")
     .eq("id", id)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
 
   const { error } = await supabase
@@ -224,7 +230,7 @@ export async function markFinancialChargePaidAction(
       paid_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("status", "open");
 
   if (error) {

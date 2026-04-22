@@ -9,6 +9,7 @@ import type {
   PatientGroup,
   NutritionalRisk,
 } from "@/lib/types/adult-nutrition-assessments";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export type AdultNutritionAssessmentFormResult =
   | { ok: true }
@@ -66,6 +67,7 @@ export async function createAdultNutritionAssessmentAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const patientId = String(formData.get("patient_id") ?? "").trim();
   if (!patientId) return { ok: false, error: "Paciente em falta." };
@@ -84,7 +86,7 @@ export async function createAdultNutritionAssessmentAction(
     .eq("id", patient.client_id)
     .maybeSingle();
 
-  if (!clientRow || clientRow.owner_user_id !== user.id) {
+  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
     return { ok: false, error: "Sem permissão para este paciente." };
   }
 

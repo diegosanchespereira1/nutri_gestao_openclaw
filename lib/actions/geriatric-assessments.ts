@@ -9,6 +9,7 @@ import type {
   PatientGroup,
   NutritionalRisk,
 } from "@/lib/types/geriatric-assessments";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export type GeriatricAssessmentFormResult =
   | { ok: true }
@@ -57,6 +58,7 @@ export async function createGeriatricAssessmentAction(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const patientId = String(formData.get("patient_id") ?? "").trim();
   if (!patientId) return { ok: false, error: "Paciente em falta." };
@@ -75,7 +77,7 @@ export async function createGeriatricAssessmentAction(
     .eq("id", patient.client_id)
     .maybeSingle();
 
-  if (!clientRow || clientRow.owner_user_id !== user.id) {
+  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
     return { ok: false, error: "Sem permissão para este paciente." };
   }
 
@@ -161,7 +163,7 @@ export async function createGeriatricAssessmentAction(
 // ── Helpers de permissão ──────────────────────────────────────────────────────
 async function assertGeriatricOwner(
   supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
-  userId: string,
+  ownerUserId: string,
   assessmentId: string,
 ): Promise<{ patientId: string } | { error: string }> {
   const { data: row } = await supabase
@@ -174,7 +176,7 @@ async function assertGeriatricOwner(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const owner = (row as any).patients?.clients?.owner_user_id;
-  if (owner !== userId) return { error: "Sem permissão para esta avaliação." };
+  if (owner !== ownerUserId) return { error: "Sem permissão para esta avaliação." };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { patientId: (row as any).patient_id as string };
@@ -187,11 +189,12 @@ export async function deleteGeriatricAssessmentAction(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const assessmentId = String(formData.get("assessment_id") ?? "").trim();
   if (!assessmentId) return { ok: false, error: "ID em falta." };
 
-  const check = await assertGeriatricOwner(supabase, user.id, assessmentId);
+  const check = await assertGeriatricOwner(supabase, workspaceOwnerId, assessmentId);
   if ("error" in check) return { ok: false, error: check.error };
 
   const { error } = await supabase
@@ -212,11 +215,12 @@ export async function updateGeriatricAssessmentAction(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const assessmentId = String(formData.get("assessment_id") ?? "").trim();
   if (!assessmentId) return { ok: false, error: "ID em falta." };
 
-  const check = await assertGeriatricOwner(supabase, user.id, assessmentId);
+  const check = await assertGeriatricOwner(supabase, workspaceOwnerId, assessmentId);
   if ("error" in check) return { ok: false, error: check.error };
 
   const patient_group = parsePatientGroup(formData.get("patient_group"));

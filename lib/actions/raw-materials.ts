@@ -9,6 +9,7 @@ import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
 import { createClient } from "@/lib/supabase/server";
 import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import { countRecipesUsingRawMaterial } from "@/lib/technical-recipes/raw-material-recipe-impact";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 const saveSchema = z.object({
   id: z.string().uuid().optional(),
@@ -43,11 +44,12 @@ export async function loadRawMaterialsForOwner(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data, error } = await supabase
     .from("professional_raw_materials")
     .select("*")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .order("name", { ascending: true });
 
   if (error || !data) return { rows: [] };
@@ -62,12 +64,13 @@ export async function loadRawMaterialById(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { row: null };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data, error } = await supabase
     .from("professional_raw_materials")
     .select("*")
     .eq("id", id)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
 
   if (error || !data) return { row: null };
@@ -82,6 +85,7 @@ export async function saveRawMaterialAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const formId = String(formData.get("id") ?? "").trim();
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -116,7 +120,7 @@ export async function saveRawMaterialAction(
         notes: notesVal,
       })
       .eq("id", id)
-      .eq("owner_user_id", user.id);
+      .eq("owner_user_id", workspaceOwnerId);
 
     if (error) {
       redirect(
@@ -145,7 +149,7 @@ export async function saveRawMaterialAction(
   }
 
   const { error } = await supabase.from("professional_raw_materials").insert({
-    owner_user_id: user.id,
+    owner_user_id: workspaceOwnerId,
     name: name.trim(),
     price_unit,
     unit_price_brl,
@@ -169,6 +173,7 @@ export async function deleteRawMaterialAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/ficha-tecnica/materias-primas?err=invalid");
@@ -185,7 +190,7 @@ export async function deleteRawMaterialAction(
     .from("professional_raw_materials")
     .delete()
     .eq("id", id)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
     redirect("/ficha-tecnica/materias-primas?err=save");

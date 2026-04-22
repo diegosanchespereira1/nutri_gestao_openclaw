@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { parseActivityLevel } from "@/lib/constants/activity-levels";
 import { createClient } from "@/lib/supabase/server";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export type NutritionAssessmentFormResult =
   | { ok: true }
@@ -52,6 +53,7 @@ export async function createNutritionAssessmentAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const patientId = String(formData.get("patient_id") ?? "").trim();
   if (!patientId) {
@@ -74,7 +76,7 @@ export async function createNutritionAssessmentAction(
     .eq("id", patient.client_id)
     .maybeSingle();
 
-  if (!clientRow || clientRow.owner_user_id !== user.id) {
+  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
     return { ok: false, error: "Sem permissão para este paciente." };
   }
 
@@ -125,7 +127,7 @@ export async function createNutritionAssessmentAction(
 // ── Helpers de permissão ──────────────────────────────────────────────────────
 async function assertAssessmentOwner(
   supabase: Awaited<ReturnType<typeof import("@/lib/supabase/server").createClient>>,
-  userId: string,
+  ownerUserId: string,
   assessmentId: string,
 ): Promise<{ patientId: string } | { error: string }> {
   const { data: row } = await supabase
@@ -138,7 +140,7 @@ async function assertAssessmentOwner(
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const owner = (row as any).patients?.clients?.owner_user_id;
-  if (owner !== userId) return { error: "Sem permissão para esta avaliação." };
+  if (owner !== ownerUserId) return { error: "Sem permissão para esta avaliação." };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return { patientId: (row as any).patient_id as string };
@@ -151,11 +153,12 @@ export async function deleteNutritionAssessmentAction(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const assessmentId = String(formData.get("assessment_id") ?? "").trim();
   if (!assessmentId) return { ok: false, error: "ID em falta." };
 
-  const check = await assertAssessmentOwner(supabase, user.id, assessmentId);
+  const check = await assertAssessmentOwner(supabase, workspaceOwnerId, assessmentId);
   if ("error" in check) return { ok: false, error: check.error };
 
   const { error } = await supabase
@@ -177,11 +180,12 @@ export async function updateNutritionAssessmentAction(
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const assessmentId = String(formData.get("assessment_id") ?? "").trim();
   if (!assessmentId) return { ok: false, error: "ID em falta." };
 
-  const check = await assertAssessmentOwner(supabase, user.id, assessmentId);
+  const check = await assertAssessmentOwner(supabase, workspaceOwnerId, assessmentId);
   if ("error" in check) return { ok: false, error: check.error };
 
   const height_cm    = parseOptDecimal(String(formData.get("height_cm") ?? ""));

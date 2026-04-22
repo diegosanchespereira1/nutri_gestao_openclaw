@@ -1,5 +1,6 @@
 import { CLIENT_EXAMS_BUCKET } from "@/lib/constants/client-exams-storage";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { NextResponse } from "next/server";
 
 export async function GET(
@@ -14,6 +15,7 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data: doc, error } = await supabase
     .from("client_exam_documents")
@@ -31,7 +33,7 @@ export async function GET(
     .eq("id", doc.client_id)
     .maybeSingle();
 
-  if (!clientRow || clientRow.owner_user_id !== user.id) {
+  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
     return NextResponse.json({ error: "Proibido." }, { status: 403 });
   }
 

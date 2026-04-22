@@ -14,6 +14,7 @@ import {
 import { loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 const PAGE_SIZE = 20;
 
@@ -46,7 +47,12 @@ export default async function ClientChecklistHistoryPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user || client.owner_user_id !== user.id) {
+  if (!user) {
+    notFound();
+  }
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (client.owner_user_id !== workspaceOwnerId) {
     notFound();
   }
 

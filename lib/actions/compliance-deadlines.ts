@@ -8,6 +8,7 @@ import type {
   ComplianceDashboardAlert,
   EstablishmentComplianceDeadlineRow,
 } from "@/lib/types/compliance-deadlines";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 const TITLE_MAX = 200;
 const NOTES_MAX = 2000;
@@ -117,6 +118,7 @@ export async function createComplianceDeadlineAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const establishmentId = String(
     formData.get("establishment_id") ?? "",
@@ -155,7 +157,7 @@ export async function createComplianceDeadlineAction(
     .eq("id", clientId)
     .maybeSingle();
 
-  if (!cl || cl.owner_user_id !== user.id || cl.kind !== "pj") {
+  if (!cl || cl.owner_user_id !== workspaceOwnerId || cl.kind !== "pj") {
     return { ok: false, error: "Sem permissão." };
   }
 

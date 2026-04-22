@@ -10,6 +10,7 @@ import type {
   ClientContractWithClient,
   ContractAlertRow,
 } from "@/lib/types/client-contracts";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,20 +44,21 @@ export async function loadContractsByClient(clientId: string): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   // Verify client belongs to tenant
   const { data: clientOk } = await supabase
     .from("clients")
     .select("id")
     .eq("id", clientId)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
   if (!clientOk) return { rows: [] };
 
   const { data, error } = await supabase
     .from("client_contracts")
     .select("*")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("client_id", clientId)
     .order("contract_end_date", { ascending: true, nullsFirst: false });
 
@@ -72,11 +74,12 @@ export async function loadContractsForOwner(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data, error } = await supabase
     .from("client_contracts")
     .select("*, clients(legal_name, trade_name)")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .order("contract_end_date", { ascending: true, nullsFirst: false });
 
   if (error || !data) return { rows: [] };
@@ -92,6 +95,7 @@ export async function loadExpiringContracts(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
@@ -102,7 +106,7 @@ export async function loadExpiringContracts(
   const { data, error } = await supabase
     .from("client_contracts")
     .select("*, clients(legal_name, trade_name)")
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .gte("contract_end_date", todayStr)
     .lte("contract_end_date", limitStr)
     .order("contract_end_date", { ascending: true });
@@ -130,6 +134,7 @@ export async function createContractAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const clientId = String(formData.get("client_id") ?? "").trim();
   const recurrenceRaw = String(formData.get("billing_recurrence") ?? "").trim();
@@ -150,7 +155,7 @@ export async function createContractAction(
     .from("clients")
     .select("id")
     .eq("id", clientId)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
   if (!clientOk) redirect(`/clientes/${clientId}/editar?contractErr=client`);
 
@@ -159,7 +164,7 @@ export async function createContractAction(
   const endDate = endRaw ? parseDate(endRaw) : null;
 
   const { error } = await supabase.from("client_contracts").insert({
-    owner_user_id: user.id,
+    owner_user_id: workspaceOwnerId,
     client_id: clientId,
     billing_recurrence: recurrenceRaw as BillingRecurrence,
     monthly_amount_cents: amountCents,
@@ -187,6 +192,7 @@ export async function updateContractAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const contractId = String(formData.get("contract_id") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();
@@ -219,7 +225,7 @@ export async function updateContractAction(
       notes: notes || null,
     })
     .eq("id", contractId)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
     redirect(`/clientes/${clientId}/editar?contractErr=save&tab=contratos`);
@@ -239,6 +245,7 @@ export async function deleteContractAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const contractId = String(formData.get("contract_id") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();
@@ -251,7 +258,7 @@ export async function deleteContractAction(
     .from("client_contracts")
     .delete()
     .eq("id", contractId)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
     redirect(`/clientes/${clientId}/editar?contractErr=save&tab=contratos`);

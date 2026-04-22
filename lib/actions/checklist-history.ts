@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import type { EstablishmentType } from "@/lib/types/establishments";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 /* ─── Tipos exportados ───────────────────────────────────────────────────── */
 
@@ -36,7 +37,7 @@ export type NcItemDetail = {
 
 async function assertClientOwned(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
+  ownerUserId: string,
   clientId: string,
 ): Promise<boolean> {
   const { data: cl } = await supabase
@@ -44,7 +45,7 @@ async function assertClientOwned(
     .select("owner_user_id")
     .eq("id", clientId)
     .maybeSingle();
-  return Boolean(cl && cl.owner_user_id === userId);
+  return Boolean(cl && cl.owner_user_id === ownerUserId);
 }
 
 /* ─── E.1: loadChecklistSessionsForClient ───────────────────────────────── */
@@ -68,6 +69,7 @@ export async function loadChecklistSessionsForClient(input: {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return empty;
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data: ownProfile } = await supabase
     .from("profiles")
@@ -77,7 +79,7 @@ export async function loadChecklistSessionsForClient(input: {
   const ownUserLabel = String(ownProfile?.full_name ?? "").trim() || "Você";
 
   // VALIDAÇÃO DE POSSE — obrigatória antes de qualquer query de dados.
-  const owned = await assertClientOwned(supabase, user.id, input.clientId);
+  const owned = await assertClientOwned(supabase, workspaceOwnerId, input.clientId);
   if (!owned) return empty;
 
   const limit = input.limit ?? 50;
@@ -295,6 +297,7 @@ export async function loadChecklistSessionNcItems(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return [];
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   // VALIDAÇÃO: verificar que a sessão pertence a um estabelecimento de um cliente do usuário.
   const { data: sess } = await supabase
@@ -313,7 +316,11 @@ export async function loadChecklistSessionNcItems(
 
   if (!est) return [];
 
-  const owned = await assertClientOwned(supabase, user.id, est.client_id as string);
+  const owned = await assertClientOwned(
+    supabase,
+    workspaceOwnerId,
+    est.client_id as string,
+  );
   if (!owned) return [];
 
   // Buscar respostas NC desta sessão

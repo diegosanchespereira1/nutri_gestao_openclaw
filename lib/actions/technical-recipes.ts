@@ -16,6 +16,7 @@ import type {
   TechnicalRecipeRow,
   TechnicalRecipeWithLines,
 } from "@/lib/types/technical-recipes";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 const tacoIdSchema = z.preprocess(
   (val) => (val === undefined || val === "" ? null : val),
@@ -474,6 +475,7 @@ export async function saveTechnicalRecipeDraftAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const parsed = saveDraftSchema.safeParse(raw);
   if (!parsed.success) {
@@ -513,7 +515,7 @@ export async function saveTechnicalRecipeDraftAction(
     const { data: rmRows, error: rmErr } = await supabase
       .from("professional_raw_materials")
       .select("id")
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", workspaceOwnerId)
       .in("id", rmIds);
     if (rmErr || !rmRows || rmRows.length !== rmIds.length) {
       return {
@@ -561,7 +563,7 @@ export async function saveTechnicalRecipeDraftAction(
 
     if (
       !estClientRow ||
-      estClientRow.owner_user_id !== user.id ||
+      estClientRow.owner_user_id !== workspaceOwnerId ||
       estClientRow.kind !== "pj"
     ) {
       return {
@@ -578,7 +580,7 @@ export async function saveTechnicalRecipeDraftAction(
 
     if (
       !orgClientRow ||
-      orgClientRow.owner_user_id !== user.id ||
+      orgClientRow.owner_user_id !== workspaceOwnerId ||
       orgClientRow.kind !== "pj"
     ) {
       return {
@@ -733,6 +735,7 @@ export async function deleteTechnicalRecipeAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { error } = await supabase
     .from("technical_recipes")
@@ -935,7 +938,7 @@ export async function loadTemplatesForPickerAction(ctx: {
     .maybeSingle();
   if (
     !clientRow ||
-    (clientRow as { owner_user_id: string }).owner_user_id !== user.id ||
+    (clientRow as { owner_user_id: string }).owner_user_id !== workspaceOwnerId ||
     (clientRow as { kind: string }).kind !== "pj"
   ) {
     return { ok: false, error: "Sem permissão para este contexto." };
@@ -1029,6 +1032,7 @@ export async function loadTemplateDataForNewRecipeAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   let targetClientId: string;
 
@@ -1056,7 +1060,7 @@ export async function loadTemplateDataForNewRecipeAction(
     .maybeSingle();
   if (
     !clientRow ||
-    (clientRow as { owner_user_id: string }).owner_user_id !== user.id ||
+    (clientRow as { owner_user_id: string }).owner_user_id !== workspaceOwnerId ||
     (clientRow as { kind: string }).kind !== "pj"
   ) {
     return { ok: false, error: "Sem permissão para este contexto." };
@@ -1096,6 +1100,7 @@ export async function toggleTemplateStatusAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { error } = await supabase
     .from("technical_recipes")
@@ -1141,7 +1146,7 @@ export async function createRecipeFromTemplateAction(
 
   if (
     !clientRow ||
-    clientRow.owner_user_id !== user.id ||
+    clientRow.owner_user_id !== workspaceOwnerId ||
     clientRow.kind !== "pj"
   ) {
     return { ok: false, error: "Sem permissão para este estabelecimento." };

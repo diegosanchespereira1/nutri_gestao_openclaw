@@ -12,6 +12,7 @@ import {
 } from "@/lib/actions/checklist-fill-photos";
 import {
   CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM,
+  CHECKLIST_FILL_PHOTO_MAX_BYTES,
 } from "@/lib/constants/checklist-fill-photos-storage";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import { cn } from "@/lib/utils";
@@ -109,6 +110,23 @@ export function ChecklistItemPhotos({
       if (!file || disabled || atLimit) return;
 
       setUploadError(null);
+
+      // Validar tamanho do arquivo antes de fazer upload
+      if (file.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {
+        const maxMB = CHECKLIST_FILL_PHOTO_MAX_BYTES / 1024 / 1024;
+        const fileMB = (file.size / 1024 / 1024).toFixed(1);
+        setUploadError(
+          `Ficheiro muito grande. Máximo: ${maxMB}MB. Tamanho: ${fileMB}MB.`
+        );
+        return;
+      }
+
+      // Validar tipo MIME
+      if (!file.type.startsWith("image/")) {
+        setUploadError("Selecione um ficheiro de imagem válido.");
+        return;
+      }
+
       setBusy(true);
 
       let lat = "";

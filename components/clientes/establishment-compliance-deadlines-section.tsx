@@ -76,7 +76,7 @@ export function EstablishmentComplianceDeadlinesSection({
           {initialRows.map((row) => (
             <li
               key={row.id}
-              className="border-border flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+              className="border-border flex flex-wrap items-start justify-between gap-2 rounded-lg border px-3 py-2 text-sm bg-white"
             >
               <div className="min-w-0">
                 <p className="text-foreground font-medium">{row.title}</p>
@@ -109,7 +109,7 @@ export function EstablishmentComplianceDeadlinesSection({
         </ul>
       )}
 
-      <form action={createAction} className="border-border space-y-3 rounded-lg border p-4">
+      <form action={createAction} className="border-border space-y-3 rounded-lg border p-4 bg-white">
         <input type="hidden" name="establishment_id" value={establishmentId} />
         <input type="hidden" name="client_id" value={clientId} />
         <p className="text-foreground text-sm font-medium">Novo prazo</p>

@@ -55,7 +55,7 @@ export async function EstablishmentChecklistHistorySection({
 
   return (
     <div className="space-y-3">
-      <ul className="divide-y divide-border/50 rounded-lg border border-border overflow-hidden">
+      <ul className="divide-y divide-border/50 rounded-lg border border-border overflow-hidden bg-white">
         {rows.map((session) => (
           <li key={session.id} className="flex items-start justify-between gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">

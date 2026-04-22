@@ -16,6 +16,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
 
 function NavLinks({
@@ -148,6 +149,10 @@ export function AppShell({
             NutriGestão
           </Link>
         </div>
+
+        <Separator className="bg-sidebar-border opacity-40" />
+
+        <AppShellUserGreeting />
 
         <Separator className="bg-sidebar-border opacity-40" />
 

@@ -19,7 +19,7 @@ export async function ClientExamDocumentList({
       <h3 className="text-foreground text-sm font-medium">
         Ficheiros de exame carregados
       </h3>
-      <ul className="divide-border divide-y rounded-md border">
+      <ul className="divide-border divide-y rounded-md border bg-white">
         {rows.map((row) => (
           <li
             key={row.id}

@@ -69,7 +69,7 @@ export function ChecklistFillDossierPreview({
   return (
     <div
       className={cn(
-        "border-border rounded-xl border bg-background p-4 shadow-xs",
+        "border-border rounded-xl border bg-white p-4 shadow-xs",
         className,
       )}
     >
@@ -84,7 +84,7 @@ export function ChecklistFillDossierPreview({
           return (
             <div
               key={section.id}
-              className="border-border overflow-hidden rounded-lg border bg-background"
+              className="border-border overflow-hidden rounded-lg border bg-white"
             >
               <button
                 type="button"
@@ -94,7 +94,7 @@ export function ChecklistFillDossierPreview({
                     [section.id]: !open,
                   }))
                 }
-                className="text-foreground hover:bg-muted/40 flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium transition-colors"
+                className="text-foreground hover:bg-muted/40 flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium transition-colors cursor-pointer"
                 aria-expanded={open}
               >
                 <ChevronDown

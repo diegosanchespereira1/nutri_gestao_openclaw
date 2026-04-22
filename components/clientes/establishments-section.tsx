@@ -40,7 +40,7 @@ export async function EstablishmentsSection({
           </p>
         </div>
       ) : (
-        <div className="border-border overflow-hidden rounded-lg border">
+        <div className="border-border overflow-hidden rounded-lg border bg-white">
           <Link
             href={`/clientes/${clientId}/estabelecimentos/${establishment.id}/editar`}
             className="hover:bg-muted/50 focus-visible:ring-ring block px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"

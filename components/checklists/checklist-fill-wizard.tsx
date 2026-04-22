@@ -135,18 +135,25 @@ export function ChecklistFillWizard({
 
   /* ── Task D: indicador de auto-save ── */
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function reportSaving() {
     if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
     setSaveStatus("saving");
+    setSaveErrorMsg(null);
   }
   function reportSaved() {
     setSaveStatus("saved");
+    setSaveErrorMsg(null);
     savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
   }
-  function reportSaveError() {
+  function reportSaveError(error?: string) {
     setSaveStatus("error");
+    setSaveErrorMsg(error || "Erro desconhecido ao salvar");
+    if (error) {
+      console.error("Erro ao salvar:", error);
+    }
   }
 
   useEffect(() => {
@@ -227,7 +234,7 @@ export function ChecklistFillWizard({
       if (result.ok) {
         reportSaved();
       } else {
-        reportSaveError();
+        reportSaveError(result.error);
       }
     });
   }
@@ -287,7 +294,7 @@ export function ChecklistFillWizard({
           if (result.ok) {
             reportSaved();
           } else {
-            reportSaveError();
+            reportSaveError(result.error);
           }
         });
       }
@@ -384,7 +391,7 @@ export function ChecklistFillWizard({
                 <line x1="12" y1="8" x2="12" y2="12" />
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
-              Erro ao salvar — verifique a conexão
+              {saveErrorMsg || "Erro ao salvar — verifique a conexão"}
             </span>
           )}
         </div>
@@ -392,7 +399,7 @@ export function ChecklistFillWizard({
           {showDossierPeekButton ? (
             <Button
               type="button"
-              variant="outline"
+              variant="default"
               size="sm"
               className="gap-1.5"
               onClick={() => setDossierPeekOpen(true)}
@@ -403,7 +410,7 @@ export function ChecklistFillWizard({
           ) : null}
           <Link
             href={backHref}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            className={cn(buttonVariants({ variant: "default", size: "sm" }))}
           >
             {backLabel}
           </Link>
@@ -432,7 +439,7 @@ export function ChecklistFillWizard({
             <div
               key={item.id}
               className={cn(
-                "rounded-xl border border-border bg-background p-4 shadow-xs transition-[box-shadow,border-color] duration-150",
+                "rounded-xl border border-border bg-white p-4 shadow-xs transition-[box-shadow,border-color] duration-150",
                 requiredInvalid
                   ? "border-destructive ring-destructive/35 ring-2"
                   : "border-border",

@@ -268,7 +268,7 @@ export default async function EditarClientePage({
           <Separator />
           <EstablishmentsSection clientId={row.id} />
           {/* Task F: acesso rápido ao histórico de checklists — apenas clientes PJ */}
-          <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+          <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-white px-4 py-3">
             <div>
               <p className="text-sm font-medium text-foreground">Histórico de checklists</p>
               <p className="mt-0.5 text-xs text-muted-foreground">
@@ -277,7 +277,7 @@ export default async function EditarClientePage({
             </div>
             <Link
               href={`/clientes/${row.id}/checklists`}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              className={cn(buttonVariants({ variant: "default", size: "sm" }))}
             >
               Ver histórico →
             </Link>

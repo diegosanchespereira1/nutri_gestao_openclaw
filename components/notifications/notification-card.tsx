@@ -47,7 +47,7 @@ export function NotificationCard({ notification, onDetailClick }: NotificationCa
   return (
     <button
       onClick={() => onDetailClick?.(notification)}
-      className={`w-full text-left p-4 border rounded-lg transition-colors ${
+      className={`w-full text-left p-4 border rounded-lg transition-colors cursor-pointer ${
         isUnread ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' : 'bg-white border-gray-200 hover:bg-gray-50'
       }`}
     >

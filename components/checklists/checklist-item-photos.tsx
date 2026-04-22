@@ -15,8 +15,27 @@ import {
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import { cn } from "@/lib/utils";
 
+function allowsFeature(feature: "geolocation"): boolean {
+  if (typeof document === "undefined") return true;
+  const doc = document as Document & {
+    permissionsPolicy?: { allowsFeature?: (name: string) => boolean };
+    featurePolicy?: { allowsFeature?: (name: string) => boolean };
+  };
+  const policy = doc.permissionsPolicy ?? doc.featurePolicy;
+  if (!policy?.allowsFeature) return true;
+  try {
+    return policy.allowsFeature(feature);
+  } catch {
+    return true;
+  }
+}
+
 function getPositionOptional(): Promise<GeolocationPosition | null> {
-  if (typeof window === "undefined" || !navigator.geolocation) {
+  if (
+    typeof window === "undefined" ||
+    !navigator.geolocation ||
+    !allowsFeature("geolocation")
+  ) {
     return Promise.resolve(null);
   }
   return new Promise((resolve) => {

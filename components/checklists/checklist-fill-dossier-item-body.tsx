@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { ZoomIn } from "lucide-react";
 
 import { saveFillItemResponse } from "@/lib/actions/checklist-fill";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import { Label } from "@/components/ui/label";
+import { ImageViewerModal } from "@/components/image-viewer-modal";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
   type FillItemResponseState,
@@ -43,6 +45,10 @@ export function ChecklistFillDossierItemBody({
   onPatchResponse,
 }: Props) {
   const [savingItemId, setSavingItemId] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<{
+    url: string;
+    hasLocation: boolean;
+  } | null>(null);
 
   const canEdit =
     reviewEditable &&
@@ -68,7 +74,8 @@ export function ChecklistFillDossierItemBody({
   );
 
   return (
-    <ul className="space-y-3">
+    <>
+      <ul className="space-y-3">
       {section.items.map((item) => {
         const r = responses[item.id] ?? emptyItem();
         const photos = itemPhotos[item.id] ?? [];
@@ -166,24 +173,46 @@ export function ChecklistFillDossierItemBody({
             ) : null}
 
             {photos.length > 0 ? (
-              <div className="mt-2">
+              <div className="mt-3">
                 <p className="text-muted-foreground mb-2 text-xs font-medium">
-                  Fotos ({photos.length})
+                  Fotos de evidência ({photos.length})
                 </p>
-                <ul className="flex flex-wrap gap-2" aria-label="Miniaturas">
+                <ul className="flex flex-wrap gap-3" aria-label="Fotos de evidência">
                   {photos.map((p) => (
                     <li
                       key={p.id}
-                      className="border-border overflow-hidden rounded-md border"
+                      className="border-border group relative overflow-hidden rounded-lg border bg-muted/20 cursor-pointer transition-transform hover:scale-105"
+                      onClick={() =>
+                        setViewingImage({ url: p.url, hasLocation: p.hasLocation })
+                      }
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          setViewingImage({ url: p.url, hasLocation: p.hasLocation });
+                        }
+                      }}
+                      aria-label="Clique para visualizar imagem ampliada"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada */}
                       <img
                         src={p.url}
-                        alt=""
-                        width={64}
-                        height={64}
-                        className="size-16 object-cover"
+                        alt="Foto de evidência"
+                        width={120}
+                        height={120}
+                        className="size-32 object-cover"
                       />
+                      {/* Overlay com ícone de zoom */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40 flex items-center justify-center">
+                        <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                          <ZoomIn className="text-white size-6" aria-hidden />
+                        </div>
+                      </div>
+                      {p.hasLocation ? (
+                        <p className="bg-background/80 text-muted-foreground px-2 py-1 text-center text-[10px]">
+                          Com localização
+                        </p>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -192,6 +221,14 @@ export function ChecklistFillDossierItemBody({
           </li>
         );
       })}
-    </ul>
+      </ul>
+
+      <ImageViewerModal
+        isOpen={viewingImage !== null}
+        imageUrl={viewingImage?.url ?? ""}
+        hasLocation={viewingImage?.hasLocation}
+        onClose={() => setViewingImage(null)}
+      />
+    </>
   );
 }

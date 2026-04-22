@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Images, Trash2 } from "lucide-react";
+import { Camera, Images, Trash2, ZoomIn } from "lucide-react";
 
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { Button } from "@/components/ui/button";
+import { ImageViewerModal } from "@/components/image-viewer-modal";
 import {
   deleteChecklistFillPhotoAction,
   uploadChecklistFillPhotoAction,
@@ -80,6 +81,10 @@ export function ChecklistItemPhotos({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewingImage, setViewingImage] = useState<{
+    url: string;
+    hasLocation: boolean;
+  } | null>(null);
   /** Câmara (traseira em telemóvel/tablet — atributo HTML `capture`). */
   const inputCameraRef = useRef<HTMLInputElement>(null);
   /** Galeria / ficheiros sem forçar câmara (útil em tablet ou desktop). */
@@ -134,16 +139,11 @@ export function ChecklistItemPhotos({
         return;
       }
 
-      setPhotos((prev) => [...prev, res.photo]);
-      // Atualizar photos do pai assincrono para evitar setState durante render
-      setTimeout(() => {
-        setPhotos((prev) => {
-          onPhotosChange?.(prev);
-          return prev;
-        });
-      }, 0);
+      const newPhotos = [...photos, res.photo];
+      setPhotos(newPhotos);
+      onPhotosChange?.(newPhotos);
     },
-    [atLimit, disabled, itemId, itemResponseSource, onPhotosChange, sessionId],
+    [atLimit, disabled, itemId, itemResponseSource, sessionId, photos, onPhotosChange],
   );
 
   const onDelete = useCallback(
@@ -157,16 +157,11 @@ export function ChecklistItemPhotos({
         setUploadError(r.error);
         return;
       }
-      setPhotos((prev) => prev.filter((p) => p.id !== photoId));
-      // Atualizar photos do pai assincrono para evitar setState durante render
-      setTimeout(() => {
-        setPhotos((prev) => {
-          onPhotosChange?.(prev);
-          return prev;
-        });
-      }, 0);
+      const newPhotos = photos.filter((p) => p.id !== photoId);
+      setPhotos(newPhotos);
+      onPhotosChange?.(newPhotos);
     },
-    [disabled, onPhotosChange, sessionId],
+    [disabled, sessionId, photos, onPhotosChange],
   );
 
   return (
@@ -206,7 +201,7 @@ export function ChecklistItemPhotos({
         <div className="flex flex-wrap items-center gap-2">
           {busy ? (
             <p className="text-muted-foreground min-h-11 px-1 py-2 text-sm sm:min-h-9 sm:py-1.5">
-              A enviar…
+              Carregando…
             </p>
           ) : (
             <>
@@ -278,7 +273,18 @@ export function ChecklistItemPhotos({
           {photos.map((p) => (
             <li
               key={p.id}
-              className="border-border relative overflow-hidden rounded-lg border bg-muted/30"
+              className="border-border relative overflow-hidden rounded-lg border bg-muted/30 group cursor-pointer transition-transform hover:scale-105"
+              onClick={() =>
+                setViewingImage({ url: p.url, hasLocation: p.hasLocation })
+              }
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setViewingImage({ url: p.url, hasLocation: p.hasLocation });
+                }
+              }}
+              aria-label="Clique para visualizar imagem ampliada"
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- URLs assinadas dinâmicas */}
               <img
@@ -288,6 +294,12 @@ export function ChecklistItemPhotos({
                 height={80}
                 className="size-20 object-cover"
               />
+              {/* Overlay com ícone de zoom */}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors group-hover:bg-black/40">
+                <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                  <ZoomIn className="text-white size-5" aria-hidden />
+                </div>
+              </div>
               {p.hasLocation ? (
                 <span className="bg-background/90 text-muted-foreground absolute bottom-0 left-0 right-0 px-1 py-0.5 text-center text-[10px]">
                   Com localização
@@ -303,7 +315,10 @@ export function ChecklistItemPhotos({
                 )}
                 disabled={disabled || deletingId !== null}
                 aria-label="Remover foto"
-                onClick={() => void onDelete(p.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void onDelete(p.id);
+                }}
               >
                 <Trash2 className="size-3.5" aria-hidden />
               </Button>
@@ -316,6 +331,13 @@ export function ChecklistItemPhotos({
           Nenhuma foto anexada a este item.
         </p>
       )}
+
+      <ImageViewerModal
+        isOpen={viewingImage !== null}
+        imageUrl={viewingImage?.url ?? ""}
+        hasLocation={viewingImage?.hasLocation}
+        onClose={() => setViewingImage(null)}
+      />
     </div>
   );
 }

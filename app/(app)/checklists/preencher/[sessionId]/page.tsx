@@ -38,20 +38,20 @@ export default async function ChecklistPreencherPage({
           </h1>
           <PageHelpHint ariaLabel="Como funciona o preenchimento do checklist">
             <p>
-              Respostas são guardadas ao alterar cada item. Pode saltar entre secções com{" "}
-              <strong>Ir para secção</strong> ou <strong>Seguinte</strong> /{" "}
-              <strong>Secção anterior</strong> sem preencher tudo de seguida.
+              Respostas são salvas ao alterar cada item. Você pode pular entre seções com{" "}
+              <strong>Ir para seção</strong> ou <strong>Próxima seção</strong> /{" "}
+              <strong>Seção anterior</strong> sem preencher tudo de uma vez.
             </p>
             <p>
-              Use <strong>Pré-visualizar dossiê</strong> para rever o rascunho. Após escolher
-              a avaliação, pode escrever uma <strong>anotação opcional</strong> por item. Pode
-              anexar fotos com <strong>Tirar foto</strong> (câmara em telemóvel/tablet) ou{" "}
+              Use <strong>Pré-visualizar dossiê</strong> para revisar o rascunho. Após escolher
+              a avaliação, você pode escrever uma <strong>anotação opcional</strong> por item. Pode
+              anexar fotos com <strong>Tirar foto</strong> (câmera no celular/tablet) ou{" "}
               <strong>Galeria</strong>.
             </p>
             <p>
               Quando terminar, use <strong>Finalizar e ver dossiê</strong>: só aí é obrigatório
-              que todos os requisitos estejam válidos; depois pode <strong>ajustar textos</strong>{" "}
-              no preview e <strong>aprovar</strong> para registar (imutável).
+              que todos os requisitos estejam válidos; depois você pode <strong>ajustar textos</strong>{" "}
+              no preview e <strong>aprovar</strong> para registrar (imutável).
             </p>
           </PageHelpHint>
         </div>

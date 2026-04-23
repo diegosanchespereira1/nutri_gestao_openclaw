@@ -364,7 +364,7 @@ export function ChecklistFillWizard({
             {template.name}
           </h2>
           <p className="text-muted-foreground mt-1 text-sm">
-            Secção {sectionIndex + 1} de {sections.length}: {section.title}
+            Seção {sectionIndex + 1} de {sections.length}: {section.title}
           </p>
           {/* Task D: indicador de auto-save */}
           {saveStatus === "saving" && (
@@ -627,7 +627,7 @@ export function ChecklistFillWizard({
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-xl">
               <Label htmlFor="checklist-section-jump" className="text-xs">
-                Ir para secção
+                Ir para seção
               </Label>
               <select
                 id="checklist-section-jump"
@@ -640,7 +640,7 @@ export function ChecklistFillWizard({
                   saveCurrentSectionFields();
                   setSectionIndex(Math.min(Math.max(0, next), sections.length - 1));
                 }}
-                aria-label="Escolher secção do checklist"
+                aria-label="Escolher seção do checklist"
               >
                 {sections.map((s, i) => (
                   <option key={s.id} value={i}>
@@ -658,14 +658,14 @@ export function ChecklistFillWizard({
             onClick={handlePrev}
             disabled={sectionIndex === 0 || isPending || formLocked}
           >
-            Secção anterior
+            Seção anterior
           </Button>
           <Button
             type="button"
             onClick={handleNext}
             disabled={isPending || formLocked || isLast}
           >
-            Seguinte secção
+            Próxima seção
           </Button>
           {!formLocked ? (
             <Button
@@ -796,10 +796,10 @@ export function ChecklistFillWizard({
           <DialogHeader>
             <DialogTitle>Finalizar e compilar dossiê?</DialogTitle>
             <DialogDescription>
-              Será gerado um relatório único com todas as secções, avaliações, textos de
-              não conformidade, anotações e fotos. Os dados já estão guardados. Ao
-              confirmar, todos os itens obrigatórios têm de estar válidos; caso falte
-              algum requisito, indicamos a secção a corrigir.
+              Será gerado um relatório único com todas as seções, avaliações, textos de
+              não conformidade, anotações e fotos. Os dados já estão salvos. Ao
+              confirmar, todos os itens obrigatórios devem estar válidos; caso falte
+              algum requisito, indicamos a seção a corrigir.
             </DialogDescription>
           </DialogHeader>
           {finalizeDialogError ? (

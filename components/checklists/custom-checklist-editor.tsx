@@ -66,7 +66,7 @@ export function CustomChecklistEditor({
             <input type="hidden" name="custom_template_id" value={customTemplateId} />
             <input type="hidden" name="custom_section_id" value={sec.id} />
             <p className="text-muted-foreground text-xs font-medium">
-              Novo item nesta secção
+              Novo item nesta seção
             </p>
             <div className="space-y-2">
               <Label htmlFor={`desc-${sec.id}`}>Descrição</Label>
@@ -94,25 +94,25 @@ export function CustomChecklistEditor({
 
       <section className="border-border rounded-xl border border-dashed p-4">
         <h2 className="text-foreground text-base font-semibold">
-          Nova secção
+          Nova seção
         </h2>
         <p className="text-muted-foreground mt-1 text-sm">
-          Secções vazias podem receber apenas itens seus (úteis para requisitos
+          Seções vazias podem receber apenas itens seus (úteis para requisitos
           internos do cliente).
         </p>
         <form action={addCustomSectionAction} className="mt-4 flex flex-wrap gap-3">
           <input type="hidden" name="custom_template_id" value={customTemplateId} />
           <div className="flex min-w-[200px] flex-1 flex-col gap-2">
-            <Label htmlFor="new-section-title">Título da secção</Label>
+            <Label htmlFor="new-section-title">Título da seção</Label>
             <Input
               id="new-section-title"
               name="title"
               required
-              placeholder="Ex.: Controlo interno"
+              placeholder="Ex.: Controle interno"
             />
           </div>
           <div className="flex items-end">
-            <Button type="submit">Adicionar secção</Button>
+            <Button type="submit">Adicionar seção</Button>
           </div>
         </form>
       </section>

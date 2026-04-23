@@ -33,7 +33,7 @@ type Props = {
   ) => void;
 };
 
-/** Conteúdo completo dos itens de uma secção (partilhado entre resumo e dossiê preview). */
+/** Conteúdo completo dos itens de uma seção (compartilhado entre resumo e dossiê preview). */
 export function ChecklistFillDossierItemBody({
   section,
   responses,

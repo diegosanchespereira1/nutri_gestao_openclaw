@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 type Props = {
   id: string;
   title: string;
-  /** Conteúdo da subsecção (lista, vazio, etc.). */
+  /** Conteúdo da subseção (lista, vazio, etc.). */
   children: ReactNode;
   /** Ações à direita do título (ex.: link). */
   actions?: ReactNode;

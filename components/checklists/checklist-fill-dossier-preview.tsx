@@ -64,7 +64,7 @@ export function ChecklistFillDossierPreview({
     ? "Dossiê aprovado — conteúdo em modo leitura (FR70)."
     : reviewEditable
       ? "Revise os textos abaixo; guarde ao sair de cada campo. Depois pode aprovar o dossiê."
-      : "Checklist, fotos e notas agregados por secção. Expanda cada bloco para rever o detalhe.";
+      : "Checklist, fotos e notas agregados por seção. Expanda cada bloco para revisar o detalhe.";
 
   return (
     <div

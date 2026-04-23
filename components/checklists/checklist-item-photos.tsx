@@ -56,6 +56,10 @@ function getPositionOptional(): Promise<GeolocationPosition | null> {
   });
 }
 
+type UploadState =
+  | { status: "idle" }
+  | { status: "uploading" };
+
 type Props = {
   sessionId: string;
   itemId: string;
@@ -80,7 +84,7 @@ export function ChecklistItemPhotos({
     setPhotos(initialPhotos);
   }, [initialPhotos]);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>({ status: "idle" });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewingImage, setViewingImage] = useState<{
     url: string;
@@ -92,6 +96,7 @@ export function ChecklistItemPhotos({
   const inputGalleryRef = useRef<HTMLInputElement>(null);
 
   const atLimit = photos.length >= CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM;
+  const busy = uploadState.status !== "idle";
 
   const openCamera = useCallback(() => {
     setUploadError(null);
@@ -102,6 +107,56 @@ export function ChecklistItemPhotos({
     setUploadError(null);
     inputGalleryRef.current?.click();
   }, []);
+
+  const performUpload = useCallback(async (file: File): Promise<boolean> => {
+    try {
+      setUploadError(null);
+      setUploadState({ status: "uploading" });
+
+      let lat = "";
+      let lng = "";
+      try {
+        const pos = await getPositionOptional();
+        if (pos) {
+          lat = String(pos.coords.latitude);
+          lng = String(pos.coords.longitude);
+        }
+      } catch {
+        /* localização opcional */
+      }
+
+      const fd = new FormData();
+      fd.append("session_id", sessionId);
+      fd.append("item_id", itemId);
+      fd.append("item_response_source", itemResponseSource);
+      fd.append("file", file);
+      if (lat) fd.append("latitude", lat);
+      if (lng) fd.append("longitude", lng);
+
+      const res = await uploadChecklistFillPhotoAction(fd);
+      setUploadState({ status: "idle" });
+
+      if (!res.ok) {
+        setUploadError(res.error);
+        return false;
+      }
+
+      const newPhotos = [...photos, res.photo];
+      setPhotos(newPhotos);
+      onPhotosChange?.(newPhotos);
+      return true;
+    } catch (err) {
+      setUploadState({ status: "idle" });
+      const msg =
+        err instanceof Error ? err.message : String(err);
+      setUploadError(
+        msg.includes("Failed to fetch") || msg.includes("network")
+          ? "Erro de rede ao enviar foto. Verifique a ligação e tente novamente."
+          : `Erro ao enviar foto: ${msg}`,
+      );
+      return false;
+    }
+  }, [sessionId, itemId, itemResponseSource, photos, onPhotosChange]);
 
   const onFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,41 +182,9 @@ export function ChecklistItemPhotos({
         return;
       }
 
-      setBusy(true);
-
-      let lat = "";
-      let lng = "";
-      try {
-        const pos = await getPositionOptional();
-        if (pos) {
-          lat = String(pos.coords.latitude);
-          lng = String(pos.coords.longitude);
-        }
-      } catch {
-        /* localização opcional */
-      }
-
-      const fd = new FormData();
-      fd.append("session_id", sessionId);
-      fd.append("item_id", itemId);
-      fd.append("item_response_source", itemResponseSource);
-      fd.append("file", file);
-      if (lat) fd.append("latitude", lat);
-      if (lng) fd.append("longitude", lng);
-
-      const res = await uploadChecklistFillPhotoAction(fd);
-      setBusy(false);
-
-      if (!res.ok) {
-        setUploadError(res.error);
-        return;
-      }
-
-      const newPhotos = [...photos, res.photo];
-      setPhotos(newPhotos);
-      onPhotosChange?.(newPhotos);
+      await performUpload(file);
     },
-    [atLimit, disabled, itemId, itemResponseSource, sessionId, photos, onPhotosChange],
+    [performUpload, atLimit, disabled],
   );
 
   const onDelete = useCallback(

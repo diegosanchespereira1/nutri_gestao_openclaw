@@ -249,17 +249,25 @@ export async function saveFillItemResponse(input: {
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { sessionId, itemId, itemResponseSource, outcome, note, annotation } =
     input;
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("id, template_id, custom_template_id, dossier_approved_at")
+    .select("id, template_id, custom_template_id, dossier_approved_at, establishment_id")
     .eq("id", sessionId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!sess) return { ok: false, error: "Rascunho não encontrado." };
+
+  const estOwned = await assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    sess.establishment_id as string,
+  );
+  if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
 
   if (sess.dossier_approved_at) {
     return {
@@ -531,13 +539,20 @@ export async function approveChecklistFillDossierAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const estOwned = await assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    bundle.session.establishment_id as string,
+  );
+  if (!estOwned) return { ok: false, error: "Sem permissão para aprovar este dossiê." };
+
   const approvedAt = new Date().toISOString();
 
   const { data: updated, error } = await supabase
     .from("checklist_fill_sessions")
     .update({ dossier_approved_at: approvedAt })
     .eq("id", sessionId)
-    .eq("user_id", user.id)
     .is("dossier_approved_at", null)
     .select("dossier_approved_at")
     .maybeSingle();
@@ -554,7 +569,6 @@ export async function approveChecklistFillDossierAction(
       .from("scheduled_visits")
       .update({ status: "completed" })
       .eq("id", visitId)
-      .eq("user_id", user.id)
       .in("status", ["scheduled", "in_progress"]);
   }
 

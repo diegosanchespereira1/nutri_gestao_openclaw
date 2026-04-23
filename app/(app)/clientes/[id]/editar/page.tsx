@@ -5,10 +5,13 @@ import { ClientExamDocumentList } from "@/components/clientes/client-exam-docume
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { ClientContractsSection } from "@/components/clientes/client-contracts-section";
 import { ClientForm } from "@/components/clientes/client-form";
+import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
 import { ClientChecklistHistorySection } from "@/components/clientes/client-checklist-history-section";
+import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
 import { ClientEditTabNav } from "@/components/clientes/client-edit-tab-nav";
 import { DeleteClientButton } from "@/components/clientes/delete-client-button";
 import { EstablishmentsSection } from "@/components/clientes/establishments-section";
+import { EstablishmentAreasSection } from "@/components/clientes/establishment-areas-section";
 import { PatientsSection } from "@/components/pacientes/patients-section";
 import {
   Card,
@@ -24,6 +27,7 @@ import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
+import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { normalizeClientRow } from "@/lib/clients/normalize-client-row";
 import { resolveClientEditTab } from "@/lib/clientes/client-edit-tab";
@@ -40,6 +44,38 @@ function dateInputValue(isoOrDate: string | null): string {
   return isoOrDate.slice(0, 10);
 }
 
+async function ChecklistsTabSection({
+  clientId,
+  sp,
+}: {
+  clientId: string;
+  sp: { est?: string; area?: string; status?: string; page?: string };
+}) {
+  const scoreHistory = await loadChecklistScoreHistory(clientId);
+  return (
+    <div className="space-y-6">
+      {scoreHistory.byTemplate.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+          <h3 className="text-base font-semibold text-foreground tracking-tight">
+            Evolução da pontuação
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pontuação por dossiê aprovado — cada linha representa um template de checklist.
+          </p>
+          <div className="mt-4">
+            <ChecklistScoreEvolutionChart byTemplate={scoreHistory.byTemplate} />
+          </div>
+        </div>
+      )}
+      <ClientChecklistHistorySection
+        clientId={clientId}
+        embeddedInClientEdit
+        searchParams={sp}
+      />
+    </div>
+  );
+}
+
 export default async function EditarClientePage({
   params,
   searchParams,
@@ -50,6 +86,7 @@ export default async function EditarClientePage({
     tab?: string;
     formTab?: string;
     est?: string;
+    area?: string;
     status?: string;
     page?: string;
   }>;
@@ -108,6 +145,12 @@ export default async function EditarClientePage({
     loadCustomSegmentsAction(),
     loadTeamMembersForSelect(),
   ]);
+
+  // Áreas do estabelecimento (apenas PJ com estabelecimento já criado)
+  const establishmentAreas =
+    row.kind === "pj" && estData?.id
+      ? await loadAreasForEstablishment(estData.id)
+      : [];
 
   const activeTab = resolveClientEditTab(sp.tab, row.kind);
 
@@ -220,6 +263,16 @@ export default async function EditarClientePage({
               <EstablishmentsSection clientId={row.id} />
             ) : null}
           </ClientForm>
+
+          {row.kind === "pj" && estData?.id ? (
+            <>
+              <Separator className="my-8" />
+              <EstablishmentAreasSection
+                establishmentId={estData.id}
+                initialAreas={establishmentAreas}
+              />
+            </>
+          ) : null}
 
           {row.kind === "pf" ? (
             <>
@@ -335,14 +388,9 @@ export default async function EditarClientePage({
       ) : null}
 
       {activeTab === "checklists" && row.kind === "pj" ? (
-        <ClientChecklistHistorySection
+        <ChecklistsTabSection
           clientId={row.id}
-          embeddedInClientEdit
-          searchParams={{
-            est: sp.est,
-            status: sp.status,
-            page: sp.page,
-          }}
+          sp={{ est: sp.est, area: sp.area, status: sp.status, page: sp.page }}
         />
       ) : null}
     </PageLayout>

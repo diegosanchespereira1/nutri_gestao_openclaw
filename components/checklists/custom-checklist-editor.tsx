@@ -40,7 +40,12 @@ export function CustomChecklistEditor({
                 <span className="text-foreground min-w-0 flex-1">
                   {it.description}
                 </span>
-                <span className="flex shrink-0 gap-2">
+                <span className="flex shrink-0 flex-wrap gap-2">
+                  {it.peso !== 1 && (
+                    <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
+                      Peso {it.peso}
+                    </span>
+                  )}
                   {it.is_required ? (
                     <span className="bg-primary/15 text-primary rounded-md px-2 py-0.5 text-xs font-medium">
                       Obrigatório
@@ -84,6 +89,30 @@ export function CustomChecklistEditor({
                 <input type="checkbox" name="is_required" className="h-4 w-4" />
                 Marcar como obrigatório no preenchimento
               </label>
+              <div className="flex items-center gap-2">
+                <Label
+                  htmlFor={`peso-${sec.id}`}
+                  className="text-sm whitespace-nowrap"
+                >
+                  Peso
+                </Label>
+                <Input
+                  id={`peso-${sec.id}`}
+                  name="peso"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  defaultValue="1"
+                  className="h-8 w-20 text-sm"
+                  aria-describedby={`peso-hint-${sec.id}`}
+                />
+                <span
+                  id={`peso-hint-${sec.id}`}
+                  className="text-muted-foreground text-xs"
+                >
+                  (padrão 1)
+                </span>
+              </div>
               <Button type="submit" size="sm">
                 Adicionar item
               </Button>

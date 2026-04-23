@@ -27,6 +27,8 @@ export type ChecklistTemplateItemRow = {
   description: string;
   is_required: boolean;
   position: number;
+  /** Peso do item para cálculo de pontuação. Padrão 1. */
+  peso: number;
   created_at: string;
 };
 

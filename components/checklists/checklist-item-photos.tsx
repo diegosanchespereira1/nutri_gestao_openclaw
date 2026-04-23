@@ -32,6 +32,11 @@ function allowsFeature(feature: "geolocation"): boolean {
   }
 }
 
+/** Tempo para o usuário responder ao pedido de localização (negar = segue sem coords). */
+const GEOLOCATION_BROWSER_TIMEOUT_MS = 28_000;
+/** Margem acima do timeout do browser para evitar Promise pendente. */
+const GEOLOCATION_ENVELOPE_MS = GEOLOCATION_BROWSER_TIMEOUT_MS + 3_000;
+
 function getPositionOptional(): Promise<GeolocationPosition | null> {
   if (
     typeof window === "undefined" ||
@@ -41,18 +46,30 @@ function getPositionOptional(): Promise<GeolocationPosition | null> {
     return Promise.resolve(null);
   }
   return new Promise((resolve) => {
-    const t = window.setTimeout(() => resolve(null), 4500);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        window.clearTimeout(t);
-        resolve(pos);
-      },
-      () => {
-        window.clearTimeout(t);
-        resolve(null);
-      },
-      { enableHighAccuracy: false, maximumAge: 300_000, timeout: 4000 },
+    let settled = false;
+    const finish = (pos: GeolocationPosition | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(envelopeTimer);
+      resolve(pos);
+    };
+    const envelopeTimer = window.setTimeout(
+      () => finish(null),
+      GEOLOCATION_ENVELOPE_MS,
     );
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => finish(pos),
+        () => finish(null),
+        {
+          enableHighAccuracy: false,
+          maximumAge: 300_000,
+          timeout: GEOLOCATION_BROWSER_TIMEOUT_MS,
+        },
+      );
+    } catch {
+      finish(null);
+    }
   });
 }
 
@@ -62,8 +79,8 @@ const JPEG_QUALITY = 0.85;
 /**
  * Redimensiona e converte a imagem para JPEG via Canvas.
  * Resolve dois problemas de mobile:
- *  - iOS câmara envia HEIC (tipo não suportado pelo servidor)
- *  - Fotos de câmara são tipicamente 4-8MB (ultrapassa o limite de 6MB)
+ *  - iOS câmera envia HEIC (tipo não suportado pelo servidor)
+ *  - Fotos de câmera são tipicamente 4-8MB (ultrapassa o limite de 6MB)
  */
 function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
@@ -117,9 +134,10 @@ type UploadState =
 
 const STEP_LABELS: Record<UploadStep, string> = {
   compressing: "Comprimindo imagem…",
-  location: "Obtendo localização…",
+  location:
+    "Localização opcional — aguardando permissão ou seguindo sem GPS…",
   uploading: "Enviando ao servidor…",
-  saving: "Salvando registo…",
+  saving: "Salvando registro…",
 };
 
 type Props = {
@@ -152,9 +170,9 @@ export function ChecklistItemPhotos({
     url: string;
     hasLocation: boolean;
   } | null>(null);
-  /** Câmara (traseira em telemóvel/tablet — atributo HTML `capture`). */
+  /** Câmera (traseira em celular/tablet — atributo HTML `capture`). */
   const inputCameraRef = useRef<HTMLInputElement>(null);
-  /** Galeria / ficheiros sem forçar câmara (útil em tablet ou desktop). */
+  /** Galeria / arquivos sem forçar câmera (útil em tablet ou desktop). */
   const inputGalleryRef = useRef<HTMLInputElement>(null);
 
   const atLimit = photos.length >= CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM;
@@ -179,7 +197,7 @@ export function ChecklistItemPhotos({
       setUploadError(null);
 
       if (file.type && !file.type.startsWith("image/")) {
-        setUploadError("Selecione um ficheiro de imagem válido.");
+        setUploadError("Selecione um arquivo de imagem válido.");
         return;
       }
 
@@ -199,18 +217,14 @@ export function ChecklistItemPhotos({
           return;
         }
 
-        // ── Etapa 2: localização ──
+        // ── Etapa 2: localização (opcional — negação ou timeout não bloqueia o upload) ──
         setUploadState({ status: "busy", step: "location", percent: 40 });
         let lat = "";
         let lng = "";
-        try {
-          const pos = await getPositionOptional();
-          if (pos) {
-            lat = String(pos.coords.latitude);
-            lng = String(pos.coords.longitude);
-          }
-        } catch {
-          /* localização opcional */
+        const pos = await getPositionOptional();
+        if (pos) {
+          lat = String(pos.coords.latitude);
+          lng = String(pos.coords.longitude);
         }
         setUploadState({ status: "busy", step: "location", percent: 50 });
 
@@ -241,7 +255,7 @@ export function ChecklistItemPhotos({
         onPhotosChange?.(newPhotos);
         setUploadState({ status: "busy", step: "saving", percent: 100 });
 
-        // Breve pausa para o utilizador ver 100%
+        // Breve pausa para o usuário ver 100%
         await new Promise((r) => setTimeout(r, 400));
         setUploadState({ status: "idle" });
       } catch (err) {
@@ -249,7 +263,7 @@ export function ChecklistItemPhotos({
         const msg = err instanceof Error ? err.message : String(err);
         setUploadError(
           msg.includes("Failed to fetch") || msg.includes("network")
-            ? "Erro de rede ao enviar foto. Verifique a ligação e tente novamente."
+            ? "Erro de rede ao enviar foto. Verifique a conexão e tente novamente."
             : msg.includes("processar") || msg.includes("ler")
               ? msg
               : `Erro ao enviar foto: ${msg}`,
@@ -286,9 +300,10 @@ export function ChecklistItemPhotos({
           </p>
           <PageHelpHint ariaLabel="Como anexar fotos de evidência a este item">
             <p>
-              Em telemóvel ou tablet, use <strong>Tirar foto</strong> para abrir a câmara;{" "}
-              <strong>Galeria</strong> para escolher uma imagem já guardada. Formatos JPEG,
-              PNG ou WebP até 6 MB. A localização é opcional se o browser permitir.
+              Em celular ou tablet, use <strong>Tirar foto</strong> para abrir a câmera;{" "}
+              <strong>Galeria</strong> para escolher uma imagem já salva. Formatos JPEG,
+              PNG ou WebP até 6 MB. A localização é opcional: se você negar ou demorar a
+              responder, a foto é enviada mesmo assim, sem coordenadas.
             </p>
           </PageHelpHint>
         </div>
@@ -321,7 +336,7 @@ export function ChecklistItemPhotos({
                 className="min-h-11 min-w-[44px] gap-1.5 sm:min-h-9"
                 disabled={disabled || atLimit}
                 onClick={openCamera}
-                aria-label="Tirar foto com a câmara"
+                aria-label="Tirar foto com a câmera"
               >
                 <Camera className="size-4" aria-hidden />
                 Tirar foto
@@ -333,7 +348,7 @@ export function ChecklistItemPhotos({
                 className="min-h-11 min-w-[44px] gap-1.5 sm:min-h-9"
                 disabled={disabled || atLimit}
                 onClick={openGallery}
-                aria-label="Escolher imagem da galeria ou ficheiros"
+                aria-label="Escolher imagem da galeria ou arquivos"
               >
                 <Images className="size-4" aria-hidden />
                 Galeria
@@ -386,7 +401,7 @@ export function ChecklistItemPhotos({
               onClick={openCamera}
               disabled={disabled || busy || atLimit}
             >
-              Tentar câmara
+              Tentar câmera
             </Button>
             <Button
               type="button"

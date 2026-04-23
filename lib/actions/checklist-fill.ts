@@ -59,6 +59,7 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const establishmentId = String(formData.get("establishment_id") ?? "").trim();
+  const areaIdRaw = String(formData.get("area_id") ?? "").trim();
 
   if (!templateId || !establishmentId) {
     redirect("/checklists?err=missing");
@@ -76,6 +77,20 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
 
   if (!template) redirect("/checklists?err=template");
 
+  // Validar area_id se fornecido: deve pertencer ao estabelecimento e ao owner
+  let resolvedAreaId: string | null = null;
+  if (areaIdRaw) {
+    const { data: area } = await supabase
+      .from("establishment_areas")
+      .select("id")
+      .eq("id", areaIdRaw)
+      .eq("establishment_id", establishmentId)
+      .eq("owner_user_id", workspaceOwnerId)
+      .maybeSingle();
+    if (!area) redirect("/checklists?err=area");
+    resolvedAreaId = area.id;
+  }
+
   const { data: session, error } = await supabase
     .from("checklist_fill_sessions")
     .insert({
@@ -83,6 +98,7 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
       establishment_id: establishmentId,
       template_id: templateId,
       custom_template_id: null,
+      area_id: resolvedAreaId,
     })
     .select("id")
     .single();
@@ -100,6 +116,7 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
   if (!user) redirect("/login");
 
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
+  const areaIdRawCustom = String(formData.get("area_id") ?? "").trim();
   if (!customTemplateId) redirect("/checklists/personalizados?err=missing");
 
   const { data: ct } = await supabase
@@ -111,6 +128,19 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
 
   if (!ct) redirect("/checklists/personalizados?err=forbidden");
 
+  // Validar area_id se fornecido
+  let resolvedAreaIdCustom: string | null = null;
+  if (areaIdRawCustom) {
+    const { data: area } = await supabase
+      .from("establishment_areas")
+      .select("id")
+      .eq("id", areaIdRawCustom)
+      .eq("establishment_id", ct.establishment_id as string)
+      .eq("owner_user_id", user.id)
+      .maybeSingle();
+    if (area) resolvedAreaIdCustom = area.id;
+  }
+
   const { data: session, error } = await supabase
     .from("checklist_fill_sessions")
     .insert({
@@ -118,6 +148,7 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
       establishment_id: ct.establishment_id as string,
       template_id: null,
       custom_template_id: customTemplateId,
+      area_id: resolvedAreaIdCustom,
     })
     .select("id")
     .single();
@@ -132,6 +163,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   template: ChecklistTemplateWithSections;
   responses: FillResponsesMap;
   establishmentLabel: string;
+  /** Nome da área física avaliada nesta sessão (null quando não aplicável). */
+  areaName: string | null;
   itemResponseSource: "global" | "custom";
   itemPhotos: Record<string, ChecklistFillPhotoView[]>;
   latestPdfExport: ChecklistFillPdfExportRow | null;
@@ -223,11 +256,23 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     createdByName = creatorProfile?.full_name ?? null;
   }
 
+  // Resolver nome da área (se a sessão tiver area_id)
+  let areaName: string | null = null;
+  if (row.area_id) {
+    const { data: areaRow } = await supabase
+      .from("establishment_areas")
+      .select("name")
+      .eq("id", row.area_id)
+      .maybeSingle();
+    areaName = areaRow?.name ?? null;
+  }
+
   return {
-    session: row,
+    session: { ...row, area_name: areaName },
     template,
     responses,
     establishmentLabel,
+    areaName,
     itemResponseSource,
     itemPhotos,
     latestPdfExport,
@@ -273,7 +318,7 @@ export async function saveFillItemResponse(input: {
     return {
       ok: false,
       error:
-        "Dossiê já aprovado: não é possível alterar respostas (registo imutável, FR70).",
+        "Dossiê já aprovado: não é possível alterar respostas (registro imutável, FR70).",
     };
   }
 
@@ -632,6 +677,11 @@ export async function approveChecklistFillDossierAction(
   if (error || !updated?.dossier_approved_at) {
     return { ok: false, error: "Não foi possível aprovar o dossiê." };
   }
+
+  // Calcular e persistir a pontuação (best-effort: não impede a aprovação se falhar)
+  await supabase.rpc("calculate_and_store_session_score", {
+    p_session_id: sessionId,
+  });
 
   const at = String(updated.dossier_approved_at);
 

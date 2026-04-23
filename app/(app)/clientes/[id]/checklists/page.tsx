@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 
+import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
 import { ClientChecklistHistorySection } from "@/components/clientes/client-checklist-history-section";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
@@ -13,6 +15,7 @@ export default async function ClientChecklistHistoryPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     est?: string;
+    area?: string;
     status?: string;
     page?: string;
   }>;
@@ -44,6 +47,8 @@ export default async function ClientChecklistHistoryPage({
     notFound();
   }
 
+  const scoreHistory = await loadChecklistScoreHistory(clientId);
+
   return (
     <PageLayout variant="form">
       <PageHeader
@@ -52,11 +57,26 @@ export default async function ClientChecklistHistoryPage({
         back={{ href: `/clientes/${clientId}/editar?tab=checklists`, label: client.legal_name }}
       />
 
+      {scoreHistory.byTemplate.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+          <h3 className="text-base font-semibold text-foreground tracking-tight">
+            Evolução da pontuação
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pontuação por dossiê aprovado — cada linha representa um template de checklist.
+          </p>
+          <div className="mt-4">
+            <ChecklistScoreEvolutionChart byTemplate={scoreHistory.byTemplate} />
+          </div>
+        </div>
+      )}
+
       <ClientChecklistHistorySection
         clientId={clientId}
         embeddedInClientEdit={false}
         searchParams={{
           est: sp.est,
+          area: sp.area,
           status: sp.status,
           page: sp.page,
         }}

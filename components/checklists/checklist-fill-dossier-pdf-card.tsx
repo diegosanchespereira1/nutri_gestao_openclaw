@@ -22,7 +22,7 @@ type Props = {
 
 function formatJobTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("pt-PT", {
+    return new Date(iso).toLocaleString("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
     });
@@ -124,13 +124,13 @@ export function ChecklistFillDossierPdfCard({
     <div className="border-border rounded-lg border bg-background p-4 text-sm">
       <p className="text-foreground font-medium">PDF do relatório</p>
       <p className="text-muted-foreground mt-1 text-xs">
-        Relatório com texto do dossié, identificação do profissional (CRN) e fotos de evidência embutidas no PDF.
+        Relatório com texto do dossiê, identificação do profissional (CRN) e fotos de evidência embutidas no PDF.
       </p>
 
       {showProcessing ? (
         <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
           <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-          A gerar PDF… Se ficar preso, recarregue a página ou tente gerar de novo.
+          Gerando PDF… Se ficar preso, recarregue a página ou tente gerar de novo.
         </p>
       ) : null}
 

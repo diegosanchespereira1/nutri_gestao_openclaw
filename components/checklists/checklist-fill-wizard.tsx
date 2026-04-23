@@ -20,7 +20,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { cn } from "@/lib/utils";
-import { approveChecklistFillDossierAction, saveFillItemResponse } from "@/lib/actions/checklist-fill";
+import {
+  approveChecklistFillDossierAction,
+  saveFillItemResponse,
+  type FillActionResult,
+} from "@/lib/actions/checklist-fill";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
   validateChecklistSection,
@@ -47,9 +51,19 @@ const emptyItemState = (): FillItemResponseState => ({
   annotation: null,
 });
 
+function scoreClassification(pct: number): {
+  label: string;
+  colorClass: string;
+} {
+  if (pct >= 90) return { label: "Excelente", colorClass: "bg-green-100 text-green-800" };
+  if (pct >= 75) return { label: "Bom", colorClass: "bg-blue-100 text-blue-800" };
+  if (pct >= 50) return { label: "Regular", colorClass: "bg-amber-100 text-amber-800" };
+  return { label: "Crítico", colorClass: "bg-red-100 text-red-800" };
+}
+
 function formatDossierApprovedLabel(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("pt-PT", {
+    return new Date(iso).toLocaleString("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
     });
@@ -65,6 +79,8 @@ type Props = {
   template: ChecklistTemplateWithSections;
   initialResponses: FillResponsesMap;
   establishmentLabel: string;
+  /** Nome da área física avaliada nesta sessão (quando definido). */
+  areaName?: string | null;
   /** Itens mapeiam para `checklist_template_items` ou `checklist_custom_items`. */
   itemResponseSource: "global" | "custom";
   backHref?: string;
@@ -91,6 +107,7 @@ export function ChecklistFillWizard({
   template,
   initialResponses,
   establishmentLabel,
+  areaName = null,
   itemResponseSource,
   backHref = "/checklists",
   backLabel = "Voltar ao catálogo",
@@ -125,6 +142,7 @@ export function ChecklistFillWizard({
   const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [finalizeDialogError, setFinalizeDialogError] = useState<string | null>(null);
   const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
+  const [finalizeBusy, setFinalizeBusy] = useState(false);
   const [dossierPreviewConfirmed, setDossierPreviewConfirmed] = useState(() =>
     Boolean(initialDossierApprovedAt),
   );
@@ -200,6 +218,25 @@ export function ChecklistFillWizard({
     [],
   );
 
+  /** Persiste nota/anotação que só existiam no estado local (setNote/setAnnotation não gravam na BD). */
+  const syncAllResponsesToServer = useCallback(async (): Promise<FillActionResult> => {
+    const snapshot = responsesRef.current;
+    for (const itemId of Object.keys(snapshot)) {
+      const cur = snapshot[itemId];
+      if (!cur?.outcome) continue;
+      const result = await saveFillItemResponse({
+        sessionId,
+        itemId,
+        itemResponseSource,
+        outcome: cur.outcome,
+        note: cur.note ?? null,
+        annotation: cur.annotation ?? null,
+      });
+      if (!result.ok) return result;
+    }
+    return { ok: true };
+  }, [sessionId, itemResponseSource]);
+
   const section = sections[sectionIndex];
   const isLast = sectionIndex >= sections.length - 1;
 
@@ -215,6 +252,23 @@ export function ChecklistFillWizard({
     }
     return m;
   }, [clientIssues]);
+
+  /** Pontuação em tempo real: só computa itens com resposta (exclui pendentes e NA). */
+  const liveScore = useMemo(() => {
+    let earned = 0;
+    let total = 0;
+    for (const sec of sections) {
+      for (const item of sec.items) {
+        const r = responses[item.id];
+        if (!r?.outcome || r.outcome === "na") continue;
+        const w = item.peso ?? 1;
+        total += w;
+        if (r.outcome === "conforme") earned += w;
+      }
+    }
+    if (total === 0) return null;
+    return Math.round((earned / total) * 100);
+  }, [sections, responses]);
 
   function setOutcome(itemId: string, outcome: ChecklistFillOutcome | null) {
     const cur = responses[itemId] ?? emptyItemState();
@@ -306,7 +360,7 @@ export function ChecklistFillWizard({
 
   if (!section) {
     return (
-      <p className="text-muted-foreground text-sm">Modelo sem secções.</p>
+      <p className="text-muted-foreground text-sm">Modelo sem seções.</p>
     );
   }
 
@@ -319,6 +373,11 @@ export function ChecklistFillWizard({
             <h2 className="text-foreground text-xl font-semibold tracking-tight">
               {template.name}
             </h2>
+            {areaName ? (
+              <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+                📍 {areaName}
+              </span>
+            ) : null}
             <p className="text-muted-foreground mt-1 text-sm">
               Visualização do dossiê desta sessão.
             </p>
@@ -366,6 +425,11 @@ export function ChecklistFillWizard({
           <h2 className="text-foreground text-xl font-semibold tracking-tight">
             {template.name}
           </h2>
+          {areaName ? (
+            <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+              📍 {areaName}
+            </span>
+          ) : null}
           <p className="text-muted-foreground mt-1 text-sm">
             Seção {sectionIndex + 1} de {sections.length}: {section.title}
           </p>
@@ -397,6 +461,22 @@ export function ChecklistFillWizard({
               {saveErrorMsg || "Erro ao salvar — verifique a conexão"}
             </span>
           )}
+          {liveScore !== null && (() => {
+            const { label, colorClass } = scoreClassification(liveScore);
+            return (
+              <span
+                className={cn(
+                  "mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                  colorClass,
+                )}
+                role="status"
+                aria-live="polite"
+                aria-label={`Pontuação atual: ${liveScore}% — ${label}`}
+              >
+                {liveScore}% · {label}
+              </span>
+            );
+          })()}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {showDossierPeekButton ? (
@@ -695,7 +775,7 @@ export function ChecklistFillWizard({
               </p>
               <p className="text-muted-foreground mt-1">
                 {dossierApprovedAt
-                  ? "Dossiê aprovado e registado. Se esta sessão estiver ligada a uma visita, a visita foi marcada como concluída."
+                  ? "Dossiê aprovado e registrado. Se esta sessão estiver ligada a uma visita, a visita foi marcada como concluída."
                   : "Dossiê compilado abaixo. Ajuste textos se necessário e aprove para fechar o ciclo."}
               </p>
               {dossierApprovedAt ? (
@@ -745,7 +825,7 @@ export function ChecklistFillWizard({
                 {dossierPreviewConfirmed && !dossierApprovedAt ? (
                   <div className="border-border space-y-3 rounded-lg border bg-muted/20 p-4">
                     <p className="text-muted-foreground text-xs">
-                      Após aprovar, o relatório fica registado e deixa de ser editável. Novas
+                      Após aprovar, o relatório fica registrado e deixa de ser editável. Novas
                       alterações no produto seguirão o fluxo de nova versão do relatório
                       (FR70).
                     </p>
@@ -760,6 +840,11 @@ export function ChecklistFillWizard({
                       onClick={() => {
                         setApproveError(null);
                         startApproveTransition(async () => {
+                          const synced = await syncAllResponsesToServer();
+                          if (!synced.ok) {
+                            setApproveError(synced.error);
+                            return;
+                          }
                           const r = await approveChecklistFillDossierAction(sessionId);
                           if (!r.ok) {
                             setApproveError(r.error);
@@ -770,7 +855,7 @@ export function ChecklistFillWizard({
                         });
                       }}
                     >
-                      {isApprovePending ? "A aprovar…" : "Aprovar dossiê"}
+                      {isApprovePending ? "Aprovando…" : "Aprovar dossiê"}
                     </Button>
                   </div>
                 ) : null}
@@ -823,8 +908,10 @@ export function ChecklistFillWizard({
             <Button
               type="button"
               size="sm"
+              disabled={finalizeBusy}
               onClick={() => {
-                const issues = validateChecklistTemplate(sections, responses);
+                const snap = responsesRef.current;
+                const issues = validateChecklistTemplate(sections, snap);
                 if (issues.length > 0) {
                   const first = issues[0];
                   const idx = sections.findIndex((sec) =>
@@ -835,11 +922,20 @@ export function ChecklistFillWizard({
                   return;
                 }
                 setFinalizeDialogError(null);
-                setDossierPreviewConfirmed(true);
-                setFinalizeDialogOpen(false);
+                setFinalizeBusy(true);
+                void (async () => {
+                  const synced = await syncAllResponsesToServer();
+                  setFinalizeBusy(false);
+                  if (!synced.ok) {
+                    setFinalizeDialogError(synced.error);
+                    return;
+                  }
+                  setDossierPreviewConfirmed(true);
+                  setFinalizeDialogOpen(false);
+                })();
               }}
             >
-              Confirmar
+              {finalizeBusy ? "Salvando…" : "Confirmar"}
             </Button>
           </div>
         </DialogContent>
@@ -894,13 +990,13 @@ export function ChecklistFillWizard({
                   "Relatório aprovado e imutável."
                 ) : dossierPreviewConfirmed ? (
                   <>
-                    Leitura do dossié compilado. Para ajustar textos antes de aprovar, use
-                    os campos na vista abaixo desta página.
+                    Leitura do dossiê compilado. Para ajustar textos antes de aprovar, use
+                    os campos na área abaixo desta página.
                   </>
                 ) : (
                   <>
-                    Vista com base no que já foi guardado (rascunho). Itens por preencher
-                    aparecem como «Sem avaliação». Continue nas secções; quando terminar,
+                    Vista com base no que já foi salvo (rascunho). Itens por preencher
+                    aparecem como “Sem avaliação”. Continue nas seções; quando terminar,
                     use{" "}
                     <span className="text-foreground font-medium">
                       Finalizar e ver dossiê
@@ -929,8 +1025,8 @@ export function ChecklistFillWizard({
                   dossierApprovedAt
                     ? undefined
                     : dossierPreviewConfirmed
-                      ? "Secções colapsáveis — mesmos dados da vista na página."
-                      : "Secções colapsáveis — o conteúdo reflete o rascunho atual; feche o diálogo e continue a preencher se precisar."
+                      ? "Seções expansíveis — mesmos dados da visualização na página."
+                      : "Seções expansíveis — o conteúdo reflete o rascunho atual; feche o diálogo e continue a preencher se precisar."
                 }
                 className="border-0 bg-transparent p-3 shadow-none sm:p-4"
               />

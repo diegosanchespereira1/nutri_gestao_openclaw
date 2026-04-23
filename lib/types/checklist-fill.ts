@@ -12,8 +12,18 @@ export type ChecklistFillSessionRow = {
   template_id: string | null;
   custom_template_id?: string | null;
   scheduled_visit_id?: string | null;
+  /** Área física avaliada nesta sessão (nullable). */
+  area_id?: string | null;
+  /** Nome da área resolvido via join — presente quando a query inclui establishment_areas. */
+  area_name?: string | null;
   /** Quando definido, o dossiê foi aprovado e as respostas/fotos não podem mudar (FR23/FR70). */
   dossier_approved_at?: string | null;
+  /** Pontuação percentual de conformidade (0-100), persistida ao aprovar o dossiê. */
+  score_percentage?: number | null;
+  /** Pontos obtidos (conforme × peso). */
+  score_points_earned?: number | null;
+  /** Pontos aplicáveis (total excluindo NA). */
+  score_points_total?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -80,7 +90,7 @@ export function validateChecklistSection(
       if (outcome === "nc" && note.length === 0) {
         issues.push({
           item_id: item.id,
-          message: "Se assinalou Não conforme, descreva o motivo.",
+          message: "Se você marcou Não conforme, descreva o motivo.",
         });
       }
     }
@@ -88,7 +98,7 @@ export function validateChecklistSection(
   return issues;
 }
 
-/** Valida todas as secções (ordem do modelo). Útil antes de compilar/aprovar o dossiê. */
+/** Valida todas as seções (ordem do modelo). Útil antes de compilar/aprovar o dossiê. */
 export function validateChecklistTemplate(
   sections: ChecklistTemplateSectionWithItems[],
   responses: FillResponsesMap,

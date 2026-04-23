@@ -294,7 +294,9 @@ export async function uploadChecklistFillPhotoAction(
   const photoId = crypto.randomUUID();
   const safeName = sanitizeStorageFilename(file.name);
   const objectName = `${photoId}.${ext}`;
-  const storagePath = `${user.id}/${sessionId}/${objectName}`;
+  // Pasta do bucket = titular do workspace (RLS em storage.objects), não auth.uid() —
+  // senão membros da equipe falham no upload.
+  const storagePath = `${workspaceOwnerId}/${sessionId}/${objectName}`;
 
   const buf = Buffer.from(await file.arrayBuffer());
   const { error: upErr } = await supabase.storage

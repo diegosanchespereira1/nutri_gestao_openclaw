@@ -77,6 +77,7 @@ export default async function ChecklistPreencherPage({
         template={bundle.template}
         initialResponses={bundle.responses}
         establishmentLabel={bundle.establishmentLabel}
+        areaName={bundle.areaName}
         itemResponseSource={bundle.itemResponseSource}
         initialItemPhotos={bundle.itemPhotos}
         initialDossierApprovedAt={bundle.session.dossier_approved_at ?? null}

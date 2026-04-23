@@ -20,11 +20,18 @@ export type ChecklistSessionSummary = {
   establishment_id: string;
   establishment_name: string;
   establishment_type: EstablishmentType;
+  /** Nome da área avaliada (null quando não vinculado a área). */
+  area_id: string | null;
+  area_name: string | null;
   conformant_count: number;
   nc_count: number;
   na_count: number;
   pending_count: number;
   total_items: number;
+  /** Score de conformidade (0-100), disponível após aprovação do dossiê. */
+  score_percentage: number | null;
+  score_points_earned: number | null;
+  score_points_total: number | null;
   latestPdfExport?: {
     id: string;
     user_id: string;
@@ -70,6 +77,8 @@ async function assertClientOwned(
 export async function loadChecklistSessionsForClient(input: {
   clientId: string;
   establishmentId?: string | null;
+  /** Filtrar por área específica do estabelecimento. */
+  areaId?: string | null;
   status?: "em_andamento" | "aprovado" | null;
   limit?: number;
   offset?: number;
@@ -126,7 +135,7 @@ export async function loadChecklistSessionsForClient(input: {
   let sessionQuery = supabase
     .from("checklist_fill_sessions")
     .select(
-      "id, user_id, establishment_id, template_id, custom_template_id, dossier_approved_at, created_at, updated_at",
+      "id, user_id, establishment_id, template_id, custom_template_id, dossier_approved_at, area_id, score_percentage, score_points_earned, score_points_total, created_at, updated_at",
       { count: "exact" },
     )
     .in("establishment_id", estIds)
@@ -137,6 +146,11 @@ export async function loadChecklistSessionsForClient(input: {
     sessionQuery = sessionQuery.not("dossier_approved_at", "is", null);
   } else if (input.status === "em_andamento") {
     sessionQuery = sessionQuery.is("dossier_approved_at", null);
+  }
+
+  // Filtro por área
+  if (input.areaId) {
+    sessionQuery = sessionQuery.eq("area_id", input.areaId);
   }
 
   const { data: sessions, count: totalCount } = await sessionQuery;
@@ -257,7 +271,22 @@ export async function loadChecklistSessionsForClient(input: {
     }
   }
 
-  // 5.5. Carregar últimos PDF exports por sessão
+  // 5.5. Nomes das áreas vinculadas às sessões
+  const areaIds = [...new Set(
+    sessions.map((s) => (s as Record<string, unknown>).area_id as string | null).filter(Boolean)
+  )] as string[];
+  const areaNameMap = new Map<string, string>();
+  if (areaIds.length > 0) {
+    const { data: areaRows } = await supabase
+      .from("establishment_areas")
+      .select("id, name")
+      .in("id", areaIds);
+    for (const a of areaRows ?? []) {
+      areaNameMap.set(a.id, a.name);
+    }
+  }
+
+  // 5.6. Carregar últimos PDF exports por sessão
   const { data: pdfExports } = await supabase
     .from("checklist_fill_pdf_exports")
     .select("id, user_id, session_id, status, created_at, updated_at, storage_path, error_message")
@@ -306,6 +335,9 @@ export async function loadChecklistSessionsForClient(input: {
     const pendingCount = Math.max(0, totalItems - answeredCount);
     const startedByLabel = sess.user_id === user.id ? ownUserLabel : "Membro da equipe";
 
+    const sessRaw = sess as Record<string, unknown>;
+    const areaId = (sessRaw.area_id as string | null) ?? null;
+
     return {
       id: sess.id,
       seq_number: seqMap.get(sess.id) ?? 0,
@@ -319,11 +351,16 @@ export async function loadChecklistSessionsForClient(input: {
       establishment_id: sess.establishment_id,
       establishment_name: est.name,
       establishment_type: est.establishment_type,
+      area_id: areaId,
+      area_name: areaId ? (areaNameMap.get(areaId) ?? null) : null,
       conformant_count: counts.conforme,
       nc_count: counts.nc,
       na_count: counts.na,
       pending_count: pendingCount,
       total_items: totalItems,
+      score_percentage: (sessRaw.score_percentage as number | null) ?? null,
+      score_points_earned: (sessRaw.score_points_earned as number | null) ?? null,
+      score_points_total: (sessRaw.score_points_total as number | null) ?? null,
       latestPdfExport: latestPdfBySession.get(sess.id) ?? null,
     };
   });
@@ -441,4 +478,116 @@ export async function loadChecklistSessionNcItems(
   }
 
   return result;
+}
+
+/* ─── E.3: loadChecklistScoreHistory ────────────────────────────────────── */
+
+export type ScoreHistoryPoint = {
+  sessionId: string;
+  approvedAt: string;
+  scorePercentage: number;
+  templateName: string;
+  templateId: string;
+  areaName: string | null;
+};
+
+/**
+ * Carrega o histórico de pontuações aprovadas de um cliente,
+ * agrupadas por template para exibição no gráfico de evolução.
+ * Só retorna sessões com score calculado (não-null).
+ */
+export async function loadChecklistScoreHistory(
+  clientId: string,
+): Promise<{ byTemplate: { templateId: string; templateName: string; points: ScoreHistoryPoint[] }[] }> {
+  const empty = { byTemplate: [] };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return empty;
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const owned = await assertClientOwned(supabase, workspaceOwnerId, clientId);
+  if (!owned) return empty;
+
+  // Estabelecimentos do cliente
+  const { data: ests } = await supabase
+    .from("establishments")
+    .select("id")
+    .eq("client_id", clientId);
+  const estIds = (ests ?? []).map((e) => e.id as string);
+  if (estIds.length === 0) return empty;
+
+  // Sessões aprovadas com score
+  const { data: sessions } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id, template_id, custom_template_id, dossier_approved_at, score_percentage, area_id")
+    .in("establishment_id", estIds)
+    .not("dossier_approved_at", "is", null)
+    .not("score_percentage", "is", null)
+    .order("dossier_approved_at", { ascending: true });
+
+  if (!sessions || sessions.length === 0) return empty;
+
+  // Fetch template names
+  const globalTemplateIds = [...new Set(
+    sessions.filter((s) => s.template_id).map((s) => s.template_id as string)
+  )];
+  const customTemplateIds = [...new Set(
+    sessions.filter((s) => s.custom_template_id).map((s) => s.custom_template_id as string)
+  )];
+
+  const templateNameMap = new Map<string, string>();
+
+  if (globalTemplateIds.length > 0) {
+    const { data: tRows } = await supabase
+      .from("checklist_templates")
+      .select("id, name")
+      .in("id", globalTemplateIds);
+    for (const t of tRows ?? []) templateNameMap.set(t.id as string, t.name as string);
+  }
+  if (customTemplateIds.length > 0) {
+    const { data: cRows } = await supabase
+      .from("checklist_custom_templates")
+      .select("id, name")
+      .in("id", customTemplateIds);
+    for (const t of cRows ?? []) templateNameMap.set(t.id as string, t.name as string);
+  }
+
+  // Fetch area names
+  const areaIds = [...new Set(sessions.filter((s) => s.area_id).map((s) => s.area_id as string))];
+  const areaNameMap = new Map<string, string>();
+  if (areaIds.length > 0) {
+    const { data: areaRows } = await supabase
+      .from("establishment_areas")
+      .select("id, name")
+      .in("id", areaIds);
+    for (const a of areaRows ?? []) areaNameMap.set(a.id as string, a.name as string);
+  }
+
+  // Group by template
+  const groups = new Map<string, { templateName: string; points: ScoreHistoryPoint[] }>();
+  for (const s of sessions) {
+    const templateId = (s.template_id ?? s.custom_template_id) as string;
+    if (!templateId) continue;
+    const templateName = templateNameMap.get(templateId) ?? "Template";
+    if (!groups.has(templateId)) groups.set(templateId, { templateName, points: [] });
+    groups.get(templateId)!.points.push({
+      sessionId: s.id as string,
+      approvedAt: s.dossier_approved_at as string,
+      scorePercentage: Number(s.score_percentage),
+      templateName,
+      templateId,
+      areaName: s.area_id ? (areaNameMap.get(s.area_id as string) ?? null) : null,
+    });
+  }
+
+  return {
+    byTemplate: Array.from(groups.entries()).map(([templateId, { templateName, points }]) => ({
+      templateId,
+      templateName,
+      points,
+    })),
+  };
 }

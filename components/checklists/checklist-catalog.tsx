@@ -40,6 +40,8 @@ import {
   registerChecklistEstablishmentOpenAction,
   searchOwnerEstablishmentsAction,
 } from "@/lib/actions/establishments";
+import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
+import type { EstablishmentAreaOption } from "@/lib/types/establishment-areas";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 import type {
   EstablishmentPickerOption,
@@ -162,6 +164,10 @@ export function ChecklistCatalog({
   const [conflictSession, setConflictSession] = useState<ExistingOpenSession | null>(null);
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
+  /* Áreas do estabelecimento selecionado */
+  const [availableAreas, setAvailableAreas] = useState<EstablishmentAreaOption[]>([]);
+  const [selectedAreaId, setSelectedAreaId] = useState<string>("");
+
   /* Ref para o form de startFill — usado para submit programático */
   const startFillFormRef = useRef<HTMLFormElement>(null);
   const duplicateFormRef = useRef<HTMLFormElement>(null);
@@ -253,6 +259,23 @@ export function ChecklistCatalog({
     void loadDropdownOptions(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Carregar áreas sempre que o estabelecimento mudar
+  useEffect(() => {
+    if (!establishmentId) {
+      setAvailableAreas([]);
+      setSelectedAreaId("");
+      return;
+    }
+    let cancelled = false;
+    void loadAreasForEstablishment(establishmentId).then((areas) => {
+      if (!cancelled) {
+        setAvailableAreas(areas);
+        setSelectedAreaId(areas.length === 1 ? areas[0].id : "");
+      }
+    });
+    return () => { cancelled = true; };
+  }, [establishmentId]);
 
   useEffect(() => {
     const query = establishmentSearchTerm.trim();
@@ -967,6 +990,33 @@ export function ChecklistCatalog({
                 </div>
               </div>
 
+              {/* Seletor de área (quando o estabelecimento tem áreas cadastradas) */}
+              {availableAreas.length > 0 && (
+                <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
+                  <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                    📍 Área:
+                  </label>
+                  <select
+                    value={selectedAreaId}
+                    onChange={(e) => setSelectedAreaId(e.target.value)}
+                    className={cn(
+                      "h-8 rounded-md border px-2 text-sm shadow-xs outline-none",
+                      "border-input bg-background text-foreground",
+                      "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
+                      !selectedAreaId && "border-amber-400",
+                    )}
+                    aria-label="Selecionar área do estabelecimento"
+                  >
+                    <option value="">Selecione a área…</option>
+                    {availableAreas.map((area) => (
+                      <option key={area.id} value={area.id}>
+                        {area.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Ações */}
               <div className="flex shrink-0 items-center gap-2">
                 {!step1Done && (
@@ -1001,17 +1051,24 @@ export function ChecklistCatalog({
                 <form ref={startFillFormRef} action={startFillAction} className="hidden">
                   <input type="hidden" name="template_id" value={selectedTemplate.id} />
                   <input type="hidden" name="establishment_id" value={establishmentId} />
+                  <input type="hidden" name="area_id" value={selectedAreaId} />
                 </form>
 
                 {/* Task C.3: botão assíncrono com verificação de conflito */}
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!establishmentId || checkingSession}
+                  disabled={
+                    !establishmentId ||
+                    checkingSession ||
+                    (availableAreas.length > 0 && !selectedAreaId)
+                  }
                   title={
-                    establishmentId
-                      ? "Iniciar rascunho de preenchimento"
-                      : "Selecione um estabelecimento primeiro"
+                    !establishmentId
+                      ? "Selecione um estabelecimento primeiro"
+                      : availableAreas.length > 0 && !selectedAreaId
+                        ? "Selecione a área do estabelecimento"
+                        : "Iniciar rascunho de preenchimento"
                   }
                   className="gap-1.5"
                   onClick={handleUsarTemplate}

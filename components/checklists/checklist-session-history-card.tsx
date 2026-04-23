@@ -104,6 +104,14 @@ export function ChecklistSessionHistoryCard({
                 {session.template_name}
               </p>
               <StatusBadge status={session.status} />
+              {session.area_name ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                  📍 {session.area_name}
+                </span>
+              ) : null}
+              {session.status === "aprovado" && session.score_percentage != null ? (
+                <ScoreBadge pct={session.score_percentage} />
+              ) : null}
             </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {session.establishment_name}
@@ -289,6 +297,19 @@ export function ChecklistSessionHistoryCard({
 }
 
 /* ─── sub-componentes ────────────────────────────────────────────────────── */
+
+function ScoreBadge({ pct }: { pct: number }) {
+  let colorClass = "bg-red-100 text-red-800";
+  let label = "Crítico";
+  if (pct >= 90) { colorClass = "bg-green-100 text-green-800"; label = "Excelente"; }
+  else if (pct >= 75) { colorClass = "bg-blue-100 text-blue-800"; label = "Bom"; }
+  else if (pct >= 50) { colorClass = "bg-amber-100 text-amber-800"; label = "Regular"; }
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full border-0 px-1.5 py-0 text-[10px] font-semibold tabular-nums", colorClass)}>
+      {Math.round(pct)}% · {label}
+    </span>
+  );
+}
 
 function StatusBadge({ status }: { status: "em_andamento" | "aprovado" }) {
   if (status === "aprovado") {

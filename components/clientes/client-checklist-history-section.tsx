@@ -21,6 +21,7 @@ export type ClientChecklistHistorySectionProps = {
   embeddedInClientEdit?: boolean;
   searchParams: {
     est?: string;
+    area?: string;
     status?: string;
     page?: string;
   };
@@ -47,6 +48,7 @@ export async function ClientChecklistHistorySection({
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
   const estFilter = sp.est ?? null;
+  const areaFilter = sp.area ?? null;
   const statusFilter =
     sp.status === "aprovado" || sp.status === "em_andamento"
       ? sp.status
@@ -55,6 +57,7 @@ export async function ClientChecklistHistorySection({
   const { rows, total } = await loadChecklistSessionsForClient({
     clientId,
     establishmentId: estFilter,
+    areaId: areaFilter,
     status: statusFilter,
     limit: PAGE_SIZE,
     offset,
@@ -79,6 +82,15 @@ export async function ClientChecklistHistorySection({
     .eq("client_id", clientId)
     .order("name");
 
+  // Carrega áreas do estabelecimento filtrado (para o seletor de área)
+  const { data: areaRows } = estFilter
+    ? await supabase
+        .from("establishment_areas")
+        .select("id, name")
+        .eq("establishment_id", estFilter)
+        .order("position")
+    : { data: [] };
+
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const basePath = embeddedInClientEdit
@@ -89,6 +101,7 @@ export async function ClientChecklistHistorySection({
     const base: Record<string, string> = {};
     if (embeddedInClientEdit) base.tab = "checklists";
     if (estFilter) base.est = estFilter;
+    if (areaFilter) base.area = areaFilter;
     if (statusFilter) base.status = statusFilter;
     if (page > 1) base.page = String(page);
     const merged = { ...base, ...params };
@@ -154,7 +167,9 @@ export async function ClientChecklistHistorySection({
 
       <ChecklistHistoryFilters
         establishments={estRows ?? []}
+        areas={areaRows ?? []}
         currentEst={estFilter}
+        currentArea={areaFilter}
         currentStatus={statusFilter}
         baseHref={filtersBaseHref}
       />
@@ -163,7 +178,7 @@ export async function ClientChecklistHistorySection({
         <div className="rounded-xl border border-dashed p-10 text-center">
           <ClipboardList className="mx-auto mb-3 size-8 text-muted-foreground/40" aria-hidden />
           <p className="text-sm font-medium text-muted-foreground">
-            {estFilter || statusFilter
+            {estFilter || areaFilter || statusFilter
               ? "Nenhum checklist encontrado com os filtros selecionados."
               : "Nenhum checklist realizado ainda neste cliente."}
           </p>

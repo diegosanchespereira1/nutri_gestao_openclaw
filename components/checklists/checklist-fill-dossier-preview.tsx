@@ -15,6 +15,32 @@ const defaultEmptyItem = (): FillItemResponseState => ({
   annotation: null,
 });
 
+function calcDossierScore(
+  template: ChecklistTemplateWithSections,
+  responses: FillResponsesMap,
+): { percentage: number; earned: number; total: number } | null {
+  let earned = 0;
+  let total = 0;
+  for (const sec of template.sections) {
+    for (const item of sec.items) {
+      const r = responses[item.id];
+      if (!r?.outcome || r.outcome === "na") continue;
+      const w = item.peso ?? 1;
+      total += w;
+      if (r.outcome === "conforme") earned += w;
+    }
+  }
+  if (total === 0) return null;
+  return { percentage: Math.round((earned / total) * 100), earned, total };
+}
+
+function scoreLabel(pct: number): { text: string; colorClass: string } {
+  if (pct >= 90) return { text: "Excelente", colorClass: "bg-green-100 text-green-800 ring-green-500/20" };
+  if (pct >= 75) return { text: "Bom", colorClass: "bg-blue-100 text-blue-800 ring-blue-500/20" };
+  if (pct >= 50) return { text: "Regular", colorClass: "bg-amber-100 text-amber-800 ring-amber-500/20" };
+  return { text: "Crítico", colorClass: "bg-red-100 text-red-800 ring-red-500/20" };
+}
+
 type Props = {
   template: ChecklistTemplateWithSections;
   responses: FillResponsesMap;
@@ -34,7 +60,7 @@ type Props = {
   className?: string;
 };
 
-/** Dossiê com secções colapsáveis (FR22, UX-DR7). */
+/** Dossiê com seções expansíveis (FR22, UX-DR7). */
 export function ChecklistFillDossierPreview({
   template,
   responses,
@@ -60,10 +86,12 @@ export function ChecklistFillDossierPreview({
     () => initialOpen,
   );
 
+  const score = useMemo(() => calcDossierScore(template, responses), [template, responses]);
+
   const defaultIntro = dossierApprovedAt
     ? "Dossiê aprovado — conteúdo em modo leitura (FR70)."
     : reviewEditable
-      ? "Revise os textos abaixo; guarde ao sair de cada campo. Depois pode aprovar o dossiê."
+      ? "Revise os textos abaixo; salve ao sair de cada campo. Em seguida, você pode aprovar o dossiê."
       : "Checklist, fotos e notas agregados por seção. Expanda cada bloco para revisar o detalhe.";
 
   return (
@@ -77,6 +105,27 @@ export function ChecklistFillDossierPreview({
         {heading ?? "Dossiê do preenchimento"}
       </h3>
       <p className="text-muted-foreground mt-1 text-xs">{intro ?? defaultIntro}</p>
+
+      {score !== null && (() => {
+        const { text, colorClass } = scoreLabel(score.percentage);
+        return (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <div
+              className={cn(
+                "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ring-inset",
+                colorClass,
+              )}
+            >
+              <span className="text-lg font-bold tabular-nums">{score.percentage}%</span>
+              <span>{text}</span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {score.earned.toFixed(score.earned % 1 === 0 ? 0 : 2)} /{" "}
+              {score.total.toFixed(score.total % 1 === 0 ? 0 : 2)} pontos
+            </p>
+          </div>
+        );
+      })()}
 
       <div className="mt-4 space-y-2">
         {template.sections.map((section) => {

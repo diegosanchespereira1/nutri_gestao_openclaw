@@ -15,6 +15,8 @@ export type CustomEditItem = {
   is_required: boolean;
   position: number;
   is_user_extra: boolean;
+  /** Peso do item para cálculo de pontuação. Padrão 1. */
+  peso: number;
 };
 
 export type CustomEditSection = {
@@ -97,6 +99,7 @@ export async function loadCustomTemplateEditData(
       is_required: Boolean(it.is_required),
       position: Number(it.position),
       is_user_extra: Boolean(it.is_user_extra),
+      peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
     });
     itemsBySection.set(sid, list);
   }
@@ -178,6 +181,7 @@ export async function loadCustomTemplateUnified(
         description: String(it.description),
         is_required: Boolean(it.is_required),
         position: Number(it.position),
+        peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
         created_at: String(it.created_at),
       };
     });
@@ -337,6 +341,7 @@ export async function duplicateGlobalTemplateAction(
       is_required: it.is_required,
       position: it.position,
       is_user_extra: false,
+      peso: it.peso ?? 1,
     }));
 
     if (itemRows.length > 0) {
@@ -404,6 +409,8 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   const isRequired = String(formData.get("is_required") ?? "") === "on";
+  const pesoRaw = parseFloat(String(formData.get("peso") ?? "1"));
+  const peso = isFinite(pesoRaw) && pesoRaw > 0 ? pesoRaw : 1;
 
   if (!customSectionId || !customTemplateId || !description) return;
 
@@ -437,6 +444,7 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
     is_required: isRequired,
     position,
     is_user_extra: true,
+    peso,
   });
 
   if (error) return;

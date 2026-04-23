@@ -59,6 +59,7 @@ function assembleTemplates(
       description: String(it.description),
       is_required: Boolean(it.is_required),
       position: Number(it.position),
+      peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
       created_at: String(it.created_at),
     };
     const list = itemsBySection.get(sectionId) ?? [];

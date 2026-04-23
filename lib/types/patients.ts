@@ -16,6 +16,8 @@ export type PatientRow = {
   phone: string | null;
   email: string | null;
   notes: string | null;
+  /** Membro da equipe responsável pelo atendimento (opcional). */
+  responsible_team_member_id: string | null;
   created_at: string;
   updated_at: string;
 };

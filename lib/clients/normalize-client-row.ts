@@ -36,5 +36,9 @@ export function normalizeClientRow(raw: Record<string, unknown>): ClientRow {
     lifecycle_status: normalizeLifecycle(raw.lifecycle_status),
     business_segment: normalizeBusinessSegment(raw.business_segment),
     social_links: normalizeSocialLinks(raw.social_links),
+    responsible_team_member_id:
+      typeof raw.responsible_team_member_id === "string"
+        ? raw.responsible_team_member_id
+        : null,
   };
 }

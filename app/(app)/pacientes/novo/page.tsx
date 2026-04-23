@@ -2,11 +2,14 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { PatientForm } from "@/components/pacientes/patient-form";
 import { loadClientsForOwner } from "@/lib/actions/clients";
+import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import type { ClientRow } from "@/lib/types/clients";
 
 export default async function NovoPacientePage() {
-  // Carregar clientes PJ para o seletor opcional
-  const { rows: clientRows } = await loadClientsForOwner({ kind: "pj" });
+  const [{ rows: clientRows }, teamMembers] = await Promise.all([
+    loadClientsForOwner({ kind: "pj" }),
+    loadTeamMembersForSelect(),
+  ]);
 
   const clients: Pick<ClientRow, "id" | "legal_name" | "trade_name">[] =
     clientRows.map((c) => ({
@@ -25,6 +28,7 @@ export default async function NovoPacientePage() {
       <PatientForm
         mode="create"
         clients={clients}
+        teamMembers={teamMembers}
         defaults={{
           full_name: "",
           birth_date: "",
@@ -33,6 +37,7 @@ export default async function NovoPacientePage() {
           phone: "",
           email: "",
           notes: "",
+          responsible_team_member_id: null,
         }}
       />
     </PageLayout>

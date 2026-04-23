@@ -23,6 +23,7 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
+import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { normalizeClientRow } from "@/lib/clients/normalize-client-row";
 import { resolveClientEditTab } from "@/lib/clientes/client-edit-tab";
@@ -103,7 +104,10 @@ export default async function EditarClientePage({
   );
   const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
   const { rows: contracts } = await loadContractsByClient(row.id);
-  const customSegments = await loadCustomSegmentsAction();
+  const [customSegments, teamMembersForSelect] = await Promise.all([
+    loadCustomSegmentsAction(),
+    loadTeamMembersForSelect(),
+  ]);
 
   const activeTab = resolveClientEditTab(sp.tab, row.kind);
 
@@ -201,6 +205,10 @@ export default async function EditarClientePage({
             defaultTechnicalRepPhone={row.technical_rep_phone ?? ""}
             defaultBusinessSegment={row.business_segment ?? ""}
             defaultCustomSegments={customSegments}
+            teamMembersForSelect={teamMembersForSelect}
+            defaultResponsibleTeamMemberId={
+              row.responsible_team_member_id ?? null
+            }
             defaultEstName={estData?.name ?? ""}
             defaultEstAddressLine1={estData?.address_line1 ?? ""}
             defaultEstAddressLine2={estData?.address_line2 ?? ""}

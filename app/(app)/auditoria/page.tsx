@@ -35,6 +35,7 @@ export default async function AuditoriaPage({
 
   const tableNames = [
     { id: 'patients', label: 'Pacientes' },
+    { id: 'clients', label: 'Clientes' },
     { id: 'patient_nutrition_assessments', label: 'Avaliações Nutricionais' },
   ];
 

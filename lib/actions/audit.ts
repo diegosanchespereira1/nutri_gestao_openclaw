@@ -5,9 +5,11 @@ import { z } from 'zod';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { createClient } from '@/lib/supabase/server';
+import { getWorkspaceAccountOwnerId } from '@/lib/workspace';
 import type {
-  AuditLogRow,
   AuditLogFilters,
+  AuditLogRow,
+  AuditLogWithContext,
   AuditDsarReport,
 } from '@/lib/types/audit';
 
@@ -35,7 +37,7 @@ async function checkRateLimit(userId: string): Promise<boolean> {
 /** Carrega logs de auditoria do utilizador com paginação e filtros. */
 export async function loadAuditLogs(
   filters?: AuditLogFilters & { limit?: number; offset?: number },
-): Promise<{ rows: AuditLogRow[]; total: number }> {
+): Promise<{ rows: AuditLogWithContext[]; total: number }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -73,16 +75,44 @@ export async function loadAuditLogs(
     throw new Error(`Falha ao carregar logs: ${error.message}`);
   }
 
+  const rawRows = (data ?? []) as AuditLogWithContext[];
+  const actorIds = [
+    ...new Set(
+      rawRows
+        .map((r) => r.actor_user_id)
+        .filter((x): x is string => typeof x === 'string' && x.length > 0),
+    ),
+  ];
+  const actorNames: Record<string, string> = {};
+  if (actorIds.length > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .in('user_id', actorIds);
+    for (const pr of profs ?? []) {
+      const uid = pr.user_id as string;
+      const fn = pr.full_name as string;
+      if (uid && fn) actorNames[uid] = fn;
+    }
+  }
+
+  const rows = rawRows.map((r) => ({
+    ...r,
+    actor_full_name: r.actor_user_id
+      ? actorNames[r.actor_user_id] ?? null
+      : null,
+  }));
+
   return {
-    rows: (data as AuditLogRow[]) ?? [],
-    total: (data as AuditLogRow[])?.length ?? 0,
+    rows,
+    total: rows.length,
   };
 }
 
 /** Carrega histórico de acesso a um paciente específico (DSAR). */
 export async function loadPatientAccessHistory(
   patientId: string,
-): Promise<AuditLogRow[]> {
+): Promise<AuditLogWithContext[]> {
   // Validar formato UUID
   const validatedId = uuidSchema.parse(patientId);
 
@@ -103,7 +133,8 @@ export async function loadPatientAccessHistory(
     throw new Error('Paciente não encontrado');
   }
 
-  if (patient.user_id !== user.id) {
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (patient.user_id !== workspaceOwnerId) {
     throw new Error('Acesso negado a este paciente');
   }
 
@@ -119,7 +150,7 @@ export async function loadPatientAccessHistory(
     throw new Error(`Falha ao carregar histórico: ${error.message}`);
   }
 
-  return (logs as AuditLogRow[]) ?? [];
+  return (logs as AuditLogWithContext[]) ?? [];
 }
 
 /** Gera relatório DSAR (Data Subject Access Request) para um paciente. */
@@ -146,7 +177,11 @@ export async function generateDsarReport(
     throw new Error('Paciente não encontrado');
   }
 
-  if (patient.user_id !== user.id) {
+  const workspaceOwnerIdDsar = await getWorkspaceAccountOwnerId(
+    supabase,
+    user.id,
+  );
+  if (patient.user_id !== workspaceOwnerIdDsar) {
     throw new Error('Acesso negado a este paciente');
   }
 

@@ -27,6 +27,7 @@ import {
   createClientAction,
   updateClientAction,
 } from "@/lib/actions/clients";
+import type { TeamMemberSelectOption } from "@/lib/actions/team-members";
 import {
   type ClientCustomSegment,
   createCustomSegmentAction,
@@ -144,6 +145,8 @@ export function ClientForm({
   defaultTechnicalRepPhone,
   defaultBusinessSegment,
   defaultCustomSegments = [],
+  teamMembersForSelect = [],
+  defaultResponsibleTeamMemberId = null,
   defaultEstName = "",
   defaultEstAddressLine1 = "",
   defaultEstAddressLine2 = "",
@@ -202,6 +205,10 @@ export function ClientForm({
   defaultBusinessSegment: string;
   /** Categorias personalizadas já criadas no workspace. */
   defaultCustomSegments?: ClientCustomSegment[];
+  /** Membros da equipe para atribuir responsável pela carteira. */
+  teamMembersForSelect?: TeamMemberSelectOption[];
+  /** ID do `team_member` responsável (opcional). */
+  defaultResponsibleTeamMemberId?: string | null;
   /** Campos do estabelecimento 1:1 (apenas PJ). */
   defaultEstName?: string;
   defaultEstAddressLine1?: string;
@@ -531,6 +538,34 @@ export function ClientForm({
                     />
                   </div>
                 </div>
+
+                {teamMembersForSelect.length > 0 ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="responsible-team-member">
+                      Profissional responsável pelo atendimento (opcional)
+                    </Label>
+                    <select
+                      id="responsible-team-member"
+                      name="responsible_team_member_id"
+                      defaultValue={defaultResponsibleTeamMemberId ?? ""}
+                      className={selectClassName}
+                    >
+                      <option value="">— Nenhum —</option>
+                      {teamMembersForSelect.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.full_name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-muted-foreground text-xs">
+                      Quem acompanha a carteira deste cliente. Se outro colega
+                      fizer uma visita ou checklist, pode actualizar este campo
+                      para reflectir quem está a tratar o caso.
+                    </p>
+                  </div>
+                ) : (
+                  <input type="hidden" name="responsible_team_member_id" value="" />
+                )}
 
                 {kind === "pj" ? (
                   <>

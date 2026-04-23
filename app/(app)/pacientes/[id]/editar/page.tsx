@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadPatientById } from "@/lib/actions/patients";
+import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { cn } from "@/lib/utils";
 
 export default async function EditarPacientePage({
@@ -31,7 +32,10 @@ export default async function EditarPacientePage({
   const avaliacaoAdultoOk =
     typeof sp.avaliacao_adulto === "string" && sp.avaliacao_adulto === "ok";
 
-  const { row } = await loadPatientById(id);
+  const [{ row }, teamMembers] = await Promise.all([
+    loadPatientById(id),
+    loadTeamMembersForSelect(),
+  ]);
   if (!row) notFound();
 
   const birthSlice = row.birth_date
@@ -116,6 +120,7 @@ export default async function EditarPacientePage({
             patientId={row.id}
             clientId={row.client_id}
             establishmentId={row.establishment_id}
+            teamMembers={teamMembers}
             defaults={{
               full_name: row.full_name,
               birth_date: birthSlice,
@@ -124,6 +129,8 @@ export default async function EditarPacientePage({
               phone: row.phone ?? "",
               email: row.email ?? "",
               notes: row.notes ?? "",
+              responsible_team_member_id:
+                row.responsible_team_member_id ?? null,
             }}
           />
         </CardContent>

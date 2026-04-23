@@ -63,7 +63,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Concern | Impacto | Módulos Afetados |
 |---|---|---|
 | Isolamento multi-tenant (RLS) | Toda query no banco | Todos |
-| Log de auditoria | Toda mutação em dados de pacientes | Visitas, Pacientes, Portal Externo, Ficha Técnica |
+| Log de auditoria | Mutações em dados de pacientes, clientes (carteira) e campos sensíveis; `actor_user_id` quando a sessão está disponível no trigger | Visitas, Pacientes, Clientes, Portal Externo, Ficha Técnica |
 | Geração de PDF | Múltiplos tipos de documento | Visitas, Ficha Técnica, POPs, Contratos |
 | Notificações (email/push) | Eventos em múltiplos domínios | Alertas, Visitas, Financeiro, Admin |
 | LGPD compliance | Todo dado pessoal/saúde | Pacientes, Portal Externo, Onboarding |
@@ -71,6 +71,13 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 | Cálculos nutricionais (TACO) | Ficha técnica + receitas | Ficha Técnica, Escalonamento |
 
 **Mapa de segurança neste documento:** decisões núcleo de **Authentication & Security** e **API security** estão em *Core Architectural Decisions* (gravada abaixo, após o starter). O detalhe de **ameaças e abuso** (DDoS/WAF, injeção, push, supply chain, pentest, resposta a incidente) está na secção **Segurança, abuso e ameaças** mais abaixo. As duas leituras são complementares; evitar duplicar tabelas.
+
+### Profissional responsável pela carteira (cliente e paciente)
+
+- Opcionalmente, cada **cliente** e cada **paciente** pode referenciar um `team_members.id` do mesmo workspace (`responsible_team_member_id`), com validação em trigger antes de gravar.
+- É **independente** da atribuição operacional em **visitas agendadas** (`scheduled_visits.assigned_team_member_id`): a visita descreve quem executa aquele evento; o campo na carteira descreve quem é o responsável de continuidade do atendimento.
+- A **área Equipe** lista, por membro, os clientes e pacientes em que esse membro está definido como responsável.
+- **Auditoria:** mutações em `clients` geram linhas em `audit_log` com payload focado; mutações em `patients` continuam a usar o trigger genérico (com mascaramento). A coluna `audit_log.actor_user_id` regista o utilizador da sessão quando `auth.uid()` está disponível no trigger (`SECURITY DEFINER`); `audit_log.user_id` mantém-se como chave de tenant (titular).
 
 ## Preferências Técnicas (Confirmadas)
 

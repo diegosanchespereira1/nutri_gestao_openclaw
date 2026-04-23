@@ -2,9 +2,13 @@ import { ClientForm } from "@/components/clientes/client-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
+import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 
 export default async function NovoClientePage() {
-  const customSegments = await loadCustomSegmentsAction();
+  const [customSegments, teamMembersForSelect] = await Promise.all([
+    loadCustomSegmentsAction(),
+    loadTeamMembersForSelect(),
+  ]);
 
   return (
     <PageLayout variant="form">
@@ -56,6 +60,8 @@ export default async function NovoClientePage() {
         defaultTechnicalRepPhone=""
         defaultBusinessSegment=""
         defaultCustomSegments={customSegments}
+        teamMembersForSelect={teamMembersForSelect}
+        defaultResponsibleTeamMemberId={null}
         defaultEstName=""
         defaultEstAddressLine1=""
         defaultEstAddressLine2=""

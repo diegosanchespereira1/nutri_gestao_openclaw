@@ -63,6 +63,25 @@ function parseOptionalBirthDate(raw: string):
   return { ok: true, value: t };
 }
 
+async function resolveResponsibleTeamMemberId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceOwnerId: string,
+  formData: FormData,
+): Promise<{ ok: true; value: string | null } | { ok: false; error: string }> {
+  const raw = String(formData.get("responsible_team_member_id") ?? "").trim();
+  if (!raw) return { ok: true, value: null };
+  const { data } = await supabase
+    .from("team_members")
+    .select("id")
+    .eq("id", raw)
+    .eq("owner_user_id", workspaceOwnerId)
+    .maybeSingle();
+  if (!data) {
+    return { ok: false, error: "Profissional responsável inválido." };
+  }
+  return { ok: true, value: raw };
+}
+
 function parsePatientDocument(raw: string):
   | { ok: true; value: string | null }
   | { ok: false; error: string } {
@@ -260,6 +279,15 @@ export async function createPatientAction(
   const notesRaw = String(formData.get("notes") ?? "").trim();
   const notes = notesRaw.length > 0 ? notesRaw : null;
 
+  const responsibleRes = await resolveResponsibleTeamMemberId(
+    supabase,
+    workspaceOwnerId,
+    formData,
+  );
+  if (!responsibleRes.ok) {
+    return { ok: false, error: responsibleRes.error };
+  }
+
   const { data, error } = await supabase
     .from("patients")
     .insert({
@@ -273,6 +301,7 @@ export async function createPatientAction(
       phone,
       email,
       notes,
+      responsible_team_member_id: responsibleRes.value,
     })
     .select("id")
     .single();
@@ -295,6 +324,8 @@ export async function updatePatientAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     return { ok: false, error: "Identificador em falta." };
@@ -308,6 +339,15 @@ export async function updatePatientAction(
 
   if (!existing) {
     return { ok: false, error: "Paciente não encontrado." };
+  }
+
+  const responsibleRes = await resolveResponsibleTeamMemberId(
+    supabase,
+    workspaceOwnerId,
+    formData,
+  );
+  if (!responsibleRes.ok) {
+    return { ok: false, error: responsibleRes.error };
   }
 
   const full_name = String(formData.get("full_name") ?? "").trim();
@@ -351,6 +391,7 @@ export async function updatePatientAction(
       phone,
       email,
       notes,
+      responsible_team_member_id: responsibleRes.value,
     })
     .eq("id", id);
 

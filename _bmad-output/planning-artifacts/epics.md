@@ -93,6 +93,7 @@ FR67: Profissional pode encerrar sessão (logout) e sistema invalida tokens de a
 FR68: Profissional pode recuperar acesso à conta via email (reset de senha / Magic Link)
 FR69: Profissional pode solicitar exclusão completa da sua conta e dados pessoais conforme LGPD Art. 18, respeitando obrigações legais de retenção
 FR70: Sistema preserva checklists preenchidos em visitas como registros imutáveis (evidência legal) — edições geram nova versão, não substituem o original
+FR71: Profissional pode associar opcionalmente um membro da equipe como responsável pelo atendimento em cada cliente e paciente; a equipa visualiza a carteira por profissional na área Equipe; alterações são registadas em auditoria (incluindo identificação da sessão que executou a mutação quando disponível)
 ```
 
 ### NonFunctional Requirements
@@ -180,7 +181,7 @@ UX-DR17: Ícones lucide-react alinhados à navegação e ações.
 | FR1, FR3, FR4, FR67, FR68 | 1 | Auth email/senha, 2FA, perfil, sessão |
 | FR2 | — | **Fora de âmbito** — login social não implementado (decisão produto) |
 | FR5 | 4 | CRN em PDFs/relatórios gerados |
-| FR6–FR11 | 2 | Cadastros e importação |
+| FR6–FR11, FR71 | 2 | Cadastros e importação |
 | FR12–FR14 | 3 | Checklists lado profissional |
 | FR15, FR16 | 10 | Admin checklists e notificações |
 | FR17–FR25, FR70 | 4 | Visitas, dossiê, imutabilidade |
@@ -521,6 +522,22 @@ So that começo com contexto certo (FR55, FR56).
 **Then** wizard pede primeiro cliente/estabelecimento e sugere portarias aplicáveis para o estado  
 **When** completo o wizard  
 **Then** sou levado ao *dashboard* com estado “pronto para agendar visita”
+
+### Story 2.8: Profissional responsável pela carteira (cliente e paciente)
+
+**Implementação:** Concluída
+
+As a profissional ou gestor de equipa,  
+I want associar opcionalmente um membro da equipe como responsável pelo atendimento em cada cliente e paciente e ver a carteira por pessoa na área Equipe,  
+So that há clareza de ownership e rastreio em auditoria (FR71).
+
+**Acceptance Criteria:**
+
+**Given** sessão no workspace com membros em `team_members`  
+**When** edito cliente ou paciente e escolho um responsável (ou deixo vazio)  
+**Then** o valor é guardado e validado contra o mesmo tenant  
+**And** na página Equipe vejo listas de clientes e pacientes por membro  
+**And** alterações em clientes e pacientes aparecem no log de auditoria; mutações via triggers de paciente incluem `actor_user_id` quando a sessão está disponível
 
 ---
 

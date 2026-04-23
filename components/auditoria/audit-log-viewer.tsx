@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 
-import type { AuditLogRow } from '@/lib/types/audit';
+import type { AuditLogWithContext } from '@/lib/types/audit';
 import { cn } from '@/lib/utils';
 
 function formatRelativeTime(date: Date): string {
@@ -39,7 +39,7 @@ function getOperationBadgeColor(operation: string): string {
   }
 }
 
-export function AuditLogViewer({ logs }: { logs: AuditLogRow[] }) {
+export function AuditLogViewer({ logs }: { logs: AuditLogWithContext[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
   if (logs.length === 0) {
@@ -89,6 +89,16 @@ export function AuditLogViewer({ logs }: { logs: AuditLogRow[] }) {
                   </div>
                   <p className="text-muted-foreground mt-1 text-xs">
                     {relativeTime} · ID: {log.record_id?.slice(0, 8)}...
+                    {log.actor_user_id ? (
+                      <>
+                        {' '}
+                        · Quem executou:{' '}
+                        <span className="text-foreground font-medium">
+                          {log.actor_full_name?.trim() ||
+                            `utilizador ${log.actor_user_id.slice(0, 8)}…`}
+                        </span>
+                      </>
+                    ) : null}
                   </p>
                 </div>
                 <div className="shrink-0">
@@ -144,6 +154,19 @@ export function AuditLogViewer({ logs }: { logs: AuditLogRow[] }) {
                           {new Date(log.created_at).toLocaleString('pt-BR')}
                         </dd>
                       </div>
+                      {log.actor_user_id ? (
+                        <div className="flex flex-wrap gap-2">
+                          <dt className="text-muted-foreground font-medium">
+                            Sessão (actor):
+                          </dt>
+                          <dd className="font-mono text-foreground text-xs">
+                            {log.actor_user_id}
+                            {log.actor_full_name
+                              ? ` · ${log.actor_full_name}`
+                              : ''}
+                          </dd>
+                        </div>
+                      ) : null}
                       {log.ip_address && (
                         <div className="flex gap-2">
                           <dt className="text-muted-foreground font-medium">

@@ -7,6 +7,7 @@ import {
   createPatientAction,
   updatePatientAction,
 } from "@/lib/actions/patients";
+import type { TeamMemberSelectOption } from "@/lib/actions/team-members";
 import type { PatientSex } from "@/lib/types/patients";
 import type { ClientRow } from "@/lib/types/clients";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ export function PatientForm({
   establishmentId,
   /** Lista de clientes PJ disponíveis para o seletor (só relevante em create sem clientId fixo). */
   clients,
+  teamMembers = [],
   defaults,
 }: {
   mode: "create" | "edit";
@@ -42,6 +44,7 @@ export function PatientForm({
   clientId?: string | null;
   establishmentId?: string | null;
   clients?: Pick<ClientRow, "id" | "legal_name" | "trade_name">[];
+  teamMembers?: TeamMemberSelectOption[];
   defaults: {
     full_name: string;
     birth_date: string;
@@ -50,6 +53,7 @@ export function PatientForm({
     phone: string;
     email: string;
     notes: string;
+    responsible_team_member_id: string | null;
   };
 }) {
   const action =
@@ -143,6 +147,33 @@ export function PatientForm({
             className="font-mono"
           />
         </div>
+
+        {teamMembers.length > 0 ? (
+          <div className="space-y-2">
+            <Label htmlFor="patient-responsible">
+              Profissional responsável pelo atendimento (opcional)
+            </Label>
+            <select
+              id="patient-responsible"
+              name="responsible_team_member_id"
+              defaultValue={defaults.responsible_team_member_id ?? ""}
+              className={cn(selectClass, !defaults.responsible_team_member_id && "text-muted-foreground")}
+            >
+              <option value="">— Nenhum —</option>
+              {teamMembers.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.full_name}
+                </option>
+              ))}
+            </select>
+            <p className="text-muted-foreground text-xs">
+              Se outro colega fizer o acompanhamento ou checklist, actualize para
+              o nome de quem está a tratar o paciente.
+            </p>
+          </div>
+        ) : (
+          <input type="hidden" name="responsible_team_member_id" value="" />
+        )}
       </fieldset>
 
       <div className="border-t border-border" />

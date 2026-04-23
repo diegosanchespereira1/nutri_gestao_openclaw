@@ -324,6 +324,25 @@ export type ClientFormResult =
   | { ok: true }
   | { ok: false; error: string };
 
+async function resolveResponsibleTeamMemberId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceOwnerId: string,
+  formData: FormData,
+): Promise<{ ok: true; value: string | null } | { ok: false; error: string }> {
+  const raw = String(formData.get("responsible_team_member_id") ?? "").trim();
+  if (!raw) return { ok: true, value: null };
+  const { data } = await supabase
+    .from("team_members")
+    .select("id")
+    .eq("id", raw)
+    .eq("owner_user_id", workspaceOwnerId)
+    .maybeSingle();
+  if (!data) {
+    return { ok: false, error: "Profissional responsável inválido." };
+  }
+  return { ok: true, value: raw };
+}
+
 function parseKind(raw: unknown): ClientKind | null {
   if (raw === "pf" || raw === "pj") return raw;
   return null;
@@ -407,6 +426,15 @@ export async function createClientAction(
     pjPayload = { ...pj.fields, logo_storage_path: null };
   }
 
+  const responsibleRes = await resolveResponsibleTeamMemberId(
+    supabase,
+    workspaceOwnerId,
+    formData,
+  );
+  if (!responsibleRes.ok) {
+    return { ok: false, error: responsibleRes.error };
+  }
+
   const { data, error } = await supabase
     .from("clients")
     .insert({
@@ -418,6 +446,7 @@ export async function createClientAction(
       email,
       phone,
       notes,
+      responsible_team_member_id: responsibleRes.value,
       ...pf,
       ...pjPayload,
     })
@@ -587,6 +616,18 @@ export async function updateClientAction(
   } else {
     Object.assign(baseUpdate, pfOnlyClearPayload(), { logo_storage_path: logoPath });
   }
+
+  const responsibleRes = await resolveResponsibleTeamMemberId(
+    supabase,
+    workspaceOwnerId,
+    formData,
+  );
+  if (!responsibleRes.ok) {
+    return { ok: false, error: responsibleRes.error };
+  }
+  Object.assign(baseUpdate, {
+    responsible_team_member_id: responsibleRes.value,
+  });
 
   const { error } = await supabase
     .from("clients")

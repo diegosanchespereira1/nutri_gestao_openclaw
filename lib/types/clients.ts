@@ -56,6 +56,8 @@ export type ClientRow = {
   guardian_email: string | null;
   guardian_phone: string | null;
   guardian_relationship: string | null;
+  /** Membro da equipe responsável pelo atendimento / carteira (opcional). */
+  responsible_team_member_id: string | null;
   created_at: string;
   updated_at: string;
 };

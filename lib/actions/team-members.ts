@@ -485,6 +485,76 @@ export async function updateTeamMemberAction(formData: FormData): Promise<void> 
   redirect("/equipe");
 }
 
+export type TeamMemberSelectOption = {
+  id: string;
+  full_name: string;
+};
+
+/** Opções para selects «profissional responsável» (ordenado por nome). */
+export async function loadTeamMembersForSelect(): Promise<
+  TeamMemberSelectOption[]
+> {
+  const { rows } = await loadTeamMembersForOwner();
+  return rows.map((r) => ({ id: r.id, full_name: r.full_name }));
+}
+
+export type ResponsiblePortfolioEntry = {
+  clients: { id: string; legal_name: string }[];
+  patients: { id: string; full_name: string }[];
+};
+
+/** Clientes e pacientes com `responsible_team_member_id` agrupados por membro. */
+export async function loadResponsiblePortfolioByMemberId(): Promise<
+  Record<string, ResponsiblePortfolioEntry>
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return {};
+
+  const ownerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const [clientsRes, patientsRes] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, legal_name, responsible_team_member_id")
+      .eq("owner_user_id", ownerId)
+      .not("responsible_team_member_id", "is", null),
+    supabase
+      .from("patients")
+      .select("id, full_name, responsible_team_member_id")
+      .eq("user_id", ownerId)
+      .not("responsible_team_member_id", "is", null),
+  ]);
+
+  const byMember: Record<string, ResponsiblePortfolioEntry> = {};
+
+  for (const row of clientsRes.data ?? []) {
+    const mid = row.responsible_team_member_id as string;
+    if (!byMember[mid]) {
+      byMember[mid] = { clients: [], patients: [] };
+    }
+    byMember[mid].clients.push({
+      id: row.id as string,
+      legal_name: row.legal_name as string,
+    });
+  }
+
+  for (const row of patientsRes.data ?? []) {
+    const mid = row.responsible_team_member_id as string;
+    if (!byMember[mid]) {
+      byMember[mid] = { clients: [], patients: [] };
+    }
+    byMember[mid].patients.push({
+      id: row.id as string,
+      full_name: row.full_name as string,
+    });
+  }
+
+  return byMember;
+}
+
 export async function deleteTeamMemberAction(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {

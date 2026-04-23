@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import { createHash } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
+import { getWorkspaceAccountOwnerId } from '@/lib/workspace';
 import { z } from 'zod';
 import type {
   DsarCompleteReport,
@@ -40,7 +41,8 @@ export async function generateCompletePatientDsar(
       return { success: false, error: 'Paciente não encontrado' };
     }
 
-    if (patient.user_id !== user.id) {
+    const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+    if (patient.user_id !== workspaceOwnerId) {
       // Registar tentativa de acesso negado em auditoria
       await supabase
         .from('audit_log')
@@ -117,7 +119,7 @@ export async function generateCompletePatientDsar(
       .from('consent_records')
       .select('*')
       .eq('patient_id', validatedId)
-      .eq('user_id', user.id)
+      .eq('user_id', workspaceOwnerId)
       .order('created_at', { ascending: false });
 
     const dsarConsents: DsarConsentEntry[] = (consents ?? []).map(c => ({
@@ -336,7 +338,8 @@ export async function sendDsarByEmail(
       .eq('id', patientId)
       .maybeSingle();
 
-    if (!patient || patient.user_id !== user.id) {
+    const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+    if (!patient || patient.user_id !== workspaceOwnerId) {
       return { success: false, error: 'Acesso negado a este paciente' };
     }
 

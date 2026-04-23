@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PatientForm } from "@/components/pacientes/patient-form";
+import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { createClient } from "@/lib/supabase/server";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ export default async function NovoPacienteEstabelecimentoPage({
 }) {
   const { id: clientId, estId } = await params;
   const supabase = await createClient();
+  const teamMembers = await loadTeamMembersForSelect();
 
   const { data: client } = await supabase
     .from("clients")
@@ -61,6 +63,7 @@ export default async function NovoPacienteEstabelecimentoPage({
         mode="create"
         clientId={clientId}
         establishmentId={estId}
+        teamMembers={teamMembers}
         defaults={{
           full_name: "",
           birth_date: "",
@@ -69,6 +72,7 @@ export default async function NovoPacienteEstabelecimentoPage({
           phone: "",
           email: "",
           notes: "",
+          responsible_team_member_id: null,
         }}
       />
     </div>

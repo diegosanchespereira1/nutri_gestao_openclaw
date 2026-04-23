@@ -56,9 +56,71 @@ function getPositionOptional(): Promise<GeolocationPosition | null> {
   });
 }
 
+const MAX_DIMENSION = 1920;
+const JPEG_QUALITY = 0.85;
+
+/**
+ * Redimensiona e converte a imagem para JPEG via Canvas.
+ * Resolve dois problemas de mobile:
+ *  - iOS câmara envia HEIC (tipo não suportado pelo servidor)
+ *  - Fotos de câmara são tipicamente 4-8MB (ultrapassa o limite de 6MB)
+ */
+function compressImage(file: File): Promise<File> {
+  return new Promise((resolve, reject) => {
+    // Se já for pequeno e JPEG/PNG/WebP, pode não precisar comprimir
+    // Mas comprimimos sempre para garantir compatibilidade de formato
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / width, MAX_DIMENSION / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas não suportado"));
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            reject(new Error("Falha ao comprimir imagem"));
+            return;
+          }
+          const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+          resolve(new File([blob], name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        JPEG_QUALITY,
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Não foi possível ler a imagem"));
+    };
+    img.src = url;
+  });
+}
+
+type UploadStep = "compressing" | "location" | "uploading" | "saving";
+
 type UploadState =
   | { status: "idle" }
-  | { status: "uploading" };
+  | { status: "busy"; step: UploadStep; percent: number };
+
+const STEP_LABELS: Record<UploadStep, string> = {
+  compressing: "Comprimindo imagem…",
+  location: "Obtendo localização…",
+  uploading: "Enviando ao servidor…",
+  saving: "Salvando registo…",
+};
 
 type Props = {
   sessionId: string;
@@ -96,7 +158,7 @@ export function ChecklistItemPhotos({
   const inputGalleryRef = useRef<HTMLInputElement>(null);
 
   const atLimit = photos.length >= CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM;
-  const busy = uploadState.status !== "idle";
+  const busy = uploadState.status === "busy";
 
   const openCamera = useCallback(() => {
     setUploadError(null);
@@ -108,56 +170,6 @@ export function ChecklistItemPhotos({
     inputGalleryRef.current?.click();
   }, []);
 
-  const performUpload = useCallback(async (file: File): Promise<boolean> => {
-    try {
-      setUploadError(null);
-      setUploadState({ status: "uploading" });
-
-      let lat = "";
-      let lng = "";
-      try {
-        const pos = await getPositionOptional();
-        if (pos) {
-          lat = String(pos.coords.latitude);
-          lng = String(pos.coords.longitude);
-        }
-      } catch {
-        /* localização opcional */
-      }
-
-      const fd = new FormData();
-      fd.append("session_id", sessionId);
-      fd.append("item_id", itemId);
-      fd.append("item_response_source", itemResponseSource);
-      fd.append("file", file);
-      if (lat) fd.append("latitude", lat);
-      if (lng) fd.append("longitude", lng);
-
-      const res = await uploadChecklistFillPhotoAction(fd);
-      setUploadState({ status: "idle" });
-
-      if (!res.ok) {
-        setUploadError(res.error);
-        return false;
-      }
-
-      const newPhotos = [...photos, res.photo];
-      setPhotos(newPhotos);
-      onPhotosChange?.(newPhotos);
-      return true;
-    } catch (err) {
-      setUploadState({ status: "idle" });
-      const msg =
-        err instanceof Error ? err.message : String(err);
-      setUploadError(
-        msg.includes("Failed to fetch") || msg.includes("network")
-          ? "Erro de rede ao enviar foto. Verifique a ligação e tente novamente."
-          : `Erro ao enviar foto: ${msg}`,
-      );
-      return false;
-    }
-  }, [sessionId, itemId, itemResponseSource, photos, onPhotosChange]);
-
   const onFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
@@ -166,25 +178,85 @@ export function ChecklistItemPhotos({
 
       setUploadError(null);
 
-      // Validar tamanho do arquivo antes de fazer upload
-      if (file.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {
-        const maxMB = CHECKLIST_FILL_PHOTO_MAX_BYTES / 1024 / 1024;
-        const fileMB = (file.size / 1024 / 1024).toFixed(1);
-        setUploadError(
-          `Ficheiro muito grande. Máximo: ${maxMB}MB. Tamanho: ${fileMB}MB.`
-        );
-        return;
-      }
-
-      // Validar tipo MIME
-      if (!file.type.startsWith("image/")) {
+      if (file.type && !file.type.startsWith("image/")) {
         setUploadError("Selecione um ficheiro de imagem válido.");
         return;
       }
 
-      await performUpload(file);
+      try {
+        // ── Etapa 1: comprimir ──
+        setUploadState({ status: "busy", step: "compressing", percent: 10 });
+        const compressed = await compressImage(file);
+        setUploadState({ status: "busy", step: "compressing", percent: 30 });
+
+        if (compressed.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {
+          setUploadState({ status: "idle" });
+          const maxMB = CHECKLIST_FILL_PHOTO_MAX_BYTES / 1024 / 1024;
+          const fileMB = (compressed.size / 1024 / 1024).toFixed(1);
+          setUploadError(
+            `Imagem muito grande mesmo após compressão. Máximo: ${maxMB}MB. Tamanho: ${fileMB}MB.`,
+          );
+          return;
+        }
+
+        // ── Etapa 2: localização ──
+        setUploadState({ status: "busy", step: "location", percent: 40 });
+        let lat = "";
+        let lng = "";
+        try {
+          const pos = await getPositionOptional();
+          if (pos) {
+            lat = String(pos.coords.latitude);
+            lng = String(pos.coords.longitude);
+          }
+        } catch {
+          /* localização opcional */
+        }
+        setUploadState({ status: "busy", step: "location", percent: 50 });
+
+        // ── Etapa 3: enviar ao servidor ──
+        setUploadState({ status: "busy", step: "uploading", percent: 55 });
+
+        const fd = new FormData();
+        fd.append("session_id", sessionId);
+        fd.append("item_id", itemId);
+        fd.append("item_response_source", itemResponseSource);
+        fd.append("file", compressed);
+        if (lat) fd.append("latitude", lat);
+        if (lng) fd.append("longitude", lng);
+
+        setUploadState({ status: "busy", step: "uploading", percent: 65 });
+        const res = await uploadChecklistFillPhotoAction(fd);
+
+        if (!res.ok) {
+          setUploadState({ status: "idle" });
+          setUploadError(res.error);
+          return;
+        }
+
+        // ── Etapa 4: finalizar ──
+        setUploadState({ status: "busy", step: "saving", percent: 95 });
+        const newPhotos = [...photos, res.photo];
+        setPhotos(newPhotos);
+        onPhotosChange?.(newPhotos);
+        setUploadState({ status: "busy", step: "saving", percent: 100 });
+
+        // Breve pausa para o utilizador ver 100%
+        await new Promise((r) => setTimeout(r, 400));
+        setUploadState({ status: "idle" });
+      } catch (err) {
+        setUploadState({ status: "idle" });
+        const msg = err instanceof Error ? err.message : String(err);
+        setUploadError(
+          msg.includes("Failed to fetch") || msg.includes("network")
+            ? "Erro de rede ao enviar foto. Verifique a ligação e tente novamente."
+            : msg.includes("processar") || msg.includes("ler")
+              ? msg
+              : `Erro ao enviar foto: ${msg}`,
+        );
+      }
     },
-    [performUpload, atLimit, disabled],
+    [sessionId, itemId, itemResponseSource, photos, onPhotosChange, atLimit, disabled],
   );
 
   const onDelete = useCallback(
@@ -223,7 +295,7 @@ export function ChecklistItemPhotos({
         <input
           ref={inputCameraRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
           capture="environment"
           className="sr-only"
           aria-hidden
@@ -233,18 +305,14 @@ export function ChecklistItemPhotos({
         <input
           ref={inputGalleryRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*"
           className="sr-only"
           aria-hidden
           tabIndex={-1}
           onChange={(ev) => void onFileChange(ev)}
         />
         <div className="flex flex-wrap items-center gap-2">
-          {busy ? (
-            <p className="text-muted-foreground min-h-11 px-1 py-2 text-sm sm:min-h-9 sm:py-1.5">
-              Carregando…
-            </p>
-          ) : (
+          {!busy ? (
             <>
               <Button
                 type="button"
@@ -271,9 +339,37 @@ export function ChecklistItemPhotos({
                 Galeria
               </Button>
             </>
-          )}
+          ) : null}
         </div>
       </div>
+
+      {uploadState.status === "busy" ? (
+        <div className="mt-3 space-y-1.5" role="status" aria-live="polite">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground flex items-center gap-1.5">
+              <svg className="size-3.5 animate-spin text-primary" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              {STEP_LABELS[uploadState.step]}
+            </span>
+            <span className="text-foreground tabular-nums font-medium">
+              {uploadState.percent}%
+            </span>
+          </div>
+          <div className="bg-muted h-2 w-full overflow-hidden rounded-full">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-500 ease-out",
+                uploadState.percent === 100
+                  ? "bg-green-500"
+                  : "bg-primary",
+              )}
+              style={{ width: `${uploadState.percent}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {uploadError ? (
         <div

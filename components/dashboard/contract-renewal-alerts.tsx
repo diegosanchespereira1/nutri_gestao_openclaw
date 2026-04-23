@@ -64,7 +64,7 @@ export function ContractRenewalAlerts({ rows, withinDays = 60 }: Props) {
                   {formatDateBR(r.contract_end_date)}
                 </span>
                 <Link
-                  href={`/clientes/${r.client_id}/editar?tab=contratos`}
+                  href={`/clientes/${r.client_id}/editar?tab=financeiro`}
                   className={cn(
                     buttonVariants({ variant: "ghost", size: "sm" }),
                     "h-auto px-2 py-0.5 text-xs text-amber-700 hover:text-amber-900 dark:text-amber-300",

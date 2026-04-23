@@ -18,11 +18,17 @@ export function ChecklistHistoryFilters({
   const router = useRouter();
 
   function navigate(est: string | null, status: string | null) {
-    const params = new URLSearchParams();
+    const [pathname, rawSearch = ""] = baseHref.includes("?")
+      ? (baseHref.split("?", 2) as [string, string])
+      : [baseHref, ""];
+    const params = new URLSearchParams(rawSearch);
     if (est) params.set("est", est);
+    else params.delete("est");
     if (status) params.set("status", status);
+    else params.delete("status");
+    params.delete("page");
     const qs = params.toString();
-    router.push(`${baseHref}${qs ? `?${qs}` : ""}`);
+    router.push(`${pathname}${qs ? `?${qs}` : ""}`);
   }
 
   return (

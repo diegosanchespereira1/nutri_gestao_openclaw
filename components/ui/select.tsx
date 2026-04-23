@@ -4,6 +4,7 @@ import * as React from "react";
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon } from "lucide-react";
 
+import { touchMinHeight } from "@/lib/touch-targets"
 import { cn } from "@/lib/utils";
 
 function Select(props: SelectPrimitive.Root.Props<string>) {
@@ -21,7 +22,7 @@ function SelectTrigger({
       id={id}
       data-slot="select-trigger"
       className={cn(
-        "border-input bg-background text-foreground placeholder:text-muted-foreground flex h-9 w-full items-center justify-between rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        `border-input bg-background text-foreground placeholder:text-muted-foreground flex h-9 w-full touch-manipulation items-center justify-between rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${touchMinHeight}`,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         className,
       )}
@@ -88,7 +89,7 @@ function SelectItem({
       value={value}
       data-slot="select-item"
       className={cn(
-        "data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex cursor-default select-none items-center gap-2 rounded-sm py-1.5 pr-2 pl-7 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-50",
+        `data-highlighted:bg-accent data-highlighted:text-accent-foreground relative flex min-h-9 cursor-default select-none items-center gap-2 rounded-sm py-1.5 pr-2 pl-7 text-sm outline-none data-disabled:pointer-events-none data-disabled:opacity-50 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-2.5 max-lg:min-h-11 max-lg:py-2.5`,
         className,
       )}
       {...props}

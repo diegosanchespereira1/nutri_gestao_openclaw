@@ -181,7 +181,7 @@ export async function createContractAction(
   revalidatePath(`/clientes/${clientId}/editar`);
   revalidatePath("/financeiro");
   revalidatePath("/inicio");
-  redirect(`/clientes/${clientId}/editar?tab=contratos`);
+  redirect(`/clientes/${clientId}/editar?tab=financeiro`);
 }
 
 export async function updateContractAction(
@@ -207,7 +207,7 @@ export async function updateContractAction(
   const notes = String(formData.get("notes") ?? "").trim();
 
   if (!contractId || !clientId || !isValidRecurrence(recurrenceRaw)) {
-    redirect(`/clientes/${clientId}/editar?contractErr=invalid&tab=contratos`);
+    redirect(`/clientes/${clientId}/editar?contractErr=invalid&tab=financeiro`);
   }
 
   const amountCents = amountRaw ? parseAmountCents(amountRaw) : null;
@@ -228,13 +228,13 @@ export async function updateContractAction(
     .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
-    redirect(`/clientes/${clientId}/editar?contractErr=save&tab=contratos`);
+    redirect(`/clientes/${clientId}/editar?contractErr=save&tab=financeiro`);
   }
 
   revalidatePath(`/clientes/${clientId}/editar`);
   revalidatePath("/financeiro");
   revalidatePath("/inicio");
-  redirect(`/clientes/${clientId}/editar?tab=contratos`);
+  redirect(`/clientes/${clientId}/editar?tab=financeiro`);
 }
 
 export async function deleteContractAction(
@@ -251,7 +251,7 @@ export async function deleteContractAction(
   const clientId = String(formData.get("client_id") ?? "").trim();
 
   if (!contractId || !clientId) {
-    redirect(`/clientes/${clientId}/editar?contractErr=invalid&tab=contratos`);
+    redirect(`/clientes/${clientId}/editar?contractErr=invalid&tab=financeiro`);
   }
 
   const { error } = await supabase
@@ -261,11 +261,11 @@ export async function deleteContractAction(
     .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
-    redirect(`/clientes/${clientId}/editar?contractErr=save&tab=contratos`);
+    redirect(`/clientes/${clientId}/editar?contractErr=save&tab=financeiro`);
   }
 
   revalidatePath(`/clientes/${clientId}/editar`);
   revalidatePath("/financeiro");
   revalidatePath("/inicio");
-  redirect(`/clientes/${clientId}/editar?tab=contratos`);
+  redirect(`/clientes/${clientId}/editar?tab=financeiro`);
 }

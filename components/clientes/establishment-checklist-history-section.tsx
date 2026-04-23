@@ -93,7 +93,7 @@ export async function EstablishmentChecklistHistorySection({
       </ul>
 
       <Link
-        href={`/clientes/${clientId}/checklists?est=${establishmentId}`}
+        href={`/clientes/${clientId}/editar?tab=checklists&est=${encodeURIComponent(establishmentId)}`}
         className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full justify-center")}
       >
         Ver histórico completo →

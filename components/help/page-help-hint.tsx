@@ -3,6 +3,7 @@
 import { Tooltip } from "@base-ui/react/tooltip";
 import { CircleHelp } from "lucide-react";
 
+import { touchMinTarget } from "@/lib/touch-targets";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -24,7 +25,8 @@ export function PageHelpHint({ ariaLabel, children, className }: Props) {
           type="button"
           aria-label={ariaLabel}
           className={cn(
-            "text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 rounded-full p-0.5 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+            "text-muted-foreground hover:text-foreground focus-visible:ring-ring inline-flex shrink-0 items-center justify-center rounded-full p-1.5 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none touch-manipulation",
+            touchMinTarget,
             className,
           )}
         >

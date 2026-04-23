@@ -2,6 +2,7 @@
 
 import { Tabs as TabsPrimitive } from "@base-ui/react/tabs";
 
+import { touchMinHeight } from "@/lib/touch-targets";
 import { cn } from "@/lib/utils";
 
 function Tabs({ className, ...props }: TabsPrimitive.Root.Props) {
@@ -32,7 +33,7 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow]",
+        `ring-offset-background focus-visible:ring-ring inline-flex items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow] ${touchMinHeight}`,
         "border-border/80 bg-card text-foreground/80 shadow-xs",
         "hover:border-primary/45 hover:bg-primary/18 hover:text-foreground",
         "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",

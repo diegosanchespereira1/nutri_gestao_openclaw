@@ -29,6 +29,7 @@ import {
   ESTABLISHMENT_TYPES,
   establishmentTypeLabel,
 } from "@/lib/constants/establishment-types";
+import { touchMinHeight, touchMinTarget } from "@/lib/touch-targets";
 import { cn } from "@/lib/utils";
 import {
   checkExistingOpenFillSession,
@@ -689,6 +690,7 @@ export function ChecklistCatalog({
                 "h-9 w-full rounded-lg border pl-9 pr-9 text-sm shadow-xs outline-none",
                 "border-input bg-background text-foreground placeholder:text-muted-foreground",
                 "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
+                touchMinHeight,
               )}
               aria-label="Buscar template de checklist"
             />
@@ -696,7 +698,10 @@ export function ChecklistCatalog({
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                className={cn(
+                  "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
+                  touchMinTarget,
+                )}
                 aria-label="Limpar busca"
               >
                 <X className="size-4" />
@@ -713,7 +718,8 @@ export function ChecklistCatalog({
                 type="button"
                 onClick={() => setTypeFilter((prev) => (prev === type ? null : type))}
                 className={cn(
-                  "rounded-full border px-3 py-1 text-xs font-medium transition-all",
+                  "rounded-full border px-3 py-2 text-xs font-medium transition-all touch-manipulation",
+                  touchMinHeight,
                   typeFilter === type
                     ? "border-primary bg-primary text-primary-foreground shadow-sm"
                     : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
@@ -730,8 +736,9 @@ export function ChecklistCatalog({
                   value={ufFilter ?? ""}
                   onChange={(e) => setUfFilter(e.target.value || null)}
                   className={cn(
-                    "h-7 rounded-full border px-2.5 text-xs shadow-xs outline-none",
+                    "min-h-8 rounded-full border px-3 py-2 text-xs shadow-xs outline-none touch-manipulation",
                     "bg-background focus-visible:ring-ring focus-visible:ring-2",
+                    touchMinHeight,
                     ufFilter
                       ? "border-primary text-primary font-medium"
                       : "border-border text-muted-foreground",
@@ -752,7 +759,10 @@ export function ChecklistCatalog({
               <button
                 type="button"
                 onClick={clearFilters}
-                className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                className={cn(
+                  "flex min-h-10 items-center gap-1 rounded-md px-1 text-xs text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
+                  "max-lg:min-h-11 [@media(pointer:coarse)]:min-h-11",
+                )}
               >
                 <X className="size-3" />
                 Limpar filtros

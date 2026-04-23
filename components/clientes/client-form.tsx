@@ -14,7 +14,13 @@ import {
   UserCircle,
   Users,
 } from "lucide-react";
-import { useActionState, useRef, useState, useTransition } from "react";
+import {
+  useActionState,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 
 import {
   type ClientFormResult,
@@ -78,6 +84,7 @@ type ClientFormTab =
   | "identificacao"
   | "pessoa-saude"
   | "documentos"
+  | "pj-estabelecimento"
   | "pj-fiscal"
   | "pj-web"
   | "pj-marca"
@@ -86,6 +93,7 @@ type ClientFormTab =
 
 const PF_ONLY_TABS: ClientFormTab[] = ["pessoa-saude", "documentos"];
 const PJ_ONLY_TABS: ClientFormTab[] = [
+  "pj-estabelecimento",
   "pj-fiscal",
   "pj-web",
   "pj-marca",
@@ -142,6 +150,9 @@ export function ClientForm({
   defaultEstCity = "",
   defaultEstState = "",
   defaultEstPostalCode = "",
+  /** Abre o separador interno «Estabelecimento» ao carregar (edição PJ). */
+  initialFormTab,
+  children,
 }: {
   mode: "create" | "edit";
   clientId?: string;
@@ -198,12 +209,22 @@ export function ClientForm({
   defaultEstCity?: string;
   defaultEstState?: string;
   defaultEstPostalCode?: string;
+  initialFormTab?: "pj-estabelecimento";
+  children?: ReactNode;
 }) {
   const action =
     mode === "create" ? createClientAction : updateClientAction;
   const [state, formAction] = useActionState(action, initial);
   const [kind, setKind] = useState<ClientKind>(defaultKind);
-  const [tab, setTab] = useState<ClientFormTab>("identificacao");
+  const [tab, setTab] = useState<ClientFormTab>(() => {
+    if (
+      initialFormTab === "pj-estabelecimento" &&
+      defaultKind === "pj"
+    ) {
+      return "pj-estabelecimento";
+    }
+    return "identificacao";
+  });
 
   const [segmentValue, setSegmentValue] = useState(defaultBusinessSegment);
   const [customSegments, setCustomSegments] =
@@ -257,8 +278,9 @@ export function ClientForm({
           Aqui regista o <strong className="text-foreground font-medium">contrato</strong>{" "}
           (PF ou PJ). Em PF, o separador{" "}
           <strong className="text-foreground font-medium">Pessoa atendida e saúde</strong>{" "}
-          concentra dados clínicos iniciais. Em PJ, use os separadores para estado do
-          contrato, fiscal, web, marca e responsáveis. Um clique em salvar grava tudo.
+          concentra dados clínicos iniciais. Em PJ, use os separadores para unidade,
+          estado do contrato, fiscal, web, marca e responsáveis. Um clique em salvar grava
+          tudo.
         </CardDescription>
       </CardHeader>
       <form action={formAction}>
@@ -295,6 +317,10 @@ export function ClientForm({
               ) : null}
               {kind === "pj" ? (
                 <>
+                  <TabsTrigger value="pj-estabelecimento" className="shrink-0">
+                    <MapPin className="size-4 opacity-70" aria-hidden />
+                    Estabelecimento
+                  </TabsTrigger>
                   <TabsTrigger value="pj-fiscal" className="shrink-0">
                     <IdCard className="size-4 opacity-70" aria-hidden />
                     Fiscal e licenças
@@ -548,91 +574,100 @@ export function ClientForm({
                         />
                       </div>
                     </div>
-
-                    <Separator />
-                    <div>
-                      <p className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
-                        <MapPin className="size-4 text-muted-foreground" aria-hidden />
-                        Estabelecimento
-                      </p>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        Unidade física onde o serviço é prestado. Cada cliente PJ
-                        representa 1 CNPJ = 1 estabelecimento.
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="est-name">
-                        Nome do estabelecimento (opcional)
-                      </Label>
-                      <Input
-                        id="est-name"
-                        name="est_name"
-                        defaultValue={defaultEstName}
-                        placeholder="Se vazio, usa a razão social acima"
-                        autoComplete="organization"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="est-address1">
-                        Endereço (linha 1) (opcional)
-                      </Label>
-                      <Input
-                        id="est-address1"
-                        name="est_address_line1"
-                        defaultValue={defaultEstAddressLine1}
-                        placeholder="Rua, número, complemento…"
-                        autoComplete="street-address"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="est-address2">
-                        Endereço (linha 2) (opcional)
-                      </Label>
-                      <Input
-                        id="est-address2"
-                        name="est_address_line2"
-                        defaultValue={defaultEstAddressLine2}
-                        placeholder="Bairro, bloco, andar…"
-                      />
-                    </div>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      <div className="space-y-2 sm:col-span-1">
-                        <Label htmlFor="est-city">Cidade (opcional)</Label>
-                        <Input
-                          id="est-city"
-                          name="est_city"
-                          defaultValue={defaultEstCity}
-                          autoComplete="address-level2"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="est-state">UF (opcional)</Label>
-                        <Input
-                          id="est-state"
-                          name="est_state"
-                          defaultValue={defaultEstState}
-                          maxLength={2}
-                          placeholder="SP"
-                          className="uppercase"
-                          autoComplete="address-level1"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="est-postal">CEP (opcional)</Label>
-                        <Input
-                          id="est-postal"
-                          name="est_postal_code"
-                          defaultValue={defaultEstPostalCode}
-                          inputMode="numeric"
-                          placeholder="00000-000"
-                          autoComplete="postal-code"
-                        />
-                      </div>
-                    </div>
                   </>
                 ) : null}
               </div>
             </TabsContent>
+
+            {kind === "pj" ? (
+              <TabsContent value="pj-estabelecimento" className="space-y-6">
+                <div>
+                  <p className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
+                    <MapPin className="size-4 text-muted-foreground" aria-hidden />
+                    Estabelecimento
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    Unidade física onde o serviço é prestado. Cada cliente PJ representa
+                    1 CNPJ = 1 estabelecimento. Guarde as alterações no fim do formulário.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="est-name">
+                    Nome do estabelecimento (opcional)
+                  </Label>
+                  <Input
+                    id="est-name"
+                    name="est_name"
+                    defaultValue={defaultEstName}
+                    placeholder="Se vazio, usa a razão social acima"
+                    autoComplete="organization"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="est-address1">
+                    Endereço (linha 1) (opcional)
+                  </Label>
+                  <Input
+                    id="est-address1"
+                    name="est_address_line1"
+                    defaultValue={defaultEstAddressLine1}
+                    placeholder="Rua, número, complemento…"
+                    autoComplete="street-address"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="est-address2">
+                    Endereço (linha 2) (opcional)
+                  </Label>
+                  <Input
+                    id="est-address2"
+                    name="est_address_line2"
+                    defaultValue={defaultEstAddressLine2}
+                    placeholder="Bairro, bloco, andar…"
+                  />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2 sm:col-span-1">
+                    <Label htmlFor="est-city">Cidade (opcional)</Label>
+                    <Input
+                      id="est-city"
+                      name="est_city"
+                      defaultValue={defaultEstCity}
+                      autoComplete="address-level2"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="est-state">UF (opcional)</Label>
+                    <Input
+                      id="est-state"
+                      name="est_state"
+                      defaultValue={defaultEstState}
+                      maxLength={2}
+                      placeholder="SP"
+                      className="uppercase"
+                      autoComplete="address-level1"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="est-postal">CEP (opcional)</Label>
+                    <Input
+                      id="est-postal"
+                      name="est_postal_code"
+                      defaultValue={defaultEstPostalCode}
+                      inputMode="numeric"
+                      placeholder="00000-000"
+                      autoComplete="postal-code"
+                    />
+                  </div>
+                </div>
+                {children ? (
+                  <>
+                    <Separator />
+                    {children}
+                  </>
+                ) : null}
+              </TabsContent>
+            ) : null}
 
             {kind === "pf" ? (
               <>

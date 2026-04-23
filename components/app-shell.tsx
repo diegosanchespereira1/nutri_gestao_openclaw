@@ -48,7 +48,8 @@ function NavLinks({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
+              "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
+              "max-lg:min-h-11 max-lg:py-3 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-3",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
               active
                 ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
@@ -100,7 +101,8 @@ function NavLinksMobile({
             href={item.href}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
+              "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
+              "max-lg:min-h-11 max-lg:py-3 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-3",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               active
                 ? "bg-primary/10 border-l-[3px] border-primary text-foreground font-semibold"

@@ -75,7 +75,6 @@ export function NotificationCard({ notification, onDetailClick }: NotificationCa
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-2"
                 onClick={handleMarkAsRead}
               >
                 <Check className="w-4 h-4 mr-1" />

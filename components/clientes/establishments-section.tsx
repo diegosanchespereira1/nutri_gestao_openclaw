@@ -1,9 +1,7 @@
 import Link from "next/link";
 
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
-import { cn } from "@/lib/utils";
 
 export async function EstablishmentsSection({
   clientId,
@@ -23,20 +21,19 @@ export async function EstablishmentsSection({
           id="estabelecimento-heading"
           className="text-foreground text-lg font-semibold tracking-tight"
         >
-          Estabelecimento
+          Gestão da unidade
         </h2>
       </div>
       <p className="text-muted-foreground text-sm">
-        Unidade deste cliente PJ. O endereço e tipo são editados no formulário
-        acima (aba <strong className="text-foreground font-medium">Identificação</strong>).
-        Clique no card abaixo para gerir compliance, checklists e pacientes.
+        O nome, tipo e morada da unidade editam-se nos campos acima. Use o card abaixo
+        para compliance, histórico de checklists deste local e pacientes.
       </p>
       {!establishment ? (
         <div className="border-border bg-muted/30 rounded-lg border border-dashed p-6 text-center">
           <p className="text-muted-foreground text-sm">
-            Ainda sem estabelecimento. Preencha os campos de endereço na aba
-            <strong className="text-foreground font-medium"> Identificação</strong>{" "}
-            e clique em <strong className="text-foreground font-medium">Salvar alterações</strong>.
+            Preencha nome e morada nos campos acima e clique em{" "}
+            <strong className="text-foreground font-medium">Salvar alterações</strong> no
+            fim deste formulário.
           </p>
         </div>
       ) : (
@@ -61,14 +58,9 @@ export async function EstablishmentsSection({
 
       {establishment ? (
         <p className="text-muted-foreground text-xs">
-          Para editar nome, tipo ou endereço use a aba{" "}
-          <Link
-            href={`/clientes/${clientId}/editar`}
-            className={cn(buttonVariants({ variant: "link" }), "h-auto p-0 text-xs")}
-          >
-            Identificação
-          </Link>
-          {" "}acima.
+          Para atualizar nome, tipo ou morada no registo, altere os campos acima e use{" "}
+          <strong className="text-foreground font-medium">Salvar alterações</strong> no
+          fim do formulário.
         </p>
       ) : null}
     </section>

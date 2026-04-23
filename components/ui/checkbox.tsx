@@ -19,6 +19,8 @@ function Checkbox({
       onCheckedChange={onCheckedChange}
       className={cn(
         "peer border-input bg-background data-checked:bg-primary data-checked:border-primary flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border shadow-xs transition-colors",
+        "[@media(pointer:coarse)]:box-content [@media(pointer:coarse)]:p-[14px] [@media(pointer:coarse)]:m-[-14px]",
+        "max-lg:box-content max-lg:p-[14px] max-lg:m-[-14px]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         "disabled:cursor-not-allowed disabled:opacity-50",
         className,

@@ -144,7 +144,7 @@ export function PreviewTable({
                             ? `Incluir linha ${absIdx + 1}`
                             : `Ignorar linha ${absIdx + 1}`
                         }
-                        className="h-6 px-2 text-xs"
+                        className="text-xs"
                       >
                         {ignored ? "Incluir" : "Ignorar"}
                       </Button>
@@ -166,7 +166,7 @@ export function PreviewTable({
           <div className="flex gap-1">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
               disabled={currentPage === 0}
               aria-label="Página anterior"
@@ -175,7 +175,7 @@ export function PreviewTable({
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() =>
                 setCurrentPage((p) => Math.min(totalPages - 1, p + 1))
               }

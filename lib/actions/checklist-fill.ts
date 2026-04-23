@@ -511,6 +511,78 @@ export async function checkExistingOpenFillSession(input: {
   return null;
 }
 
+/* ─── Delete draft session ────────────────────────────────────────────── */
+
+/**
+ * Deleta permanentemente uma sessão de preenchimento **não aprovada**.
+ * Remove fotos do storage e, via cascade no banco, as respostas e PDF exports.
+ */
+export async function deleteChecklistFillSessionAction(
+  sessionId: string,
+): Promise<FillActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: sess } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id, establishment_id, dossier_approved_at")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (!sess) return { ok: false, error: "Rascunho não encontrado." };
+
+  if (sess.dossier_approved_at) {
+    return {
+      ok: false,
+      error: "Dossiê já aprovado: não é possível excluir.",
+    };
+  }
+
+  const estOwned = await assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    sess.establishment_id as string,
+  );
+  if (!estOwned) return { ok: false, error: "Sem permissão para excluir este rascunho." };
+
+  // Remove fotos do bucket antes de deletar os registros (cascade).
+  const { data: photos } = await supabase
+    .from("checklist_fill_item_photos")
+    .select("storage_path")
+    .eq("session_id", sessionId);
+
+  const paths = (photos ?? [])
+    .map((p) => p.storage_path as string)
+    .filter(Boolean);
+
+  if (paths.length > 0) {
+    const { CHECKLIST_FILL_PHOTOS_BUCKET } = await import(
+      "@/lib/constants/checklist-fill-photos-storage"
+    );
+    await supabase.storage.from(CHECKLIST_FILL_PHOTOS_BUCKET).remove(paths);
+  }
+
+  const { error } = await supabase
+    .from("checklist_fill_sessions")
+    .delete()
+    .eq("id", sessionId)
+    .is("dossier_approved_at", null);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível excluir o rascunho." };
+  }
+
+  revalidatePath("/inicio");
+  revalidatePath("/checklists");
+
+  return { ok: true };
+}
+
 export type ApproveDossierResult =
   | { ok: true; approvedAt: string }
   | { ok: false; error: string };

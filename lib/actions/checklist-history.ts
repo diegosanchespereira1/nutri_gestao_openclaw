@@ -8,6 +8,8 @@ import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export type ChecklistSessionSummary = {
   id: string;
+  /** Número sequencial do checklist dentro deste cliente (1-based, por ordem de criação). */
+  seq_number: number;
   started_by_label: string;
   created_at: string;
   updated_at: string;
@@ -141,6 +143,18 @@ export async function loadChecklistSessionsForClient(input: {
   if (!sessions || sessions.length === 0) return empty;
 
   const sessionIds = sessions.map((s) => s.id);
+
+  // 2.5. Numeração sequencial por cliente (ordem de criação, 1-based).
+  const { data: allSessionIds } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id")
+    .in("establishment_id", estIds)
+    .order("created_at", { ascending: true });
+
+  const seqMap = new Map<string, number>();
+  for (let i = 0; i < (allSessionIds ?? []).length; i++) {
+    seqMap.set(allSessionIds![i].id, i + 1);
+  }
 
   // 3. Contar respostas por sessão e outcome em uma única query
   const { data: responseRows } = await supabase
@@ -294,6 +308,7 @@ export async function loadChecklistSessionsForClient(input: {
 
     return {
       id: sess.id,
+      seq_number: seqMap.get(sess.id) ?? 0,
       started_by_label: startedByLabel,
       created_at: sess.created_at,
       updated_at: sess.updated_at,

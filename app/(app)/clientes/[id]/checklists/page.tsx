@@ -12,6 +12,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
+import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -47,6 +48,8 @@ export default async function ClientChecklistHistoryPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
+
   if (!user) {
     notFound();
   }
@@ -188,7 +191,11 @@ export default async function ClientChecklistHistoryPage({
       ) : (
         <div className="space-y-3">
           {rows.map((session) => (
-            <ChecklistSessionHistoryCard key={session.id} session={session} />
+            <ChecklistSessionHistoryCard
+              key={session.id}
+              session={session}
+              dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+            />
           ))}
         </div>
       )}

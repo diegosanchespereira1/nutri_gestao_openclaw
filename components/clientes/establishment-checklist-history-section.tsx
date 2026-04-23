@@ -60,6 +60,9 @@ export async function EstablishmentChecklistHistorySection({
           <li key={session.id} className="flex items-start justify-between gap-3 px-4 py-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-foreground">
+                <span className="inline-flex items-center justify-center rounded bg-primary/10 px-1.5 py-px text-xs font-bold tabular-nums text-primary mr-1.5">
+                  #{session.seq_number}
+                </span>
                 {session.template_name}
               </p>
               <p className="text-xs text-muted-foreground mt-0.5">

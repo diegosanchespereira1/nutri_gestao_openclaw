@@ -19,6 +19,7 @@ import { loadScheduledVisitById } from "@/lib/actions/visits";
 import { formatDateTimeShort, isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
+import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { visitDisplayTitle } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 
@@ -184,6 +185,8 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
     });
     if (!model) notFound();
 
+    const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
+
     return (
       <div className="space-y-6">
         <VisitExecutionHeader
@@ -215,6 +218,7 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
           recurringNcSessionCountByItemId={model.recurringNcSessionCountByItemId}
           initialDossierApprovedAt={model.fill.session.dossier_approved_at ?? null}
           initialPdfExport={model.fill.latestPdfExport}
+          dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
         />
       </div>
     );

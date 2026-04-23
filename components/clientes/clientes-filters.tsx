@@ -8,15 +8,18 @@ import {
   CLIENT_LIFECYCLE_STATUSES,
   clientLifecycleBadgeLabel,
 } from "@/lib/constants/client-lifecycle";
-import type { ClientLifecycleStatus } from "@/lib/types/clients";
+import type { ClientLifecycleStatus, ClientBusinessSegment } from "@/lib/types/clients";
 import { cn } from "@/lib/utils";
+import { BusinessSegmentFilterDropdown } from "./business-segment-filter-dropdown";
 
 export function ClientesFilters({
   defaultQ,
   defaultSituacao,
+  defaultSegmentos = [],
 }: {
   defaultQ: string;
   defaultSituacao: ClientLifecycleStatus | "all";
+  defaultSegmentos?: ClientBusinessSegment[];
 }) {
   return (
     <form
@@ -53,6 +56,9 @@ export function ClientesFilters({
             ))}
           </select>
         </div>
+      </div>
+      <div className="w-full lg:w-auto lg:min-w-[12rem] lg:max-w-xs">
+        <BusinessSegmentFilterDropdown defaultSegmentos={defaultSegmentos} />
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="submit">Filtrar</Button>

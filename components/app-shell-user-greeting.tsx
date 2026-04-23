@@ -39,9 +39,12 @@ export function AppShellUserGreeting() {
   }
 
   return (
-    <div className="px-4 py-3 text-sm">
-      <p className="text-sidebar-foreground">
-        Olá, <span className="font-medium">{firstName}</span>
+    <div className="bg-primary mx-2 rounded-md px-3 py-2.5">
+      <p className="text-primary-foreground text-sm leading-snug">
+        Olá,{" "}
+        <span className="text-primary-foreground text-base font-bold tracking-tight">
+          {firstName}
+        </span>
       </p>
     </div>
   );

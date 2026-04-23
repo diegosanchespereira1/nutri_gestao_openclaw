@@ -82,6 +82,8 @@ type Props = {
   initialPdfExport?: ChecklistFillPdfExportRow | null;
   /** Modo de visualização do dossiê, sem edição. */
   viewOnlyDossier?: boolean;
+  /** Resend + remetente configurados (envio de PDF por email). */
+  dossierEmailDeliveryConfigured?: boolean;
 };
 
 export function ChecklistFillWizard({
@@ -97,6 +99,7 @@ export function ChecklistFillWizard({
   initialDossierApprovedAt = null,
   initialPdfExport = null,
   viewOnlyDossier = false,
+  dossierEmailDeliveryConfigured = false,
 }: Props) {
   const router = useRouter();
   const sections = template.sections;
@@ -776,6 +779,7 @@ export function ChecklistFillWizard({
                     sessionId={sessionId}
                     dossierApprovedAt={dossierApprovedAt}
                     initialJob={initialPdfExport ?? null}
+                    dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
                   />
                 ) : null}
               </>

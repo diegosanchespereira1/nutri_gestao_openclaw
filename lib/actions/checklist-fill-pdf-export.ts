@@ -10,6 +10,7 @@ import {
 import { buildApprovedDossierPdfBytes } from "@/lib/pdf/build-approved-dossier-pdf";
 import { createClient } from "@/lib/supabase/server";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 function safeErr(e: unknown): string {
   const m = e instanceof Error ? e.message : String(e);
@@ -32,6 +33,8 @@ export async function generateDossierPdfAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const bundle = await loadFillSessionPageData(sessionId);
   if (!bundle) return { ok: false, error: "Sessão não encontrada." };
@@ -58,7 +61,8 @@ export async function generateDossierPdfAction(
   }
 
   const jobId = job.id as string;
-  const storagePath = `${user.id}/${sessionId}/${jobId}.pdf`;
+  // Storage path usa workspaceOwnerId para alinhar com a RLS policy do bucket
+  const storagePath = `${workspaceOwnerId}/${sessionId}/${jobId}.pdf`;
 
   try {
     const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
@@ -96,7 +100,6 @@ export async function generateDossierPdfAction(
         error_message: null,
       })
       .eq("id", jobId)
-      .eq("user_id", user.id)
       .select("id, user_id, session_id, status, storage_path, error_message, created_at, updated_at")
       .single();
 
@@ -126,8 +129,7 @@ export async function generateDossierPdfAction(
         error_message: msg,
         storage_path: null,
       })
-      .eq("id", jobId)
-      .eq("user_id", user.id);
+      .eq("id", jobId);
 
     revalidatePath(`/checklists/preencher/${sessionId}`);
 
@@ -144,11 +146,11 @@ export async function downloadDossierPdfAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
+  // RLS já filtra por workspace_member_user_ids(), sem necessidade de .eq("user_id")
   const { data: row } = await supabase
     .from("checklist_fill_pdf_exports")
     .select("id, user_id, status, storage_path, session_id")
     .eq("id", jobId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!row || row.status !== "ready" || !row.storage_path) {

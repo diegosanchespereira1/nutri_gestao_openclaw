@@ -12,6 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type {
+  ClientBusinessSegment,
   ClientKind,
   ClientLifecycleStatus,
   ClientRow,
@@ -676,6 +677,7 @@ export async function loadClientsForOwner(options: {
   q?: string;
   kind?: ClientKind | "all";
   lifecycle?: ClientLifecycleStatus | "all";
+  businessSegments?: ClientBusinessSegment[];
 }): Promise<{ rows: ClientRow[] }> {
   const supabase = await createClient();
   const {
@@ -703,6 +705,11 @@ export async function loadClientsForOwner(options: {
     lifeFilter === "finalizado"
   ) {
     q = q.eq("lifecycle_status", lifeFilter);
+  }
+
+  const businessSegmentsFilter = options.businessSegments;
+  if (businessSegmentsFilter && businessSegmentsFilter.length > 0) {
+    q = q.in("business_segment", businessSegmentsFilter);
   }
 
   const rawQ = (options.q ?? "").trim();

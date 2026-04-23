@@ -1,10 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { AlertCircle, ChevronDown, ChevronUp, ExternalLink, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -12,6 +25,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import { deleteChecklistFillSessionAction } from "@/lib/actions/checklist-fill";
 import {
   loadChecklistSessionNcItems,
   type ChecklistSessionSummary,
@@ -39,12 +53,19 @@ function formatDateTimeBR(iso: string): string {
 
 type Props = {
   session: ChecklistSessionSummary;
+  dossierEmailDeliveryConfigured?: boolean;
 };
 
-export function ChecklistSessionHistoryCard({ session }: Props) {
+export function ChecklistSessionHistoryCard({
+  session,
+  dossierEmailDeliveryConfigured = false,
+}: Props) {
+  const router = useRouter();
   const [ncItems, setNcItems] = useState<NcItemDetail[] | null>(null);
   const [ncOpen, setNcOpen] = useState(false);
   const [loadingNc, setLoadingNc] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const totalSafe = session.total_items > 0 ? session.total_items : 1;
   const conformantPct = (session.conformant_count / totalSafe) * 100;
@@ -76,6 +97,9 @@ export function ChecklistSessionHistoryCard({ session }: Props) {
         <div className="flex flex-wrap items-start justify-between gap-2 p-4 pb-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center justify-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold tabular-nums text-primary">
+                #{session.seq_number}
+              </span>
               <p className="text-sm font-semibold text-foreground leading-snug">
                 {session.template_name}
               </p>
@@ -148,15 +172,69 @@ export function ChecklistSessionHistoryCard({ session }: Props) {
             <ExternalLink className="size-3" aria-hidden />
           </Link>
           {session.status === "em_andamento" ? (
-            <Link
-              href={`/checklists/preencher/${session.id}`}
-              target="_blank"
-              rel="noopener"
-              className={cn(buttonVariants({ size: "sm" }), "h-7 gap-1 px-2 text-xs")}
-            >
-              Continuar preenchimento
-              <ExternalLink className="size-3" aria-hidden />
-            </Link>
+            <>
+              <Link
+                href={`/checklists/preencher/${session.id}`}
+                target="_blank"
+                rel="noopener"
+                className={cn(buttonVariants({ size: "sm" }), "h-7 gap-1 px-2 text-xs")}
+              >
+                Continuar preenchimento
+                <ExternalLink className="size-3" aria-hidden />
+              </Link>
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 gap-1 px-2 text-xs text-destructive hover:text-destructive"
+                      aria-label="Excluir rascunho"
+                      disabled={deleting}
+                    >
+                      <Trash2 className="size-3.5" aria-hidden />
+                      {deleting ? "Excluindo…" : "Excluir"}
+                    </Button>
+                  }
+                />
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Excluir rascunho de checklist?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Todas as respostas, anotações e fotos deste preenchimento serão
+                      permanentemente removidas. Esta ação não pode ser desfeita.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  {deleteError && (
+                    <p className="text-destructive text-sm" role="alert">
+                      {deleteError}
+                    </p>
+                  )}
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90 inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium"
+                      onClick={async (e) => {
+                        e.preventDefault();
+                        setDeleting(true);
+                        setDeleteError(null);
+                        const res = await deleteChecklistFillSessionAction(session.id);
+                        if (!res.ok) {
+                          setDeleteError(res.error);
+                          setDeleting(false);
+                          return;
+                        }
+                        toast.success("Checklist excluído com sucesso.");
+                        router.refresh();
+                      }}
+                    >
+                      Excluir
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
           ) : null}
 
           {session.nc_count > 0 && (
@@ -192,6 +270,7 @@ export function ChecklistSessionHistoryCard({ session }: Props) {
               sessionId={session.id}
               dossierApprovedAt={session.dossier_approved_at}
               initialJob={session.latestPdfExport ?? null}
+              dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
             />
           </div>
         ) : null}

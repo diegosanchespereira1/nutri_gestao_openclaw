@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
+import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 
 export default async function ChecklistPreencherPage({
   params,
@@ -19,6 +20,8 @@ export default async function ChecklistPreencherPage({
   if (!bundle) {
     notFound();
   }
+
+  const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
 
   const createdAt = new Date(bundle.session.created_at);
   const createdAtLabel = createdAt.toLocaleString("pt-BR", {
@@ -79,6 +82,7 @@ export default async function ChecklistPreencherPage({
         initialDossierApprovedAt={bundle.session.dossier_approved_at ?? null}
         initialPdfExport={bundle.latestPdfExport}
         viewOnlyDossier={viewOnlyDossier}
+        dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
       />
     </div>
   );

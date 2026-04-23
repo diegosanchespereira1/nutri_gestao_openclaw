@@ -39,3 +39,31 @@ export function parseDossierRecipientEmailsFromText(raw: string): {
 
   return { ok: true, emails };
 }
+
+/**
+ * Coleta emails únicos a partir de vários campos (cliente, representantes), validando e limitando o máximo.
+ */
+export function collectValidUniqueEmails(
+  raws: (string | null | undefined)[],
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of raws) {
+    if (raw == null) continue;
+    const parts = raw
+      .split(/[\s,;]+/u)
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.length > 0);
+    for (const part of parts) {
+      const r = emailSchema.safeParse(part);
+      if (!r.success) continue;
+      if (seen.has(r.data)) continue;
+      seen.add(r.data);
+      out.push(r.data);
+      if (out.length >= MAX_DOSSIER_EMAIL_RECIPIENTS) {
+        return out;
+      }
+    }
+  }
+  return out;
+}

@@ -13,9 +13,13 @@ import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import type {
+  ClientBusinessSegment,
   ClientLifecycleStatus,
   ClientRow,
 } from "@/lib/types/clients";
+import {
+  isClientBusinessSegment,
+} from "@/lib/constants/client-business-segment";
 
 function parseSituacao(
   raw: string | undefined,
@@ -24,6 +28,14 @@ function parseSituacao(
     return raw;
   }
   return "all";
+}
+
+function parseSegmentos(
+  raw: string | string[] | undefined,
+): ClientBusinessSegment[] {
+  if (!raw) return [];
+  const values = Array.isArray(raw) ? raw : [raw];
+  return values.filter((v) => isClientBusinessSegment(v)) as ClientBusinessSegment[];
 }
 
 export default async function ClientesPage({
@@ -36,9 +48,16 @@ export default async function ClientesPage({
   const situacaoRaw =
     typeof sp.situacao === "string" ? sp.situacao : undefined;
   const situacao = parseSituacao(situacaoRaw);
+  const segmentosRaw = sp.segmentos;
+  const segmentos = parseSegmentos(segmentosRaw);
   // Story 2.1a — Clientes = apenas Pessoa Jurídica (empresas, hospitais, clínicas).
   // Pacientes PF têm módulo próprio em /pacientes/.
-  const { rows } = await loadClientsForOwner({ q, kind: "pj", lifecycle: situacao });
+  const { rows } = await loadClientsForOwner({
+    q,
+    kind: "pj",
+    lifecycle: situacao,
+    businessSegments: segmentos.length > 0 ? segmentos : undefined,
+  });
 
   const supabase = await createClient();
   const rowsWithLogos: { row: ClientRow; logoUrl: string | null }[] =
@@ -52,7 +71,7 @@ export default async function ClientesPage({
       })),
     );
 
-  const hasFilters = !!(q || situacao !== "all");
+  const hasFilters = !!(q || situacao !== "all" || segmentos.length > 0);
 
   return (
     <PageLayout>
@@ -69,6 +88,7 @@ export default async function ClientesPage({
       <ClientesFilters
         defaultQ={q}
         defaultSituacao={situacao}
+        defaultSegmentos={segmentos}
       />
 
       {rows.length === 0 ? (

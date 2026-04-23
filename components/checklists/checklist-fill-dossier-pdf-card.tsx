@@ -1,9 +1,10 @@
 "use client";
 
-import { Eye, FileDown, Loader2, RefreshCw } from "lucide-react";
+import { Eye, FileDown, Loader2, Mail, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import { sendDossierPdfToClientFromSessionAction } from "@/lib/actions/checklist-fill-dossier-email";
 import {
   downloadDossierPdfAction,
   generateDossierPdfAction,
@@ -15,6 +16,8 @@ type Props = {
   sessionId: string;
   dossierApprovedAt: string | null;
   initialJob: ChecklistFillPdfExportRow | null;
+  /** true quando RESEND e remetente estão definidos no servidor. */
+  dossierEmailDeliveryConfigured?: boolean;
 };
 
 function formatJobTime(iso: string): string {
@@ -32,12 +35,15 @@ export function ChecklistFillDossierPdfCard({
   sessionId,
   dossierApprovedAt,
   initialJob,
+  dossierEmailDeliveryConfigured = false,
 }: Props) {
   const router = useRouter();
   const [job, setJob] = useState<ChecklistFillPdfExportRow | null>(initialJob);
   const [localErr, setLocalErr] = useState<string | null>(null);
+  const [emailMsg, setEmailMsg] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [downloadPending, startDownload] = useTransition();
+  const [emailPending, startEmail] = useTransition();
 
   useEffect(() => {
     setJob(initialJob);
@@ -56,7 +62,12 @@ export function ChecklistFillDossierPdfCard({
       }
       setJob(r.job);
       router.refresh();
-      window.open(r.downloadUrl, "_blank", "noopener,noreferrer");
+      const a = document.createElement("a");
+      a.href = r.downloadUrl;
+      a.download = `dossier-${new Date().toISOString().split("T")[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     });
   }
 
@@ -89,6 +100,20 @@ export function ChecklistFillDossierPdfCard({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+    });
+  }
+
+  async function handleSendToClient() {
+    setLocalErr(null);
+    setEmailMsg(null);
+    startEmail(async () => {
+      const r = await sendDossierPdfToClientFromSessionAction(sessionId);
+      if (!r.ok) {
+        setEmailMsg(r.error);
+        return;
+      }
+      setEmailMsg("Email enviado com o PDF em anexo.");
+      router.refresh();
     });
   }
 
@@ -174,11 +199,48 @@ export function ChecklistFillDossierPdfCard({
               ) : (
                 <FileDown className="size-4" aria-hidden />
               )}
-              Transferir PDF
+              Baixar PDF
             </Button>
           </>
         ) : null}
       </div>
+
+      {dossierEmailDeliveryConfigured ? (
+        <div className="mt-3 flex flex-col gap-2 border-t pt-3">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={emailPending}
+            onClick={() => void handleSendToClient()}
+            className="gap-1.5 w-fit"
+          >
+            {emailPending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : (
+              <Mail className="size-4" aria-hidden />
+            )}
+            Enviar PDF ao cliente
+          </Button>
+          {emailMsg ? (
+            <p
+              className={
+                emailMsg.startsWith("Email enviado")
+                  ? "text-muted-foreground text-xs"
+                  : "text-destructive text-xs"
+              }
+              role="status"
+            >
+              {emailMsg}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-muted-foreground mt-3 border-t pt-3 text-xs">
+          Envio por email para o cliente não está disponível (configure Resend no
+          servidor).
+        </p>
+      )}
     </div>
   );
 }

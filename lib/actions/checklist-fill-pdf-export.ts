@@ -3,10 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
-import {
-  CHECKLIST_DOSSIER_PDFS_BUCKET,
-  CHECKLIST_DOSSIER_PDF_SIGNED_URL_SEC,
-} from "@/lib/constants/checklist-dossier-pdf";
+import { CHECKLIST_DOSSIER_PDFS_BUCKET } from "@/lib/constants/checklist-dossier-pdf";
 import { buildApprovedDossierPdfBytes } from "@/lib/pdf/build-approved-dossier-pdf";
 import { createClient } from "@/lib/supabase/server";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
@@ -84,14 +81,6 @@ export async function generateDossierPdfAction(
       throw new Error(upErr.message);
     }
 
-    const { data: signed, error: signErr } = await supabase.storage
-      .from(CHECKLIST_DOSSIER_PDFS_BUCKET)
-      .createSignedUrl(storagePath, CHECKLIST_DOSSIER_PDF_SIGNED_URL_SEC);
-
-    if (signErr || !signed?.signedUrl) {
-      throw new Error(signErr?.message ?? "URL de transferência indisponível.");
-    }
-
     const { data: updated, error: updErr } = await supabase
       .from("checklist_fill_pdf_exports")
       .update({
@@ -115,10 +104,11 @@ export async function generateDossierPdfAction(
       revalidatePath(`/visitas/${id}/iniciar`);
     }
 
+    const downloadUrl = `/api/checklists/dossier-pdf/${jobId}`;
     return {
       ok: true,
       job: updated as ChecklistFillPdfExportRow,
-      downloadUrl: signed.signedUrl,
+      downloadUrl,
     };
   } catch (e) {
     const msg = safeErr(e);
@@ -157,16 +147,8 @@ export async function downloadDossierPdfAction(
     return { ok: false, error: "PDF não disponível. Gere novamente." };
   }
 
-  const { data: signed, error } = await supabase.storage
-    .from(CHECKLIST_DOSSIER_PDFS_BUCKET)
-    .createSignedUrl(
-      row.storage_path as string,
-      CHECKLIST_DOSSIER_PDF_SIGNED_URL_SEC,
-    );
-
-  if (error || !signed?.signedUrl) {
-    return { ok: false, error: "Não foi possível obter o link de transferência." };
-  }
-
-  return { ok: true, downloadUrl: signed.signedUrl };
+  return {
+    ok: true,
+    downloadUrl: `/api/checklists/dossier-pdf/${jobId}`,
+  };
 }

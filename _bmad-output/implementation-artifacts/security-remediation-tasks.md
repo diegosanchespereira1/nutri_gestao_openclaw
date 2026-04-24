@@ -27,8 +27,15 @@
 | SEC-15 | Rotas `(portal)` — modelo de acesso | Média | **Backlog** | Confirmar público vs autenticado vs convidado |
 | SEC-16 | CSP com nonces (fase 2) | Baixa | **Backlog** | Reduzir `unsafe-inline` / `unsafe-eval` |
 | SEC-17 | Documentação entrypoint auth | Baixa | **Backlog** | Next 16: `proxy.ts` em vez de `middleware.ts` na raiz |
+| SEC-18 | PDFs sem expor URL do Supabase | Média | **Feito** | Proxy `GET /api/checklists/dossier-pdf/[jobId]` + redação de URLs em texto dos PDFs (`lib/pdf/redact-storage-urls.ts`) |
 
 **Legenda de prioridade:** Bloqueante → Alta → Média → Baixa → Contínua.
+
+### SEC-18 — Detalhe (hardening de superfície)
+
+- **Problema:** URLs assinadas do Storage (`*.supabase.co`) na barra de endereço e em atributos `href` revelam o host do projeto (reconhecimento) e tokens temporários em histórico/partilhas de ecrã.
+- **Solução implementada:** o browser passa a usar apenas caminhos na origem da app (`/api/checklists/dossier-pdf/...`); o servidor faz `storage.download` com a sessão do utilizador. Texto livre (notas, anotações, corpo POP) é filtrado para substituir padrões `*.supabase.co` por marcador neutro antes de desenhar no PDF.
+- **Manutenção:** novos fluxos que devolvam `createSignedUrl` ao cliente para ficheiros sensíveis devem seguir o mesmo padrão (rota proxy + auth).
 
 ---
 

@@ -270,6 +270,23 @@ export function ChecklistFillWizard({
     return Math.round((earned / total) * 100);
   }, [sections, responses]);
 
+  /** Pontuação por seção — null quando nenhum item respondido naquela seção. */
+  const sectionScores = useMemo(() => {
+    return sections.map((sec) => {
+      let earned = 0;
+      let total = 0;
+      for (const item of sec.items) {
+        const r = responses[item.id];
+        if (!r?.outcome || r.outcome === "na") continue;
+        const w = item.peso ?? 1;
+        total += w;
+        if (r.outcome === "conforme") earned += w;
+      }
+      if (total === 0) return null;
+      return Math.round((earned / total) * 100);
+    });
+  }, [sections, responses]);
+
   function setOutcome(itemId: string, outcome: ChecklistFillOutcome | null) {
     const cur = responses[itemId] ?? emptyItemState();
     const note = outcome === "nc" ? cur.note : null;
@@ -461,22 +478,42 @@ export function ChecklistFillWizard({
               {saveErrorMsg || "Erro ao salvar — verifique a conexão"}
             </span>
           )}
-          {liveScore !== null && (() => {
-            const { label, colorClass } = scoreClassification(liveScore);
-            return (
-              <span
-                className={cn(
-                  "mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
-                  colorClass,
-                )}
-                role="status"
-                aria-live="polite"
-                aria-label={`Pontuação atual: ${liveScore}% — ${label}`}
-              >
-                {liveScore}% · {label}
-              </span>
-            );
-          })()}
+          {/* Score global + score da seção atual */}
+          {(liveScore !== null || sectionScores[sectionIndex] !== null) && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              {liveScore !== null && (() => {
+                const { label, colorClass } = scoreClassification(liveScore);
+                return (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                      colorClass,
+                    )}
+                    role="status"
+                    aria-live="polite"
+                    aria-label={`Pontuação geral: ${liveScore}% — ${label}`}
+                  >
+                    Geral: {liveScore}% · {label}
+                  </span>
+                );
+              })()}
+              {sectionScores[sectionIndex] !== null && (() => {
+                const sc = sectionScores[sectionIndex]!;
+                const { label, colorClass } = scoreClassification(sc);
+                return (
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium tabular-nums",
+                      colorClass,
+                    )}
+                    aria-label={`Pontuação desta seção: ${sc}% — ${label}`}
+                  >
+                    Seção: {sc}%
+                  </span>
+                );
+              })()}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {showDossierPeekButton ? (
@@ -725,11 +762,14 @@ export function ChecklistFillWizard({
                 }}
                 aria-label="Escolher seção do checklist"
               >
-                {sections.map((s, i) => (
-                  <option key={s.id} value={i}>
-                    {i + 1}. {s.title}
-                  </option>
-                ))}
+                {sections.map((s, i) => {
+                  const sc = sectionScores[i];
+                  return (
+                    <option key={s.id} value={i}>
+                      {i + 1}. {s.title}{sc !== null ? ` — ${sc}%` : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

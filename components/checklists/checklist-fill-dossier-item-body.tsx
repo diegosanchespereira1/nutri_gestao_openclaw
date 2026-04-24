@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { ZoomIn } from "lucide-react";
+import { AlertTriangle, ZoomIn } from "lucide-react";
 
 import { saveFillItemResponse } from "@/lib/actions/checklist-fill";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import { Label } from "@/components/ui/label";
 import { ImageViewerModal } from "@/components/image-viewer-modal";
+import { cn } from "@/lib/utils";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
   type FillItemResponseState,
@@ -80,15 +81,36 @@ export function ChecklistFillDossierItemBody({
         const r = responses[item.id] ?? emptyItem();
         const photos = itemPhotos[item.id] ?? [];
         const busy = savingItemId === item.id;
+        const isNc = r.outcome === "nc";
         return (
           <li
             key={item.id}
-            className="border-border rounded-lg border bg-background p-3 text-sm"
+            className={cn(
+              "rounded-lg border p-3 text-sm",
+              isNc
+                ? "border-red-300 bg-red-50 border-l-4 border-l-red-500"
+                : "border-border bg-background",
+            )}
           >
-            <p className="text-foreground font-medium">{item.description}</p>
-            <p className="text-muted-foreground mt-1 text-xs">
+            <div className="flex items-start gap-2">
+              {isNc && (
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0 text-red-500"
+                  aria-hidden
+                />
+              )}
+              <p className={cn("font-medium", isNc ? "text-red-900" : "text-foreground")}>
+                {item.description}
+              </p>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
               Avaliação:{" "}
-              <span className="text-foreground">
+              <span
+                className={cn(
+                  "font-semibold",
+                  isNc ? "text-red-700" : "text-foreground",
+                )}
+              >
                 {formatChecklistOutcomeLabel(r.outcome)}
               </span>
             </p>
@@ -116,10 +138,10 @@ export function ChecklistFillDossierItemBody({
                   </>
                 ) : (
                   <>
-                    <p className="text-muted-foreground text-xs font-medium">
+                    <p className="text-red-700 text-xs font-semibold">
                       Não conformidade
                     </p>
-                    <p className="text-foreground mt-0.5 whitespace-pre-wrap">
+                    <p className="text-red-900 mt-0.5 whitespace-pre-wrap">
                       {(r.note ?? "").trim()}
                     </p>
                   </>

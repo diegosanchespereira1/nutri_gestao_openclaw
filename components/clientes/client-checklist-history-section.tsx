@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2, Clock, ClipboardList, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Clock, ClipboardList, AlertTriangle, Star, MapPin } from "lucide-react";
 
 import { ChecklistSessionHistoryCard } from "@/components/checklists/checklist-session-history-card";
 import { ChecklistHistoryFilters } from "@/components/checklists/checklist-history-filters";
@@ -14,6 +14,48 @@ import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
+
+function getScoreStyle(pct: number) {
+  if (pct >= 90)
+    return {
+      scoreLabel: "Excelente",
+      scoreColorClasses: {
+        card: "border-green-200 bg-green-50/50",
+        border: "border-green-200 bg-green-50/40",
+        icon: "text-green-600",
+        text: "text-green-700",
+      },
+    };
+  if (pct >= 75)
+    return {
+      scoreLabel: "Bom",
+      scoreColorClasses: {
+        card: "border-blue-200 bg-blue-50/50",
+        border: "border-blue-200 bg-blue-50/40",
+        icon: "text-blue-600",
+        text: "text-blue-700",
+      },
+    };
+  if (pct >= 50)
+    return {
+      scoreLabel: "Regular",
+      scoreColorClasses: {
+        card: "border-amber-200 bg-amber-50/50",
+        border: "border-amber-200 bg-amber-50/40",
+        icon: "text-amber-600",
+        text: "text-amber-700",
+      },
+    };
+  return {
+    scoreLabel: "Crítico",
+    scoreColorClasses: {
+      card: "border-red-200 bg-red-50/50",
+      border: "border-red-200 bg-red-50/40",
+      icon: "text-red-600",
+      text: "text-red-700",
+    },
+  };
+}
 
 export type ClientChecklistHistorySectionProps = {
   clientId: string;
@@ -76,6 +118,35 @@ export async function ClientChecklistHistorySection({
     .filter((r) => r.status === "em_andamento")
     .reduce((acc, r) => acc + r.nc_count, 0);
 
+  // Nota média geral (apenas aprovados com score calculado)
+  const scoredApproved = allRows.filter(
+    (r) => r.status === "aprovado" && r.score_percentage != null,
+  );
+  const avgScore =
+    scoredApproved.length > 0
+      ? Math.round(
+          scoredApproved.reduce((acc, r) => acc + r.score_percentage!, 0) /
+            scoredApproved.length,
+        )
+      : null;
+
+  // Nota média por área (apenas quando há áreas distintas com score)
+  const areaScoreMap = new Map<string, { name: string; scores: number[] }>();
+  for (const r of allRows) {
+    if (r.status !== "aprovado" || r.score_percentage == null || !r.area_id) continue;
+    const key = r.area_id;
+    const name = r.area_name ?? "Área sem nome";
+    if (!areaScoreMap.has(key)) areaScoreMap.set(key, { name, scores: [] });
+    areaScoreMap.get(key)!.scores.push(r.score_percentage);
+  }
+  const areaScores = Array.from(areaScoreMap.values())
+    .map((a) => ({
+      name: a.name,
+      avg: Math.round(a.scores.reduce((s, v) => s + v, 0) / a.scores.length),
+      count: a.scores.length,
+    }))
+    .sort((a, b) => a.avg - b.avg); // pior primeiro → mais atenção no topo
+
   const { data: estRows } = await supabase
     .from("establishments")
     .select("id, name")
@@ -122,7 +193,12 @@ export async function ClientChecklistHistorySection({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className={cn(
+        "grid gap-3",
+        avgScore !== null
+          ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5"
+          : "grid-cols-2 sm:grid-cols-4",
+      )}>
         <Card className="border-border shadow-xs">
           <CardContent className="flex flex-col gap-1 p-4">
             <div className="flex items-center gap-2">
@@ -163,7 +239,68 @@ export async function ClientChecklistHistorySection({
             <p className="text-xs text-muted-foreground">em rascunhos</p>
           </CardContent>
         </Card>
+
+        {/* Card nota média — só renderiza quando há sessões aprovadas com score */}
+        {avgScore !== null && (() => {
+          const { scoreColorClasses, scoreLabel } = getScoreStyle(avgScore);
+          return (
+            <Card className={cn("border-border shadow-xs", scoreColorClasses.card)}>
+              <CardContent className="flex flex-col gap-1 p-4">
+                <div className="flex items-center gap-2">
+                  <Star className={cn("size-4 shrink-0", scoreColorClasses.icon)} aria-hidden />
+                  <span className="text-xs text-muted-foreground">Nota média</span>
+                </div>
+                <p className={cn("text-2xl font-bold tabular-nums", scoreColorClasses.text)}>
+                  {avgScore}%
+                </p>
+                <p className={cn("text-xs font-medium", scoreColorClasses.text)}>
+                  {scoreLabel} · {scoredApproved.length} avaliação{scoredApproved.length !== 1 ? "ões" : ""}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })()}
       </div>
+
+      {/* Breakdown por área — só aparece quando há pelo menos 1 área com score */}
+      {areaScores.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+          <div className="flex items-center gap-2 mb-3">
+            <MapPin className="size-4 text-muted-foreground" aria-hidden />
+            <h3 className="text-sm font-semibold text-foreground">Nota média por área</h3>
+            <span className="text-xs text-muted-foreground">— áreas com pior nota aparecem primeiro</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {areaScores.map((a) => {
+              const { scoreColorClasses, scoreLabel } = getScoreStyle(a.avg);
+              return (
+                <div
+                  key={a.name}
+                  className={cn(
+                    "flex items-center justify-between rounded-lg border px-3 py-2.5",
+                    scoreColorClasses.border,
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">📍 {a.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {a.count} avaliação{a.count !== 1 ? "ões" : ""}
+                    </p>
+                  </div>
+                  <div className="ml-3 shrink-0 text-right">
+                    <p className={cn("text-lg font-bold tabular-nums", scoreColorClasses.text)}>
+                      {a.avg}%
+                    </p>
+                    <p className={cn("text-xs font-medium", scoreColorClasses.text)}>
+                      {scoreLabel}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <ChecklistHistoryFilters
         establishments={estRows ?? []}

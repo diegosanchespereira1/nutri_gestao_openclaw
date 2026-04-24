@@ -44,7 +44,7 @@ export async function buildApprovedDossierPdfBytes(
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, crn")
-    .eq("id", userId)
+    .eq("user_id", userId)
     .maybeSingle();
 
   const professionalName = foldTextForPdf(

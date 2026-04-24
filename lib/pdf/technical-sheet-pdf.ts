@@ -11,6 +11,7 @@ import { computeRecipePricingBreakdown } from "@/lib/technical-recipes/recipe-pr
 import type { TechnicalRecipeWithLines } from "@/lib/types/technical-recipes";
 
 import { foldTextForPdf } from "./dossier-pdf";
+import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
 
 function formatBrl(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -86,10 +87,13 @@ export async function buildTechnicalRecipePdfBytes(
   };
 
   draw("Ficha técnica — NutriGestão", titleSize, true);
-  draw(foldTextForPdf(recipe.name), bodySize + 1, true);
-  draw(`Contexto: ${foldTextForPdf(meta.establishmentLabel)}`, bodySize);
+  draw(foldTextForPdf(redactSupabaseUrlsForPdf(recipe.name)), bodySize + 1, true);
   draw(
-    `Profissional: ${foldTextForPdf(meta.professionalName)} — CRN: ${foldTextForPdf(meta.professionalCrn || "—")}`,
+    `Contexto: ${foldTextForPdf(redactSupabaseUrlsForPdf(meta.establishmentLabel))}`,
+    bodySize,
+  );
+  draw(
+    `Profissional: ${foldTextForPdf(redactSupabaseUrlsForPdf(meta.professionalName))} — CRN: ${foldTextForPdf(redactSupabaseUrlsForPdf(meta.professionalCrn || "—"))}`,
     bodySize,
   );
   draw(
@@ -137,7 +141,7 @@ export async function buildTechnicalRecipePdfBytes(
       ? `${l.taco_food.taco_code} ${l.taco_food.name}`
       : "—";
     const row = `${l.ingredient_name} | ${l.quantity} ${unit} | corr. ${l.correction_factor} cocção ${l.cooking_factor} | TACO: ${taco}`;
-    draw(row, bodySize - 0.5);
+    draw(redactSupabaseUrlsForPdf(row), bodySize - 0.5);
   }
   y -= lineH / 2;
 

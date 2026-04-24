@@ -130,6 +130,29 @@ export function ChecklistFillDossierPreview({
       <div className="mt-4 space-y-2">
         {template.sections.map((section) => {
           const open = openSections[section.id] ?? false;
+
+          // Score individual desta seção
+          let secEarned = 0;
+          let secTotal = 0;
+          for (const item of section.items) {
+            const r = responses[item.id];
+            if (!r?.outcome || r.outcome === "na") continue;
+            const w = item.peso ?? 1;
+            secTotal += w;
+            if (r.outcome === "conforme") secEarned += w;
+          }
+          const secScore = secTotal > 0 ? Math.round((secEarned / secTotal) * 100) : null;
+          const secClass =
+            secScore === null
+              ? "text-muted-foreground"
+              : secScore >= 90
+                ? "text-green-700 bg-green-100"
+                : secScore >= 75
+                  ? "text-blue-700 bg-blue-100"
+                  : secScore >= 50
+                    ? "text-amber-700 bg-amber-100"
+                    : "text-red-700 bg-red-100";
+
           return (
             <div
               key={section.id}
@@ -154,6 +177,16 @@ export function ChecklistFillDossierPreview({
                   aria-hidden
                 />
                 <span className="min-w-0 flex-1">{section.title}</span>
+                {secScore !== null ? (
+                  <span
+                    className={cn(
+                      "shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums",
+                      secClass,
+                    )}
+                  >
+                    {secScore}%
+                  </span>
+                ) : null}
                 <span className="text-muted-foreground shrink-0 text-xs font-normal">
                   {section.items.length} itens
                 </span>

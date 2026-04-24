@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import { foldTextForPdf } from "./dossier-pdf";
+import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
 
 function wrapToWidth(text: string, maxChars: number): string[] {
   const t = foldTextForPdf(text);
@@ -87,7 +88,7 @@ export async function buildPopPdfBytes(input: {
     const trimmed = para.trim();
     if (trimmed.length === 0) continue;
     for (const line of trimmed.split("\n")) {
-      draw(line, bodySize);
+      draw(redactSupabaseUrlsForPdf(line), bodySize);
     }
     y -= lineH / 2;
   }

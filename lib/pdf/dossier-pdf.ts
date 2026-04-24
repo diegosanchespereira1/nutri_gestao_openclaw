@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import type { ChecklistFillOutcome } from "@/lib/types/checklist-fill";
+import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
 
 /** Helvetica WinAnsi: remove diacríticos para evitar caracteres inválidos. */
 export function foldTextForPdf(s: string): string {
@@ -107,14 +108,24 @@ export async function buildDossierPdfBytes(
     drawLines(`Secao: ${foldTextForPdf(sec.title)}`, 11, true);
     y -= 2;
     for (const it of sec.items) {
-      drawLines(`- ${foldTextForPdf(it.description)}`, bodySize, true);
+      drawLines(
+        `- ${foldTextForPdf(redactSupabaseUrlsForPdf(it.description))}`,
+        bodySize,
+        true,
+      );
       const outcome = formatChecklistOutcomeLabel(it.outcome);
       drawLines(`  Avaliacao: ${foldTextForPdf(outcome)}`, bodySize);
       if (it.outcome === "nc" && (it.note ?? "").trim().length > 0) {
-        drawLines(`  Nao conformidade: ${foldTextForPdf((it.note ?? "").trim())}`, bodySize);
+        drawLines(
+          `  Nao conformidade: ${foldTextForPdf(redactSupabaseUrlsForPdf((it.note ?? "").trim()))}`,
+          bodySize,
+        );
       }
       if ((it.annotation ?? "").trim().length > 0) {
-        drawLines(`  Anotacao: ${foldTextForPdf((it.annotation ?? "").trim())}`, bodySize);
+        drawLines(
+          `  Anotacao: ${foldTextForPdf(redactSupabaseUrlsForPdf((it.annotation ?? "").trim()))}`,
+          bodySize,
+        );
       }
       
       // Renderizar imagens

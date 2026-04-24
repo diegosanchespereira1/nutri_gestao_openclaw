@@ -8,13 +8,7 @@ import { Leaf, Menu } from "lucide-react";
 import { adminNavItem, appNavItems } from "@/lib/app-nav";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
@@ -63,53 +57,6 @@ function NavLinks({
               )}
               aria-hidden
             />
-            {item.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
-// NavLinks leve para o Sheet mobile (fundo claro)
-function NavLinksMobile({
-  onNavigate,
-  className,
-  showAdminNav,
-}: {
-  onNavigate?: () => void;
-  className?: string;
-  showAdminNav?: boolean;
-}) {
-  const pathname = usePathname();
-  const items = showAdminNav ? [...appNavItems, adminNavItem] : appNavItems;
-
-  return (
-    <nav
-      className={cn("flex flex-col gap-0.5 px-2 py-2", className)}
-      aria-label="Navegação principal"
-    >
-      {items.map((item) => {
-        const Icon = item.icon;
-        const active =
-          pathname === item.href ||
-          (item.href !== "/inicio" && pathname.startsWith(`${item.href}/`));
-
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
-              "max-lg:min-h-11 max-lg:py-3 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-3",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              active
-                ? "bg-primary/10 border-l-[3px] border-primary text-foreground font-semibold"
-                : "text-foreground/75 border-l-[3px] border-transparent hover:bg-muted/60",
-            )}
-          >
-            <Icon className="size-4 shrink-0 opacity-90" aria-hidden />
             {item.label}
           </Link>
         );
@@ -197,25 +144,38 @@ export function AppShell({
           <SheetContent
             id="menu-navegacao-mobile"
             side="left"
-            className="flex w-72 flex-col p-0"
+            closeButtonClassName="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring"
+            className="border-sidebar-border bg-sidebar text-sidebar-foreground flex w-72 flex-col gap-0 border-r p-0 shadow-lg"
           >
-            <SheetHeader className="border-border border-b p-4 text-left">
-              <SheetTitle className="font-heading flex items-center gap-2">
-                <Leaf className="text-primary size-4" aria-hidden />
+            <SheetTitle className="sr-only">Menu de navegação NutriGestão</SheetTitle>
+
+            <div className="flex h-14 items-center gap-2 pr-12 pl-4">
+              <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
+              <Link
+                href="/inicio"
+                onClick={() => setMenuOpen(false)}
+                className="text-sidebar-foreground font-heading text-base font-semibold tracking-tight"
+              >
                 NutriGestão
-              </SheetTitle>
-              <SheetDescription className="sr-only">
-                Navegação principal da aplicação
-              </SheetDescription>
-            </SheetHeader>
-            <NavLinksMobile
+              </Link>
+            </div>
+
+            <Separator className="bg-sidebar-border opacity-40" />
+
+            <AppShellUserGreeting />
+
+            <Separator className="bg-sidebar-border opacity-40" />
+
+            <NavLinks
               className="min-h-0 flex-1 overflow-y-auto"
               showAdminNav={showAdminNav}
               onNavigate={() => setMenuOpen(false)}
             />
-            <Separator className="bg-border" />
+
+            <Separator className="bg-sidebar-border opacity-40" />
+
             <div className="p-2">
-              <LogoutButton className="text-foreground hover:bg-muted hover:text-foreground" />
+              <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
             </div>
           </SheetContent>
         </Sheet>

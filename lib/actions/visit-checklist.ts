@@ -9,6 +9,7 @@ import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { loadScheduledVisitById } from "@/lib/actions/visits";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 import type { FillResponsesMap } from "@/lib/types/checklist-fill";
@@ -68,7 +69,6 @@ export async function markScheduledVisitInProgress(
     .from("scheduled_visits")
     .select("status")
     .eq("id", visitId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!row || row.status !== "scheduled") return;
@@ -76,8 +76,7 @@ export async function markScheduledVisitInProgress(
   await supabase
     .from("scheduled_visits")
     .update({ status: "in_progress" })
-    .eq("id", visitId)
-    .eq("user_id", user.id);
+    .eq("id", visitId);
 
   // Não chamar revalidatePath durante o render do RSC (ex.: página iniciar).
   after(() => {
@@ -143,15 +142,19 @@ async function loadPatientEstablishmentOptions(
 /** Resolve o estabelecimento usado para portaria / checklist (visita a estabelecimento ou paciente). */
 export async function resolveVisitChecklistEstablishmentId(input: {
   visit: ScheduledVisitWithTargets;
-  userId: string;
+  authUserId: string;
   ctxEstablishmentId: string | null;
 }): Promise<
   | { ok: true; establishmentId: string }
   | { ok: false; reason: "no_context"; message: string }
   | { ok: false; reason: "pick"; options: EstPick[] }
 > {
-  const { visit, userId, ctxEstablishmentId } = input;
+  const { visit, authUserId, ctxEstablishmentId } = input;
   const supabase = await createClient();
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(
+    supabase,
+    authUserId,
+  );
 
   if (visit.target_type === "establishment") {
     const eid = visit.establishment_id;
@@ -162,7 +165,7 @@ export async function resolveVisitChecklistEstablishmentId(input: {
         message: "Visita sem estabelecimento associado.",
       };
     }
-    const ok = await assertEstablishmentOwned(supabase, userId, eid);
+    const ok = await assertEstablishmentOwned(supabase, workspaceOwnerId, eid);
     if (!ok) {
       return {
         ok: false,
@@ -176,7 +179,7 @@ export async function resolveVisitChecklistEstablishmentId(input: {
   const opts = await loadPatientEstablishmentOptions(
     supabase,
     visit.patient_id as string,
-    userId,
+    workspaceOwnerId,
   );
   if (!opts || opts.length === 0) {
     return {
@@ -203,13 +206,11 @@ export async function resolveVisitChecklistEstablishmentId(input: {
 
 async function loadCustomTemplateRowsForEstablishment(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  userId: string,
   establishmentId: string,
 ): Promise<{ id: string; name: string }[]> {
   const { data, error } = await supabase
     .from("checklist_custom_templates")
     .select("id, name")
-    .eq("user_id", userId)
     .eq("establishment_id", establishmentId)
     .order("updated_at", { ascending: false });
 
@@ -222,10 +223,9 @@ async function loadCustomTemplateRowsForEstablishment(
 
 export async function buildVisitChecklistOptions(input: {
   establishmentId: string;
-  userId: string;
 }): Promise<VisitChecklistOption[]> {
   const supabase = await createClient();
-  const { establishmentId, userId } = input;
+  const { establishmentId } = input;
 
   const { data: est } = await supabase
     .from("establishments")
@@ -246,7 +246,6 @@ export async function buildVisitChecklistOptions(input: {
 
   const customs = await loadCustomTemplateRowsForEstablishment(
     supabase,
-    userId,
     establishmentId,
   );
 
@@ -283,7 +282,6 @@ export async function getLatestFillSessionIdForVisit(
     .from("checklist_fill_sessions")
     .select("id")
     .eq("scheduled_visit_id", visitId)
-    .eq("user_id", user.id)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -293,21 +291,29 @@ export async function getLatestFillSessionIdForVisit(
 
 export async function insertVisitChecklistFillSession(input: {
   visitId: string;
-  userId: string;
+  authUserId: string;
   establishmentId: string;
   option: VisitChecklistOption;
 }): Promise<{ sessionId: string } | { error: string }> {
   const supabase = await createClient();
-  const { visitId, userId, establishmentId, option } = input;
+  const { visitId, authUserId, establishmentId, option } = input;
 
-  const owned = await assertEstablishmentOwned(supabase, userId, establishmentId);
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(
+    supabase,
+    authUserId,
+  );
+
+  const owned = await assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    establishmentId,
+  );
   if (!owned) return { error: "Estabelecimento inválido." };
 
   const { data: visit } = await supabase
     .from("scheduled_visits")
-    .select("id, user_id")
+    .select("id")
     .eq("id", visitId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (!visit) return { error: "Visita não encontrada." };
@@ -325,7 +331,7 @@ export async function insertVisitChecklistFillSession(input: {
     const { data: session, error } = await supabase
       .from("checklist_fill_sessions")
       .insert({
-        user_id: userId,
+        user_id: authUserId,
         establishment_id: establishmentId,
         template_id: option.templateId,
         custom_template_id: null,
@@ -342,7 +348,6 @@ export async function insertVisitChecklistFillSession(input: {
     .from("checklist_custom_templates")
     .select("id, establishment_id")
     .eq("id", option.customTemplateId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (!ct || ct.establishment_id !== establishmentId) {
@@ -352,7 +357,7 @@ export async function insertVisitChecklistFillSession(input: {
   const { data: session, error } = await supabase
     .from("checklist_fill_sessions")
     .insert({
-      user_id: userId,
+      user_id: authUserId,
       establishment_id: establishmentId,
       template_id: null,
       custom_template_id: option.customTemplateId,
@@ -381,13 +386,13 @@ export async function chooseVisitEstablishmentContextAction(
   }
 
   const { row } = await loadScheduledVisitById(visitId);
-  if (!row || row.user_id !== user.id) {
+  if (!row) {
     redirect("/visitas");
   }
 
   const resolved = await resolveVisitChecklistEstablishmentId({
     visit: row,
-    userId: user.id,
+    authUserId: user.id,
     ctxEstablishmentId: null,
   });
 
@@ -430,7 +435,7 @@ export async function createVisitChecklistSessionAction(
 
   const resolved = await resolveVisitChecklistEstablishmentId({
     visit: row,
-    userId: user.id,
+    authUserId: user.id,
     ctxEstablishmentId,
   });
 
@@ -453,7 +458,7 @@ export async function createVisitChecklistSessionAction(
 
   const result = await insertVisitChecklistFillSession({
     visitId,
-    userId: user.id,
+    authUserId: user.id,
     establishmentId: resolved.establishmentId,
     option,
   });
@@ -484,10 +489,9 @@ function countFillProgress(
 
 const NC_HISTORY_SESSION_CHUNK = 100;
 
-/** Conta, por item do modelo atual, em quantas sessões anteriores (mesmo user + estabelecimento) houve NC. */
+/** Conta, por item do modelo atual, em quantas sessões anteriores (mesmo estabelecimento, equipa) houve NC. */
 async function loadRecurringNcSessionCountByItem(input: {
   supabase: Awaited<ReturnType<typeof createClient>>;
-  userId: string;
   establishmentId: string;
   currentSessionId: string;
   template: ChecklistTemplateWithSections;
@@ -495,7 +499,6 @@ async function loadRecurringNcSessionCountByItem(input: {
 }): Promise<Record<string, number>> {
   const {
     supabase,
-    userId,
     establishmentId,
     currentSessionId,
     template,
@@ -512,7 +515,6 @@ async function loadRecurringNcSessionCountByItem(input: {
   const { data: sessions } = await supabase
     .from("checklist_fill_sessions")
     .select("id")
-    .eq("user_id", userId)
     .eq("establishment_id", establishmentId)
     .neq("id", currentSessionId);
 
@@ -576,16 +578,14 @@ export type VisitChecklistWizardModel = {
 export async function loadVisitChecklistWizardModel(input: {
   visit: ScheduledVisitWithTargets;
   sessionId: string;
-  userId: string;
 }): Promise<VisitChecklistWizardModel | null> {
   const supabase = await createClient();
-  const { visit, sessionId, userId } = input;
+  const { visit, sessionId } = input;
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
     .select("id, scheduled_visit_id, user_id")
     .eq("id", sessionId)
-    .eq("user_id", userId)
     .maybeSingle();
 
   if (!sess || sess.scheduled_visit_id !== visit.id) return null;
@@ -607,7 +607,6 @@ export async function loadVisitChecklistWizardModel(input: {
 
   const recurringNcSessionCountByItemId = await loadRecurringNcSessionCountByItem({
     supabase,
-    userId,
     establishmentId: fill.session.establishment_id,
     currentSessionId: sessionId,
     template: fill.template,

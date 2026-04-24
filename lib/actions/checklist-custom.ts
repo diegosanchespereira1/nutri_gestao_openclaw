@@ -68,7 +68,6 @@ export async function loadCustomTemplateEditData(
     .from("checklist_custom_templates")
     .select("id, name")
     .eq("id", customTemplateId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (cErr || !ct) return null;
@@ -131,7 +130,6 @@ export async function loadCustomTemplateUnified(
     .from("checklist_custom_templates")
     .select("*")
     .eq("id", customTemplateId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (cErr || !ct) return null;
@@ -224,7 +222,6 @@ export async function listCustomTemplatesForOwner(): Promise<{
   const { data: customs, error } = await supabase
     .from("checklist_custom_templates")
     .select("id, name, establishment_id, source_template_id, updated_at")
-    .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
 
   if (error || !customs) return { rows: [] };
@@ -375,7 +372,6 @@ export async function addCustomSectionAction(formData: FormData): Promise<void> 
     .from("checklist_custom_templates")
     .select("id")
     .eq("id", customTemplateId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!ct) return;
@@ -418,7 +414,6 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
     .from("checklist_custom_templates")
     .select("id")
     .eq("id", customTemplateId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!ct) return;

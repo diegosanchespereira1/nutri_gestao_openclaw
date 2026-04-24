@@ -37,7 +37,7 @@ function AreaItem({
   isPending: boolean;
 }) {
   return (
-    <li className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2.5 text-sm transition-colors">
+    <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2.5 text-sm transition-colors">
       <GripVertical className="size-4 shrink-0 text-muted-foreground/50 cursor-grab" aria-hidden />
       <span className="flex-1 font-medium text-foreground truncate">{area.name}</span>
       {area.description ? (
@@ -63,7 +63,7 @@ function AreaItem({
       >
         <Trash2 className="size-3.5" />
       </button>
-    </li>
+    </div>
   );
 }
 

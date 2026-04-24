@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye } from "lucide-react";
+import { Eye, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -391,9 +391,10 @@ export function ChecklistFillWizard({
               {template.name}
             </h2>
             {areaName ? (
-              <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                📍 {areaName}
-              </span>
+              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary shadow-xs">
+                <MapPin className="size-4 shrink-0" aria-hidden />
+                {areaName}
+              </div>
             ) : null}
             <p className="text-muted-foreground mt-1 text-sm">
               Visualização do dossiê desta sessão.
@@ -627,6 +628,7 @@ export function ChecklistFillWizard({
                     [
                       ["conforme", "Conforme"],
                       ["nc", "Não conforme"],
+                      ["na", "Não aplicável"],
                     ] as const
                   ).map(([value, label]) => (
                     <label
@@ -644,30 +646,6 @@ export function ChecklistFillWizard({
                       {label}
                     </label>
                   ))}
-                  {!item.is_required ? (
-                    <label className="flex cursor-pointer items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name={`outcome-${item.id}`}
-                        value="na"
-                        checked={r.outcome === "na"}
-                        onChange={() => setOutcome(item.id, "na")}
-                        className="border-input text-primary h-4 w-4"
-                      />
-                      Não aplicável
-                    </label>
-                  ) : null}
-                  <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input
-                      type="radio"
-                      name={`outcome-${item.id}`}
-                      value=""
-                      checked={r.outcome === null}
-                      onChange={() => setOutcome(item.id, null)}
-                      className="border-input text-primary h-4 w-4"
-                    />
-                    Limpar
-                  </label>
                 </div>
               </div>
 

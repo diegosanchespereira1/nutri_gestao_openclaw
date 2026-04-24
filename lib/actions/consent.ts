@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getWorkspaceAccountOwnerId } from '@/lib/workspace';
 import type {
   ConsentRecord,
   ConsentType,
@@ -22,7 +23,8 @@ export async function recordConsent(input: RecordConsentInput): Promise<{ succes
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Validar que paciente pertence ao utilizador
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: patient, error: patientError } = await supabase
     .from('patients')
     .select('id, user_id, date_of_birth')
@@ -33,7 +35,7 @@ export async function recordConsent(input: RecordConsentInput): Promise<{ succes
     return { success: false, error: 'Paciente não encontrado' };
   }
 
-  if (patient.user_id !== user.id) {
+  if (patient.user_id !== workspaceOwnerId) {
     return { success: false, error: 'Acesso negado a este paciente' };
   }
 
@@ -51,7 +53,6 @@ export async function recordConsent(input: RecordConsentInput): Promise<{ succes
       .from('consent_records')
       .select('id')
       .eq('patient_id', input.patientId)
-      .eq('user_id', user.id)
       .eq('is_parental_consent', true)
       .eq('status', 'active')
       .eq('consent_type', input.consentType)
@@ -106,16 +107,12 @@ export async function revokeConsent(input: RevokeConsentInput): Promise<{ succes
   // Validar que consentimento pertence ao utilizador
   const { data: consent, error: fetchError } = await supabase
     .from('consent_records')
-    .select('id, user_id')
+    .select('id')
     .eq('id', input.consentRecordId)
     .maybeSingle();
 
   if (fetchError || !consent) {
     return { success: false, error: 'Consentimento não encontrado' };
-  }
-
-  if (consent.user_id !== user.id) {
-    return { success: false, error: 'Acesso negado a este consentimento' };
   }
 
   // Atualizar status para 'revogado'
@@ -145,14 +142,15 @@ export async function loadPatientConsents(patientId: string): Promise<ConsentRec
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Validar que paciente pertence ao utilizador
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: patient } = await supabase
     .from('patients')
     .select('id, user_id')
     .eq('id', patientId)
     .maybeSingle();
 
-  if (!patient || patient.user_id !== user.id) {
+  if (!patient || patient.user_id !== workspaceOwnerId) {
     throw new Error('Acesso negado a este paciente');
   }
 
@@ -160,7 +158,6 @@ export async function loadPatientConsents(patientId: string): Promise<ConsentRec
     .from('consent_records')
     .select('*')
     .eq('patient_id', patientId)
-    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -180,14 +177,15 @@ export async function validateMinorConsent(patientId: string): Promise<boolean> 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Validar que paciente pertence ao utilizador
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: patient } = await supabase
     .from('patients')
     .select('id, user_id, date_of_birth')
     .eq('id', patientId)
     .maybeSingle();
 
-  if (!patient || patient.user_id !== user.id) {
+  if (!patient || patient.user_id !== workspaceOwnerId) {
     throw new Error('Acesso negado a este paciente');
   }
 
@@ -208,7 +206,6 @@ export async function validateMinorConsent(patientId: string): Promise<boolean> 
     .from('consent_records')
     .select('id')
     .eq('patient_id', patientId)
-    .eq('user_id', user.id)
     .eq('is_parental_consent', true)
     .eq('status', 'active')
     .maybeSingle();
@@ -225,14 +222,15 @@ export async function loadPatientConsentSummary(patientId: string): Promise<Pati
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Validar que paciente pertence ao utilizador
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: patient } = await supabase
     .from('patients')
     .select('id, user_id')
     .eq('id', patientId)
     .maybeSingle();
 
-  if (!patient || patient.user_id !== user.id) {
+  if (!patient || patient.user_id !== workspaceOwnerId) {
     throw new Error('Acesso negado a este paciente');
   }
 
@@ -240,7 +238,6 @@ export async function loadPatientConsentSummary(patientId: string): Promise<Pati
     .from('consent_records')
     .select('consent_type, is_parental_consent, created_at, status')
     .eq('patient_id', patientId)
-    .eq('user_id', user.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
 
@@ -273,14 +270,15 @@ export async function loadPatientConsentsWithUser(patientId: string): Promise<(C
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Validar que paciente pertence ao utilizador
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: patient } = await supabase
     .from('patients')
     .select('id, user_id')
     .eq('id', patientId)
     .maybeSingle();
 
-  if (!patient || patient.user_id !== user.id) {
+  if (!patient || patient.user_id !== workspaceOwnerId) {
     throw new Error('Acesso negado a este paciente');
   }
 
@@ -295,7 +293,6 @@ export async function loadPatientConsentsWithUser(patientId: string): Promise<(C
     `
     )
     .eq('patient_id', patientId)
-    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) {

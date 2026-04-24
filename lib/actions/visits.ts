@@ -34,7 +34,6 @@ export async function loadScheduledVisitsForOwner(): Promise<{
       team_members ( id, full_name, job_role )
     `,
     )
-    .eq("user_id", user.id)
     .order("scheduled_start", { ascending: true });
 
   if (error || !data) return { rows: [] };
@@ -61,7 +60,6 @@ export async function loadScheduledVisitById(
     `,
     )
     .eq("id", id)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (error || !data) return { row: null };
@@ -242,7 +240,6 @@ export async function updateScheduledVisitDossierRecipientsFormAction(
     .from("scheduled_visits")
     .select("id")
     .eq("id", visitId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!v) return { ok: false, error: "Visita não encontrada." };
@@ -250,8 +247,7 @@ export async function updateScheduledVisitDossierRecipientsFormAction(
   const { error } = await supabase
     .from("scheduled_visits")
     .update({ dossier_recipient_emails: parsed.emails })
-    .eq("id", visitId)
-    .eq("user_id", user.id);
+    .eq("id", visitId);
 
   if (error) return { ok: false, error: "Não foi possível salvar." };
 

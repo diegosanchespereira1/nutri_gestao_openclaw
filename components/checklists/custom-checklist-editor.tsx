@@ -24,6 +24,13 @@ export function CustomChecklistEditor({
   return (
     <div className="space-y-8">
       <p className="text-foreground text-lg font-medium">{templateName}</p>
+      <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
+        No preenchimento, cada critério deste modelo usa as opções padrão de
+        avaliação: <span className="text-foreground font-medium">Conforme</span>
+        ,{" "}
+        <span className="text-foreground font-medium">Não conforme</span> e{" "}
+        <span className="text-foreground font-medium">Não aplicável</span>.
+      </p>
 
       {sections.map((sec) => (
         <section

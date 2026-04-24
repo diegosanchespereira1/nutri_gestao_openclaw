@@ -69,7 +69,7 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
 
   const resolvedEst = await resolveVisitChecklistEstablishmentId({
     visit: row,
-    userId: user.id,
+    authUserId: user.id,
     ctxEstablishmentId,
   });
 
@@ -181,7 +181,6 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
     const model = await loadVisitChecklistWizardModel({
       visit: row,
       sessionId: sessionParam,
-      userId: user.id,
     });
     if (!model) notFound();
 
@@ -231,7 +230,6 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
 
   const options = await buildVisitChecklistOptions({
     establishmentId,
-    userId: user.id,
   });
 
   if (options.length === 0) {
@@ -272,7 +270,7 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
   if (options.length === 1) {
     const created = await insertVisitChecklistFillSession({
       visitId: id,
-      userId: user.id,
+      authUserId: user.id,
       establishmentId,
       option: options[0],
     });

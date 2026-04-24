@@ -115,6 +115,8 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
   const areaIdRawCustom = String(formData.get("area_id") ?? "").trim();
   if (!customTemplateId) redirect("/checklists/personalizados?err=missing");
@@ -123,7 +125,6 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
     .from("checklist_custom_templates")
     .select("id, establishment_id")
     .eq("id", customTemplateId)
-    .eq("user_id", user.id)
     .maybeSingle();
 
   if (!ct) redirect("/checklists/personalizados?err=forbidden");
@@ -136,7 +137,7 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
       .select("id")
       .eq("id", areaIdRawCustom)
       .eq("establishment_id", ct.establishment_id as string)
-      .eq("owner_user_id", user.id)
+      .eq("owner_user_id", workspaceOwnerId)
       .maybeSingle();
     if (area) resolvedAreaIdCustom = area.id;
   }
@@ -327,23 +328,20 @@ export async function saveFillItemResponse(input: {
     return { ok: false, error: "Tipo de item incompatível com a sessão." };
   }
 
-  let isRequired = false;
   if (itemResponseSource === "global") {
     const { data: itemMeta } = await supabase
       .from("checklist_template_items")
-      .select("id, is_required")
+      .select("id")
       .eq("id", itemId)
       .maybeSingle();
     if (!itemMeta) return { ok: false, error: "Item inválido." };
-    isRequired = Boolean(itemMeta.is_required);
   } else {
     const { data: itemMeta } = await supabase
       .from("checklist_custom_items")
-      .select("id, is_required, custom_section_id")
+      .select("id, custom_section_id")
       .eq("id", itemId)
       .maybeSingle();
     if (!itemMeta) return { ok: false, error: "Item inválido." };
-    isRequired = Boolean(itemMeta.is_required);
 
     const { data: sec } = await supabase
       .from("checklist_custom_sections")
@@ -386,13 +384,6 @@ export async function saveFillItemResponse(input: {
     }
 
     return { ok: true };
-  }
-
-  if (outcome === "na" && isRequired) {
-    return {
-      ok: false,
-      error: "Itens obrigatórios não podem ser Não aplicável.",
-    };
   }
 
   const noteTrim = (note ?? "").trim();
@@ -486,6 +477,8 @@ export type ExistingOpenSession = {
   updated_at: string;
   response_count: number;
   started_by_me: boolean;
+  /** Nome de quem iniciou (null = fui eu mesmo). */
+  started_by_name: string | null;
 };
 
 /**
@@ -544,16 +537,116 @@ export async function checkExistingOpenFillSession(input: {
 
     const responseCount = count ?? 0;
     if (responseCount > 0) {
+      const isMine = sess.user_id === user.id;
+      let startedByName: string | null = null;
+      if (!isMine) {
+        // Busca pelo team_members do workspace (RLS permite leitura via owner_user_id).
+        // O member_user_id liga o registro de membro ao auth.uid() de quem iniciou a sessão.
+        const { data: member } = await supabase
+          .from("team_members")
+          .select("full_name")
+          .eq("owner_user_id", workspaceOwnerId)
+          .eq("member_user_id", sess.user_id)
+          .maybeSingle();
+        startedByName = member?.full_name ?? null;
+
+        // Fallback: profiles (funciona quando o próprio criador é o owner do workspace)
+        if (!startedByName) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("user_id", sess.user_id)
+            .maybeSingle();
+          startedByName = profile?.full_name ?? null;
+        }
+      }
       return {
         id: sess.id,
         updated_at: sess.updated_at,
         response_count: responseCount,
-        started_by_me: sess.user_id === user.id,
+        started_by_me: isMine,
+        started_by_name: startedByName,
       };
     }
   }
 
   return null;
+}
+
+/* ─── startChecklistFillBatch ─────────────────────────────────────────── */
+
+/**
+ * Cria uma sessão de preenchimento para cada área selecionada (ou uma única sessão
+ * sem área se `areaIds` for vazio). Retorna o ID da primeira sessão criada para
+ * redirecionar o cliente — não faz redirect internamente.
+ */
+export async function startChecklistFillBatch(input: {
+  templateId: string;
+  establishmentId: string;
+  areaIds: string[]; // [] = sem área
+}): Promise<
+  { ok: true; firstSessionId: string; totalSessions: number } |
+  { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "not_authenticated" };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { templateId, establishmentId, areaIds } = input;
+
+  if (!templateId || !establishmentId) {
+    return { ok: false, error: "missing_fields" };
+  }
+
+  const owned = await assertEstablishmentOwned(supabase, workspaceOwnerId, establishmentId);
+  if (!owned) return { ok: false, error: "forbidden" };
+
+  const { data: template } = await supabase
+    .from("checklist_templates")
+    .select("id")
+    .eq("id", templateId)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (!template) return { ok: false, error: "template_not_found" };
+
+  // Resolver lista de area_ids (null = sem área)
+  const resolvedAreas: (string | null)[] = areaIds.length > 0 ? areaIds : [null];
+
+  // Validar cada área fornecida
+  for (const areaId of resolvedAreas) {
+    if (areaId) {
+      const { data: area } = await supabase
+        .from("establishment_areas")
+        .select("id")
+        .eq("id", areaId)
+        .eq("establishment_id", establishmentId)
+        .maybeSingle();
+      if (!area) return { ok: false, error: `area_not_found:${areaId}` };
+    }
+  }
+
+  const sessionIds: string[] = [];
+  for (const areaId of resolvedAreas) {
+    const { data: session, error } = await supabase
+      .from("checklist_fill_sessions")
+      .insert({
+        user_id: user.id,
+        establishment_id: establishmentId,
+        template_id: templateId,
+        custom_template_id: null,
+        area_id: areaId,
+      })
+      .select("id")
+      .single();
+    if (error || !session) return { ok: false, error: "session_create_failed" };
+    sessionIds.push(session.id);
+  }
+
+  revalidatePath("/checklists");
+  return { ok: true, firstSessionId: sessionIds[0], totalSessions: sessionIds.length };
 }
 
 /* ─── Delete draft session ────────────────────────────────────────────── */

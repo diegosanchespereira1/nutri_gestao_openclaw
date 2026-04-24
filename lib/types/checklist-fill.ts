@@ -69,14 +69,8 @@ export function validateChecklistSection(
       if (outcome === null) {
         issues.push({
           item_id: item.id,
-          message: "Indique Conforme ou Não conforme (obrigatório).",
-        });
-        continue;
-      }
-      if (outcome === "na") {
-        issues.push({
-          item_id: item.id,
-          message: "Itens obrigatórios não podem ser marcados como Não aplicável.",
+          message:
+            "Indique Conforme, Não conforme ou Não aplicável (obrigatório).",
         });
         continue;
       }

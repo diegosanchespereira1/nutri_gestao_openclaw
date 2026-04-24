@@ -244,11 +244,13 @@ export async function getAreaById(areaId: string): Promise<EstablishmentAreaRow 
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data } = await supabase
     .from("establishment_areas")
     .select("*")
     .eq("id", areaId)
-    .eq("owner_user_id", user.id)
+    .eq("owner_user_id", workspaceOwnerId)
     .maybeSingle();
 
   return data as EstablishmentAreaRow | null;

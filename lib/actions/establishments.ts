@@ -216,14 +216,21 @@ export async function loadRecentChecklistEstablishmentsAction(
 
   const { data: recentRows, error: recentErr } = await supabase
     .from("checklist_establishment_recent")
-    .select("establishment_id")
-    .eq("user_id", user.id)
+    .select("establishment_id, last_opened_at")
     .order("last_opened_at", { ascending: false })
-    .limit(safeLimit);
+    .limit(safeLimit * 8);
 
   if (recentErr || !recentRows?.length) return { rows: [] };
 
-  const establishmentIds = recentRows.map((row) => row.establishment_id as string);
+  const seen = new Set<string>();
+  const establishmentIds: string[] = [];
+  for (const row of recentRows) {
+    const eid = row.establishment_id as string;
+    if (seen.has(eid)) continue;
+    seen.add(eid);
+    establishmentIds.push(eid);
+    if (establishmentIds.length >= safeLimit) break;
+  }
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 

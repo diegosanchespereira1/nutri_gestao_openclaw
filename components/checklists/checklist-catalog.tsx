@@ -33,6 +33,7 @@ import { touchMinHeight, touchMinTarget } from "@/lib/touch-targets";
 import { cn } from "@/lib/utils";
 import {
   checkExistingOpenFillSession,
+  startChecklistFillBatch,
   type ExistingOpenSession,
 } from "@/lib/actions/checklist-fill";
 import {
@@ -125,7 +126,7 @@ function StepIndicator({
 export function ChecklistCatalog({
   recentEstablishments,
   templates,
-  startFillAction,
+  startFillAction: _startFillAction, // mantido na interface para compatibilidade com o pai
   duplicateTemplateAction,
   focusTemplateId = null,
 }: Props) {
@@ -166,10 +167,12 @@ export function ChecklistCatalog({
 
   /* Áreas do estabelecimento selecionado */
   const [availableAreas, setAvailableAreas] = useState<EstablishmentAreaOption[]>([]);
-  const [selectedAreaId, setSelectedAreaId] = useState<string>("");
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+  const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
+  const areaDropdownRef = useRef<HTMLDivElement>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
-  /* Ref para o form de startFill — usado para submit programático */
-  const startFillFormRef = useRef<HTMLFormElement>(null);
+  /* Ref para o form de personalizar template — usado para submit programático */
   const duplicateFormRef = useRef<HTMLFormElement>(null);
 
   /* ── filtros de template ── */
@@ -264,18 +267,33 @@ export function ChecklistCatalog({
   useEffect(() => {
     if (!establishmentId) {
       setAvailableAreas([]);
-      setSelectedAreaId("");
+      setSelectedAreaIds([]);
+      setBatchError(null);
       return;
     }
     let cancelled = false;
     void loadAreasForEstablishment(establishmentId).then((areas) => {
       if (!cancelled) {
         setAvailableAreas(areas);
-        setSelectedAreaId(areas.length === 1 ? areas[0].id : "");
+        // Auto-selecionar quando há apenas 1 área cadastrada
+        setSelectedAreaIds(areas.length === 1 ? [areas[0].id] : []);
+        setBatchError(null);
       }
     });
     return () => { cancelled = true; };
   }, [establishmentId]);
+
+  // Fechar dropdown de áreas ao clicar fora
+  useEffect(() => {
+    if (!areaDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (areaDropdownRef.current && !areaDropdownRef.current.contains(e.target as Node)) {
+        setAreaDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [areaDropdownOpen]);
 
   useEffect(() => {
     const query = establishmentSearchTerm.trim();
@@ -387,19 +405,26 @@ export function ChecklistCatalog({
     if (selectedEstablishment) upsertRecent(selectedEstablishment);
   }
 
-  /** Task C.3: Submit programático do startFillAction com um templateId específico. */
-  function submitStartFill(templateId: string) {
-    if (!startFillFormRef.current) return;
-    // Atualizar os hidden inputs antes de submeter
-    const form = startFillFormRef.current;
-    const templateInput = form.querySelector<HTMLInputElement>('input[name="template_id"]');
-    if (templateInput) templateInput.value = templateId;
-    form.requestSubmit();
+  /** Inicia uma ou mais sessões via batch e navega para a primeira. */
+  async function launchBatch(templateId: string) {
+    setBatchError(null);
+    const result = await startChecklistFillBatch({
+      templateId,
+      establishmentId,
+      areaIds: selectedAreaIds,
+    });
+    if (result.ok) {
+      await registerEstablishmentOpen();
+      router.push(`/checklists/preencher/${result.firstSessionId}`);
+    } else {
+      setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
+    }
   }
 
-  /** Task C.3: Handler do botão "Usar template" — verifica conflito antes de criar. */
+  /** Verifica conflito antes de criar — usa batch para multi-área. */
   async function handleUsarTemplate() {
     if (!selectedTemplate || !establishmentId) return;
+    if (availableAreas.length > 0 && selectedAreaIds.length === 0) return;
     setCheckingSession(true);
     try {
       const existing = await checkExistingOpenFillSession({
@@ -411,8 +436,7 @@ export function ChecklistCatalog({
         setPendingTemplateId(selectedTemplate.id);
         setConflictSession(existing);
       } else {
-        await registerEstablishmentOpen();
-        submitStartFill(selectedTemplate.id);
+        await launchBatch(selectedTemplate.id);
       }
     } finally {
       setCheckingSession(false);
@@ -990,108 +1014,185 @@ export function ChecklistCatalog({
                 </div>
               </div>
 
-              {/* Seletor de área (quando o estabelecimento tem áreas cadastradas) */}
+              {/* Seletor de área: dropdown multi-select com checkboxes */}
               {availableAreas.length > 0 && (
-                <div className="flex shrink-0 flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
-                  <label className="text-xs font-medium text-muted-foreground whitespace-nowrap">
-                    📍 Área:
+                <div ref={areaDropdownRef} className="relative flex shrink-0 flex-col gap-1">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    📍 Área
                   </label>
-                  <select
-                    value={selectedAreaId}
-                    onChange={(e) => setSelectedAreaId(e.target.value)}
+                  {/* Trigger */}
+                  <button
+                    type="button"
+                    onClick={() => setAreaDropdownOpen((o) => !o)}
                     className={cn(
-                      "h-8 rounded-md border px-2 text-sm shadow-xs outline-none",
-                      "border-input bg-background text-foreground",
+                      "flex h-9 w-48 items-center justify-between gap-2 rounded-lg border px-3 text-sm shadow-xs outline-none transition-colors",
+                      "bg-background text-foreground",
                       "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
-                      !selectedAreaId && "border-amber-400",
+                      areaDropdownOpen
+                        ? "border-primary ring-1 ring-primary/30"
+                        : selectedAreaIds.length === 0
+                          ? "border-amber-400"
+                          : "border-input",
                     )}
-                    aria-label="Selecionar área do estabelecimento"
+                    aria-haspopup="listbox"
+                    aria-expanded={areaDropdownOpen}
                   >
-                    <option value="">Selecione a área…</option>
-                    {availableAreas.map((area) => (
-                      <option key={area.id} value={area.id}>
-                        {area.name}
-                      </option>
-                    ))}
-                  </select>
+                    <span className="truncate text-left">
+                      {selectedAreaIds.length === 0
+                        ? <span className="text-muted-foreground">Selecione as áreas…</span>
+                        : selectedAreaIds.length === 1
+                          ? (availableAreas.find((a) => a.id === selectedAreaIds[0])?.name ?? "1 área")
+                          : `${selectedAreaIds.length} áreas selecionadas`}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        areaDropdownOpen && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+
+                  {/* Painel */}
+                  {areaDropdownOpen && (
+                    <div
+                      className="absolute bottom-full left-0 z-50 mb-1 w-56 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
+                      role="listbox"
+                      aria-multiselectable="true"
+                      aria-label="Áreas do estabelecimento"
+                    >
+                      <div className="max-h-52 overflow-y-auto py-1">
+                        {availableAreas.map((area) => {
+                          const picked = selectedAreaIds.includes(area.id);
+                          return (
+                            <button
+                              key={area.id}
+                              type="button"
+                              role="option"
+                              aria-selected={picked}
+                              onClick={() =>
+                                setSelectedAreaIds((prev) =>
+                                  picked
+                                    ? prev.filter((id) => id !== area.id)
+                                    : [...prev, area.id],
+                                )
+                              }
+                              className={cn(
+                                "flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-muted/60",
+                                picked && "bg-primary/5",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                                  picked
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border",
+                                )}
+                              >
+                                {picked && <Check className="size-3" aria-hidden />}
+                              </span>
+                              <span className={cn("truncate", picked && "font-medium text-foreground")}>
+                                {area.name}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Rodapé informativo */}
+                      <div className="border-t border-border px-3 py-1.5">
+                        {selectedAreaIds.length === 0 ? (
+                          <p className="text-[11px] font-medium text-amber-600">
+                            Selecione ao menos uma área
+                          </p>
+                        ) : (
+                          <p className="text-[11px] text-muted-foreground">
+                            {selectedAreaIds.length} selecionada{selectedAreaIds.length !== 1 ? "s" : ""}
+                            {selectedAreaIds.length > 1 && " · uma sessão por área"}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
               {/* Ações */}
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 flex-col items-end gap-2">
                 {!step1Done && (
                   <p className="text-xs text-amber-600">
                     ↑ Selecione um estabelecimento
                   </p>
                 )}
-                <form
-                  ref={duplicateFormRef}
-                  action={duplicateTemplateAction}
-                  className="contents"
-                >
-                  <input type="hidden" name="template_id" value={selectedTemplate.id} />
-                  <input type="hidden" name="establishment_id" value={establishmentId} />
+                <div className="flex items-center gap-2">
+                  <form
+                    ref={duplicateFormRef}
+                    action={duplicateTemplateAction}
+                    className="contents"
+                  >
+                    <input type="hidden" name="template_id" value={selectedTemplate.id} />
+                    <input type="hidden" name="establishment_id" value={establishmentId} />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!establishmentId}
+                      title={
+                        establishmentId
+                          ? "Duplicar e personalizar este template"
+                          : "Selecione um estabelecimento primeiro"
+                      }
+                      onClick={handlePersonalizarTemplate}
+                    >
+                      Personalizar
+                    </Button>
+                  </form>
+
                   <Button
                     type="button"
-                    variant="outline"
                     size="sm"
-                    disabled={!establishmentId}
-                    title={
-                      establishmentId
-                        ? "Duplicar e personalizar este template"
-                        : "Selecione um estabelecimento primeiro"
+                    disabled={
+                      !establishmentId ||
+                      checkingSession ||
+                      (availableAreas.length > 0 && selectedAreaIds.length === 0)
                     }
-                    onClick={handlePersonalizarTemplate}
+                    title={
+                      !establishmentId
+                        ? "Selecione um estabelecimento primeiro"
+                        : availableAreas.length > 0 && selectedAreaIds.length === 0
+                          ? "Selecione ao menos uma área"
+                          : selectedAreaIds.length > 1
+                            ? `Iniciar ${selectedAreaIds.length} sessões (uma por área)`
+                            : "Iniciar rascunho de preenchimento"
+                    }
+                    className="gap-1.5"
+                    onClick={handleUsarTemplate}
                   >
-                    Personalizar
+                    {checkingSession ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                        Verificando…
+                      </>
+                    ) : (
+                      <>
+                        {selectedAreaIds.length > 1
+                          ? `Iniciar ${selectedAreaIds.length} sessões`
+                          : "Usar template"}
+                        <ArrowRight className="size-3.5" />
+                      </>
+                    )}
                   </Button>
-                </form>
-
-                {/* Task C.3: form oculto para submit programático */}
-                <form ref={startFillFormRef} action={startFillAction} className="hidden">
-                  <input type="hidden" name="template_id" value={selectedTemplate.id} />
-                  <input type="hidden" name="establishment_id" value={establishmentId} />
-                  <input type="hidden" name="area_id" value={selectedAreaId} />
-                </form>
-
-                {/* Task C.3: botão assíncrono com verificação de conflito */}
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={
-                    !establishmentId ||
-                    checkingSession ||
-                    (availableAreas.length > 0 && !selectedAreaId)
-                  }
-                  title={
-                    !establishmentId
-                      ? "Selecione um estabelecimento primeiro"
-                      : availableAreas.length > 0 && !selectedAreaId
-                        ? "Selecione a área do estabelecimento"
-                        : "Iniciar rascunho de preenchimento"
-                  }
-                  className="gap-1.5"
-                  onClick={handleUsarTemplate}
-                >
-                  {checkingSession ? (
-                    <>
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden />
-                      Verificando…
-                    </>
-                  ) : (
-                    <>
-                      Usar template
-                      <ArrowRight className="size-3.5" />
-                    </>
-                  )}
-                </Button>
+                </div>
+                {batchError && (
+                  <p className="text-xs text-destructive" role="alert">{batchError}</p>
+                )}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ─── Task C.3: Dialog de conflito de sessão em aberto ────────────── */}
+      {/* ─── Dialog de conflito de sessão em aberto ────────────────────── */}
       <Dialog
         open={conflictSession !== null}
         onOpenChange={(open) => {
@@ -1115,54 +1216,87 @@ export function ChecklistCatalog({
                 {(conflictSession?.response_count ?? 0) !== 1 ? "s" : ""} salva
                 {(conflictSession?.response_count ?? 0) !== 1 ? "s" : ""}
               </span>
-              .{conflictSession ? ` Última alteração: ${formatRelativeTime(conflictSession.updated_at)}.` : ""}
+              .
             </DialogDescription>
-            {conflictSession && !conflictSession.started_by_me && (
-              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                ⚠ Este preenchimento foi iniciado por outro membro da equipe.
-              </p>
-            )}
           </DialogHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+
+          {/* Metadados da sessão conflitante */}
+          <div className="rounded-md border border-border bg-muted/40 px-3 py-2 space-y-1.5 text-xs">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">ID da sessão</span>
+              <code className="font-mono font-semibold text-foreground tracking-wide">
+                #{conflictSession?.id.slice(0, 8).toUpperCase()}
+              </code>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Última alteração</span>
+              <span className="text-foreground font-medium">
+                {conflictSession ? formatRelativeTime(conflictSession.updated_at) : "—"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-muted-foreground">Iniciado por</span>
+              <span className="text-foreground font-medium">
+                {conflictSession?.started_by_me
+                  ? "Você"
+                  : conflictSession?.started_by_name
+                    ? conflictSession.started_by_name
+                    : <span className="italic text-muted-foreground">nome não disponível</span>}
+              </span>
+            </div>
+          </div>
+
+          {conflictSession && !conflictSession.started_by_me && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              ⚠ Este preenchimento foi iniciado por outro membro da equipe. Coordene antes de criar um novo para evitar duplicidade.
+            </p>
+          )}
+
+          <div className="mt-2 flex flex-col gap-2">
+            {/* Opção 1 — continuar o existente */}
             <Button
               type="button"
+              className="w-full justify-start gap-2"
               onClick={() => {
                 if (!conflictSession) return;
+                const sessionId = conflictSession.id;
                 setConflictSession(null);
                 setPendingTemplateId(null);
                 void registerEstablishmentOpen();
-                router.push(`/checklists/preencher/${conflictSession.id}`);
+                router.push(`/checklists/preencher/${sessionId}`);
               }}
             >
-              Ver e continuar preenchimento
+              <ArrowRight className="size-4 shrink-0" aria-hidden />
+              Continuar preenchimento existente
             </Button>
+
+            {/* Opção 2 — iniciar novo sem afetar o existente */}
             <Button
               type="button"
               variant="outline"
-              className="text-destructive hover:text-destructive"
+              className="w-full justify-start gap-2"
               onClick={() => {
                 const tId = pendingTemplateId;
                 setConflictSession(null);
                 setPendingTemplateId(null);
-                if (tId) {
-                  void (async () => {
-                    await registerEstablishmentOpen();
-                    submitStartFill(tId);
-                  })();
-                }
+                if (tId) void launchBatch(tId);
               }}
             >
-              Cancelar e iniciar novo
+              <ListChecks className="size-4 shrink-0" aria-hidden />
+              Iniciar novo (mantém o existente)
             </Button>
+
+            {/* Opção 3 — fechar / decidir depois */}
             <Button
               type="button"
               variant="ghost"
+              className="w-full"
               onClick={() => {
                 setConflictSession(null);
                 setPendingTemplateId(null);
               }}
             >
-              Fechar
+              Decidir depois
             </Button>
           </div>
         </DialogContent>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
+import { resolveChecklistDossierPdfFilename } from "@/lib/checklist-dossier-pdf-filename";
 import { CHECKLIST_DOSSIER_PDFS_BUCKET } from "@/lib/constants/checklist-dossier-pdf";
 import { buildApprovedDossierPdfBytes } from "@/lib/pdf/build-approved-dossier-pdf";
 import { createClient } from "@/lib/supabase/server";
@@ -15,11 +16,16 @@ function safeErr(e: unknown): string {
 }
 
 export type GenerateDossierPdfResult =
-  | { ok: true; job: ChecklistFillPdfExportRow; downloadUrl: string }
+  | {
+      ok: true;
+      job: ChecklistFillPdfExportRow;
+      downloadUrl: string;
+      suggestedFilename: string;
+    }
   | { ok: false; error: string };
 
 export type DownloadDossierPdfResult =
-  | { ok: true; downloadUrl: string }
+  | { ok: true; downloadUrl: string; suggestedFilename: string }
   | { ok: false; error: string };
 
 export async function generateDossierPdfAction(
@@ -63,9 +69,12 @@ export async function generateDossierPdfAction(
 
   try {
     const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+      sessionId,
       template: bundle.template,
       responses: bundle.responses,
       establishmentLabel: bundle.establishmentLabel,
+      clientLabel: bundle.pdfClientLabel,
+      areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
     });
@@ -105,10 +114,14 @@ export async function generateDossierPdfAction(
     }
 
     const downloadUrl = `/api/checklists/dossier-pdf/${jobId}`;
+    const suggestedFilename =
+      (await resolveChecklistDossierPdfFilename(supabase, jobId)) ??
+      `dossie-checklist-${sessionId.slice(0, 8)}.pdf`;
     return {
       ok: true,
       job: updated as ChecklistFillPdfExportRow,
       downloadUrl,
+      suggestedFilename,
     };
   } catch (e) {
     const msg = safeErr(e);
@@ -147,8 +160,13 @@ export async function downloadDossierPdfAction(
     return { ok: false, error: "PDF não disponível. Gere novamente." };
   }
 
+  const suggestedFilename =
+    (await resolveChecklistDossierPdfFilename(supabase, jobId)) ??
+    `dossie-checklist-${String(row.session_id).slice(0, 8)}.pdf`;
+
   return {
     ok: true,
     downloadUrl: `/api/checklists/dossier-pdf/${jobId}`,
+    suggestedFilename,
   };
 }

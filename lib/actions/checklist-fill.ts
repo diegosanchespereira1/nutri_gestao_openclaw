@@ -164,6 +164,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   template: ChecklistTemplateWithSections;
   responses: FillResponsesMap;
   establishmentLabel: string;
+  /** Nome do cliente (PJ) para nome de ficheiro do PDF do dossiê. */
+  pdfClientLabel: string;
   /** Nome da área física avaliada nesta sessão (null quando não aplicável). */
   areaName: string | null;
   itemResponseSource: "global" | "custom";
@@ -226,8 +228,12 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     .eq("id", session.establishment_id)
     .maybeSingle();
 
+  const pdfClientLabel = est
+    ? establishmentClientLabel(est as EstablishmentWithClientNames)
+    : "Cliente";
+
   const establishmentLabel = est
-    ? `${(est as EstablishmentWithClientNames).name} — ${establishmentClientLabel(est as EstablishmentWithClientNames)}`
+    ? `${(est as EstablishmentWithClientNames).name} — ${pdfClientLabel}`
     : "Estabelecimento";
 
   const itemPhotos = await loadSessionItemPhotosWithUrls(supabase, sessionId);
@@ -273,12 +279,109 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     template,
     responses,
     establishmentLabel,
+    pdfClientLabel,
     areaName,
     itemResponseSource,
     itemPhotos,
     latestPdfExport,
     createdByName,
   };
+}
+
+export type LoadFillResponsesResult =
+  | { ok: true; responses: FillResponsesMap }
+  | { ok: false; error: string };
+
+/** Mapa de respostas persistidas (reconciliação antes de finalizar/aprovar). */
+export async function loadFillResponsesMapForSession(
+  sessionId: string,
+): Promise<LoadFillResponsesResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: sess } = await supabase
+    .from("checklist_fill_sessions")
+    .select("establishment_id, dossier_approved_at")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (!sess) return { ok: false, error: "Rascunho não encontrado." };
+
+  const estOwned = await assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    sess.establishment_id as string,
+  );
+  if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
+
+  if (sess.dossier_approved_at) {
+    return { ok: false, error: "Dossiê já aprovado." };
+  }
+
+  const { data: respRows } = await supabase
+    .from("checklist_fill_item_responses")
+    .select("*")
+    .eq("session_id", sessionId);
+
+  const responses: FillResponsesMap = {};
+  for (const raw of respRows ?? []) {
+    const r = raw as ChecklistFillItemResponseRow;
+    const key = r.template_item_id ?? r.custom_item_id;
+    if (!key) continue;
+    responses[key] = {
+      outcome: r.outcome,
+      note: r.note,
+      annotation: r.item_annotation ?? null,
+    };
+  }
+
+  return { ok: true, responses };
+}
+
+function buildResponseUpdatePayload(input: {
+  outcome: ChecklistFillOutcome;
+  noteTrim: string;
+  annotationTrim: string;
+  existingNote: string | null;
+  existingAnnotation: string | null;
+  persistMode: "full" | "merge";
+}): { outcome: ChecklistFillOutcome; note: string | null; item_annotation: string | null } {
+  const { outcome, noteTrim, annotationTrim, existingNote, existingAnnotation, persistMode } =
+    input;
+
+  if (persistMode === "full") {
+    return {
+      outcome,
+      note: noteTrim.length > 0 ? noteTrim : null,
+      item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+    };
+  }
+
+  // merge: não anular nota/anotação já gravadas quando o payload veio vazio (flush/reconciliação).
+  let note: string | null;
+  if (outcome !== "nc") {
+    note = null;
+  } else if (noteTrim.length > 0) {
+    note = noteTrim;
+  } else {
+    const keep = (existingNote ?? "").trim().length > 0 ? existingNote : null;
+    note = keep;
+  }
+
+  let item_annotation: string | null;
+  if (annotationTrim.length > 0) {
+    item_annotation = annotationTrim;
+  } else {
+    const keepAnn = (existingAnnotation ?? "").trim().length > 0 ? existingAnnotation : null;
+    item_annotation = keepAnn;
+  }
+
+  return { outcome, note, item_annotation };
 }
 
 export async function saveFillItemResponse(input: {
@@ -288,6 +391,8 @@ export async function saveFillItemResponse(input: {
   outcome: ChecklistFillOutcome | null;
   note: string | null;
   annotation: string | null;
+  /** merge: atualização parcial — não apaga note/anotação no BD se o cliente enviar vazio. */
+  persistMode?: "full" | "merge";
 }): Promise<FillActionResult> {
   const supabase = await createClient();
   const {
@@ -299,6 +404,7 @@ export async function saveFillItemResponse(input: {
 
   const { sessionId, itemId, itemResponseSource, outcome, note, annotation } =
     input;
+  const persistMode = input.persistMode ?? "full";
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
@@ -395,19 +501,23 @@ export async function saveFillItemResponse(input: {
   if (itemResponseSource === "global") {
     const { data: existing } = await supabase
       .from("checklist_fill_item_responses")
-      .select("id")
+      .select("id, note, item_annotation")
       .eq("session_id", sessionId)
       .eq("template_item_id", itemId)
       .maybeSingle();
 
     if (existing) {
+      const payload = buildResponseUpdatePayload({
+        outcome,
+        noteTrim,
+        annotationTrim,
+        existingNote: existing.note as string | null,
+        existingAnnotation: existing.item_annotation as string | null,
+        persistMode,
+      });
       const { error } = await supabase
         .from("checklist_fill_item_responses")
-        .update({
-          outcome,
-          note: noteTrim.length > 0 ? noteTrim : null,
-          item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
-        })
+        .update(payload)
         .eq("id", existing.id as string);
       if (error) return { ok: false, error: "Não foi possível salvar." };
     } else {
@@ -424,19 +534,23 @@ export async function saveFillItemResponse(input: {
   } else {
     const { data: existing } = await supabase
       .from("checklist_fill_item_responses")
-      .select("id")
+      .select("id, note, item_annotation")
       .eq("session_id", sessionId)
       .eq("custom_item_id", itemId)
       .maybeSingle();
 
     if (existing) {
+      const payload = buildResponseUpdatePayload({
+        outcome,
+        noteTrim,
+        annotationTrim,
+        existingNote: existing.note as string | null,
+        existingAnnotation: existing.item_annotation as string | null,
+        persistMode,
+      });
       const { error } = await supabase
         .from("checklist_fill_item_responses")
-        .update({
-          outcome,
-          note: noteTrim.length > 0 ? noteTrim : null,
-          item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
-        })
+        .update(payload)
         .eq("id", existing.id as string);
       if (error) return { ok: false, error: "Não foi possível salvar." };
     } else {
@@ -585,8 +699,8 @@ export async function startChecklistFillBatch(input: {
   establishmentId: string;
   areaIds: string[]; // [] = sem área
 }): Promise<
-  { ok: true; firstSessionId: string; totalSessions: number } |
-  { ok: false; error: string }
+  | { ok: true; sessionIds: string[]; firstSessionId: string; totalSessions: number }
+  | { ok: false; error: string }
 > {
   const supabase = await createClient();
   const {
@@ -646,7 +760,14 @@ export async function startChecklistFillBatch(input: {
   }
 
   revalidatePath("/checklists");
-  return { ok: true, firstSessionId: sessionIds[0], totalSessions: sessionIds.length };
+  const first = sessionIds[0];
+  if (!first) return { ok: false, error: "session_create_failed" };
+  return {
+    ok: true,
+    sessionIds,
+    firstSessionId: first,
+    totalSessions: sessionIds.length,
+  };
 }
 
 /* ─── Delete draft session ────────────────────────────────────────────── */

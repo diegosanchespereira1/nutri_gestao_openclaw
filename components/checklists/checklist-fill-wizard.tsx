@@ -22,6 +22,7 @@ import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { cn } from "@/lib/utils";
 import {
   approveChecklistFillDossierAction,
+  loadFillResponsesMapForSession,
   saveFillItemResponse,
   type FillActionResult,
 } from "@/lib/actions/checklist-fill";
@@ -35,7 +36,44 @@ import {
 } from "@/lib/types/checklist-fill";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
+import {
+  clearChecklistFillBatch,
+  getNextBatchItemAfterSession,
+  type ChecklistFillBatchItem,
+} from "@/lib/checklist-fill-batch-storage";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
+
+/** Funde texto vazio no cliente com valores já persistidos (mesmo outcome). */
+function mergeClientResponsesWithServer(
+  client: FillResponsesMap,
+  server: FillResponsesMap,
+  template: ChecklistTemplateWithSections,
+): FillResponsesMap {
+  const out: FillResponsesMap = { ...client };
+  for (const sec of template.sections) {
+    for (const item of sec.items) {
+      const c = out[item.id];
+      const s = server[item.id];
+      if (!c?.outcome || !s?.outcome) continue;
+      if (c.outcome !== s.outcome) continue;
+      let next: FillItemResponseState = { ...c };
+      if (c.outcome === "nc") {
+        const cNote = (c.note ?? "").trim();
+        const sNote = (s.note ?? "").trim();
+        if (cNote.length === 0 && sNote.length > 0) {
+          next = { ...next, note: s.note };
+        }
+      }
+      const cAnn = (next.annotation ?? "").trim();
+      const sAnn = (s.annotation ?? "").trim();
+      if (cAnn.length === 0 && sAnn.length > 0) {
+        next = { ...next, annotation: s.annotation };
+      }
+      out[item.id] = next;
+    }
+  }
+  return out;
+}
 
 const textareaClass =
   "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
@@ -139,6 +177,13 @@ export function ChecklistFillWizard({
     sectionIndexRef.current = sectionIndex;
   }, [sectionIndex]);
 
+  const prevSectionIndexForScrollRef = useRef(sectionIndex);
+  useEffect(() => {
+    if (prevSectionIndexForScrollRef.current === sectionIndex) return;
+    prevSectionIndexForScrollRef.current = sectionIndex;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [sectionIndex]);
+
   const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [finalizeDialogError, setFinalizeDialogError] = useState<string | null>(null);
   const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
@@ -151,6 +196,8 @@ export function ChecklistFillWizard({
   );
   const [approveError, setApproveError] = useState<string | null>(null);
   const [dossierPeekOpen, setDossierPeekOpen] = useState(false);
+  const [multiAreaNextDialog, setMultiAreaNextDialog] =
+    useState<ChecklistFillBatchItem | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
 
@@ -218,24 +265,77 @@ export function ChecklistFillWizard({
     [],
   );
 
-  /** Persiste nota/anotação que só existiam no estado local (setNote/setAnnotation não gravam na BD). */
-  const syncAllResponsesToServer = useCallback(async (): Promise<FillActionResult> => {
-    const snapshot = responsesRef.current;
-    for (const itemId of Object.keys(snapshot)) {
-      const cur = snapshot[itemId];
-      if (!cur?.outcome) continue;
-      const result = await saveFillItemResponse({
-        sessionId,
-        itemId,
-        itemResponseSource,
-        outcome: cur.outcome,
-        note: cur.note ?? null,
-        annotation: cur.annotation ?? null,
-      });
-      if (!result.ok) return result;
+  const syncAllResponsesToServer = useCallback(
+    async (
+      snapshot?: FillResponsesMap,
+      persistMode: "full" | "merge" = "merge",
+    ): Promise<FillActionResult> => {
+      const data = snapshot ?? responsesRef.current;
+      for (const itemId of Object.keys(data)) {
+        const cur = data[itemId];
+        if (!cur?.outcome) continue;
+        const result = await saveFillItemResponse({
+          sessionId,
+          itemId,
+          itemResponseSource,
+          outcome: cur.outcome,
+          note: cur.note ?? null,
+          annotation: cur.annotation ?? null,
+          persistMode,
+        });
+        if (!result.ok) return result;
+      }
+      return { ok: true };
+    },
+    [sessionId, itemResponseSource],
+  );
+
+  /** Reconcilia com BD, grava com modo merge e valida o que ficou persistido. */
+  const runReconcileThenSync = useCallback(async (): Promise<FillActionResult> => {
+    const remote = await loadFillResponsesMapForSession(sessionId);
+    if (!remote.ok) return remote;
+    const merged = mergeClientResponsesWithServer(
+      responsesRef.current,
+      remote.responses,
+      template,
+    );
+    setResponses(merged);
+    responsesRef.current = merged;
+
+    const synced = await syncAllResponsesToServer(merged, "merge");
+    if (!synced.ok) return synced;
+
+    const verify = await loadFillResponsesMapForSession(sessionId);
+    if (!verify.ok) return verify;
+    const postIssues = validateChecklistTemplate(sections, verify.responses);
+    if (postIssues.length > 0) {
+      return { ok: false, error: postIssues[0].message };
     }
     return { ok: true };
-  }, [sessionId, itemResponseSource]);
+  }, [sessionId, template, sections, syncAllResponsesToServer]);
+
+  /** Grava nota/anotação só ao sair do campo — evita salvar a cada tecla. */
+  const persistItemOnBlur = useCallback(
+    (itemId: string) => {
+      startTransition(async () => {
+        const cur = responsesRef.current[itemId];
+        if (!cur?.outcome) return;
+        reportSaving();
+        const result = await saveFillItemResponse({
+          sessionId,
+          itemId,
+          itemResponseSource,
+          outcome: cur.outcome,
+          note: cur.note ?? null,
+          annotation: cur.annotation ?? null,
+          persistMode: "full",
+        });
+        if (result.ok) reportSaved();
+        else reportSaveError(result.error);
+      });
+    },
+    [sessionId, itemResponseSource],
+  );
 
   const section = sections[sectionIndex];
   const isLast = sectionIndex >= sections.length - 1;
@@ -351,27 +451,27 @@ export function ChecklistFillWizard({
   }
 
   function saveCurrentSectionFields() {
-    // Salvar todos os campos da seção atual
-    for (const itemId in responsesRef.current) {
-      const cur = responsesRef.current[itemId];
-      if (cur?.outcome && (cur.note || cur.annotation)) {
-        reportSaving();
-        startTransition(async () => {
-          const result = await saveFillItemResponse({
-            sessionId,
-            itemId,
-            itemResponseSource,
-            outcome: cur.outcome,
-            note: cur.note ?? null,
-            annotation: cur.annotation ?? null,
-          });
-          if (result.ok) {
-            reportSaved();
-          } else {
-            reportSaveError(result.error);
-          }
+    if (!section) return;
+    for (const item of section.items) {
+      const cur = responsesRef.current[item.id];
+      if (!cur?.outcome) continue;
+      reportSaving();
+      startTransition(async () => {
+        const result = await saveFillItemResponse({
+          sessionId,
+          itemId: item.id,
+          itemResponseSource,
+          outcome: cur.outcome,
+          note: cur.note ?? null,
+          annotation: cur.annotation ?? null,
+          persistMode: "full",
         });
-      }
+        if (result.ok) {
+          reportSaved();
+        } else {
+          reportSaveError(result.error);
+        }
+      });
     }
   }
 
@@ -670,6 +770,7 @@ export function ChecklistFillWizard({
                     onChange={(e) => {
                       setNote(item.id, e.target.value);
                     }}
+                    onBlur={() => persistItemOnBlur(item.id)}
                     className={textareaClass}
                     aria-invalid={Boolean(err)}
                     aria-describedby={
@@ -693,6 +794,7 @@ export function ChecklistFillWizard({
                     onChange={(e) => {
                       setAnnotation(item.id, e.target.value);
                     }}
+                    onBlur={() => persistItemOnBlur(item.id)}
                     className={textareaClass}
                     aria-describedby={`annotation-hint-${item.id}`}
                   />
@@ -771,7 +873,7 @@ export function ChecklistFillWizard({
           {!formLocked ? (
             <Button
               type="button"
-              variant="secondary"
+              variant={isLast ? "default" : "secondary"}
               disabled={isPending}
               onClick={() => {
                 setAdvanceError(null);
@@ -858,7 +960,7 @@ export function ChecklistFillWizard({
                       onClick={() => {
                         setApproveError(null);
                         startApproveTransition(async () => {
-                          const synced = await syncAllResponsesToServer();
+                          const synced = await runReconcileThenSync();
                           if (!synced.ok) {
                             setApproveError(synced.error);
                             return;
@@ -869,6 +971,12 @@ export function ChecklistFillWizard({
                             return;
                           }
                           setDossierApprovedAt(r.approvedAt);
+                          const nextInBatch = getNextBatchItemAfterSession(sessionId);
+                          if (nextInBatch) {
+                            setMultiAreaNextDialog(nextInBatch);
+                          } else {
+                            clearChecklistFillBatch();
+                          }
                           router.refresh();
                         });
                       }}
@@ -904,9 +1012,9 @@ export function ChecklistFillWizard({
             <DialogTitle>Finalizar e compilar dossiê?</DialogTitle>
             <DialogDescription>
               Será gerado um relatório único com todas as seções, avaliações, textos de
-              não conformidade, anotações e fotos. Os dados já estão salvos. Ao
-              confirmar, todos os itens obrigatórios devem estar válidos; caso falte
-              algum requisito, indicamos a seção a corrigir.
+              não conformidade, anotações e fotos. Ao confirmar, sincronizamos com o
+              servidor e validamos tudo outra vez. Se faltar algum requisito, indicamos a
+              seção a corrigir.
             </DialogDescription>
           </DialogHeader>
           {finalizeDialogError ? (
@@ -942,7 +1050,7 @@ export function ChecklistFillWizard({
                 setFinalizeDialogError(null);
                 setFinalizeBusy(true);
                 void (async () => {
-                  const synced = await syncAllResponsesToServer();
+                  const synced = await runReconcileThenSync();
                   setFinalizeBusy(false);
                   if (!synced.ok) {
                     setFinalizeDialogError(synced.error);
@@ -1049,6 +1157,57 @@ export function ChecklistFillWizard({
                 className="border-0 bg-transparent p-3 shadow-none sm:p-4"
               />
             ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={multiAreaNextDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) setMultiAreaNextDialog(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Próxima área</DialogTitle>
+            <DialogDescription className="space-y-3">
+              <span className="block">
+                Você selecionou várias áreas para este checklist. Deseja iniciar agora o
+                preenchimento da próxima?
+              </span>
+              {multiAreaNextDialog ? (
+                <span className="text-foreground block text-sm font-semibold">
+                  {multiAreaNextDialog.areaName?.trim() ||
+                    (multiAreaNextDialog.areaId
+                      ? `Área ${multiAreaNextDialog.areaId.slice(0, 8)}…`
+                      : "Próxima área")}
+                </span>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setMultiAreaNextDialog(null);
+                clearChecklistFillBatch();
+              }}
+            >
+              Preencher depois
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                const next = multiAreaNextDialog;
+                setMultiAreaNextDialog(null);
+                if (next) {
+                  router.push(`/checklists/preencher/${next.sessionId}`);
+                }
+              }}
+            >
+              Iniciar checklist
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

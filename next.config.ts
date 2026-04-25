@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
     serverActions: {
-      bodySizeLimit: "7mb",
+      bodySizeLimit: "210mb",
     },
   },
   async headers() {

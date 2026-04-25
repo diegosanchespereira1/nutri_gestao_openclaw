@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, Globe, Lock, UserCircle } from "lucide-react";
+import { Building2, ChevronRight, Globe, Lock, UserCircle } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -10,6 +10,13 @@ const settingsItems = [
     icon: UserCircle,
     label: "Perfil profissional e CRN",
     description: "Nome, CRN e dados de identificação usados em documentos.",
+  },
+  {
+    href: "/definicoes/empresa",
+    icon: Building2,
+    label: "Empresa e logotipo",
+    description:
+      "Logotipo usado nos PDFs, e-mails e comunicações da sua empresa.",
   },
   {
     href: "/definicoes/regiao",

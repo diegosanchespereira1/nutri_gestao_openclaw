@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
+import { buildChecklistDossierPdfFilename } from "@/lib/checklist-dossier-pdf-filename";
 import { buildApprovedDossierPdfBytes } from "@/lib/pdf/build-approved-dossier-pdf";
 import { sendDossierPdfViaResend } from "@/lib/email/send-dossier-email-resend";
 import { createClient } from "@/lib/supabase/server";
@@ -72,18 +73,28 @@ export async function trySendDossierEmailAfterApprove(
 
   try {
     const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+      sessionId,
       template: bundle.template,
       responses: bundle.responses,
       establishmentLabel: bundle.establishmentLabel,
+      clientLabel: bundle.pdfClientLabel,
+      areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+    });
+
+    const attachmentFilename = buildChecklistDossierPdfFilename({
+      clientLabel: bundle.pdfClientLabel,
+      areaLabel: bundle.areaName?.trim() || "sem_area",
+      approvalIso: bundle.session.dossier_approved_at as string,
+      duplicateIndex: 0,
     });
 
     const sent = await sendDossierPdfViaResend({
       to: recipients,
       subjectEstablishmentLine: bundle.establishmentLabel,
       pdfBytes: bytes,
-      attachmentFilename: "dossie-checklist.pdf",
+      attachmentFilename,
     });
 
     if (sent.ok) {
@@ -151,18 +162,28 @@ export async function resendDossierEmailAction(
 
   try {
     const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+      sessionId,
       template: bundle.template,
       responses: bundle.responses,
       establishmentLabel: bundle.establishmentLabel,
+      clientLabel: bundle.pdfClientLabel,
+      areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+    });
+
+    const attachmentFilenameResend = buildChecklistDossierPdfFilename({
+      clientLabel: bundle.pdfClientLabel,
+      areaLabel: bundle.areaName?.trim() || "sem_area",
+      approvalIso: bundle.session.dossier_approved_at as string,
+      duplicateIndex: 0,
     });
 
     const sent = await sendDossierPdfViaResend({
       to: recipients,
       subjectEstablishmentLine: bundle.establishmentLabel,
       pdfBytes: bytes,
-      attachmentFilename: "dossie-checklist.pdf",
+      attachmentFilename: attachmentFilenameResend,
     });
 
     if (!sent.ok) {
@@ -313,18 +334,28 @@ export async function sendDossierPdfToClientFromSessionAction(
 
   try {
     const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+      sessionId,
       template: bundle.template,
       responses: bundle.responses,
       establishmentLabel: bundle.establishmentLabel,
+      clientLabel: bundle.pdfClientLabel,
+      areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+    });
+
+    const attachmentFilenameSession = buildChecklistDossierPdfFilename({
+      clientLabel: bundle.pdfClientLabel,
+      areaLabel: bundle.areaName?.trim() || "sem_area",
+      approvalIso: bundle.session.dossier_approved_at as string,
+      duplicateIndex: 0,
     });
 
     const sent = await sendDossierPdfViaResend({
       to: rec.to,
       subjectEstablishmentLine: bundle.establishmentLabel,
       pdfBytes: bytes,
-      attachmentFilename: "dossie-checklist.pdf",
+      attachmentFilename: attachmentFilenameSession,
     });
 
     if (!sent.ok) {

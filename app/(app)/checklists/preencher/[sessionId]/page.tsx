@@ -41,20 +41,23 @@ export default async function ChecklistPreencherPage({
           </h1>
           <PageHelpHint ariaLabel="Como funciona o preenchimento do checklist">
             <p>
-              Respostas são salvas ao alterar cada item. Você pode pular entre seções com{" "}
-              <strong>Ir para seção</strong> ou <strong>Próxima seção</strong> /{" "}
-              <strong>Seção anterior</strong> sem preencher tudo de uma vez.
+              A <strong>avaliação</strong> (Conforme / Não conforme / Não aplicável) grava ao clicar.{" "}
+              <strong>Descrição de não conformidade</strong> e <strong>anotação</strong> salvam ao sair
+              do campo (sem gravar a cada tecla). Ao mudar de seção, os itens da seção atual
+              são enviados ao servidor. Você pode usar <strong>Ir para seção</strong>,{" "}
+              <strong>Próxima seção</strong> ou <strong>Seção anterior</strong> sem preencher tudo de
+              uma vez.
             </p>
             <p>
-              Use <strong>Pré-visualizar dossiê</strong> para revisar o rascunho. Após escolher
-              a avaliação, você pode escrever uma <strong>anotação opcional</strong> por item. Pode
-              anexar fotos com <strong>Tirar foto</strong> (câmera no celular/tablet) ou{" "}
-              <strong>Galeria</strong>.
+              Use <strong>Pré-visualizar dossiê</strong> para revisar o rascunho. Pode anexar fotos com{" "}
+              <strong>Tirar foto</strong> (câmera no celular/tablet) ou <strong>Galeria</strong>.
             </p>
             <p>
-              Quando terminar, use <strong>Finalizar e ver dossiê</strong>: só aí é obrigatório
-              que todos os requisitos estejam válidos; depois você pode <strong>ajustar textos</strong>{" "}
-              no preview e <strong>aprovar</strong> para registrar (imutável).
+              Em <strong>Finalizar e ver dossiê</strong> e em <strong>Aprovar dossiê</strong>, o
+              sistema reconcilia com o servidor e valida de novo — evita perder textos já
+              gravados. Só aí é obrigatório que todos os requisitos estejam válidos; depois você pode{" "}
+              <strong>ajustar textos</strong> no preview e <strong>aprovar</strong> para registrar
+              (imutável).
             </p>
           </PageHelpHint>
         </div>

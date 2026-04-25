@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 
+import {
+  contentDispositionWithFilename,
+  resolveChecklistDossierPdfFilename,
+} from "@/lib/checklist-dossier-pdf-filename";
 import { CHECKLIST_DOSSIER_PDFS_BUCKET } from "@/lib/constants/checklist-dossier-pdf";
 import { createClient } from "@/lib/supabase/server";
 
@@ -44,17 +48,21 @@ export async function GET(
   }
 
   const buf = Buffer.from(await blob.arrayBuffer());
-  const safeSession = String(row.session_id ?? "export")
-    .replace(/[^a-z0-9-]/gi, "-")
-    .slice(0, 36);
-  const filename = `dossie-checklist-${safeSession}.pdf`;
-  const disposition = asDownload ? "attachment" : "inline";
+  const filename =
+    (await resolveChecklistDossierPdfFilename(supabase, jobId)) ??
+    `dossie-checklist-${String(row.session_id ?? "export")
+      .replace(/[^a-z0-9-]/gi, "-")
+      .slice(0, 36)}.pdf`;
+  const dispositionKind = asDownload ? "attachment" : "inline";
 
   return new NextResponse(buf, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `${disposition}; filename="${filename}"`,
+      "Content-Disposition": contentDispositionWithFilename(
+        dispositionKind,
+        filename,
+      ),
       "Cache-Control": "private, no-store",
     },
   });

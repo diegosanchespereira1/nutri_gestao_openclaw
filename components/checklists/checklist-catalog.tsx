@@ -41,6 +41,7 @@ import {
   registerChecklistEstablishmentOpenAction,
   searchOwnerEstablishmentsAction,
 } from "@/lib/actions/establishments";
+import { saveChecklistFillBatch } from "@/lib/checklist-fill-batch-storage";
 import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
 import type { EstablishmentAreaOption } from "@/lib/types/establishment-areas";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
@@ -415,6 +416,25 @@ export function ChecklistCatalog({
     });
     if (result.ok) {
       await registerEstablishmentOpen();
+      if (result.sessionIds.length >= 2) {
+        const items = result.sessionIds.map((sid, i) => {
+          const areaId =
+            i < selectedAreaIds.length ? (selectedAreaIds[i] ?? null) : null;
+          const area = areaId
+            ? availableAreas.find((a) => a.id === areaId)
+            : null;
+          return {
+            sessionId: sid,
+            areaId,
+            areaName: area?.name ?? null,
+          };
+        });
+        saveChecklistFillBatch({
+          templateId,
+          establishmentId,
+          items,
+        });
+      }
       router.push(`/checklists/preencher/${result.firstSessionId}`);
     } else {
       setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");

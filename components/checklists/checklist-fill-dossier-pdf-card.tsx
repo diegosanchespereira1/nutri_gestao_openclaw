@@ -64,7 +64,7 @@ export function ChecklistFillDossierPdfCard({
       router.refresh();
       const a = document.createElement("a");
       a.href = `${r.downloadUrl}?download=1`;
-      a.download = `dossier-${new Date().toISOString().split("T")[0]}.pdf`;
+      a.download = r.suggestedFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -96,7 +96,7 @@ export function ChecklistFillDossierPdfCard({
       // Forçar download em vez de abrir no navegador (mesma origem, sem URL do Storage)
       const a = document.createElement("a");
       a.href = `${r.downloadUrl}?download=1`;
-      a.download = `dossier-${new Date().toISOString().split("T")[0]}.pdf`;
+      a.download = r.suggestedFilename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

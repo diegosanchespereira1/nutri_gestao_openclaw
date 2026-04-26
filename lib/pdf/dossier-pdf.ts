@@ -456,6 +456,117 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
   ctx.y = cardBottom - 14;
 }
 
+/* ── Tabela de resumo por seção (resultado por categoria) ──────────────── */
+
+function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
+  const sections = input.sections;
+  if (sections.length === 0) return;
+
+  const COL_TITLE_W  = CONTENT_W * 0.42;
+  const COL_ITEMS_W  = CONTENT_W * 0.10;
+  const COL_OK_W     = CONTENT_W * 0.10;
+  const COL_NC_W     = CONTENT_W * 0.10;
+  const COL_NA_W     = CONTENT_W * 0.10;
+  const COL_SCORE_W  = CONTENT_W * 0.18;
+
+  const ROW_H     = 22;
+  const HEADER_H  = 26;
+  const PAD_X     = 8;
+  const labelSize = 7;
+  const valueSize = 9;
+
+  // Altura total: barra topo + header de colunas + linhas + espaçamento
+  const totalH = 6 + HEADER_H + sections.length * ROW_H + 10;
+  ensureVerticalSpace(ctx, totalH + 14);
+
+  const tableTop    = ctx.y;
+  const tableBottom = tableTop - totalH;
+
+  // Fundo geral
+  ctx.page.drawRectangle({ x: MARGIN_X, y: tableBottom, width: CONTENT_W, height: totalH, color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.5 });
+  // Barra topo navy
+  ctx.page.drawRectangle({ x: MARGIN_X, y: tableTop - 6, width: CONTENT_W, height: 6, color: C.navy });
+  drawTextLine(ctx, "RESULTADO POR SECAO", MARGIN_X + 10, tableTop - 1, 6.5, ctx.fontBold, rgb(0.72, 0.79, 0.92));
+
+  // Cabeçalho das colunas
+  const colsTop = tableTop - 6;
+  const colsBtm = colsTop - HEADER_H;
+  ctx.page.drawRectangle({ x: MARGIN_X, y: colsBtm, width: CONTENT_W, height: HEADER_H, color: C.rowAlt });
+
+  // Títulos das colunas
+  let cx = MARGIN_X + PAD_X;
+  const colHeaders = [
+    { w: COL_TITLE_W, label: "SECAO" },
+    { w: COL_ITEMS_W, label: "ITENS" },
+    { w: COL_OK_W,    label: "OK" },
+    { w: COL_NC_W,    label: "NC" },
+    { w: COL_NA_W,    label: "N/A" },
+    { w: COL_SCORE_W, label: "RESULTADO" },
+  ];
+  for (const col of colHeaders) {
+    drawTextLine(ctx, col.label, cx, colsTop - (HEADER_H - labelSize) / 2, labelSize, ctx.fontBold, C.textFaint);
+    cx += col.w;
+  }
+
+  // Linhas de dados
+  let rowTop = colsBtm;
+  for (let i = 0; i < sections.length; i++) {
+    const sec = sections[i];
+    const sc  = computeSectionScore(sec);
+    const ncs = sec.items.filter(it => it.outcome === "nc").length;
+    const oks = sec.items.filter(it => it.outcome === "conforme").length;
+    const nas = sec.items.filter(it => it.outcome === "na").length;
+
+    const rowBtm = rowTop - ROW_H;
+    if (i % 2 === 1) {
+      ctx.page.drawRectangle({ x: MARGIN_X, y: rowBtm, width: CONTENT_W, height: ROW_H, color: C.rowAlt });
+    }
+    // Borda inferior
+    ctx.page.drawLine({ start: { x: MARGIN_X, y: rowBtm }, end: { x: MARGIN_X + CONTENT_W, y: rowBtm }, thickness: 0.3, color: C.cardBorder });
+
+    let rx = MARGIN_X + PAD_X;
+    const midY = rowTop - ROW_H / 2 + valueSize / 2;
+
+    // Nome da seção (truncado)
+    const titleFolded = wrapByWidth(sec.title, ctx.font, valueSize, COL_TITLE_W - PAD_X * 2).slice(0, 1)[0] ?? "";
+    drawTextLine(ctx, titleFolded, rx, midY, valueSize, ctx.font, C.textPrimary);
+    rx += COL_TITLE_W;
+
+    // Colunas numéricas
+    const numCols = [
+      { w: COL_ITEMS_W, val: String(sec.items.length), color: C.textPrimary },
+      { w: COL_OK_W,    val: String(oks),              color: C.green       },
+      { w: COL_NC_W,    val: String(ncs),              color: ncs > 0 ? C.red : C.textMuted },
+      { w: COL_NA_W,    val: String(nas),              color: C.textMuted   },
+    ];
+    for (const col of numCols) {
+      const vw = ctx.fontBold.widthOfTextAtSize(col.val, valueSize);
+      drawTextLine(ctx, col.val, rx + (col.w - vw) / 2, midY, valueSize, ctx.fontBold, col.color);
+      rx += col.w;
+    }
+
+    // Coluna de score — pill colorido
+    if (sc.percentage !== null) {
+      const { label, palette } = scoreClassification(sc.percentage);
+      const pillText = `${sc.percentage}%  ${label.toUpperCase()}`;
+      const pillTW = ctx.fontBold.widthOfTextAtSize(pillText, 7.5);
+      const pillW = Math.min(pillTW + 10, COL_SCORE_W - 6);
+      const pillH = 14;
+      const pillX = rx + (COL_SCORE_W - pillW) / 2;
+      const pillY = rowBtm + (ROW_H - pillH) / 2;
+      ctx.page.drawRectangle({ x: pillX, y: pillY, width: pillW, height: pillH, color: palette.soft, borderColor: palette.border, borderWidth: 0.5 });
+      const tw = ctx.fontBold.widthOfTextAtSize(pillText, 7.5);
+      drawTextLine(ctx, pillText, pillX + (pillW - tw) / 2, pillY + pillH - 3, 7.5, ctx.fontBold, palette.ink);
+    } else {
+      drawTextLine(ctx, "-", rx + COL_SCORE_W / 2 - 2, midY, valueSize, ctx.font, C.textFaint);
+    }
+
+    rowTop = rowBtm;
+  }
+
+  ctx.y = tableBottom - 14;
+}
+
 /* ── Cabeçalho de seção V2 ─────────────────────────────────────────────── */
 
 type SectionScore = { percentage: number | null; earned: number; total: number };
@@ -562,8 +673,8 @@ async function drawItemRow(
   const STRIPE_W = 4;
   const PAD_H = 8;
   const TEXT_SIZE = 9.5;
-  const PILL_W = 58;
-  const innerW = CONTENT_W - STRIPE_W - 12 - PILL_W - 10;
+  const PILL_RESERVE = 80; // espaço reservado à direita para o pill de status
+  const innerW = CONTENT_W - STRIPE_W - 12 - PILL_RESERVE - 10;
 
   const descLines = wrapByWidth(
     redactSupabaseUrlsForPdf(item.description),
@@ -601,14 +712,15 @@ async function drawItemRow(
     lineTop -= TEXT_SIZE + 2.5;
   }
 
-  // Pill de status (direita)
-  const outcomeText = formatChecklistOutcomeLabel(item.outcome);
-  const pillX = MARGIN_X + CONTENT_W - PILL_W - 6;
+  // Pill de status (direita) — fold para evitar encoding error com Helvetica WinAnsi
+  const outcomeText = foldTextForPdf(formatChecklistOutcomeLabel(item.outcome));
+  const pillTextW = ctx.fontBold.widthOfTextAtSize(outcomeText, 8);
+  const pillW = pillTextW + 14;
+  const pillX = MARGIN_X + CONTENT_W - pillW - 6;
   const pillH = 16;
   const pillY = bottom + (rowH - pillH) / 2;
-  ctx.page.drawRectangle({ x: pillX, y: pillY, width: PILL_W, height: pillH, color: palette.soft, borderColor: palette.border, borderWidth: 0.5 });
-  const pillTextW = ctx.fontBold.widthOfTextAtSize(outcomeText, 8);
-  drawTextLine(ctx, outcomeText, pillX + (PILL_W - pillTextW) / 2, pillY + pillH - 4, 8, ctx.fontBold, palette.ink);
+  ctx.page.drawRectangle({ x: pillX, y: pillY, width: pillW, height: pillH, color: palette.soft, borderColor: palette.border, borderWidth: 0.5 });
+  drawTextLine(ctx, outcomeText, pillX + 7, pillY + pillH - 4, 8, ctx.fontBold, palette.ink);
 
   ctx.y = bottom;
 
@@ -789,6 +901,7 @@ export async function buildDossierPdfBytes(
   await drawHeader(ctx, input);
   drawKpiStrip(ctx, input);
   drawMetaCard(ctx, input);
+  drawSectionSummaryTable(ctx, input);
 
   for (let i = 0; i < input.sections.length; i++) {
     const section = input.sections[i];

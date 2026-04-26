@@ -21,80 +21,72 @@ export function foldTextForPdf(s: string): string {
     .trim();
 }
 
-/* ── Paleta inspirada na UI do pop-up (shadcn + Tailwind) ──────────────── */
-const COLORS = {
-  pageBg: rgb(0.973, 0.976, 0.984),
-  cardBg: rgb(1, 1, 1),
-  cardBorder: rgb(0.898, 0.91, 0.922),
-  softBorder: rgb(0.937, 0.945, 0.953),
-  textPrimary: rgb(0.106, 0.122, 0.157),
-  textMuted: rgb(0.42, 0.447, 0.502),
-  textFaint: rgb(0.62, 0.647, 0.702),
+/* ── Paleta V2 — Premium Navy ──────────────────────────────────────────── */
+const C = {
+  // Fundos de página
+  pageBg:      rgb(0.945, 0.949, 0.957), // #F1F2F4
 
-  brandBg: rgb(0.933, 0.953, 1),
-  brandAccent: rgb(0.129, 0.337, 0.847),
-  brandInk: rgb(0.051, 0.176, 0.451),
+  // Navy principal (cabeçalho, badges de seção, rodapé)
+  navy:        rgb(0.106, 0.165, 0.290), // #1B2A4A
+  navyDeep:    rgb(0.063, 0.110, 0.212), // #102036
+  navyLight:   rgb(0.208, 0.302, 0.498), // #354D7F
 
-  greenSoft: rgb(0.863, 0.969, 0.886),
-  greenBorder: rgb(0.706, 0.902, 0.761),
-  greenInk: rgb(0.075, 0.404, 0.184),
+  // Sky (acento principal)
+  sky:         rgb(0.055, 0.647, 0.914), // #0EA5E9
+  skyLight:    rgb(0.816, 0.929, 0.980), // #D0EDFA
 
-  blueSoft: rgb(0.859, 0.918, 1),
-  blueBorder: rgb(0.678, 0.812, 0.984),
-  blueInk: rgb(0.063, 0.298, 0.631),
+  // Branco e cinzas de card
+  white:       rgb(1, 1, 1),
+  cardBg:      rgb(1, 1, 1),
+  cardBorder:  rgb(0.878, 0.894, 0.914), // #E0E4E9
+  softBorder:  rgb(0.922, 0.933, 0.945), // #EBF0F1
+  rowAlt:      rgb(0.973, 0.976, 0.984), // linha alternada suave
 
-  amberSoft: rgb(0.996, 0.925, 0.78),
-  amberBorder: rgb(0.988, 0.824, 0.498),
-  amberInk: rgb(0.478, 0.278, 0.004),
+  // Texto
+  textPrimary: rgb(0.098, 0.118, 0.157), // #191E28
+  textMuted:   rgb(0.408, 0.435, 0.490), // #686F7D
+  textFaint:   rgb(0.612, 0.635, 0.690), // #9CA2B0
 
-  redSoft: rgb(0.996, 0.906, 0.906),
-  redBorder: rgb(0.988, 0.729, 0.729),
-  redInk: rgb(0.608, 0.09, 0.09),
-  redAccent: rgb(0.863, 0.149, 0.149),
+  // Verde — Conforme
+  green:       rgb(0.106, 0.475, 0.243), // #1B7A3E
+  greenLight:  rgb(0.910, 0.961, 0.933), // #E8F5EE
+  greenBorder: rgb(0.690, 0.886, 0.741), // #B0E2BD
+  greenMid:    rgb(0.165, 0.600, 0.310), // #2A994F
 
-  graySoft: rgb(0.961, 0.965, 0.973),
-  grayInk: rgb(0.341, 0.369, 0.439),
+  // Âmbar — Regular
+  amber:       rgb(0.851, 0.467, 0.024), // #D97706
+  amberLight:  rgb(0.996, 0.953, 0.780), // #FEF3C7
+  amberBorder: rgb(0.988, 0.824, 0.498), // #FCD27F
+
+  // Vermelho — NC / Crítico
+  red:         rgb(0.725, 0.110, 0.110), // #B91C1C
+  redLight:    rgb(0.996, 0.886, 0.886), // #FEE2E2
+  redBorder:   rgb(0.988, 0.729, 0.729), // #FCBABA
+  redStripe:   rgb(0.863, 0.149, 0.149), // #DC2626
+
+  // Cinza — NA / neutro
+  graySoft:    rgb(0.961, 0.965, 0.973),
+  grayBorder:  rgb(0.878, 0.894, 0.914),
+  grayInk:     rgb(0.341, 0.369, 0.439),
 };
 
-type Palette = {
-  soft: RGB;
-  border: RGB;
-  ink: RGB;
-};
+type Palette = { soft: RGB; border: RGB; ink: RGB };
 
 function scoreClassification(pct: number): { label: string; palette: Palette } {
-  if (pct >= 90)
-    return {
-      label: "Excelente",
-      palette: { soft: COLORS.greenSoft, border: COLORS.greenBorder, ink: COLORS.greenInk },
-    };
-  if (pct >= 75)
-    return {
-      label: "Bom",
-      palette: { soft: COLORS.blueSoft, border: COLORS.blueBorder, ink: COLORS.blueInk },
-    };
-  if (pct >= 50)
-    return {
-      label: "Regular",
-      palette: { soft: COLORS.amberSoft, border: COLORS.amberBorder, ink: COLORS.amberInk },
-    };
-  return {
-    label: "Critico",
-    palette: { soft: COLORS.redSoft, border: COLORS.redBorder, ink: COLORS.redInk },
-  };
+  if (pct >= 90) return { label: "Excelente", palette: { soft: C.greenLight,  border: C.greenBorder, ink: C.green  } };
+  if (pct >= 75) return { label: "Bom",       palette: { soft: C.skyLight,    border: C.sky,         ink: C.navy  } };
+  if (pct >= 50) return { label: "Regular",   palette: { soft: C.amberLight,  border: C.amberBorder, ink: C.amber } };
+  return               { label: "Critico",    palette: { soft: C.redLight,    border: C.redBorder,   ink: C.red   } };
 }
 
 function outcomePalette(outcome: ChecklistFillOutcome | null): Palette {
-  if (outcome === "conforme")
-    return { soft: COLORS.greenSoft, border: COLORS.greenBorder, ink: COLORS.greenInk };
-  if (outcome === "nc")
-    return { soft: COLORS.redSoft, border: COLORS.redBorder, ink: COLORS.redInk };
-  if (outcome === "na")
-    return { soft: COLORS.graySoft, border: COLORS.cardBorder, ink: COLORS.grayInk };
-  return { soft: COLORS.graySoft, border: COLORS.cardBorder, ink: COLORS.textMuted };
+  if (outcome === "conforme") return { soft: C.greenLight, border: C.greenBorder, ink: C.green };
+  if (outcome === "nc")       return { soft: C.redLight,   border: C.redBorder,   ink: C.red   };
+  if (outcome === "na")       return { soft: C.graySoft,   border: C.grayBorder,  ink: C.grayInk };
+  return                             { soft: C.graySoft,   border: C.grayBorder,  ink: C.textMuted };
 }
 
-/* ── Imagens: detecção de formato e embed seguro ───────────────────────── */
+/* ── Detecção de formato e embed de imagem ─────────────────────────────── */
 
 type ImageKind = "jpeg" | "png" | "webp" | "unknown";
 
@@ -102,93 +94,53 @@ function detectImageKind(buffer: Buffer): ImageKind {
   if (buffer.length < 12) return "unknown";
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return "jpeg";
   if (
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47 &&
-    buffer[4] === 0x0d &&
-    buffer[5] === 0x0a &&
-    buffer[6] === 0x1a &&
-    buffer[7] === 0x0a
-  )
-    return "png";
+    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 &&
+    buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a
+  ) return "png";
   if (
-    buffer[0] === 0x52 &&
-    buffer[1] === 0x49 &&
-    buffer[2] === 0x46 &&
-    buffer[3] === 0x46 &&
-    buffer[8] === 0x57 &&
-    buffer[9] === 0x45 &&
-    buffer[10] === 0x42 &&
-    buffer[11] === 0x50
-  )
-    return "webp";
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50
+  ) return "webp";
   return "unknown";
 }
 
-async function embedImageSmart(
-  pdf: PDFDocument,
-  buffer: Buffer,
-): Promise<PDFImage | null> {
+async function embedImageSmart(pdf: PDFDocument, buffer: Buffer): Promise<PDFImage | null> {
   const kind = detectImageKind(buffer);
   try {
     if (kind === "jpeg") return await pdf.embedJpg(buffer);
-    if (kind === "png") return await pdf.embedPng(buffer);
-    // pdf-lib não suporta WebP; tentamos JPG/PNG como fallback best-effort.
-    try {
-      return await pdf.embedJpg(buffer);
-    } catch {
-      return await pdf.embedPng(buffer);
-    }
-  } catch {
-    return null;
-  }
+    if (kind === "png")  return await pdf.embedPng(buffer);
+    try { return await pdf.embedJpg(buffer); } catch { return await pdf.embedPng(buffer); }
+  } catch { return null; }
 }
 
 /* ── Quebra de texto com medição real ──────────────────────────────────── */
 
-function wrapByWidth(
-  text: string,
-  font: PDFFont,
-  size: number,
-  maxWidth: number,
-): string[] {
+function wrapByWidth(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
   const folded = foldTextForPdf(text);
   if (folded.length === 0) return [""];
   const words = folded.split(" ");
   const lines: string[] = [];
   let cur = "";
-
   const width = (s: string) => font.widthOfTextAtSize(s, size);
 
   for (const w of words) {
     const candidate = cur.length === 0 ? w : `${cur} ${w}`;
-    if (width(candidate) <= maxWidth) {
-      cur = candidate;
-      continue;
-    }
+    if (width(candidate) <= maxWidth) { cur = candidate; continue; }
     if (cur.length > 0) lines.push(cur);
-    // Palavra sozinha maior que a largura: quebra dura por caracter.
     if (width(w) > maxWidth) {
       let acc = "";
       for (const ch of w) {
-        if (width(acc + ch) <= maxWidth) {
-          acc += ch;
-        } else {
-          if (acc.length > 0) lines.push(acc);
-          acc = ch;
-        }
+        if (width(acc + ch) <= maxWidth) { acc += ch; }
+        else { if (acc.length > 0) lines.push(acc); acc = ch; }
       }
       cur = acc;
-    } else {
-      cur = w;
-    }
+    } else { cur = w; }
   }
   if (cur.length > 0) lines.push(cur);
   return lines;
 }
 
-/* ── Tipos públicos ────────────────────────────────────────────────────── */
+/* ── Tipos públicos (API imutável) ─────────────────────────────────────── */
 
 export type DossierPdfItemInput = {
   description: string;
@@ -226,13 +178,13 @@ export type DossierPdfBuildInput = {
   } | null;
 };
 
-/* ── Pipeline principal ────────────────────────────────────────────────── */
+/* ── Dimensões da página ───────────────────────────────────────────────── */
 
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
-const MARGIN_X = 40;
-const MARGIN_TOP = 40;
-const MARGIN_BOTTOM = 44;
+const MARGIN_X = 36;
+const MARGIN_TOP = 0;   // header começa no topo absoluto
+const MARGIN_BOTTOM = 48;
 const CONTENT_W = PAGE_W - MARGIN_X * 2;
 
 type Ctx = {
@@ -247,227 +199,254 @@ type Ctx = {
 
 function startNewPage(ctx: Ctx): void {
   const page = ctx.pdf.addPage([PAGE_W, PAGE_H]);
-  page.drawRectangle({
-    x: 0,
-    y: 0,
-    width: PAGE_W,
-    height: PAGE_H,
-    color: COLORS.pageBg,
-  });
+  page.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: C.pageBg });
   ctx.page = page;
-  ctx.y = PAGE_H - MARGIN_TOP;
+  ctx.y = PAGE_H - 16;
   ctx.pageIndex += 1;
 }
 
 function ensureVerticalSpace(ctx: Ctx, needed: number): void {
-  if (ctx.y - needed < MARGIN_BOTTOM) {
-    startNewPage(ctx);
-  }
+  if (ctx.y - needed < MARGIN_BOTTOM) startNewPage(ctx);
 }
 
 function drawTextLine(
-  ctx: Ctx,
-  text: string,
-  x: number,
-  topY: number,
-  size: number,
-  font: PDFFont,
-  color: RGB,
+  ctx: Ctx, text: string, x: number, topY: number,
+  size: number, font: PDFFont, color: RGB,
 ): void {
-  ctx.page.drawText(text, {
-    x,
-    y: topY - size,
-    size,
-    font,
-    color,
-  });
+  ctx.page.drawText(text, { x, y: topY - size, size, font, color });
 }
 
-/* ── Cabeçalho com logo e título ───────────────────────────────────────── */
+function formatPoints(value: number): string {
+  if (Number.isInteger(value)) return value.toString();
+  return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
 
-async function drawHeader(
-  ctx: Ctx,
-  input: DossierPdfBuildInput,
-): Promise<void> {
-  const bandH = 96;
-  const bandTop = PAGE_H - 8;
-  const bandBottom = bandTop - bandH;
+/* ── Cabeçalho V2 — banda navy full-width ──────────────────────────────── */
 
-  ctx.page.drawRectangle({
-    x: 0,
-    y: bandBottom,
-    width: PAGE_W,
-    height: bandH + 8,
-    color: COLORS.brandBg,
-  });
-  ctx.page.drawRectangle({
-    x: 0,
-    y: bandBottom - 3,
-    width: PAGE_W,
-    height: 3,
-    color: COLORS.brandAccent,
-  });
+async function drawHeader(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> {
+  const BAND_H = 108;
+  const bandBottom = PAGE_H - BAND_H;
 
-  const padding = MARGIN_X;
-  const logoSize = 64;
-  const logoX = padding;
-  const logoY = bandBottom + (bandH - logoSize) / 2;
+  // Fundo navy full-width
+  ctx.page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: BAND_H, color: C.navy });
+
+  // Linha de acento sky na base da banda
+  ctx.page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: 3, color: C.sky });
+
+  // ── Logo (círculo branco com logo dentro) ──
+  const logoSize = 56;
+  const logoX = MARGIN_X;
+  const logoCenterY = bandBottom + BAND_H / 2;
+  const logoY = logoCenterY - logoSize / 2;
 
   let logo: PDFImage | null = null;
-  if (input.logoBuffer) {
-    logo = await embedImageSmart(ctx.pdf, input.logoBuffer);
-  }
+  if (input.logoBuffer) logo = await embedImageSmart(ctx.pdf, input.logoBuffer);
 
   if (logo) {
-    const ratio = logo.width / logo.height;
-    let w = logoSize;
-    let h = logoSize;
-    if (ratio > 1) h = logoSize / ratio;
-    else w = logoSize * ratio;
-
+    // Quadrado branco com borda sky
     ctx.page.drawRectangle({
-      x: logoX,
-      y: logoY,
-      width: logoSize,
-      height: logoSize,
-      color: COLORS.cardBg,
-      borderColor: COLORS.brandAccent,
-      borderWidth: 0.6,
+      x: logoX, y: logoY, width: logoSize, height: logoSize,
+      color: C.white, borderColor: C.sky, borderWidth: 1,
     });
-    ctx.page.drawImage(logo, {
-      x: logoX + (logoSize - w) / 2,
-      y: logoY + (logoSize - h) / 2,
-      width: w,
-      height: h,
-    });
+    const ratio = logo.width / logo.height;
+    let w = logoSize - 8, h = logoSize - 8;
+    if (ratio > 1) h = (logoSize - 8) / ratio; else w = (logoSize - 8) * ratio;
+    ctx.page.drawImage(logo, { x: logoX + (logoSize - w) / 2, y: logoY + (logoSize - h) / 2, width: w, height: h });
   }
 
-  const textX = logo ? logoX + logoSize + 16 : padding;
-  const textW = PAGE_W - textX - padding;
+  // ── Textos do cabeçalho ──
+  const textX = logo ? logoX + logoSize + 14 : MARGIN_X;
+  const scoreBoxW = 110;
+  const textW = PAGE_W - textX - scoreBoxW - MARGIN_X - 16;
 
-  drawTextLine(
-    ctx,
-    "DOSSIE DE CHECKLIST",
-    textX,
-    bandTop - 18,
-    9,
-    ctx.fontBold,
-    COLORS.brandAccent,
-  );
+  // Eyebrow — label do documento
+  drawTextLine(ctx, "DOSSIE DE AUDITORIA", textX, PAGE_H - 18, 7.5, ctx.fontBold, C.sky);
 
-  const titleLines = wrapByWidth(
-    input.templateName,
-    ctx.fontBold,
-    17,
-    textW,
-  ).slice(0, 2);
-  let titleYTop = bandTop - 36;
+  // Título — nome do checklist
+  const titleLines = wrapByWidth(input.templateName, ctx.fontBold, 16, textW).slice(0, 2);
+  let titleTop = PAGE_H - 32;
   for (const line of titleLines) {
-    drawTextLine(ctx, line, textX, titleYTop, 17, ctx.fontBold, COLORS.brandInk);
-    titleYTop -= 20;
+    drawTextLine(ctx, line, textX, titleTop, 16, ctx.fontBold, C.white);
+    titleTop -= 19;
   }
 
-  drawTextLine(
-    ctx,
-    foldTextForPdf(input.clientLabel || input.establishmentLabel),
-    textX,
-    titleYTop - 2,
-    9.5,
-    ctx.font,
-    COLORS.textMuted,
-  );
+  // Subtítulo — estabelecimento
+  const estLabel = foldTextForPdf(input.clientLabel || input.establishmentLabel);
+  drawTextLine(ctx, estLabel, textX, titleTop - 2, 9.5, ctx.font, rgb(0.78, 0.82, 0.88));
 
-  ctx.y = bandBottom - 16;
+  // Data e profissional — linha abaixo
+  const metaLine = foldTextForPdf(
+    `${input.approvedAtLabel}  |  ${input.professionalName}${input.crn ? ` | CRN ${input.crn}` : ""}`,
+  );
+  drawTextLine(ctx, metaLine, textX, titleTop - 16, 8, ctx.font, rgb(0.62, 0.67, 0.76));
+
+  // ── Score Box (canto direito da banda) ──
+  if (input.score) {
+    const { percentage, pointsEarned, pointsTotal } = input.score;
+    const { label, palette } = scoreClassification(percentage);
+    const boxX = PAGE_W - MARGIN_X - scoreBoxW;
+    const boxH = BAND_H - 20;
+    const boxY = bandBottom + (BAND_H - boxH) / 2;
+
+    // Caixa com borda colorida
+    ctx.page.drawRectangle({
+      x: boxX, y: boxY, width: scoreBoxW, height: boxH,
+      color: rgb(0.11, 0.19, 0.34), borderColor: palette.ink, borderWidth: 1,
+    });
+    // Topo colorido
+    ctx.page.drawRectangle({ x: boxX, y: boxY + boxH - 4, width: scoreBoxW, height: 4, color: palette.ink });
+
+    const pctStr = `${percentage}%`;
+    const pctSize = 30;
+    const pctW = ctx.fontBold.widthOfTextAtSize(pctStr, pctSize);
+    const pctX = boxX + (scoreBoxW - pctW) / 2;
+    drawTextLine(ctx, pctStr, pctX, boxY + boxH - 14, pctSize, ctx.fontBold, C.white);
+
+    const labelStr = label.toUpperCase();
+    const labelW = ctx.fontBold.widthOfTextAtSize(labelStr, 8);
+    drawTextLine(ctx, labelStr, boxX + (scoreBoxW - labelW) / 2, boxY + boxH - 48, 8, ctx.fontBold, palette.ink);
+
+    const ptStr = `${formatPoints(pointsEarned)}/${formatPoints(pointsTotal)} pts`;
+    const ptW = ctx.font.widthOfTextAtSize(ptStr, 7.5);
+    drawTextLine(ctx, ptStr, boxX + (scoreBoxW - ptW) / 2, boxY + 14, 7.5, ctx.font, rgb(0.72, 0.76, 0.84));
+  }
+
+  ctx.y = bandBottom - 14;
 }
 
-/* ── Card de metadados (cliente, profissional, data) ───────────────────── */
+/* ── Faixa KPI (4 células abaixo do cabeçalho) ─────────────────────────── */
 
-function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
-  const padding = 14;
-  const labelSize = 7.5;
-  const valueSize = 10.5;
-  const rowGap = 6;
+function drawKpiStrip(ctx: Ctx, input: DossierPdfBuildInput): void {
+  // Contagem de itens a partir das seções
+  let totalItems = 0, conformes = 0, ncs = 0, nas = 0;
+  for (const sec of input.sections) {
+    for (const it of sec.items) {
+      totalItems += 1;
+      if (it.outcome === "conforme") conformes += 1;
+      else if (it.outcome === "nc") ncs += 1;
+      else if (it.outcome === "na") nas += 1;
+    }
+  }
+  const applied = conformes + ncs;
 
-  const items: { label: string; value: string }[] = [
+  const stripH = 52;
+  ensureVerticalSpace(ctx, stripH + 10);
+
+  const stripTop = ctx.y;
+  const stripBottom = stripTop - stripH;
+  const cellW = CONTENT_W / 4;
+
+  const cells: { topColor: RGB; label: string; value: string; sub?: string }[] = [
+    { topColor: C.sky,   label: "ITENS AVALIADOS", value: String(totalItems),   sub: `${nas} N/A` },
+    { topColor: C.green, label: "CONFORMES",        value: String(conformes),   sub: applied > 0 ? `${Math.round((conformes/applied)*100)}%` : "—" },
+    { topColor: C.red,   label: "NAO CONFORMES",   value: String(ncs),          sub: applied > 0 ? `${Math.round((ncs/applied)*100)}%` : "—" },
     {
-      label: "ESTABELECIMENTO",
-      value: foldTextForPdf(input.establishmentLabel) || "—",
-    },
-    {
-      label: "CHECKLIST",
-      value: foldTextForPdf(input.templateName) || "—",
-    },
-    {
-      label: "PROFISSIONAL",
-      value: foldTextForPdf(input.professionalName) || "—",
-    },
-    {
-      label: "CRN",
-      value: foldTextForPdf(input.crn) || "—",
-    },
-    {
-      label: "DATA DE EXECUCAO",
-      value: foldTextForPdf(input.approvedAtLabel) || "—",
+      topColor: input.score ? scoreClassification(input.score.percentage).palette.ink : C.navy,
+      label: "PONTUACAO",
+      value: input.score ? `${input.score.percentage}%` : "—",
+      sub: input.score ? `${formatPoints(input.score.pointsEarned)}/${formatPoints(input.score.pointsTotal)}` : "",
     },
   ];
 
-  if (input.areaName && input.areaName.trim().length > 0) {
-    items.splice(2, 0, {
-      label: "AREA AVALIADA",
-      value: foldTextForPdf(input.areaName),
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const cellX = MARGIN_X + i * cellW;
+    const isLast = i === cells.length - 1;
+
+    // Fundo célula
+    ctx.page.drawRectangle({
+      x: cellX, y: stripBottom, width: cellW, height: stripH,
+      color: C.cardBg,
+      borderColor: C.cardBorder, borderWidth: 0.5,
     });
+
+    // Barra colorida no topo
+    ctx.page.drawRectangle({ x: cellX, y: stripTop - 3, width: cellW, height: 3, color: cell.topColor });
+
+    // Label
+    const lx = cellX + 10;
+    drawTextLine(ctx, cell.label, lx, stripTop - 12, 6.5, ctx.fontBold, C.textFaint);
+
+    // Valor grande
+    const vSize = isLast ? 18 : 22;
+    drawTextLine(ctx, cell.value, lx, stripTop - 22, vSize, ctx.fontBold, C.textPrimary);
+
+    // Sub
+    if (cell.sub) {
+      const vW = ctx.fontBold.widthOfTextAtSize(cell.value, vSize);
+      drawTextLine(ctx, cell.sub, lx + vW + 5, stripTop - 32, 8, ctx.font, C.textMuted);
+    }
   }
 
-  const colGap = 12;
+  ctx.y = stripBottom - 14;
+}
+
+/* ── Card de metadados V2 ──────────────────────────────────────────────── */
+
+function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
+  const padding = 12;
+  const labelSize = 7;
+  const valueSize = 10;
+  const rowGap = 8;
+
+  const items: { label: string; value: string }[] = [
+    { label: "ESTABELECIMENTO", value: foldTextForPdf(input.establishmentLabel) || "—" },
+    { label: "CHECKLIST",       value: foldTextForPdf(input.templateName) || "—" },
+    { label: "PROFISSIONAL",    value: foldTextForPdf(input.professionalName) || "—" },
+    { label: "CRN",             value: foldTextForPdf(input.crn) || "—" },
+    { label: "DATA DE EXECUCAO",value: foldTextForPdf(input.approvedAtLabel) || "—" },
+  ];
+  if (input.areaName?.trim()) {
+    items.splice(2, 0, { label: "AREA AVALIADA", value: foldTextForPdf(input.areaName) });
+  }
+
+  const colGap = 10;
   const colCount = 2;
-  const colW = (CONTENT_W - padding * 2 - colGap * (colCount - 1)) / colCount;
-
+  const colW = (CONTENT_W - padding * 2 - colGap) / colCount;
   const rowsNeeded = Math.ceil(items.length / colCount);
-  let maxRowH = 0;
-  const rowHeights: number[] = [];
 
+  const rowHeights: number[] = [];
   for (let r = 0; r < rowsNeeded; r++) {
     let rowH = 0;
     for (let c = 0; c < colCount; c++) {
       const idx = r * colCount + c;
       if (idx >= items.length) continue;
-      const val = items[idx].value;
-      const lines = wrapByWidth(val, ctx.fontBold, valueSize, colW);
+      const lines = wrapByWidth(items[idx].value, ctx.fontBold, valueSize, colW);
       const h = labelSize + 3 + lines.length * (valueSize + 2);
       if (h > rowH) rowH = h;
     }
     rowHeights.push(rowH);
-    maxRowH += rowH;
   }
-  const totalH = padding * 2 + maxRowH + rowGap * (rowsNeeded - 1);
+  const totalRowH = rowHeights.reduce((a, b) => a + b, 0);
+  const cardH = padding * 2 + totalRowH + rowGap * (rowsNeeded - 1) + 6; // +6 for header bar
 
-  ensureVerticalSpace(ctx, totalH + 10);
+  ensureVerticalSpace(ctx, cardH + 10);
 
   const cardX = MARGIN_X;
   const cardTop = ctx.y;
-  const cardBottom = cardTop - totalH;
+  const cardBottom = cardTop - cardH;
 
+  // Corpo
   ctx.page.drawRectangle({
-    x: cardX,
-    y: cardBottom,
-    width: CONTENT_W,
-    height: totalH,
-    color: COLORS.cardBg,
-    borderColor: COLORS.cardBorder,
-    borderWidth: 0.6,
+    x: cardX, y: cardBottom, width: CONTENT_W, height: cardH,
+    color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.5,
   });
+  // Barra topo navy
+  ctx.page.drawRectangle({ x: cardX, y: cardTop - 6, width: CONTENT_W, height: 6, color: C.navy });
+  // Label da barra
+  drawTextLine(ctx, "INFORMACOES DA AUDITORIA", cardX + 10, cardTop - 1, 6.5, ctx.fontBold, rgb(0.72, 0.79, 0.92));
 
-  let cursorTop = cardTop - padding;
+  let cursorTop = cardTop - 6 - padding;
   for (let r = 0; r < rowsNeeded; r++) {
     for (let c = 0; c < colCount; c++) {
       const idx = r * colCount + c;
       if (idx >= items.length) continue;
       const x = cardX + padding + c * (colW + colGap);
-      drawTextLine(ctx, items[idx].label, x, cursorTop, labelSize, ctx.fontBold, COLORS.textFaint);
+      drawTextLine(ctx, items[idx].label, x, cursorTop, labelSize, ctx.fontBold, C.textFaint);
       const lines = wrapByWidth(items[idx].value, ctx.fontBold, valueSize, colW);
       let lineTop = cursorTop - labelSize - 3;
       for (const ln of lines) {
-        drawTextLine(ctx, ln, x, lineTop, valueSize, ctx.fontBold, COLORS.textPrimary);
+        drawTextLine(ctx, ln, x, lineTop, valueSize, ctx.fontBold, C.textPrimary);
         lineTop -= valueSize + 2;
       }
     }
@@ -477,120 +456,12 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
   ctx.y = cardBottom - 14;
 }
 
-/* ── Card de nota geral (score) ───────────────────────────────────────── */
-
-function drawScoreCard(ctx: Ctx, input: DossierPdfBuildInput): void {
-  const score = input.score;
-  if (!score) return;
-
-  const { label, palette } = scoreClassification(score.percentage);
-  const cardH = 72;
-
-  ensureVerticalSpace(ctx, cardH + 14);
-
-  const cardTop = ctx.y;
-  const cardBottom = cardTop - cardH;
-
-  ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: cardBottom,
-    width: CONTENT_W,
-    height: cardH,
-    color: palette.soft,
-    borderColor: palette.border,
-    borderWidth: 0.8,
-  });
-  ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: cardBottom,
-    width: 4,
-    height: cardH,
-    color: palette.ink,
-  });
-
-  drawTextLine(
-    ctx,
-    "NOTA GERAL DA AVALIACAO",
-    MARGIN_X + 20,
-    cardTop - 16,
-    8.5,
-    ctx.fontBold,
-    palette.ink,
-  );
-
-  const pctText = `${score.percentage}%`;
-  drawTextLine(
-    ctx,
-    pctText,
-    MARGIN_X + 20,
-    cardTop - 30,
-    28,
-    ctx.fontBold,
-    palette.ink,
-  );
-
-  const pctWidth = ctx.fontBold.widthOfTextAtSize(pctText, 28);
-  drawTextLine(
-    ctx,
-    label.toUpperCase(),
-    MARGIN_X + 20 + pctWidth + 12,
-    cardTop - 34,
-    11,
-    ctx.fontBold,
-    palette.ink,
-  );
-
-  const pointsTxt = `${formatPoints(score.pointsEarned)} / ${formatPoints(score.pointsTotal)} pontos aplicaveis`;
-  drawTextLine(
-    ctx,
-    pointsTxt,
-    MARGIN_X + 20,
-    cardTop - 62,
-    9,
-    ctx.font,
-    palette.ink,
-  );
-
-  // Barra de progresso à direita
-  const barW = 180;
-  const barH = 8;
-  const barX = PAGE_W - MARGIN_X - 20 - barW;
-  const barY = cardBottom + (cardH - barH) / 2 - 4;
-  ctx.page.drawRectangle({
-    x: barX,
-    y: barY,
-    width: barW,
-    height: barH,
-    color: COLORS.cardBg,
-    borderColor: palette.border,
-    borderWidth: 0.6,
-  });
-  const fillW = Math.max(0, Math.min(100, score.percentage)) * (barW / 100);
-  ctx.page.drawRectangle({
-    x: barX,
-    y: barY,
-    width: fillW,
-    height: barH,
-    color: palette.ink,
-  });
-
-  ctx.y = cardBottom - 18;
-}
-
-function formatPoints(value: number): string {
-  if (Number.isInteger(value)) return value.toString();
-  return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
-}
-
-/* ── Seções e itens (layout de cards, fiel ao pop-up) ──────────────────── */
+/* ── Cabeçalho de seção V2 ─────────────────────────────────────────────── */
 
 type SectionScore = { percentage: number | null; earned: number; total: number };
 
 function computeSectionScore(section: DossierPdfSectionInput): SectionScore {
-  // Sem pesos no input atual → todos contam 1. Isso é um fallback estético
-  // para a seção; o score geral usa os pesos reais do servidor.
-  let earned = 0;
-  let total = 0;
+  let earned = 0, total = 0;
   for (const it of section.items) {
     if (!it.outcome || it.outcome === "na") continue;
     total += 1;
@@ -606,439 +477,293 @@ function drawSectionHeader(
   index: number,
   total: number,
 ): void {
-  const headerH = 38;
-  ensureVerticalSpace(ctx, headerH + 8);
+  const sc = computeSectionScore(section);
+  const { label: scoreLabel, palette } = sc.percentage !== null
+    ? scoreClassification(sc.percentage)
+    : { label: "—", palette: { soft: C.graySoft, border: C.grayBorder, ink: C.grayInk } };
+
+  const HEADER_H = 36;
+  ensureVerticalSpace(ctx, HEADER_H + 10);
 
   const top = ctx.y;
-  const bottom = top - headerH;
+  const bottom = top - HEADER_H;
 
+  // Fundo colorido conforme score
   ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: bottom,
-    width: CONTENT_W,
-    height: headerH,
-    color: COLORS.cardBg,
-    borderColor: COLORS.cardBorder,
-    borderWidth: 0.6,
-  });
-  ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: bottom,
-    width: 3.5,
-    height: headerH,
-    color: COLORS.brandAccent,
+    x: MARGIN_X, y: bottom, width: CONTENT_W, height: HEADER_H,
+    color: palette.soft, borderColor: palette.border, borderWidth: 0.5,
   });
 
-  const tag = `SECAO ${index + 1} DE ${total}`;
-  drawTextLine(ctx, tag, MARGIN_X + 14, top - 12, 7.5, ctx.fontBold, COLORS.brandAccent);
+  // Badge número da seção (navy)
+  const badgeW = 28;
+  const badgeH = 20;
+  const badgeX = MARGIN_X + 10;
+  const badgeMidY = bottom + HEADER_H / 2;
+  ctx.page.drawRectangle({
+    x: badgeX, y: badgeMidY - badgeH / 2, width: badgeW, height: badgeH,
+    color: C.navy,
+  });
+  const numStr = String(index + 1).padStart(2, "0");
+  const numW = ctx.fontBold.widthOfTextAtSize(numStr, 10);
+  drawTextLine(ctx, numStr, badgeX + (badgeW - numW) / 2, badgeMidY + 6, 10, ctx.fontBold, C.white);
 
-  const titleLines = wrapByWidth(
-    section.title,
-    ctx.fontBold,
-    12,
-    CONTENT_W - 28 - 140,
-  ).slice(0, 1);
-  drawTextLine(
-    ctx,
-    titleLines[0] ?? "",
-    MARGIN_X + 14,
-    top - 24,
-    12,
-    ctx.fontBold,
-    COLORS.textPrimary,
-  );
+  // Título da seção
+  const titleX = badgeX + badgeW + 10;
+  const ncCount = section.items.filter(i => i.outcome === "nc").length;
+  const pillsW = 120;
+  const titleMaxW = CONTENT_W - (titleX - MARGIN_X) - pillsW - 10;
+  const titleLines = wrapByWidth(section.title, ctx.fontBold, 11, titleMaxW).slice(0, 1);
+  drawTextLine(ctx, titleLines[0] ?? "", titleX, top - 12, 11, ctx.fontBold, C.textPrimary);
 
-  // Badge de score à direita + contagem
-  const sc = computeSectionScore(section);
-  const rightEdge = PAGE_W - MARGIN_X - 12;
+  // Sub-linha: "X itens"
+  drawTextLine(ctx, `${section.items.length} itens`, titleX, top - 26, 8, ctx.font, C.textMuted);
 
-  const countText = `${section.items.length} itens`;
-  const countW = ctx.font.widthOfTextAtSize(countText, 9);
-  drawTextLine(
-    ctx,
-    countText,
-    rightEdge - countW,
-    top - 22,
-    9,
-    ctx.font,
-    COLORS.textMuted,
-  );
+  // Badges direita: score% + NC pill
+  const rightEdge = PAGE_W - MARGIN_X - 10;
+  let bx = rightEdge;
 
-  if (sc.percentage !== null) {
-    const { palette } = scoreClassification(sc.percentage);
-    const badgeText = `${sc.percentage}%`;
-    const badgeTextW = ctx.fontBold.widthOfTextAtSize(badgeText, 10);
-    const badgeW = badgeTextW + 16;
-    const badgeH = 18;
-    const badgeX = rightEdge - countW - 8 - badgeW;
-    const badgeY = top - 13 - badgeH;
-    ctx.page.drawRectangle({
-      x: badgeX,
-      y: badgeY,
-      width: badgeW,
-      height: badgeH,
-      color: palette.soft,
-      borderColor: palette.border,
-      borderWidth: 0.6,
-    });
-    drawTextLine(
-      ctx,
-      badgeText,
-      badgeX + 8,
-      badgeY + badgeH - 4,
-      10,
-      ctx.fontBold,
-      palette.ink,
-    );
+  // Badge NC (vermelho) — só se houver NCs
+  if (ncCount > 0) {
+    const ncText = `${ncCount} NC`;
+    const ncTextW = ctx.fontBold.widthOfTextAtSize(ncText, 8);
+    const ncBW = ncTextW + 12;
+    const ncBH = 17;
+    bx -= ncBW;
+    const ncBY = bottom + (HEADER_H - ncBH) / 2;
+    ctx.page.drawRectangle({ x: bx, y: ncBY, width: ncBW, height: ncBH, color: C.redLight, borderColor: C.redBorder, borderWidth: 0.5 });
+    drawTextLine(ctx, ncText, bx + 6, ncBY + ncBH - 4, 8, ctx.fontBold, C.red);
+    bx -= 6;
   }
 
-  ctx.y = bottom - 10;
+  // Badge score (colorido)
+  if (sc.percentage !== null) {
+    const scText = `${sc.percentage}%  ${scoreLabel.toUpperCase()}`;
+    const scTextW = ctx.fontBold.widthOfTextAtSize(scText, 8);
+    const scBW = scTextW + 12;
+    const scBH = 17;
+    bx -= scBW;
+    const scBY = bottom + (HEADER_H - scBH) / 2;
+    ctx.page.drawRectangle({ x: bx, y: scBY, width: scBW, height: scBH, color: palette.soft, borderColor: palette.border, borderWidth: 0.5 });
+    drawTextLine(ctx, scText, bx + 6, scBY + scBH - 4, 8, ctx.fontBold, palette.ink);
+  }
+
+  ctx.y = bottom - 2;
 }
 
-async function drawItemCard(
+/* ── Linha de item V2 (compacto) ──────────────────────────────────────── */
+
+async function drawItemRow(
   ctx: Ctx,
   item: DossierPdfItemInput,
+  rowIndex: number,
 ): Promise<void> {
   const palette = outcomePalette(item.outcome);
   const isNc = item.outcome === "nc";
-  const padding = 12;
-  const cardW = CONTENT_W;
-  const innerW = cardW - padding * 2;
-
-  // Medição do conteúdo
-  const descSize = 10.5;
-  const labelSize = 8;
-  const bodySize = 10;
+  const STRIPE_W = 4;
+  const PAD_H = 8;
+  const TEXT_SIZE = 9.5;
+  const PILL_W = 58;
+  const innerW = CONTENT_W - STRIPE_W - 12 - PILL_W - 10;
 
   const descLines = wrapByWidth(
     redactSupabaseUrlsForPdf(item.description),
-    ctx.fontBold,
-    descSize,
+    isNc ? ctx.fontBold : ctx.font,
+    TEXT_SIZE,
     innerW,
   );
+  const rowH = Math.max(22, PAD_H * 2 + descLines.length * (TEXT_SIZE + 2.5));
 
-  const outcomeText = formatChecklistOutcomeLabel(item.outcome);
-
-  const noteText =
-    isNc && (item.note ?? "").trim().length > 0
-      ? redactSupabaseUrlsForPdf((item.note ?? "").trim())
-      : "";
-  const hasNote = noteText.length > 0;
-  const noteLines = hasNote
-    ? wrapByWidth(noteText, ctx.font, bodySize, innerW - 18)
-    : [];
-
-  const annText =
-    (item.annotation ?? "").trim().length > 0
-      ? redactSupabaseUrlsForPdf((item.annotation ?? "").trim())
-      : "";
-  const hasAnn = annText.length > 0;
-  const annLines = hasAnn
-    ? wrapByWidth(annText, ctx.font, bodySize, innerW - 18)
-    : [];
-
-  const photoCount = item.photoBuffers?.length ?? 0;
-  const photoCellSize = 96;
-  const photosPerRow = Math.max(1, Math.floor(innerW / (photoCellSize + 8)));
-  const photoRows = photoCount > 0 ? Math.ceil(photoCount / photosPerRow) : 0;
-
-  let h = padding;
-  h += descLines.length * (descSize + 3);
-  h += 8; // gap
-  h += labelSize + 4; // "Avaliação"
-  h += 22; // badge outcome
-  if (hasNote) {
-    h += 10;
-    h += 28; // label NC + padding interno do bloco
-    h += noteLines.length * (bodySize + 3);
-    h += 10;
-  }
-  if (hasAnn) {
-    h += 10;
-    h += 28;
-    h += annLines.length * (bodySize + 3);
-    h += 10;
-  }
-  if (photoCount > 0) {
-    h += 14;
-    h += labelSize + 6;
-    h += photoRows * (photoCellSize + 8);
-  }
-  h += padding;
-
-  ensureVerticalSpace(ctx, h + 8);
+  ensureVerticalSpace(ctx, rowH + 2);
 
   const top = ctx.y;
-  const bottom = top - h;
+  const bottom = top - rowH;
 
-  // Card
-  ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: bottom,
-    width: cardW,
-    height: h,
-    color: isNc ? COLORS.redSoft : COLORS.cardBg,
-    borderColor: isNc ? COLORS.redBorder : COLORS.cardBorder,
-    borderWidth: 0.6,
+  // Fundo alternado suave
+  const rowBg = isNc ? C.redLight : (rowIndex % 2 === 0 ? C.cardBg : C.rowAlt);
+  ctx.page.drawRectangle({ x: MARGIN_X, y: bottom, width: CONTENT_W, height: rowH, color: rowBg });
+
+  // Borda inferior fina
+  ctx.page.drawLine({
+    start: { x: MARGIN_X, y: bottom },
+    end: { x: MARGIN_X + CONTENT_W, y: bottom },
+    thickness: 0.4,
+    color: isNc ? C.redBorder : C.cardBorder,
   });
 
-  // Faixa lateral esquerda colorida
-  ctx.page.drawRectangle({
-    x: MARGIN_X,
-    y: bottom,
-    width: 3.5,
-    height: h,
-    color: palette.ink,
-  });
+  // Faixa esquerda colorida
+  ctx.page.drawRectangle({ x: MARGIN_X, y: bottom, width: STRIPE_W, height: rowH, color: palette.ink });
 
-  let cursor = top - padding;
-
-  // Descrição (com símbolo de alerta se NC)
-  for (let i = 0; i < descLines.length; i++) {
-    drawTextLine(
-      ctx,
-      descLines[i],
-      MARGIN_X + padding,
-      cursor,
-      descSize,
-      ctx.fontBold,
-      isNc ? COLORS.redInk : COLORS.textPrimary,
-    );
-    cursor -= descSize + 3;
+  // Descrição
+  const textX = MARGIN_X + STRIPE_W + 10;
+  let lineTop = top - PAD_H;
+  for (const ln of descLines) {
+    drawTextLine(ctx, ln, textX, lineTop, TEXT_SIZE, isNc ? ctx.fontBold : ctx.font, isNc ? C.red : C.textPrimary);
+    lineTop -= TEXT_SIZE + 2.5;
   }
 
-  cursor -= 5;
+  // Pill de status (direita)
+  const outcomeText = formatChecklistOutcomeLabel(item.outcome);
+  const pillX = MARGIN_X + CONTENT_W - PILL_W - 6;
+  const pillH = 16;
+  const pillY = bottom + (rowH - pillH) / 2;
+  ctx.page.drawRectangle({ x: pillX, y: pillY, width: PILL_W, height: pillH, color: palette.soft, borderColor: palette.border, borderWidth: 0.5 });
+  const pillTextW = ctx.fontBold.widthOfTextAtSize(outcomeText, 8);
+  drawTextLine(ctx, outcomeText, pillX + (PILL_W - pillTextW) / 2, pillY + pillH - 4, 8, ctx.fontBold, palette.ink);
 
-  // Label "Avaliação"
-  drawTextLine(
-    ctx,
-    "AVALIACAO",
-    MARGIN_X + padding,
-    cursor,
-    labelSize,
-    ctx.fontBold,
-    COLORS.textFaint,
-  );
-  cursor -= labelSize + 4;
+  ctx.y = bottom;
 
-  // Badge do outcome
-  const badgeTextW = ctx.fontBold.widthOfTextAtSize(outcomeText, 10);
-  const badgeW = badgeTextW + 18;
-  const badgeH = 18;
-  ctx.page.drawRectangle({
-    x: MARGIN_X + padding,
-    y: cursor - badgeH + 2,
-    width: badgeW,
-    height: badgeH,
-    color: palette.soft,
-    borderColor: palette.border,
-    borderWidth: 0.6,
-  });
-  drawTextLine(
-    ctx,
-    outcomeText,
-    MARGIN_X + padding + 9,
-    cursor - 2,
-    10,
-    ctx.fontBold,
-    palette.ink,
-  );
-  cursor -= badgeH + 4;
-
-  // Nota de não conformidade
-  if (hasNote) {
-    cursor -= 6;
-    const blockTop = cursor;
-    const blockH = noteLines.length * (bodySize + 3) + 26;
-    const blockBottom = blockTop - blockH;
-    ctx.page.drawRectangle({
-      x: MARGIN_X + padding,
-      y: blockBottom,
-      width: innerW,
-      height: blockH,
-      color: COLORS.redSoft,
-      borderColor: COLORS.redBorder,
-      borderWidth: 0.6,
-    });
-    ctx.page.drawRectangle({
-      x: MARGIN_X + padding,
-      y: blockBottom,
-      width: 3,
-      height: blockH,
-      color: COLORS.redAccent,
-    });
-    drawTextLine(
-      ctx,
-      "NAO CONFORMIDADE",
-      MARGIN_X + padding + 10,
-      blockTop - 10,
-      labelSize,
-      ctx.fontBold,
-      COLORS.redInk,
-    );
-    let lineTop = blockTop - 10 - labelSize - 3;
-    for (const ln of noteLines) {
-      drawTextLine(ctx, ln, MARGIN_X + padding + 10, lineTop, bodySize, ctx.font, COLORS.redInk);
-      lineTop -= bodySize + 3;
-    }
-    cursor = blockBottom - 6;
+  // ── Bloco de detalhes NC (nota + anotação + fotos) ──────────────────── //
+  if (isNc) {
+    await drawNcDetails(ctx, item);
   }
 
-  // Anotação
-  if (hasAnn) {
-    cursor -= 4;
-    const blockTop = cursor;
-    const blockH = annLines.length * (bodySize + 3) + 26;
-    const blockBottom = blockTop - blockH;
-    ctx.page.drawRectangle({
-      x: MARGIN_X + padding,
-      y: blockBottom,
-      width: innerW,
-      height: blockH,
-      color: COLORS.graySoft,
-      borderColor: COLORS.softBorder,
-      borderWidth: 0.6,
-    });
-    drawTextLine(
-      ctx,
-      "ANOTACAO",
-      MARGIN_X + padding + 10,
-      blockTop - 10,
-      labelSize,
-      ctx.fontBold,
-      COLORS.textFaint,
-    );
-    let lineTop = blockTop - 10 - labelSize - 3;
-    for (const ln of annLines) {
-      drawTextLine(
-        ctx,
-        ln,
-        MARGIN_X + padding + 10,
-        lineTop,
-        bodySize,
-        ctx.font,
-        COLORS.textPrimary,
-      );
-      lineTop -= bodySize + 3;
-    }
-    cursor = blockBottom - 6;
-  }
-
-  // Fotos
-  if (photoCount > 0 && item.photoBuffers) {
-    cursor -= 8;
-    drawTextLine(
-      ctx,
-      `FOTOS DE EVIDENCIA (${photoCount})`,
-      MARGIN_X + padding,
-      cursor,
-      labelSize,
-      ctx.fontBold,
-      COLORS.textFaint,
-    );
-    cursor -= labelSize + 6;
-
-    let col = 0;
-    let rowTop = cursor;
-    for (let i = 0; i < photoCount; i++) {
-      const buf = item.photoBuffers[i];
-      const img = await embedImageSmart(ctx.pdf, buf);
-      const cellX = MARGIN_X + padding + col * (photoCellSize + 8);
-      const cellY = rowTop - photoCellSize;
-
-      // Placeholder com borda sempre visível
-      ctx.page.drawRectangle({
-        x: cellX,
-        y: cellY,
-        width: photoCellSize,
-        height: photoCellSize,
-        color: COLORS.graySoft,
-        borderColor: COLORS.cardBorder,
-        borderWidth: 0.6,
-      });
-
-      if (img) {
-        const imgRatio = img.width / img.height;
-        const cellRatio = 1;
-        let iw: number;
-        let ih: number;
-        if (imgRatio > cellRatio) {
-          iw = photoCellSize;
-          ih = photoCellSize / imgRatio;
-        } else {
-          ih = photoCellSize;
-          iw = photoCellSize * imgRatio;
-        }
-        ctx.page.drawImage(img, {
-          x: cellX + (photoCellSize - iw) / 2,
-          y: cellY + (photoCellSize - ih) / 2,
-          width: iw,
-          height: ih,
-        });
-      } else {
-        drawTextLine(
-          ctx,
-          "imagem",
-          cellX + photoCellSize / 2 - 14,
-          cellY + photoCellSize / 2 + 4,
-          8,
-          ctx.font,
-          COLORS.textFaint,
-        );
-      }
-
-      col += 1;
-      if (col >= photosPerRow) {
-        col = 0;
-        rowTop -= photoCellSize + 8;
-      }
-    }
-  }
-
-  ctx.y = bottom - 8;
+  ctx.y -= 1; // pequeno respiro entre itens
 }
 
-/* ── Rodapé por página ─────────────────────────────────────────────────── */
+/* ── Bloco de detalhes de não conformidade ─────────────────────────────── */
+
+async function drawNcDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void> {
+  const noteText = (item.note ?? "").trim().length > 0
+    ? redactSupabaseUrlsForPdf(item.note!.trim())
+    : "";
+  const annText = (item.annotation ?? "").trim().length > 0
+    ? redactSupabaseUrlsForPdf(item.annotation!.trim())
+    : "";
+  const photoCount = item.photoBuffers?.length ?? 0;
+
+  if (!noteText && !annText && photoCount === 0) return;
+
+  const INDENT = 12;
+  const BLOCK_W = CONTENT_W - INDENT;
+  const BLOCK_X = MARGIN_X + INDENT;
+  const labelSize = 7;
+  const bodySize = 9;
+  const padV = 8;
+  const padH = 10;
+
+  // ── Nota de NC ──
+  if (noteText) {
+    const noteLines = wrapByWidth(noteText, ctx.font, bodySize, BLOCK_W - padH * 2);
+    const bH = padV * 2 + labelSize + 4 + noteLines.length * (bodySize + 2.5);
+    ensureVerticalSpace(ctx, bH + 4);
+
+    const top = ctx.y;
+    const btm = top - bH;
+
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: C.redLight, borderColor: C.redBorder, borderWidth: 0.5 });
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: 3, height: bH, color: C.redStripe });
+
+    drawTextLine(ctx, "NAO CONFORMIDADE", BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, C.red);
+    let lTop = top - padV - labelSize - 4;
+    for (const ln of noteLines) {
+      drawTextLine(ctx, ln, BLOCK_X + padH, lTop, bodySize, ctx.font, C.textPrimary);
+      lTop -= bodySize + 2.5;
+    }
+    ctx.y = btm;
+  }
+
+  // ── Anotação ──
+  if (annText) {
+    const annLines = wrapByWidth(annText, ctx.font, bodySize, BLOCK_W - padH * 2);
+    const bH = padV * 2 + labelSize + 4 + annLines.length * (bodySize + 2.5);
+    ensureVerticalSpace(ctx, bH + 4);
+
+    const top = ctx.y;
+    const btm = top - bH;
+
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: C.graySoft, borderColor: C.grayBorder, borderWidth: 0.5 });
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: 3, height: bH, color: C.textMuted });
+
+    drawTextLine(ctx, "ANOTACAO", BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, C.textMuted);
+    let lTop = top - padV - labelSize - 4;
+    for (const ln of annLines) {
+      drawTextLine(ctx, ln, BLOCK_X + padH, lTop, bodySize, ctx.font, C.textPrimary);
+      lTop -= bodySize + 2.5;
+    }
+    ctx.y = btm;
+  }
+
+  // ── Fotos full-width ──
+  if (photoCount > 0 && item.photoBuffers) {
+    const PHOTO_H = 140;
+    const CAPTION_H = 18;
+    const PHOTO_GAP = 6;
+
+    // Label de fotos
+    const lblH = 16;
+    ensureVerticalSpace(ctx, lblH + 4);
+    const lblTop = ctx.y;
+    ctx.page.drawRectangle({ x: BLOCK_X, y: lblTop - lblH, width: BLOCK_W, height: lblH, color: C.navy });
+    drawTextLine(ctx, `FOTOS DE EVIDENCIA  (${photoCount})`, BLOCK_X + padH, lblTop - 4, labelSize, ctx.fontBold, C.sky);
+    ctx.y = lblTop - lblH;
+
+    for (let i = 0; i < photoCount; i++) {
+      const buf = item.photoBuffers[i];
+      const blockH = PHOTO_H + CAPTION_H;
+      ensureVerticalSpace(ctx, blockH + PHOTO_GAP);
+
+      const pTop = ctx.y;
+      const pBtm = pTop - blockH;
+
+      // Fundo foto
+      ctx.page.drawRectangle({ x: BLOCK_X, y: pTop - PHOTO_H, width: BLOCK_W, height: PHOTO_H, color: C.graySoft, borderColor: C.cardBorder, borderWidth: 0.5 });
+
+      const img = await embedImageSmart(ctx.pdf, buf);
+      if (img) {
+        const imgRatio = img.width / img.height;
+        const maxW = BLOCK_W - 4;
+        const maxH = PHOTO_H - 4;
+        let iw = maxW, ih = maxW / imgRatio;
+        if (ih > maxH) { ih = maxH; iw = maxH * imgRatio; }
+        ctx.page.drawImage(img, {
+          x: BLOCK_X + (BLOCK_W - iw) / 2,
+          y: pTop - PHOTO_H + (PHOTO_H - ih) / 2,
+          width: iw, height: ih,
+        });
+      } else {
+        drawTextLine(ctx, "imagem indisponivel", BLOCK_X + BLOCK_W / 2 - 40, pTop - PHOTO_H / 2 + 4, 8, ctx.font, C.textFaint);
+      }
+
+      // Caption navy com número
+      ctx.page.drawRectangle({ x: BLOCK_X, y: pBtm, width: BLOCK_W, height: CAPTION_H, color: C.navyDeep });
+      drawTextLine(ctx, `Foto ${i + 1} de ${photoCount}`, BLOCK_X + padH, pBtm + CAPTION_H - 5, 8, ctx.font, rgb(0.72, 0.79, 0.90));
+
+      ctx.y = pBtm - PHOTO_GAP;
+    }
+  }
+
+  ctx.y -= 4; // respiro após bloco NC
+}
+
+/* ── Rodapé por página V2 ──────────────────────────────────────────────── */
 
 function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): void {
   const total = ctx.pdf.getPageCount();
   for (let i = 0; i < total; i++) {
     const page = ctx.pdf.getPage(i);
-    const footerY = 22;
+    const footerH = 28;
+    const footerY = 0;
+
+    // Fundo footer navy suave
+    page.drawRectangle({ x: 0, y: footerY, width: PAGE_W, height: footerH, color: rgb(0.945, 0.949, 0.957) });
     page.drawLine({
-      start: { x: MARGIN_X, y: footerY + 14 },
-      end: { x: PAGE_W - MARGIN_X, y: footerY + 14 },
-      thickness: 0.4,
-      color: COLORS.cardBorder,
+      start: { x: 0, y: footerY + footerH },
+      end: { x: PAGE_W, y: footerY + footerH },
+      thickness: 0.5, color: C.cardBorder,
     });
+
     const left = foldTextForPdf(
-      `${input.professionalName}${input.crn ? ` | CRN ${input.crn}` : ""}`,
+      `${input.professionalName}${input.crn ? `  |  CRN ${input.crn}` : ""}`,
     );
-    page.drawText(left, {
-      x: MARGIN_X,
-      y: footerY,
-      size: 8,
-      font: ctx.font,
-      color: COLORS.textMuted,
-    });
-    const pageText = `Pagina ${i + 1} de ${total}`;
-    const pageW = ctx.font.widthOfTextAtSize(pageText, 8);
-    page.drawText(pageText, {
-      x: PAGE_W - MARGIN_X - pageW,
-      y: footerY,
-      size: 8,
-      font: ctx.font,
-      color: COLORS.textMuted,
-    });
+    page.drawText(left, { x: MARGIN_X, y: footerY + 9, size: 7.5, font: ctx.font, color: C.textMuted });
+
     const center = "Documento gerado eletronicamente - NutriGestao";
-    const cw = ctx.font.widthOfTextAtSize(center, 8);
-    page.drawText(center, {
-      x: (PAGE_W - cw) / 2,
-      y: footerY,
-      size: 8,
-      font: ctx.font,
-      color: COLORS.textFaint,
-    });
+    const cw = ctx.font.widthOfTextAtSize(center, 7.5);
+    page.drawText(center, { x: (PAGE_W - cw) / 2, y: footerY + 9, size: 7.5, font: ctx.font, color: C.textFaint });
+
+    const pageText = `Pagina ${i + 1} de ${total}`;
+    const pw = ctx.font.widthOfTextAtSize(pageText, 7.5);
+    page.drawText(pageText, { x: PAGE_W - MARGIN_X - pw, y: footerY + 9, size: 7.5, font: ctx.font, color: C.textMuted });
   }
 }
 
@@ -1052,34 +777,27 @@ export async function buildDossierPdfBytes(
   const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   const firstPage = pdf.addPage([PAGE_W, PAGE_H]);
-  firstPage.drawRectangle({
-    x: 0,
-    y: 0,
-    width: PAGE_W,
-    height: PAGE_H,
-    color: COLORS.pageBg,
-  });
+  firstPage.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: C.pageBg });
 
   const ctx: Ctx = {
-    pdf,
-    font,
-    fontBold,
+    pdf, font, fontBold,
     page: firstPage,
     y: PAGE_H - MARGIN_TOP,
     pageIndex: 0,
   };
 
   await drawHeader(ctx, input);
+  drawKpiStrip(ctx, input);
   drawMetaCard(ctx, input);
-  drawScoreCard(ctx, input);
 
   for (let i = 0; i < input.sections.length; i++) {
     const section = input.sections[i];
+    ctx.y -= 4;
     drawSectionHeader(ctx, section, i, input.sections.length);
-    for (const item of section.items) {
-      await drawItemCard(ctx, item);
+    for (let j = 0; j < section.items.length; j++) {
+      await drawItemRow(ctx, section.items[j], j);
     }
-    ctx.y -= 6;
+    ctx.y -= 10;
   }
 
   drawFooters(ctx, input);

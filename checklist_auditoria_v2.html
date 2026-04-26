@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Auditoria de Boas Práticas – V2</title>
+<style>
+  /* ── Reset & Base ──────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --navy:         #1B2A4A;
+    --navy-mid:     #243560;
+    --sky:          #0EA5E9;
+    --green:        #1B7A3E;
+    --green-light:  #E8F5EE;
+    --orange:       #D97706;
+    --orange-light: #FEF3C7;
+    --red:          #B91C1C;
+    --red-light:    #FEE2E2;
+    --gray-50:      #F9FAFB;
+    --gray-100:     #F3F4F6;
+    --gray-200:     #E5E7EB;
+    --gray-400:     #9CA3AF;
+    --gray-600:     #4B5563;
+    --gray-800:     #1F2937;
+    --white:        #FFFFFF;
+    --font: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  }
+  html { font-family: var(--font); color: var(--gray-800); background: #F0F2F5; }
+
+  /* ── Print ─────────────────────────────────────────────────── */
+  @media print {
+    html { background: white; }
+    .page { box-shadow: none !important; margin: 0 !important; border-radius: 0 !important; }
+    .no-print { display: none !important; }
+    .page-break { page-break-after: always; }
+    @page { margin: 0; size: A4; }
+  }
+
+  /* ── Layout ─────────────────────────────────────────────────── */
+  body { padding: 24px 0; }
+  .page {
+    width: 210mm; min-height: 297mm;
+    background: white; margin: 0 auto 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,.12);
+    overflow: hidden;
+    position: relative;
+  }
+  .page-inner { padding: 0 22mm 18mm; }
+
+  /* ── Cover Header ───────────────────────────────────────────── */
+  .cover-header {
+    background: var(--navy);
+    padding: 10mm 22mm 8mm;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover-header::after {
+    content: '';
+    position: absolute; right: 0; top: 0; bottom: 0; width: 5px;
+    background: var(--sky);
+  }
+  .cover-header .eyebrow {
+    font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase;
+    color: #3B82F6; font-weight: 700; margin-bottom: 6px;
+  }
+  .cover-header h1 {
+    font-size: 26px; font-weight: 800; color: white; letter-spacing: -.5px;
+    line-height: 1.15; margin-bottom: 5px;
+  }
+  .cover-header .subtitle {
+    font-size: 12px; color: #93C5FD; font-weight: 500; letter-spacing: .3px;
+    margin-bottom: 10px;
+  }
+  .cover-divider {
+    border: none; height: 1.5px; background: #1E3A8A;
+    margin: 10px 0 12px; width: calc(100% - 80mm);
+  }
+  .meta-grid {
+    display: flex; gap: 20px; flex-wrap: wrap;
+  }
+  .meta-item .meta-label {
+    font-size: 7px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: #64748B; display: block; margin-bottom: 2px;
+  }
+  .meta-item .meta-val {
+    font-size: 10px; font-weight: 700; color: white;
+  }
+
+  /* ── Score Circle (top-right) ──────────────────────────────── */
+  .score-circle-wrap {
+    position: absolute; top: 10mm; right: 18mm;
+    text-align: center; width: 52mm;
+  }
+  .score-circle {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--green) 0% 94.78%,
+      #1E3A5F 94.78% 100%
+    );
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 4px;
+    position: relative;
+  }
+  .score-circle::before {
+    content: '';
+    position: absolute; inset: 8px;
+    background: var(--navy); border-radius: 50%;
+  }
+  .score-inner {
+    position: relative; z-index: 1; text-align: center;
+  }
+  .score-val {
+    font-size: 18px; font-weight: 900; color: white; line-height: 1;
+    display: block;
+  }
+  .score-label {
+    font-size: 7px; color: #93C5FD; text-transform: uppercase;
+    letter-spacing: 1px; display: block; margin-top: 1px;
+  }
+  .score-min {
+    font-size: 8px; color: #475569;
+  }
+
+  /* ── KPI Cards ──────────────────────────────────────────────── */
+  .kpi-row {
+    display: flex; gap: 10px; padding: 12px 22mm;
+    background: var(--gray-50); border-bottom: 1px solid var(--gray-200);
+  }
+  .kpi-card {
+    flex: 1; background: white; border-radius: 8px;
+    border: 1px solid var(--gray-200);
+    padding: 12px 14px 10px;
+    position: relative; overflow: hidden;
+  }
+  .kpi-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  }
+  .kpi-card.green::before { background: var(--green); }
+  .kpi-card.red::before   { background: var(--red); }
+  .kpi-card.gray::before  { background: var(--gray-400); }
+
+  .kpi-label {
+    font-size: 7.5px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--gray-400); font-weight: 600; margin-bottom: 4px;
+  }
+  .kpi-value {
+    font-size: 32px; font-weight: 900; line-height: 1;
+  }
+  .kpi-card.green .kpi-value { color: var(--green); }
+  .kpi-card.red   .kpi-value { color: var(--red); }
+  .kpi-card.gray  .kpi-value { color: var(--gray-400); }
+
+  .kpi-sub {
+    font-size: 8.5px; color: var(--gray-400); margin-top: 4px;
+  }
+  .kpi-bar-wrap {
+    margin-top: 8px; height: 5px; background: var(--gray-100);
+    border-radius: 99px; overflow: hidden;
+  }
+  .kpi-bar { height: 100%; background: var(--green); border-radius: 99px; }
+
+  /* ── Section Titles ─────────────────────────────────────────── */
+  .section-block { margin-top: 14px; }
+
+  .section-header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 6px;
+    margin-bottom: 4px;
+  }
+  .section-header.green  { background: var(--green-light);  border-left: 4px solid var(--green); }
+  .section-header.orange { background: var(--orange-light); border-left: 4px solid var(--orange); }
+  .section-header.red    { background: var(--red-light);    border-left: 4px solid var(--red); }
+  .section-header.gray   { background: var(--gray-100);     border-left: 4px solid var(--gray-400); }
+
+  .section-num {
+    min-width: 26px; height: 26px; border-radius: 5px;
+    background: var(--navy); color: white;
+    font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .section-title {
+    flex: 1; font-size: 10.5px; font-weight: 700; color: var(--gray-800);
+    text-transform: uppercase; letter-spacing: .3px;
+  }
+  .section-score {
+    font-size: 16px; font-weight: 900;
+  }
+  .section-header.green .section-score  { color: var(--green); }
+  .section-header.orange .section-score { color: var(--orange); }
+  .section-header.red .section-score    { color: var(--red); }
+  .section-header.gray .section-score   { color: var(--gray-400); }
+
+  .section-nc-badge {
+    font-size: 8px; font-weight: 700; color: white;
+    padding: 3px 10px; border-radius: 99px;
+  }
+  .nc-zero { background: var(--green); }
+  .nc-pos  { background: var(--red); }
+
+  .section-meta {
+    font-size: 7.5px; color: var(--gray-400); margin-bottom: 6px;
+    padding-left: 2px;
+  }
+  .section-meta b { color: var(--gray-600); }
+
+  /* ── Check Items ────────────────────────────────────────────── */
+  .items-list { list-style: none; }
+  .check-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .check-item:last-child { border-bottom: none; }
+
+  .status-pill {
+    flex-shrink: 0; margin-top: 1px;
+    font-size: 7px; font-weight: 800; letter-spacing: .8px;
+    padding: 2px 7px; border-radius: 99px;
+    text-transform: uppercase;
+  }
+  .status-ok { background: var(--green); color: white; }
+  .status-nc { background: var(--red);   color: white; }
+  .status-na { background: var(--gray-400); color: white; }
+
+  .item-text {
+    font-size: 9px; color: var(--gray-800); line-height: 1.5; flex: 1;
+  }
+  .item-text.nc-text { color: var(--red); font-weight: 600; }
+  .item-text.na-text { color: var(--gray-400); }
+
+  /* ── NC Details: Justificativa + Foto ──────────────────────── */
+  .nc-details { margin: 4px 0 8px 34px; }
+
+  .justif-box {
+    background: var(--red-light); border-left: 3px solid var(--red);
+    border-radius: 4px; padding: 7px 10px; margin-bottom: 6px;
+  }
+  .justif-label {
+    font-size: 7.5px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: .8px; color: var(--red); margin-bottom: 3px;
+  }
+  .justif-text { font-size: 8.5px; color: var(--gray-800); line-height: 1.5; }
+
+  .photo-box {
+    border: 1.5px solid var(--red); border-radius: 6px;
+    overflow: hidden; margin-bottom: 8px;
+  }
+  .photo-placeholder {
+    background: var(--gray-100);
+    height: 52mm;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 6px;
+  }
+  .photo-icon {
+    width: 36px; height: 36px; background: var(--gray-200);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .photo-hint { font-size: 7.5px; color: var(--gray-400); }
+  .photo-caption {
+    background: var(--red); color: white;
+    font-size: 7px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; padding: 5px 10px;
+  }
+
+  /* ── Metrics Table (Page 1) ─────────────────────────────────── */
+  .table-title {
+    font-size: 11px; font-weight: 800; color: var(--navy);
+    text-transform: uppercase; letter-spacing: .5px;
+    margin: 14px 0 6px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--sky);
+  }
+  .metrics-table {
+    width: 100%; border-collapse: collapse; font-size: 8.5px;
+  }
+  .metrics-table thead tr {
+    background: var(--navy); color: white;
+  }
+  .metrics-table th {
+    padding: 8px 8px; font-weight: 700; text-align: center;
+    font-size: 7.5px; letter-spacing: .5px; text-transform: uppercase;
+  }
+  .metrics-table th:first-child { text-align: left; }
+  .metrics-table td {
+    padding: 7px 8px; text-align: center;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .metrics-table td:first-child { text-align: left; font-weight: 500; }
+  .metrics-table tbody tr:nth-child(odd) { background: var(--gray-50); }
+  .metrics-table tfoot tr {
+    background: var(--navy); color: white; font-weight: 700;
+  }
+  .metrics-table tfoot td { border: none; }
+
+  .ap-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 99px;
+    font-weight: 700; font-size: 8px;
+  }
+  .ap-green  { background: var(--green-light);  color: var(--green); }
+  .ap-orange { background: var(--orange-light); color: var(--orange); }
+  .ap-red    { background: var(--red-light);    color: var(--red); }
+  .ap-gray   { background: var(--gray-100);     color: var(--gray-400); }
+
+  .nc-col    { color: var(--red); font-weight: 700; }
+  .nc-col-0  { color: var(--gray-400); }
+
+  /* ── Signature Page ─────────────────────────────────────────── */
+  .sig-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    margin-top: 12px;
+  }
+  .sig-box {
+    border: 1px solid var(--gray-200); border-radius: 6px; overflow: hidden;
+  }
+  .sig-box-header {
+    background: var(--gray-100); padding: 8px 12px;
+    font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .5px; color: var(--gray-600);
+  }
+  .sig-box-body {
+    padding: 32px 12px 12px;
+    border-top: 1px solid var(--gray-200);
+  }
+  .sig-line {
+    border-top: 1.5px solid var(--gray-400);
+    margin: 0 12px; padding-top: 6px;
+    font-size: 7.5px; color: var(--gray-400);
+  }
+
+  /* ── Footer ─────────────────────────────────────────────────── */
+  .doc-footer {
+    margin-top: 24px;
+    padding-top: 8px; border-top: 1px solid var(--gray-200);
+    text-align: center;
+    font-size: 7px; color: var(--gray-400); letter-spacing: .5px;
+  }
+
+  /* ── No-print button ─────────────────────────────────────────── */
+  .no-print {
+    text-align: center; margin-bottom: 16px;
+  }
+  .btn-print {
+    background: var(--navy); color: white;
+    border: none; padding: 10px 28px; border-radius: 6px;
+    font-size: 13px; font-weight: 700; cursor: pointer; letter-spacing: .3px;
+  }
+  .btn-print:hover { background: var(--navy-mid); }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar como PDF</button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PÁGINA 1 — Capa + Sumário Executivo
+═══════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- Cabeçalho -->
+  <div class="cover-header">
+    <div class="eyebrow">Relatório de Auditoria</div>
+    <h1>Auditoria de Boas Práticas</h1>
+    <p class="subtitle">EINSTEIN MORUMBI &nbsp;·&nbsp; KOJI &nbsp;·&nbsp; I2 ANDAR</p>
+    <hr class="cover-divider"/>
+    <div class="meta-grid">
+      <div class="meta-item"><span class="meta-label">Auditora</span><span class="meta-val">Alana Barbosa</span></div>
+      <div class="meta-item"><span class="meta-label">Data</span><span class="meta-val">16/03/2026</span></div>
+      <div class="meta-item"><span class="meta-label">ID</span><span class="meta-val">F26031600003</span></div>
+      <div class="meta-item"><span class="meta-label">Início</span><span class="meta-val">08:53</span></div>
+      <div class="meta-item"><span class="meta-label">Término</span><span class="meta-val">09:20</span></div>
+      <div class="meta-item"><span class="meta-label">Plataforma</span><span class="meta-val">Mobile</span></div>
+    </div>
+    <!-- Score circle -->
+    <div class="score-circle-wrap">
+      <div class="score-circle">
+        <div class="score-inner">
+          <span class="score-val">94,78%</span>
+          <span class="score-label">Aproveitamento</span>
+        </div>
+      </div>
+      <div class="score-min">Padrão mínimo: 80%</div>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="kpi-row">
+    <div class="kpi-card green">
+      <div class="kpi-label">Pontos Realizados</div>
+      <div class="kpi-value">690</div>
+      <div class="kpi-sub">de 728 possíveis</div>
+      <div class="kpi-bar-wrap"><div class="kpi-bar" style="width:94.78%"></div></div>
+    </div>
+    <div class="kpi-card red">
+      <div class="kpi-label">Não Conformidades</div>
+      <div class="kpi-value">4</div>
+      <div class="kpi-sub">itens reprovados</div>
+    </div>
+    <div class="kpi-card gray">
+      <div class="kpi-label">Planos de Ação</div>
+      <div class="kpi-value">0</div>
+      <div class="kpi-sub">em aberto</div>
+    </div>
+    <div class="kpi-card green" style="border-top-color:var(--sky)">
+      <div class="kpi-label" style="color:var(--sky)">Fotos Anexadas</div>
+      <div class="kpi-value" style="color:var(--sky)">5</div>
+      <div class="kpi-sub">registros</div>
+    </div>
+  </div>
+
+  <!-- Tabela de Métricas -->
+  <div class="page-inner">
+    <div class="table-title">Resultado por Categoria</div>
+    <table class="metrics-table">
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          <th>PP</th><th>PR</th><th>NA</th><th>NC</th>
+          <th>Aproveitamento</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1. INFORMAÇÃO DA VISITA</td><td>—</td><td>—</td><td>0</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-gray">—</span></td></tr>
+        <tr><td>2. INSTALAÇÃO (ÁREA INTERNA DA LOJA)</td><td>64</td><td>62</td><td>2</td><td class="nc-col">1</td><td><span class="ap-badge ap-green">96,88%</span></td></tr>
+        <tr><td>3. PESSOAL: HIGIENE, CONTROLE E CAPACITAÇÃO</td><td>68</td><td>68</td><td>1</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-green">100,00%</span></td></tr>
+        <tr><td>4. RECEBIMENTO E ARMAZENAMENTO</td><td>84</td><td>84</td><td>3</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-green">100,00%</span></td></tr>
+        <tr><td>5. PRÉ-PREPARO, PREPARO E EXPOSIÇÃO</td><td>164</td><td>164</td><td>8</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-green">100,00%</span></td></tr>
+        <tr><td>6. EQUIPAMENTOS, MÓVEIS E UTENSÍLIOS</td><td>76</td><td>60</td><td>0</td><td class="nc-col">1</td><td><span class="ap-badge ap-orange">78,95%</span></td></tr>
+        <tr><td>7. RESÍDUOS E CONTROLE INTEGRADO DE PRAGAS</td><td>28</td><td>8</td><td>0</td><td class="nc-col">2</td><td><span class="ap-badge ap-red">28,57%</span></td></tr>
+        <tr><td>8. TEMPERATURA</td><td>128</td><td>128</td><td>1</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-green">100,00%</span></td></tr>
+        <tr><td>9. PLANILHA</td><td>48</td><td>48</td><td>1</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-green">100,00%</span></td></tr>
+        <tr><td>10. DOCUMENTAÇÃO</td><td>68</td><td>68</td><td>0</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-green">100,00%</span></td></tr>
+        <tr><td>11. RISCO À SAÚDE DO CONSUMIDOR</td><td>—</td><td>—</td><td>1</td><td class="nc-col-0">0</td><td><span class="ap-badge ap-gray">—</span></td></tr>
+      </tbody>
+      <tfoot>
+        <tr><td>GERAL</td><td>728</td><td>690</td><td>17</td><td>4</td><td>94,78%</td></tr>
+      </tfoot>
+    </table>
+
+    <div class="doc-footer">
+      AP: Aproveitamento &nbsp;·&nbsp; PP: Pontos Possíveis &nbsp;·&nbsp; PR: Pontos Realizados &nbsp;·&nbsp;
+      NA: Não Aplicáveis &nbsp;·&nbsp; NC: Não Conformidades
+    </div>
+  </div>
+</div><!-- /page 1 -->
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════
+     PÁGINA 2 — Seções 1 a 3
+═══════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-inner" style="padding-top:10mm">
+
+    <!-- SEÇÃO 1 -->
+    <div class="section-block">
+      <div class="section-header gray">
+        <div class="section-num">1</div>
+        <div class="section-title">Informação da Visita</div>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta">Sem pontuação</div>
+      <ul class="items-list">
+        <li class="check-item">
+          <span class="status-pill status-ok">OK</span>
+          <span class="item-text">Início da visita: 16/03/2026 às 08:53</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- SEÇÃO 2 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">2</div>
+        <div class="section-title">Instalação (Área Interna da Loja)</div>
+        <span class="section-score">96,88%</span>
+        <span class="section-nc-badge nc-pos">NC: 1</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 64 &nbsp;·&nbsp; <b>PR:</b> 62 &nbsp;·&nbsp; <b>NA:</b> 2 &nbsp;·&nbsp; <b>NC:</b> 1</div>
+      <ul class="items-list">
+
+        <li class="check-item">
+          <span class="status-pill status-ok">OK</span>
+          <span class="item-text">Instalação: organizada e dimensionada de forma a facilitar a execução dos procedimentos sem cruzamento de processo</span>
+        </li>
+
+        <li class="check-item">
+          <span class="status-pill status-nc">NC</span>
+          <span class="item-text nc-text">Piso: limpo, revestido com material liso, antiderrapante, impermeável, lavável, de fácil higienização, resistente e em boas condições</span>
+        </li>
+        <li style="list-style:none">
+          <div class="nc-details">
+            <div class="justif-box">
+              <div class="justif-label">⚠ Justificativa / Não Conformidade</div>
+              <div class="justif-text">Pisos manchados e com ferrugem. Recomenda-se limpeza profunda e aplicação de selador adequado para evitar propagação e contaminação.</div>
+            </div>
+            <div class="photo-box">
+              <div class="photo-placeholder">
+                <div class="photo-icon">📷</div>
+                <div class="photo-hint">Foto da não conformidade</div>
+              </div>
+              <div class="photo-caption">REGISTRO FOTOGRÁFICO &nbsp;·&nbsp; PISO MANCHADO COM FERRUGEM – ÁREA DE PRÉ-PREPARO</div>
+            </div>
+          </div>
+        </li>
+
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Ralo e calha: limpos, íntegros, sifonados, com tampa e sistema de fechamento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Parede: limpa, lisa, impermeável, lavável, de cor clara e em boas condições</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Teto: limpo, liso, impermeável, lavável, sem fresta e resistente ao calor</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Porta: limpa, resistente, impermeável, ajustada ao batente e com fechamento automático</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Janela e tela: limpa, resistente, impermeável, com proteção contra praga e sujidade</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Iluminação: limpa, adequada, calha em boas condições e lâmpada protegida contra explosão</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Ventilação: grade e dutos limpos, com renovação e circulação do ar, conforto térmico adequado</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Pia: limpa, de material liso, impermeável, lavável, resistente e de fácil higienização</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Pia para higienização das mãos: limpa, em ponto estratégico, com papel toalha, sabonete bactericida ou neutro e antisséptico</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Cartaz indicando o procedimento correto de higienização das mãos e lixeira sem contato manual</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Objeto estranho à atividade do local: ausente</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Casa de máquinas: limpa, organizada e desobstruída</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Caixa de gordura: presente, vedada, limpa e em bom estado de conservação</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Sanitário e vestiário: limpo, organizado, sem comunicação direta, em boas condições, com papel higiênico, papel toalha e sabonete bactericida</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Aviso de proibição de venda de bebida alcoólica para menores de 18 anos: presente</span></li>
+      </ul>
+    </div>
+
+    <!-- SEÇÃO 3 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">3</div>
+        <div class="section-title">Pessoal: Higiene, Controle de Saúde e Capacitação</div>
+        <span class="section-score">100,00%</span>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 68 &nbsp;·&nbsp; <b>PR:</b> 68 &nbsp;·&nbsp; <b>NA:</b> 1 &nbsp;·&nbsp; <b>NC:</b> 0</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: unha curta, sem esmalte, sem adorno, sem barba, com touca e com crachá</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: uniforme limpo, suficiente, conservado, completo, sem bolso acima da cintura, calçado fechado e antiderrapante</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Funcionário: bom hábito de higiene e boa condição de saúde ou afastado da manipulação direta de alimento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: higienização adequada das mãos ao chegar, na troca de função e ao voltar do banheiro</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: objeto pessoal em local organizado, limpo e adequado</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: EPI limpo, conservado, presente e uso adequado (avental, bota, capa térmica, luva de aço, térmica e de cano longo)</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: máscara com utilização adequada conforme Portaria 2619 e CVS5</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Funcionário: refeição realizada em local próprio e adequado</span></li>
+      </ul>
+    </div>
+
+  </div>
+</div><!-- /page 2 -->
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════
+     PÁGINA 3 — Seções 4 e 5
+═══════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-inner" style="padding-top:10mm">
+
+    <!-- SEÇÃO 4 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">4</div>
+        <div class="section-title">Recebimento e Armazenamento</div>
+        <span class="section-score">100,00%</span>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 84 &nbsp;·&nbsp; <b>PR:</b> 84 &nbsp;·&nbsp; <b>NA:</b> 3 &nbsp;·&nbsp; <b>NC:</b> 0</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Recebimento (alimento, embalagem e descartável): não colocado diretamente sobre o piso</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Recebimento refrigerado ou congelado: tempo adequado entre recebimento e armazenamento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Armazenamento: produto em embalagem adequada, limpa, íntegra, sem deformação, livre de sinais de umidade e emboloramento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Armazenamento: produto sem sinais de descongelamento ou recongelamento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Armazenamento: produto com identificação adequada e dentro do prazo de validade</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Descongelamento: sob refrigeração, identificado com data de início e data de uso</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Dessalgue: sob refrigeração, identificado com data de início de processo e data de uso</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Devolução: produto segregado e identificado</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Guarda de amostra de alimento: por 96 horas (sólido: até 4°C ou a -18°C / líquido: até 4°C)</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Guarda de amostra: de no mínimo 100g e coletada 1/3 do tempo antes do término da distribuição</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Guarda de amostra: identificada com nome, data, horário e sem risco de contaminação</span></li>
+      </ul>
+    </div>
+
+    <!-- SEÇÃO 5 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">5</div>
+        <div class="section-title">Pré-Preparo, Preparo e Exposição</div>
+        <span class="section-score">100,00%</span>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 164 &nbsp;·&nbsp; <b>PR:</b> 164 &nbsp;·&nbsp; <b>NA:</b> 8 &nbsp;·&nbsp; <b>NC:</b> 0</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Higienização de vegetais: seleção, lavagem, desinfecção (imersão completa) e enxague</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Higienização de vegetais: produto regularizado na ANVISA, no prazo de validade e com informações sobre o uso</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Dessalgue: sob temperatura &lt;5°C ou por meio de fervura</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Descongelamento: sob temperatura &lt;5,0°C ou em forno, quando de imediato cozimento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Congelamento: adequado (cocção → resfriamento forçado → congelamento)</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Tratamento térmico: mínimo de 74°C ou 70°C por 2 minutos ou 65°C por 15 minutos</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Resfriamento: adequado (de 60°C a 10°C em 2 horas)</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Reaquecimento: adequado (mínimo de 74°C)</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Utilização adequada de ovo: íntegro e limpo; cozido por 7 minutos e frito com gema dura</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Reutilização do óleo de fritura: óleo filtrado e sem fumaça, espuma, resíduo ou alteração de cor, aroma ou sabor</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Preparo: alimento manipulado em no máximo 30 minutos</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Preparo: alimento manipulado com utensílio ou com luva descartável</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Alimento pronto para consumo: mantido em equipamento próprio que permite a manutenção térmica</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Self service: identificado com os principais ingredientes e temperos</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Self service: utensílio exclusivo para cada alimento e com cabo longo</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Self service: com barreira de proteção contra contaminação pelo consumidor</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Alimento a granel: identificado, em recipiente limpo e bem conservado, com proteção e material sanitário</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Balcão térmico: água limpa e trocada diariamente</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Resto alimentar (alimento exposto ou em temperatura inadequada): não reutilizado</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Contaminação cruzada: ausente</span></li>
+      </ul>
+    </div>
+
+  </div>
+</div><!-- /page 3 -->
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════
+     PÁGINA 4 — Seções 6 e 7 (NCs críticas)
+═══════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-inner" style="padding-top:10mm">
+
+    <!-- SEÇÃO 6 -->
+    <div class="section-block">
+      <div class="section-header orange">
+        <div class="section-num">6</div>
+        <div class="section-title">Equipamentos, Móveis e Utensílios</div>
+        <span class="section-score">78,95%</span>
+        <span class="section-nc-badge nc-pos">NC: 1</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 76 &nbsp;·&nbsp; <b>PR:</b> 60 &nbsp;·&nbsp; <b>NA:</b> 0 &nbsp;·&nbsp; <b>NC:</b> 1</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Equipamentos, utensílios e móveis: limpos, conservados, de material sanitário e guardados protegidos</span></li>
+        <li class="check-item">
+          <span class="status-pill status-nc">NC</span>
+          <span class="item-text nc-text">Equipamentos, utensílios e móveis: higienizados de forma adequada e frequente</span>
+        </li>
+        <li style="list-style:none">
+          <div class="nc-details">
+            <div class="justif-box">
+              <div class="justif-label">⚠ Justificativa / Não Conformidade</div>
+              <div class="justif-text">Equipamentos com sujidades visíveis em superfícies de contato com alimentos. Implementar protocolo rigoroso de higienização diária e monitoramento de frequência.</div>
+            </div>
+            <div class="photo-box">
+              <div class="photo-placeholder">
+                <div class="photo-icon">📷</div>
+                <div class="photo-hint">Foto da não conformidade</div>
+              </div>
+              <div class="photo-caption">REGISTRO FOTOGRÁFICO &nbsp;·&nbsp; EQUIPAMENTO COM RESÍDUOS – SUPERFÍCIES DE CONTATO COM ALIMENTOS</div>
+            </div>
+          </div>
+        </li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Produto de limpeza: regularizado na ANVISA, dentro do prazo de validade e identificado</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Material de limpeza: limpo, bem conservado, guardado em local próprio</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Esponja e pano descartável: mantido em local adequado, não imerso em solução e utilizado corretamente</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Máquina de lavar louça: presente, com água de lavagem de 55°C a 65°C e enxague de 80°C a 90°C</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Louça do cliente (prato, talher, copo e bandeja): limpa e devidamente higienizada</span></li>
+      </ul>
+    </div>
+
+    <!-- SEÇÃO 7 — CRÍTICA -->
+    <div class="section-block">
+      <div class="section-header red">
+        <div class="section-num">7</div>
+        <div class="section-title">Resíduos e Controle Integrado de Pragas</div>
+        <span class="section-score">28,57%</span>
+        <span class="section-nc-badge nc-pos">NC: 2</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 28 &nbsp;·&nbsp; <b>PR:</b> 8 &nbsp;·&nbsp; <b>NA:</b> 0 &nbsp;·&nbsp; <b>NC:</b> 2</div>
+      <ul class="items-list">
+
+        <li class="check-item">
+          <span class="status-pill status-nc">NC</span>
+          <span class="item-text nc-text">Lixo: separação, acondicionamento, destino correto, remoção em horário diferenciado e recipiente limpo, adequado e em boas condições</span>
+        </li>
+        <li style="list-style:none">
+          <div class="nc-details">
+            <div class="justif-box">
+              <div class="justif-label">⚠ Justificativa / Não Conformidade</div>
+              <div class="justif-text">Descarte inadequado na lixeira de compostagem. Ação corretiva imediata: treinamento da equipe sobre segregação correta de resíduos e revisão dos procedimentos.</div>
+            </div>
+            <div class="photo-box">
+              <div class="photo-placeholder">
+                <div class="photo-icon">📷</div>
+                <div class="photo-hint">Foto da não conformidade</div>
+              </div>
+              <div class="photo-caption">REGISTRO FOTOGRÁFICO &nbsp;·&nbsp; LIXEIRA DE COMPOSTAGEM COM DESCARTE INCORRETO</div>
+            </div>
+          </div>
+        </li>
+
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Resíduo de óleo comestível: em recipiente próprio, rígido, mantido fechado, identificado com nome, CNPJ e "Resíduo Óleo Comestível"</span></li>
+
+        <li class="check-item">
+          <span class="status-pill status-nc">NC</span>
+          <span class="item-text nc-text">Pragas: ausência, uso de medidas preventivas e uso de produto somente pela empresa especializada</span>
+        </li>
+        <li style="list-style:none">
+          <div class="nc-details">
+            <div class="justif-box">
+              <div class="justif-label">⚠ Justificativa / Não Conformidade</div>
+              <div class="justif-text">Presença de mosquitinhos (drosófilas) na área do bar. Acionar imediatamente empresa de controle de pragas homologada e revisar armazenamento de frutas e bebidas.</div>
+            </div>
+            <div class="photo-box">
+              <div class="photo-placeholder">
+                <div class="photo-icon">📷</div>
+                <div class="photo-hint">Foto da não conformidade</div>
+              </div>
+              <div class="photo-caption">REGISTRO FOTOGRÁFICO &nbsp;·&nbsp; PRESENÇA DE DROSÓFILAS – ÁREA DO BAR (AÇÃO URGENTE)</div>
+            </div>
+          </div>
+        </li>
+
+      </ul>
+    </div>
+
+  </div>
+</div><!-- /page 4 -->
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════
+     PÁGINA 5 — Seções 8–10 + Documentação
+═══════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-inner" style="padding-top:10mm">
+
+    <!-- SEÇÃO 8 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">8</div>
+        <div class="section-title">Temperatura</div>
+        <span class="section-score">100,00%</span>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 128 &nbsp;·&nbsp; <b>PR:</b> 128 &nbsp;·&nbsp; <b>NA:</b> 1 &nbsp;·&nbsp; <b>NC:</b> 0</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Temperatura de equipamentos de manutenção quente: adequada</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Temperatura de equipamentos de manutenção refrigerada: adequada</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Temperatura de equipamentos de manutenção congelada: adequada</span></li>
+      </ul>
+    </div>
+
+    <!-- SEÇÃO 9 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">9</div>
+        <div class="section-title">Planilha</div>
+        <span class="section-score">100,00%</span>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 48 &nbsp;·&nbsp; <b>PR:</b> 48 &nbsp;·&nbsp; <b>NA:</b> 1 &nbsp;·&nbsp; <b>NC:</b> 0</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Planilha de controle de temperatura: recebimento</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Planilha de controle de temperatura: equipamentos (2 vezes ao dia)</span></li>
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Planilha de controle de temperatura: pratos prontos para consumo (a cada 2 horas)</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Planilha de controle de temperatura e troca: óleo de fritura</span></li>
+      </ul>
+    </div>
+
+    <!-- SEÇÃO 10 -->
+    <div class="section-block">
+      <div class="section-header green">
+        <div class="section-num">10</div>
+        <div class="section-title">Documentação</div>
+        <span class="section-score">100,00%</span>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <div class="section-meta"><b>PP:</b> 68 &nbsp;·&nbsp; <b>PR:</b> 68 &nbsp;·&nbsp; <b>NA:</b> 0 &nbsp;·&nbsp; <b>NC:</b> 0</div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">AVCB ou CLCB: presente e válido</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Licença de Funcionamento: presente e válida</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Licença Sanitária: presente e válida</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Responsável Técnico: legalmente habilitado com contrato de prestação ou proprietário/designado com curso de Boas Práticas</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">PCMSO e PGR: presente e válido</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">FDS (FISPQ) de produtos de higienização: presente e disponível</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Higienização da caixa d'água: comprovante de higienização a cada 6 meses</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Análise da água caixa d'água: certificado de análise a cada 6 meses</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Filtro de água (da loja): comprovante de troca de filtro</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Controle de pragas: comprovante de execução e relatório de medidas preventivas necessárias</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Calibração: comprovante anual de equipamentos (termômetro, balança e outros)</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Manutenção: comprovante de manutenção preventiva e corretiva de equipamentos</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Comprovante de treinamento: capacitação de funcionários, com conteúdo, carga horária e registro de participação</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">ASO (amostragem): na admissão, presente e dentro da validade (semestralmente: coprocultura e coproparasitológico)</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Auditoria de Boas Práticas (interna e fornecedor): realizada periodicamente</span></li>
+        <li class="check-item"><span class="status-pill status-ok">OK</span><span class="item-text">Manual de Boas Práticas: presente, específico para o estabelecimento e com a descrição dos POPs</span></li>
+      </ul>
+    </div>
+
+  </div>
+</div><!-- /page 5 -->
+
+<div class="page-break"></div>
+
+<!-- ══════════════════════════════════════════════
+     PÁGINA 6 — Risco, Assinatura e Encerramento
+═══════════════════════════════════════════════ -->
+<div class="page">
+  <div class="page-inner" style="padding-top:10mm">
+
+    <!-- SEÇÃO 11 -->
+    <div class="section-block">
+      <div class="section-header gray">
+        <div class="section-num">11</div>
+        <div class="section-title">Risco à Saúde do Consumidor</div>
+        <span class="section-nc-badge nc-zero">NC: 0</span>
+      </div>
+      <ul class="items-list">
+        <li class="check-item"><span class="status-pill status-na">N/A</span><span class="item-text na-text">Ausência de risco à saúde do consumidor</span></li>
+      </ul>
+    </div>
+
+    <!-- ASSINATURA -->
+    <div class="table-title" style="margin-top:20px">Assinatura e Encerramento</div>
+
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-box-header">Assinatura do Cliente</div>
+        <div class="sig-box-body" style="height:52mm">
+          <!-- espaço para assinatura -->
+        </div>
+        <div class="sig-line">Data: _____ / _____ / __________</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-box-header">Assinatura da Consultora</div>
+        <div class="sig-box-body" style="height:52mm">
+          <!-- espaço para assinatura -->
+        </div>
+        <div class="sig-line">
+          Nutricionista &nbsp;·&nbsp; Alana Barbosa<br/>
+          alana.silva@eurofinslatam.com &nbsp;·&nbsp; +55 11 9 8631-0191
+        </div>
+      </div>
+    </div>
+
+    <!-- Fim da visita -->
+    <div style="margin-top:14px; background:var(--gray-50); border-radius:6px; padding:10px 14px; font-size:8.5px; color:var(--gray-600);">
+      <b>Término da visita:</b> 16/03/2026 às 09:20 &nbsp;·&nbsp;
+      <b>Duração:</b> ~27 minutos &nbsp;·&nbsp;
+      <b>Plataforma:</b> Android Mobile (4.2.3)
+    </div>
+
+    <div class="doc-footer" style="margin-top:18mm">
+      ID: F26031600003 &nbsp;·&nbsp; Gerado em 16/03/2026 &nbsp;·&nbsp;
+      NutriGestão SaaS &nbsp;·&nbsp; Versão V2
+    </div>
+
+  </div>
+</div><!-- /page 6 -->
+
+</body>
+</html>

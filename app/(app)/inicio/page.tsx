@@ -30,6 +30,7 @@ import {
   countClientsForOwner,
   fetchProfileTimeZone,
 } from "@/lib/supabase/profile";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 
 const clinicalQuickLinkClass =
@@ -51,9 +52,10 @@ export default async function InicioPage({
   if (!user) {
     redirect("/login");
   }
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
   const [tz, clientCount] = await Promise.all([
     fetchProfileTimeZone(supabase, user.id),
-    countClientsForOwner(supabase, user.id),
+    countClientsForOwner(supabase, workspaceOwnerId),
   ]);
   const hasClients = clientCount > 0;
   const [{ rows }, complianceAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([

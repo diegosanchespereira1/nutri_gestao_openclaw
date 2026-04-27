@@ -11,6 +11,7 @@ import {
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import type { ChecklistFillOutcome } from "@/lib/types/checklist-fill";
 import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
+import { PdfTheme } from "@/lib/pdf/dossier-pdf-theme";
 
 /** Helvetica WinAnsi: remove diacríticos para evitar caracteres inválidos. */
 export function foldTextForPdf(s: string): string {
@@ -21,54 +22,9 @@ export function foldTextForPdf(s: string): string {
     .trim();
 }
 
-/* ── Paleta V2 — Premium Navy ──────────────────────────────────────────── */
-const C = {
-  // Fundos de página
-  pageBg:      rgb(0.945, 0.949, 0.957), // #F1F2F4
-
-  // Navy principal (cabeçalho, badges de seção, rodapé)
-  navy:        rgb(0.106, 0.165, 0.290), // #1B2A4A
-  navyDeep:    rgb(0.063, 0.110, 0.212), // #102036
-  navyLight:   rgb(0.208, 0.302, 0.498), // #354D7F
-
-  // Sky (acento principal)
-  sky:         rgb(0.055, 0.647, 0.914), // #0EA5E9
-  skyLight:    rgb(0.816, 0.929, 0.980), // #D0EDFA
-
-  // Branco e cinzas de card
-  white:       rgb(1, 1, 1),
-  cardBg:      rgb(1, 1, 1),
-  cardBorder:  rgb(0.878, 0.894, 0.914), // #E0E4E9
-  softBorder:  rgb(0.922, 0.933, 0.945), // #EBF0F1
-  rowAlt:      rgb(0.973, 0.976, 0.984), // linha alternada suave
-
-  // Texto
-  textPrimary: rgb(0.098, 0.118, 0.157), // #191E28
-  textMuted:   rgb(0.408, 0.435, 0.490), // #686F7D
-  textFaint:   rgb(0.612, 0.635, 0.690), // #9CA2B0
-
-  // Verde — Conforme
-  green:       rgb(0.106, 0.475, 0.243), // #1B7A3E
-  greenLight:  rgb(0.910, 0.961, 0.933), // #E8F5EE
-  greenBorder: rgb(0.690, 0.886, 0.741), // #B0E2BD
-  greenMid:    rgb(0.165, 0.600, 0.310), // #2A994F
-
-  // Âmbar — Regular
-  amber:       rgb(0.851, 0.467, 0.024), // #D97706
-  amberLight:  rgb(0.996, 0.953, 0.780), // #FEF3C7
-  amberBorder: rgb(0.988, 0.824, 0.498), // #FCD27F
-
-  // Vermelho — NC / Crítico
-  red:         rgb(0.725, 0.110, 0.110), // #B91C1C
-  redLight:    rgb(0.996, 0.886, 0.886), // #FEE2E2
-  redBorder:   rgb(0.988, 0.729, 0.729), // #FCBABA
-  redStripe:   rgb(0.863, 0.149, 0.149), // #DC2626
-
-  // Cinza — NA / neutro
-  graySoft:    rgb(0.961, 0.965, 0.973),
-  grayBorder:  rgb(0.878, 0.894, 0.914),
-  grayInk:     rgb(0.341, 0.369, 0.439),
-};
+/* ── Paleta — importada do design system centralizado ──────────────────── */
+// Para alterar cores, tipografia ou espaçamentos, edite lib/pdf/dossier-pdf-theme.ts
+const C = PdfTheme.colors;
 
 type Palette = { soft: RGB; border: RGB; ink: RGB };
 
@@ -418,7 +374,8 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
     rowHeights.push(rowH);
   }
   const totalRowH = rowHeights.reduce((a, b) => a + b, 0);
-  const cardH = padding * 2 + totalRowH + rowGap * (rowsNeeded - 1) + 6; // +6 for header bar
+  const BAR_H = 18;
+  const cardH = padding * 2 + totalRowH + rowGap * (rowsNeeded - 1) + BAR_H;
 
   ensureVerticalSpace(ctx, cardH + 10);
 
@@ -431,12 +388,12 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
     x: cardX, y: cardBottom, width: CONTENT_W, height: cardH,
     color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.5,
   });
-  // Barra topo navy
-  ctx.page.drawRectangle({ x: cardX, y: cardTop - 6, width: CONTENT_W, height: 6, color: C.navy });
-  // Label da barra
-  drawTextLine(ctx, "INFORMACOES DA AUDITORIA", cardX + 10, cardTop - 1, 6.5, ctx.fontBold, rgb(0.72, 0.79, 0.92));
+  // Barra topo navy (18 pt — comporta texto de 6.5 pt com padding confortável)
+  ctx.page.drawRectangle({ x: cardX, y: cardTop - BAR_H, width: CONTENT_W, height: BAR_H, color: C.navy });
+  // Label centrado verticalmente na barra
+  drawTextLine(ctx, "INFORMACOES DA AUDITORIA", cardX + 10, cardTop - 6, 6.5, ctx.fontBold, C.navyOnLight);
 
-  let cursorTop = cardTop - 6 - padding;
+  let cursorTop = cardTop - BAR_H - padding;
   for (let r = 0; r < rowsNeeded; r++) {
     for (let c = 0; c < colCount; c++) {
       const idx = r * colCount + c;
@@ -475,8 +432,9 @@ function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
   const labelSize = 7;
   const valueSize = 9;
 
-  // Altura total: barra topo + header de colunas + linhas + espaçamento
-  const totalH = 6 + HEADER_H + sections.length * ROW_H + 10;
+  // Altura total: barra topo (18 pt) + header de colunas + linhas + espaçamento
+  const BAR_H = 18;
+  const totalH = BAR_H + HEADER_H + sections.length * ROW_H + 10;
   ensureVerticalSpace(ctx, totalH + 14);
 
   const tableTop    = ctx.y;
@@ -484,12 +442,12 @@ function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
 
   // Fundo geral
   ctx.page.drawRectangle({ x: MARGIN_X, y: tableBottom, width: CONTENT_W, height: totalH, color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.5 });
-  // Barra topo navy
-  ctx.page.drawRectangle({ x: MARGIN_X, y: tableTop - 6, width: CONTENT_W, height: 6, color: C.navy });
-  drawTextLine(ctx, "RESULTADO POR SECAO", MARGIN_X + 10, tableTop - 1, 6.5, ctx.fontBold, rgb(0.72, 0.79, 0.92));
+  // Barra topo navy (18 pt — comporta texto de 6.5 pt com padding confortável)
+  ctx.page.drawRectangle({ x: MARGIN_X, y: tableTop - BAR_H, width: CONTENT_W, height: BAR_H, color: C.navy });
+  drawTextLine(ctx, "RESULTADO POR SECAO", MARGIN_X + 10, tableTop - 6, 6.5, ctx.fontBold, C.navyOnLight);
 
   // Cabeçalho das colunas
-  const colsTop = tableTop - 6;
+  const colsTop = tableTop - BAR_H;
   const colsBtm = colsTop - HEADER_H;
   ctx.page.drawRectangle({ x: MARGIN_X, y: colsBtm, width: CONTENT_W, height: HEADER_H, color: C.rowAlt });
 

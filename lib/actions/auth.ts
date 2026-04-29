@@ -70,8 +70,7 @@ export async function updateProfileAction(
     return { ok: false, error: photoRes.error };
   }
 
-  const profilePayload = {
-    user_id: user.id,
+  const profileFields = {
     full_name,
     crn,
     phone,
@@ -79,24 +78,54 @@ export async function updateProfileAction(
     updated_at: new Date().toISOString(),
   };
 
-  const { data: persistedProfile, error: upsertError } = await supabase
+  /** Não usar upsert com user_id no payload: após migrações, UPDATE só cobre colunas
+   * concedidas (full_name, crn, …) — incluir user_id no ON CONFLICT DO UPDATE falha com
+   * "permission denied for column user_id". */
+  const { data: afterUpdate, error: updateError } = await supabase
     .from("profiles")
-    .upsert(profilePayload, { onConflict: "user_id" })
+    .update(profileFields)
+    .eq("user_id", user.id)
     .select("id, crn")
-    .single();
+    .maybeSingle();
 
-  if (upsertError) {
-    console.error("[updateProfileAction] profiles upsert failed", {
+  let persistedProfile = afterUpdate;
+
+  if (updateError) {
+    console.error("[updateProfileAction] profiles update failed", {
       userId: user.id,
-      code: upsertError.code,
-      message: upsertError.message,
-      details: upsertError.details,
-      hint: upsertError.hint,
+      code: updateError.code,
+      message: updateError.message,
+      details: updateError.details,
+      hint: updateError.hint,
     });
     return { ok: false, error: "Não foi possível salvar. Tente novamente." };
   }
 
-  if (!persistedProfile || String(persistedProfile.crn ?? "").trim() !== crn) {
+  if (!persistedProfile) {
+    const { data: inserted, error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        user_id: user.id,
+        ...profileFields,
+      })
+      .select("id, crn")
+      .maybeSingle();
+
+    if (insertError) {
+      console.error("[updateProfileAction] profiles insert failed", {
+        userId: user.id,
+        code: insertError.code,
+        message: insertError.message,
+        details: insertError.details,
+        hint: insertError.hint,
+      });
+      return { ok: false, error: "Não foi possível salvar. Tente novamente." };
+    }
+    persistedProfile = inserted;
+  }
+
+  const persistedCrn = String(persistedProfile?.crn ?? "").trim();
+  if (!persistedProfile?.id || persistedCrn !== crn.trim()) {
     return {
       ok: false,
       error: "Não foi possível atualizar o CRN. Tente novamente.",

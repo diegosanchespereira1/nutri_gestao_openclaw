@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
+import {
+  getChecklistReopenEligibility,
+  loadReopenEventsForSession,
+} from "@/lib/actions/checklist-fill-reopen";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Label } from "@/components/ui/label";
 import { VisitExecutionHeader } from "@/components/visits/visit-execution-header";
@@ -186,6 +190,15 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
 
     const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
 
+    const supabaseWizard = await createClient();
+    const {
+      data: { user: wizardUser },
+    } = await supabaseWizard.auth.getUser();
+    const { canReopen: canReopenDossier } = wizardUser
+      ? await getChecklistReopenEligibility(supabaseWizard, wizardUser.id)
+      : { canReopen: false };
+    const initialReopenEvents = await loadReopenEventsForSession(sessionParam);
+
     return (
       <div className="space-y-6">
         <VisitExecutionHeader
@@ -217,7 +230,10 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
           recurringNcSessionCountByItemId={model.recurringNcSessionCountByItemId}
           initialDossierApprovedAt={model.fill.session.dossier_approved_at ?? null}
           initialPdfExport={model.fill.latestPdfExport}
+          pdfExportHistory={model.fill.pdfExportHistory}
           dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+          canReopenDossier={canReopenDossier}
+          initialReopenEvents={initialReopenEvents}
         />
       </div>
     );

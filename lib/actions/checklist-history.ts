@@ -1,6 +1,8 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
+import type { ChecklistFillSessionReopenEventRow } from "@/lib/types/checklist-reopen";
 import type { EstablishmentType } from "@/lib/types/establishments";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
@@ -34,16 +36,11 @@ export type ChecklistSessionSummary = {
   score_percentage: number | null;
   score_points_earned: number | null;
   score_points_total: number | null;
-  latestPdfExport?: {
-    id: string;
-    user_id: string;
-    session_id: string;
-    status: "pending" | "processing" | "ready" | "failed";
-    created_at: string;
-    updated_at: string;
-    storage_path: string | null;
-    error_message: string | null;
-  } | null;
+  latestPdfExport?: ChecklistFillPdfExportRow | null;
+  /** PDFs `ready` da sessão (histórico de versões / obsoletos). */
+  pdf_export_history?: ChecklistFillPdfExportRow[];
+  /** Reaberturas após aprovação (auditoria). */
+  reopen_events?: ChecklistFillSessionReopenEventRow[];
 };
 
 export type NcItemDetail = {
@@ -372,23 +369,85 @@ export async function loadChecklistSessionsForClient(input: {
   // 5.6. Carregar últimos PDF exports por sessão
   const { data: pdfExports } = await supabase
     .from("checklist_fill_pdf_exports")
-    .select("id, user_id, session_id, status, created_at, updated_at, storage_path, error_message")
+    .select(
+      "id, user_id, session_id, status, created_at, updated_at, storage_path, error_message, version_number, superseded_at, superseded_by_version",
+    )
     .in("session_id", sessionIds)
+    .order("version_number", { ascending: false })
     .order("created_at", { ascending: false });
 
-  const latestPdfBySession = new Map<string, { id: string; user_id: string; session_id: string; status: "pending" | "processing" | "ready" | "failed"; created_at: string; updated_at: string; storage_path: string | null; error_message: string | null }>();
+  function mapPdfRow(raw: Record<string, unknown>): ChecklistFillPdfExportRow {
+    return {
+      id: String(raw.id),
+      user_id: String(raw.user_id),
+      session_id: String(raw.session_id),
+      status: raw.status as ChecklistFillPdfExportRow["status"],
+      created_at: String(raw.created_at),
+      updated_at: String(raw.updated_at),
+      storage_path: (raw.storage_path as string | null) ?? null,
+      error_message: (raw.error_message as string | null) ?? null,
+      version_number:
+        typeof raw.version_number === "number"
+          ? raw.version_number
+          : Number(raw.version_number) || 1,
+      superseded_at: (raw.superseded_at as string | null) ?? null,
+      superseded_by_version:
+        raw.superseded_by_version === null || raw.superseded_by_version === undefined
+          ? null
+          : Number(raw.superseded_by_version),
+    };
+  }
+
+  const pdfRowsBySession = new Map<string, ChecklistFillPdfExportRow[]>();
   for (const pdf of pdfExports ?? []) {
-    if (!latestPdfBySession.has(pdf.session_id)) {
-      latestPdfBySession.set(pdf.session_id, {
-        id: pdf.id,
-        user_id: pdf.user_id,
-        session_id: pdf.session_id,
-        status: pdf.status as "pending" | "processing" | "ready" | "failed",
-        created_at: pdf.created_at,
-        updated_at: pdf.updated_at,
-        storage_path: pdf.storage_path,
-        error_message: pdf.error_message,
-      });
+    const row = mapPdfRow(pdf as Record<string, unknown>);
+    const sid = row.session_id;
+    const arr = pdfRowsBySession.get(sid) ?? [];
+    arr.push(row);
+    pdfRowsBySession.set(sid, arr);
+  }
+  for (const arr of pdfRowsBySession.values()) {
+    arr.sort(
+      (a, b) =>
+        b.version_number - a.version_number ||
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  }
+
+  function pickLatestPdfForSession(sessionId: string): ChecklistFillPdfExportRow | null {
+    const list = pdfRowsBySession.get(sessionId) ?? [];
+    if (list.length === 0) return null;
+    const activeReady = list.find((r) => r.status === "ready" && !r.superseded_at);
+    if (activeReady) return activeReady;
+    const processing = list.find((r) => r.status === "processing" || r.status === "pending");
+    if (processing) return processing;
+    return list[0] ?? null;
+  }
+
+  function pickPdfHistoryForSession(sessionId: string): ChecklistFillPdfExportRow[] {
+    const list = pdfRowsBySession.get(sessionId) ?? [];
+    return list
+      .filter((r) => r.status === "ready")
+      .sort((a, b) => b.version_number - a.version_number);
+  }
+
+  const reopenBySession = new Map<string, ChecklistFillSessionReopenEventRow[]>();
+  if (sessionIds.length > 0) {
+    const { data: reopenRows } = await supabase
+      .from("checklist_fill_session_reopen_events")
+      .select(
+        "id, session_id, reopened_by_label, reopened_by_role, justification, previous_approved_at, created_at",
+      )
+      .in("session_id", sessionIds)
+      .order("created_at", { ascending: false });
+
+    for (const raw of reopenRows ?? []) {
+      const ev = raw as ChecklistFillSessionReopenEventRow;
+      const sid = ev.session_id;
+      const arr = reopenBySession.get(sid) ?? [];
+      if (arr.length >= 20) continue;
+      arr.push(ev);
+      reopenBySession.set(sid, arr);
     }
   }
 
@@ -462,7 +521,9 @@ export async function loadChecklistSessionsForClient(input: {
       score_percentage: (sessRaw.score_percentage as number | null) ?? null,
       score_points_earned: (sessRaw.score_points_earned as number | null) ?? null,
       score_points_total: (sessRaw.score_points_total as number | null) ?? null,
-      latestPdfExport: latestPdfBySession.get(sess.id) ?? null,
+      latestPdfExport: pickLatestPdfForSession(sess.id),
+      pdf_export_history: pickPdfHistoryForSession(sess.id),
+      reopen_events: reopenBySession.get(sess.id) ?? [],
     };
   });
 

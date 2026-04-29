@@ -49,14 +49,28 @@ export async function generateDossierPdfAction(
     };
   }
 
+  const { data: maxVerRow } = await supabase
+    .from("checklist_fill_pdf_exports")
+    .select("version_number")
+    .eq("session_id", sessionId)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const nextVersion =
+    typeof maxVerRow?.version_number === "number" ? maxVerRow.version_number + 1 : 1;
+
   const { data: job, error: insErr } = await supabase
     .from("checklist_fill_pdf_exports")
     .insert({
       user_id: user.id,
       session_id: sessionId,
       status: "processing",
+      version_number: nextVersion,
     })
-    .select("id, user_id, session_id, status, storage_path, error_message, created_at, updated_at")
+    .select(
+      "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
+    )
     .single();
 
   if (insErr || !job) {
@@ -102,12 +116,22 @@ export async function generateDossierPdfAction(
         error_message: null,
       })
       .eq("id", jobId)
-      .select("id, user_id, session_id, status, storage_path, error_message, created_at, updated_at")
+      .select(
+        "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
+      )
       .single();
 
     if (updErr || !updated) {
       throw new Error(updErr?.message ?? "Falha ao registar o PDF.");
     }
+
+    const newVer = Number((updated as { version_number?: number }).version_number ?? nextVersion);
+    await supabase
+      .from("checklist_fill_pdf_exports")
+      .update({ superseded_by_version: newVer })
+      .eq("session_id", sessionId)
+      .not("superseded_at", "is", null)
+      .is("superseded_by_version", null);
 
     revalidatePath(`/checklists/preencher/${sessionId}`);
     const vid = bundle.session.scheduled_visit_id;
@@ -156,12 +180,19 @@ export async function downloadDossierPdfAction(
   // RLS já filtra por workspace_member_user_ids(), sem necessidade de .eq("user_id")
   const { data: row } = await supabase
     .from("checklist_fill_pdf_exports")
-    .select("id, user_id, status, storage_path, session_id")
+    .select("id, user_id, status, storage_path, session_id, superseded_at")
     .eq("id", jobId)
     .maybeSingle();
 
   if (!row || row.status !== "ready" || !row.storage_path) {
     return { ok: false, error: "PDF não disponível. Gere novamente." };
+  }
+
+  if (row.superseded_at) {
+    return {
+      ok: false,
+      error: "Este PDF está obsoleto. Gere ou visualize o PDF atual da sessão.",
+    };
   }
 
   const suggestedFilename =

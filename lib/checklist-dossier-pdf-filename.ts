@@ -116,6 +116,7 @@ export async function resolveChecklistDossierPdfFilename(
     .select("id, created_at")
     .eq("session_id", sessionId)
     .eq("status", "ready")
+    .is("superseded_at", null)
     .order("created_at", { ascending: true })
     .order("id", { ascending: true });
 

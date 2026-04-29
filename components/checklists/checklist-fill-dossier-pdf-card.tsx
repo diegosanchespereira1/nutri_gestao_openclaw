@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, FileDown, Loader2, Mail, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, FileDown, Loader2, Mail, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -16,6 +16,8 @@ type Props = {
   sessionId: string;
   dossierApprovedAt: string | null;
   initialJob: ChecklistFillPdfExportRow | null;
+  /** Todos os PDFs `ready` da sessão (inclui obsoletos), ordenados por versão descendente. */
+  pdfExportHistory?: ChecklistFillPdfExportRow[];
   /** true quando RESEND e remetente estão definidos no servidor. */
   dossierEmailDeliveryConfigured?: boolean;
 };
@@ -35,6 +37,7 @@ export function ChecklistFillDossierPdfCard({
   sessionId,
   dossierApprovedAt,
   initialJob,
+  pdfExportHistory = [],
   dossierEmailDeliveryConfigured = false,
 }: Props) {
   const router = useRouter();
@@ -44,10 +47,15 @@ export function ChecklistFillDossierPdfCard({
   const [pending, startTransition] = useTransition();
   const [downloadPending, startDownload] = useTransition();
   const [emailPending, startEmail] = useTransition();
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     setJob(initialJob);
   }, [initialJob]);
+
+  const obsoleteReadyPdfs = pdfExportHistory.filter(
+    (r) => r.status === "ready" && r.superseded_at,
+  );
 
   if (!dossierApprovedAt) return null;
 
@@ -122,7 +130,14 @@ export function ChecklistFillDossierPdfCard({
 
   return (
     <div className="border-border rounded-lg border bg-background p-4 text-sm">
-      <p className="text-foreground font-medium">PDF do relatório</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-foreground font-medium">PDF do relatório</p>
+        {job?.status === "ready" && job.version_number ? (
+          <span className="bg-muted text-foreground/90 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums">
+            PDF v{job.version_number}
+          </span>
+        ) : null}
+      </div>
       <p className="text-foreground/85 mt-1 text-xs">
         Relatório com texto do dossiê, identificação do profissional (CRN) e fotos de evidência embutidas no PDF.
       </p>
@@ -204,6 +219,43 @@ export function ChecklistFillDossierPdfCard({
           </>
         ) : null}
       </div>
+
+      {obsoleteReadyPdfs.length > 0 ? (
+        <div className="mt-3 border-t pt-3">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="text-foreground/90 hover:text-foreground flex w-full items-center justify-between gap-2 text-left text-xs font-medium"
+          >
+            <span>Versões anteriores (obsoletas)</span>
+            {historyOpen ? (
+              <ChevronUp className="size-4 shrink-0" aria-hidden />
+            ) : (
+              <ChevronDown className="size-4 shrink-0" aria-hidden />
+            )}
+          </button>
+          {historyOpen ? (
+            <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
+              {obsoleteReadyPdfs.map((row) => (
+                <li
+                  key={row.id}
+                  className="bg-muted/40 rounded-md border border-border/60 px-3 py-2"
+                >
+                  <p className="font-medium text-foreground">
+                    PDF v{row.version_number} — Obsoleto
+                    {row.superseded_by_version != null
+                      ? `. Substituído pela versão v${row.superseded_by_version}.`
+                      : ". Novo PDF ainda não foi gerado após a reabertura."}
+                  </p>
+                  <p className="text-muted-foreground mt-0.5">
+                    Gerado em {formatJobTime(row.created_at)}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       {dossierEmailDeliveryConfigured ? (
         <div className="mt-3 flex flex-col gap-2 border-t pt-3">

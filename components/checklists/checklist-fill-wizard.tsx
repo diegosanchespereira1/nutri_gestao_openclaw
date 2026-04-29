@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
 import { ChecklistFillDossierPreview } from "@/components/checklists/checklist-fill-dossier-preview";
+import { ChecklistReopenDialog } from "@/components/checklists/checklist-reopen-dialog";
 import { ChecklistItemPhotos } from "@/components/checklists/checklist-item-photos";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -36,6 +37,7 @@ import {
   type FillResponsesMap,
 } from "@/lib/types/checklist-fill";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
+import type { ChecklistFillSessionReopenEventRow } from "@/lib/types/checklist-reopen";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import {
   clearChecklistFillBatch,
@@ -159,6 +161,12 @@ type Props = {
   viewOnlyDossier?: boolean;
   /** Resend + remetente configurados (envio de PDF por email). */
   dossierEmailDeliveryConfigured?: boolean;
+  /** Titular ou admin da equipa: pode reabrir checklist já aprovado. */
+  canReopenDossier?: boolean;
+  /** Histórico de reaberturas (auditoria). */
+  initialReopenEvents?: ChecklistFillSessionReopenEventRow[];
+  /** PDFs `ready` da sessão (versões / obsoletos). */
+  pdfExportHistory?: ChecklistFillPdfExportRow[];
 };
 
 export function ChecklistFillWizard({
@@ -176,6 +184,9 @@ export function ChecklistFillWizard({
   initialPdfExport = null,
   viewOnlyDossier = false,
   dossierEmailDeliveryConfigured = false,
+  canReopenDossier = false,
+  initialReopenEvents = [],
+  pdfExportHistory = [],
 }: Props) {
   const router = useRouter();
   const sections = template.sections;
@@ -221,6 +232,12 @@ export function ChecklistFillWizard({
     useState<ChecklistFillBatchItem | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
+
+  const handleDossierReopened = useCallback(() => {
+    setDossierApprovedAt(null);
+    setDossierPreviewConfirmed(false);
+    setSectionIndex(0);
+  }, []);
 
   /* ── Task D: indicador de auto-save ── */
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -537,6 +554,11 @@ export function ChecklistFillWizard({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <ChecklistReopenDialog
+              sessionId={sessionId}
+              canReopen={canReopenDossier}
+              onReopened={handleDossierReopened}
+            />
             <Link
               href={backHref}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -545,6 +567,29 @@ export function ChecklistFillWizard({
             </Link>
           </div>
         </div>
+
+        {initialReopenEvents.length > 0 ? (
+          <div className="bg-muted/30 rounded-lg border p-4 text-sm">
+            <p className="text-foreground font-medium">Histórico de reaberturas</p>
+            <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
+              {initialReopenEvents.map((ev) => (
+                <li key={ev.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
+                  <p>
+                    {formatDossierApprovedLabel(ev.created_at)} — {ev.reopened_by_label} (
+                    {ev.reopened_by_role === "owner"
+                      ? "Titular"
+                      : ev.reopened_by_role === "gestao"
+                        ? "Gestão"
+                        : "Administrador"})
+                  </p>
+                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
+                    Justificativa: {ev.justification}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <ChecklistFillDossierPreview
           template={template}
@@ -560,6 +605,7 @@ export function ChecklistFillWizard({
           sessionId={sessionId}
           dossierApprovedAt={dossierApprovedAt}
           initialJob={initialPdfExport ?? null}
+          pdfExportHistory={pdfExportHistory}
           dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
         />
       </div>
@@ -1024,6 +1070,11 @@ export function ChecklistFillWizard({
                     Ver dossiê
                   </Button>
                 ) : null}
+                <ChecklistReopenDialog
+                  sessionId={sessionId}
+                  canReopen={canReopenDossier && Boolean(dossierApprovedAt)}
+                  onReopened={handleDossierReopened}
+                />
                 <Link
                   href={backHref}
                   className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex")}
@@ -1032,6 +1083,28 @@ export function ChecklistFillWizard({
                 </Link>
               </div>
             </div>
+            {initialReopenEvents.length > 0 ? (
+              <div className="bg-muted/30 rounded-lg border p-4 text-sm">
+                <p className="text-foreground font-medium">Histórico de reaberturas</p>
+                <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
+                  {initialReopenEvents.map((ev) => (
+                    <li key={ev.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
+                      <p>
+                        {formatDossierApprovedLabel(ev.created_at)} — {ev.reopened_by_label} (
+                        {ev.reopened_by_role === "owner"
+                          ? "Titular"
+                          : ev.reopened_by_role === "gestao"
+                            ? "Gestão"
+                            : "Administrador"})
+                      </p>
+                      <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
+                        Justificativa: {ev.justification}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {dossierPreviewConfirmed ? (
               <>
                 <ChecklistFillDossierPreview
@@ -1094,6 +1167,7 @@ export function ChecklistFillWizard({
                     sessionId={sessionId}
                     dossierApprovedAt={dossierApprovedAt}
                     initialJob={initialPdfExport ?? null}
+                    pdfExportHistory={pdfExportHistory}
                     dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
                   />
                 ) : null}

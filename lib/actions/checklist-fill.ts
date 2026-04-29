@@ -173,6 +173,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   itemResponseSource: "global" | "custom" | "workspace";
   itemPhotos: Record<string, ChecklistFillPhotoView[]>;
   latestPdfExport: ChecklistFillPdfExportRow | null;
+  /** Todos os PDFs `ready` da sessão (versão atual primeiro), para histórico de obsolescência. */
+  pdfExportHistory: ChecklistFillPdfExportRow[];
   /** Info do utilizador que criou o rascunho (pode ser diferente do utilizador atual). */
   createdByName: string | null;
 } | null> {
@@ -248,20 +250,45 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   const itemPhotos = await loadSessionItemPhotosWithUrls(supabase, sessionId);
 
-  const pdfRes = await supabase
+  const { data: pdfRows, error: pdfErr } = await supabase
     .from("checklist_fill_pdf_exports")
     .select(
-      "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at",
+      "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
     )
     .eq("session_id", sessionId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("version_number", { ascending: false })
+    .order("created_at", { ascending: false });
 
-  const latestPdfExport =
-    !pdfRes.error && pdfRes.data
-      ? (pdfRes.data as ChecklistFillPdfExportRow)
-      : null;
+  const pdfList: ChecklistFillPdfExportRow[] = (pdfRows ?? []).map((raw) => ({
+    id: raw.id as string,
+    user_id: raw.user_id as string,
+    session_id: raw.session_id as string,
+    status: raw.status as ChecklistFillPdfExportRow["status"],
+    storage_path: (raw.storage_path as string | null) ?? null,
+    error_message: (raw.error_message as string | null) ?? null,
+    created_at: raw.created_at as string,
+    updated_at: raw.updated_at as string,
+    version_number:
+      typeof raw.version_number === "number" ? raw.version_number : Number(raw.version_number) || 1,
+    superseded_at: (raw.superseded_at as string | null) ?? null,
+    superseded_by_version:
+      raw.superseded_by_version === null || raw.superseded_by_version === undefined
+        ? null
+        : Number(raw.superseded_by_version),
+  }));
+
+  const latestPdfExport = (() => {
+    if (pdfErr || pdfList.length === 0) return null;
+    const activeReady = pdfList.find((r) => r.status === "ready" && !r.superseded_at);
+    if (activeReady) return activeReady;
+    const processing = pdfList.find((r) => r.status === "processing" || r.status === "pending");
+    if (processing) return processing;
+    return pdfList[0] ?? null;
+  })();
+
+  const pdfExportHistory = pdfList
+    .filter((r) => r.status === "ready")
+    .sort((a, b) => b.version_number - a.version_number);
 
   let createdByName: string | null = null;
   if (row.user_id !== user.id) {
@@ -294,6 +321,7 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     itemResponseSource,
     itemPhotos,
     latestPdfExport,
+    pdfExportHistory,
     createdByName,
   };
 }

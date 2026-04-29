@@ -9,6 +9,7 @@ import {
   Card,
   CardContent,
 } from "@/components/ui/card";
+import { getChecklistReopenEligibility } from "@/lib/actions/checklist-fill-reopen";
 import { loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
 import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-alerts";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
@@ -93,6 +94,9 @@ export async function ClientChecklistHistorySection({
     data: { user },
   } = await supabase.auth.getUser();
   const tz = await fetchProfileTimeZone(supabase, user?.id ?? "");
+  const canReopenDossier = user
+    ? (await getChecklistReopenEligibility(supabase, user.id)).canReopen
+    : false;
 
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -369,6 +373,7 @@ export async function ClientChecklistHistorySection({
               key={session.id}
               session={session}
               dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+              canReopenDossier={canReopenDossier}
             />
           ))}
         </div>

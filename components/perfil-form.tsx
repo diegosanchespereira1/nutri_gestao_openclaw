@@ -8,6 +8,13 @@ import {
   updateProfileAction,
 } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MAX_PROFILE_PHOTO_BYTES } from "@/lib/constants/profile-photos-storage";
@@ -128,19 +135,28 @@ export function PerfilForm({
   }
 
   return (
-    <div className="max-w-xl space-y-8">
-      <form action={formAction} className="space-y-4">
-        {pendingEmail ? (
-          <div className="border-border bg-muted/40 rounded-md border p-3">
-            <p className="text-sm font-medium">
-              Alteração de email pendente de confirmação
-            </p>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Confirmar no endereço <span className="font-medium">{pendingEmail}</span>{" "}
-              para concluir a troca.
-            </p>
-          </div>
-        ) : null}
+    <div className="max-w-xl space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Dados do perfil</CardTitle>
+          <CardDescription>
+            Nome, email, telefone, CRN e foto usados na conta e em documentos gerados.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <form action={formAction} className="space-y-4">
+            {pendingEmail ? (
+              <div className="border-border bg-muted/40 rounded-md border p-3">
+                <p className="text-sm font-medium">
+                  Alteração de email pendente de confirmação
+                </p>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  Confirmar no endereço{" "}
+                  <span className="font-medium">{pendingEmail}</span> para concluir a
+                  troca.
+                </p>
+              </div>
+            ) : null}
 
         <div className="space-y-2">
           <Label htmlFor="perfil-name">Nome completo</Label>
@@ -151,7 +167,6 @@ export function PerfilForm({
             value={fullNameValue}
             onChange={(event) => setFullNameValue(event.target.value)}
             autoComplete="name"
-            aria-invalid={state?.ok === false}
             aria-describedby={state?.ok === false ? "perfil-err" : undefined}
           />
         </div>
@@ -166,7 +181,6 @@ export function PerfilForm({
             value={emailValue}
             onChange={(event) => setEmailValue(event.target.value)}
             autoComplete="email"
-            aria-invalid={state?.ok === false}
             aria-describedby={state?.ok === false ? "perfil-err" : undefined}
           />
           <p className="text-muted-foreground text-xs">
@@ -187,7 +201,6 @@ export function PerfilForm({
             autoComplete="tel"
             inputMode="numeric"
             placeholder="Ex.: (11) 98765-4321"
-            aria-invalid={state?.ok === false}
             aria-describedby={state?.ok === false ? "perfil-err" : undefined}
           />
           <p className="text-muted-foreground text-xs">
@@ -204,7 +217,6 @@ export function PerfilForm({
             value={crnValue}
             onChange={(event) => setCrnValue(event.target.value)}
             placeholder="Ex.: 12345"
-            aria-invalid={state?.ok === false}
             aria-describedby={state?.ok === false ? "perfil-err" : undefined}
           />
           <p className="text-muted-foreground text-xs">
@@ -238,36 +250,38 @@ export function PerfilForm({
               </label>
             </div>
           ) : null}
-          <Input
-            id="perfil-photo"
-            name="photo"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="border-input bg-background text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
-            aria-invalid={state?.ok === false}
-            aria-describedby={state?.ok === false ? "perfil-err" : undefined}
-          />
-        </div>
+            <Input
+              id="perfil-photo"
+              name="photo"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="border-input bg-transparent text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
+              aria-describedby={state?.ok === false ? "perfil-err" : undefined}
+            />
+          </div>
 
-        {state?.ok === false ? (
-          <p id="perfil-err" className="text-destructive text-sm" role="alert">
-            {state.error}
-          </p>
-        ) : null}
-        <Button type="submit">Salvar perfil</Button>
-      </form>
+          {state?.ok === false ? (
+            <p id="perfil-err" className="text-destructive text-sm" role="alert">
+              {state.error}
+            </p>
+          ) : null}
+          <Button type="submit">Salvar perfil</Button>
+        </form>
+        </CardContent>
+      </Card>
 
-      <form
-        onSubmit={handlePasswordSubmit}
-        className="border-border space-y-4 rounded-lg border p-4"
-      >
-        <div className="space-y-1">
-          <h2 className="text-sm font-semibold">Alterar senha</h2>
-          <p className="text-muted-foreground text-xs">
+      <Card>
+        <CardHeader>
+          <CardTitle>Alterar senha</CardTitle>
+          <CardDescription>
             Use pelo menos 12 caracteres para manter a conta protegida.
-          </p>
-        </div>
-
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form
+            onSubmit={handlePasswordSubmit}
+            className="space-y-4"
+          >
         <div className="space-y-2">
           <Label htmlFor="perfil-new-password">Nova senha</Label>
           <PasswordField
@@ -315,6 +329,8 @@ export function PerfilForm({
           {passwordLoading ? "Alterando…" : "Alterar senha"}
         </Button>
       </form>
+        </CardContent>
+      </Card>
 
       {toast ? (
         <div

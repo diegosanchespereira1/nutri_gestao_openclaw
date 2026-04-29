@@ -7,6 +7,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
+import { ChecklistReopenDialog } from "@/components/checklists/checklist-reopen-dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,11 +55,14 @@ function formatDateTimeBR(iso: string): string {
 type Props = {
   session: ChecklistSessionSummary;
   dossierEmailDeliveryConfigured?: boolean;
+  /** Titular ou admin: pode reabrir checklist aprovado a partir do histórico. */
+  canReopenDossier?: boolean;
 };
 
 export function ChecklistSessionHistoryCard({
   session,
   dossierEmailDeliveryConfigured = false,
+  canReopenDossier = false,
 }: Props) {
   const router = useRouter();
   const [ncItems, setNcItems] = useState<NcItemDetail[] | null>(null);
@@ -177,6 +181,14 @@ export function ChecklistSessionHistoryCard({
             Ver dossiê
             <ExternalLink className="size-3" aria-hidden />
           </Link>
+          {session.status === "aprovado" ? (
+            <ChecklistReopenDialog
+              sessionId={session.id}
+              canReopen={canReopenDossier}
+              onReopened={() => router.refresh()}
+              triggerSize="sm"
+            />
+          ) : null}
           {session.status === "em_andamento" ? (
             <>
               <Link
@@ -269,6 +281,30 @@ export function ChecklistSessionHistoryCard({
           )}
         </div>
 
+        {/* ── Reaberturas (auditoria) ── */}
+        {(session.reopen_events?.length ?? 0) > 0 ? (
+          <div className="border-t border-border/50 bg-muted/20 px-4 py-3 text-xs text-foreground/85">
+            <p className="text-foreground font-medium">Histórico de reaberturas</p>
+            <ul className="mt-2 space-y-2">
+              {(session.reopen_events ?? []).map((ev) => (
+                <li key={ev.id} className="border-border/50 border-b pb-2 last:border-0 last:pb-0">
+                  <p>
+                    {formatDateTimeBR(ev.created_at)} — {ev.reopened_by_label} (
+                    {ev.reopened_by_role === "owner"
+                      ? "Titular"
+                      : ev.reopened_by_role === "gestao"
+                        ? "Gestão"
+                        : "Administrador"})
+                  </p>
+                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
+                    Justificativa: {ev.justification}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {/* ── PDF Card para dossiés aprovados ── */}
         {session.status === "aprovado" && session.dossier_approved_at ? (
           <div className="border-t border-border/50 px-4 py-3">
@@ -276,6 +312,7 @@ export function ChecklistSessionHistoryCard({
               sessionId={session.id}
               dossierApprovedAt={session.dossier_approved_at}
               initialJob={session.latestPdfExport ?? null}
+              pdfExportHistory={session.pdf_export_history ?? []}
               dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
             />
           </div>

@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 
 import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
 import { PageHelpHint } from "@/components/help/page-help-hint";
+import {
+  getChecklistReopenEligibility,
+  loadReopenEventsForSession,
+} from "@/lib/actions/checklist-fill-reopen";
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function ChecklistPreencherPage({
   params,
@@ -22,6 +27,15 @@ export default async function ChecklistPreencherPage({
   }
 
   const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const { canReopen: canReopenDossier } = user
+    ? await getChecklistReopenEligibility(supabase, user.id)
+    : { canReopen: false };
+  const initialReopenEvents = await loadReopenEventsForSession(sessionId);
 
   const createdAt = new Date(bundle.session.created_at);
   const createdAtLabel = createdAt.toLocaleString("pt-BR", {
@@ -85,8 +99,11 @@ export default async function ChecklistPreencherPage({
         initialItemPhotos={bundle.itemPhotos}
         initialDossierApprovedAt={bundle.session.dossier_approved_at ?? null}
         initialPdfExport={bundle.latestPdfExport}
+        pdfExportHistory={bundle.pdfExportHistory}
         viewOnlyDossier={viewOnlyDossier}
         dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+        canReopenDossier={canReopenDossier}
+        initialReopenEvents={initialReopenEvents}
       />
     </div>
   );

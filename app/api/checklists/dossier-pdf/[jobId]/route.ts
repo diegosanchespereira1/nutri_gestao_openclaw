@@ -28,12 +28,16 @@ export async function GET(
 
   const { data: row, error: rowErr } = await supabase
     .from("checklist_fill_pdf_exports")
-    .select("id, status, storage_path, session_id")
+    .select("id, status, storage_path, session_id, superseded_at")
     .eq("id", jobId)
     .maybeSingle();
 
   if (rowErr || !row || row.status !== "ready" || !row.storage_path) {
     return NextResponse.json({ error: "Não encontrado." }, { status: 404 });
+  }
+
+  if (row.superseded_at) {
+    return NextResponse.json({ error: "PDF obsoleto." }, { status: 410 });
   }
 
   const { data: blob, error: dlErr } = await supabase.storage

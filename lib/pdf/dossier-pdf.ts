@@ -1,3 +1,7 @@
+import { readFileSync } from "fs";
+import path from "path";
+
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
   PDFFont,
@@ -13,13 +17,20 @@ import type { ChecklistFillOutcome } from "@/lib/types/checklist-fill";
 import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
 import { PdfTheme } from "@/lib/pdf/dossier-pdf-theme";
 
-/** Helvetica WinAnsi: remove diacríticos para evitar caracteres inválidos. */
+/**
+ * Normaliza espaços e remove caracteres de controle.
+ * Com a fonte Inter (Unicode completo), acentos e cedilhas são preservados.
+ * Anteriormente removia diacríticos para WinAnsi — não é mais necessário.
+ */
 export function foldTextForPdf(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  let out = "";
+  for (const ch of s) {
+    const cp = ch.codePointAt(0) ?? 0;
+    // Preserva todo Unicode printable (acentos, cedilha, etc.)
+    if (cp >= 0x20 && cp !== 0x7f) out += ch;
+    else if (cp === 0x09 || cp === 0x0a || cp === 0x0d) out += " ";
+  }
+  return out.replace(/\s+/g, " ").trim();
 }
 
 /* ── Paleta — importada do design system centralizado ──────────────────── */
@@ -843,8 +854,21 @@ export async function buildDossierPdfBytes(
   input: DossierPdfBuildInput,
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  // Registrar fontkit para suporte a fontes TTF com Unicode completo (acentos, ç, etc.)
+  pdf.registerFontkit(fontkit);
+
+  let font: PDFFont;
+  let fontBold: PDFFont;
+  try {
+    const fontsDir = path.join(process.cwd(), "public", "fonts");
+    font     = await pdf.embedFont(readFileSync(path.join(fontsDir, "Inter-Regular.ttf")));
+    fontBold = await pdf.embedFont(readFileSync(path.join(fontsDir, "Inter-Bold.ttf")));
+  } catch {
+    // Fallback para Helvetica (WinAnsi — sem suporte a acentos portugueses)
+    console.warn("[dossier-pdf] Fonte Inter não encontrada — usando Helvetica sem acentos.");
+    font     = await pdf.embedFont(StandardFonts.Helvetica);
+    fontBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  }
 
   const firstPage = pdf.addPage([PAGE_W, PAGE_H]);
   firstPage.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: PAGE_H, color: C.pageBg });

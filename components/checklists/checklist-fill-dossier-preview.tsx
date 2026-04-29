@@ -13,6 +13,7 @@ const defaultEmptyItem = (): FillItemResponseState => ({
   outcome: null,
   note: null,
   annotation: null,
+  validUntil: null,
 });
 
 function calcDossierScore(
@@ -50,7 +51,7 @@ type Props = {
   itemResponseSource?: "global" | "custom";
   onPatchResponse?: (
     itemId: string,
-    patch: Partial<Pick<FillItemResponseState, "note" | "annotation">>,
+    patch: Partial<Pick<FillItemResponseState, "note" | "annotation" | "validUntil">>,
   ) => void;
   dossierApprovedAt?: string | null;
   /** Sobrepõe o título (ex. pré-visualização em modal). */

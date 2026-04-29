@@ -37,22 +37,26 @@ create index if not exists ext_portal_users_token_idx
 
 alter table public.external_portal_users enable row level security;
 
+drop policy if exists "ext_portal_users_select_own" on public.external_portal_users;
 create policy "ext_portal_users_select_own"
   on public.external_portal_users for select
   to authenticated
   using (owner_user_id = (select auth.uid()));
 
+drop policy if exists "ext_portal_users_insert_own" on public.external_portal_users;
 create policy "ext_portal_users_insert_own"
   on public.external_portal_users for insert
   to authenticated
   with check (owner_user_id = (select auth.uid()));
 
+drop policy if exists "ext_portal_users_update_own" on public.external_portal_users;
 create policy "ext_portal_users_update_own"
   on public.external_portal_users for update
   to authenticated
   using (owner_user_id = (select auth.uid()))
   with check (owner_user_id = (select auth.uid()));
 
+drop policy if exists "ext_portal_users_delete_own" on public.external_portal_users;
 create policy "ext_portal_users_delete_own"
   on public.external_portal_users for delete
   to authenticated
@@ -88,22 +92,26 @@ create index if not exists ext_access_perm_ext_user_idx
 
 alter table public.external_access_permissions enable row level security;
 
+drop policy if exists "ext_access_perm_select_own" on public.external_access_permissions;
 create policy "ext_access_perm_select_own"
   on public.external_access_permissions for select
   to authenticated
   using (owner_user_id = (select auth.uid()));
 
+drop policy if exists "ext_access_perm_insert_own" on public.external_access_permissions;
 create policy "ext_access_perm_insert_own"
   on public.external_access_permissions for insert
   to authenticated
   with check (owner_user_id = (select auth.uid()));
 
+drop policy if exists "ext_access_perm_update_own" on public.external_access_permissions;
 create policy "ext_access_perm_update_own"
   on public.external_access_permissions for update
   to authenticated
   using (owner_user_id = (select auth.uid()))
   with check (owner_user_id = (select auth.uid()));
 
+drop policy if exists "ext_access_perm_delete_own" on public.external_access_permissions;
 create policy "ext_access_perm_delete_own"
   on public.external_access_permissions for delete
   to authenticated
@@ -145,17 +153,20 @@ create index if not exists patient_consents_owner_idx
 
 alter table public.patient_parental_consents enable row level security;
 
+drop policy if exists "patient_consents_select_own" on public.patient_parental_consents;
 create policy "patient_consents_select_own"
   on public.patient_parental_consents for select
   to authenticated
   using (owner_user_id = (select auth.uid()));
 
+drop policy if exists "patient_consents_insert_own" on public.patient_parental_consents;
 create policy "patient_consents_insert_own"
   on public.patient_parental_consents for insert
   to authenticated
   with check (owner_user_id = (select auth.uid()));
 
 -- Consentimentos não se editam (apenas se revoga com novo registo)
+drop policy if exists "patient_consents_update_own" on public.patient_parental_consents;
 create policy "patient_consents_update_own"
   on public.patient_parental_consents for update
   to authenticated

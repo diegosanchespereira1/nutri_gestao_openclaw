@@ -12,6 +12,7 @@ import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
+  type SectionValidationIssue,
   validateChecklistSection,
   type ChecklistFillItemResponseRow,
   type ChecklistFillOutcome,
@@ -219,6 +220,7 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
       outcome: r.outcome,
       note: r.note,
       annotation: r.item_annotation ?? null,
+      validUntil: r.valid_until ?? null,
     };
   }
 
@@ -337,6 +339,7 @@ export async function loadFillResponsesMapForSession(
       outcome: r.outcome,
       note: r.note,
       annotation: r.item_annotation ?? null,
+      validUntil: r.valid_until ?? null,
     };
   }
 
@@ -347,10 +350,17 @@ function buildResponseUpdatePayload(input: {
   outcome: ChecklistFillOutcome;
   noteTrim: string;
   annotationTrim: string;
+  validUntil: string | null;
   existingNote: string | null;
   existingAnnotation: string | null;
+  existingValidUntil: string | null;
   persistMode: "full" | "merge";
-}): { outcome: ChecklistFillOutcome; note: string | null; item_annotation: string | null } {
+}): {
+  outcome: ChecklistFillOutcome;
+  note: string | null;
+  item_annotation: string | null;
+  valid_until: string | null;
+} {
   const { outcome, noteTrim, annotationTrim, existingNote, existingAnnotation, persistMode } =
     input;
 
@@ -359,6 +369,7 @@ function buildResponseUpdatePayload(input: {
       outcome,
       note: noteTrim.length > 0 ? noteTrim : null,
       item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+      valid_until: input.validUntil,
     };
   }
 
@@ -381,7 +392,8 @@ function buildResponseUpdatePayload(input: {
     item_annotation = keepAnn;
   }
 
-  return { outcome, note, item_annotation };
+  const valid_until = input.validUntil ?? input.existingValidUntil ?? null;
+  return { outcome, note, item_annotation, valid_until };
 }
 
 export async function saveFillItemResponse(input: {
@@ -391,6 +403,7 @@ export async function saveFillItemResponse(input: {
   outcome: ChecklistFillOutcome | null;
   note: string | null;
   annotation: string | null;
+  validUntil: string | null;
   /** merge: atualização parcial — não apaga note/anotação no BD se o cliente enviar vazio. */
   persistMode?: "full" | "merge";
 }): Promise<FillActionResult> {
@@ -402,7 +415,7 @@ export async function saveFillItemResponse(input: {
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  const { sessionId, itemId, itemResponseSource, outcome, note, annotation } =
+  const { sessionId, itemId, itemResponseSource, outcome, note, annotation, validUntil } =
     input;
   const persistMode = input.persistMode ?? "full";
 
@@ -497,11 +510,12 @@ export async function saveFillItemResponse(input: {
   if (annotationTrim.length > MAX_CHECKLIST_ITEM_ANNOTATION_CHARS) {
     annotationTrim = annotationTrim.slice(0, MAX_CHECKLIST_ITEM_ANNOTATION_CHARS);
   }
+  const normalizedValidUntil = (validUntil ?? "").trim() || null;
 
   if (itemResponseSource === "global") {
     const { data: existing } = await supabase
       .from("checklist_fill_item_responses")
-      .select("id, note, item_annotation")
+      .select("id, note, item_annotation, valid_until")
       .eq("session_id", sessionId)
       .eq("template_item_id", itemId)
       .maybeSingle();
@@ -511,8 +525,10 @@ export async function saveFillItemResponse(input: {
         outcome,
         noteTrim,
         annotationTrim,
+        validUntil: normalizedValidUntil,
         existingNote: existing.note as string | null,
         existingAnnotation: existing.item_annotation as string | null,
+        existingValidUntil: existing.valid_until as string | null,
         persistMode,
       });
       const { error } = await supabase
@@ -528,13 +544,14 @@ export async function saveFillItemResponse(input: {
         outcome,
         note: noteTrim.length > 0 ? noteTrim : null,
         item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+        valid_until: normalizedValidUntil,
       });
       if (error) return { ok: false, error: "Não foi possível salvar." };
     }
   } else {
     const { data: existing } = await supabase
       .from("checklist_fill_item_responses")
-      .select("id, note, item_annotation")
+      .select("id, note, item_annotation, valid_until")
       .eq("session_id", sessionId)
       .eq("custom_item_id", itemId)
       .maybeSingle();
@@ -544,8 +561,10 @@ export async function saveFillItemResponse(input: {
         outcome,
         noteTrim,
         annotationTrim,
+        validUntil: normalizedValidUntil,
         existingNote: existing.note as string | null,
         existingAnnotation: existing.item_annotation as string | null,
+        existingValidUntil: existing.valid_until as string | null,
         persistMode,
       });
       const { error } = await supabase
@@ -561,6 +580,7 @@ export async function saveFillItemResponse(input: {
         outcome,
         note: noteTrim.length > 0 ? noteTrim : null,
         item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+        valid_until: normalizedValidUntil,
       });
       if (error) return { ok: false, error: "Não foi possível salvar." };
     }
@@ -846,6 +866,20 @@ export type ApproveDossierResult =
   | { ok: true; approvedAt: string }
   | { ok: false; error: string };
 
+function formatIssueWithSectionAndItem(
+  template: ChecklistTemplateWithSections,
+  issue: SectionValidationIssue,
+): string {
+  const sectionIndex = template.sections.findIndex((section) =>
+    section.items.some((item) => item.id === issue.item_id),
+  );
+  if (sectionIndex < 0) return issue.message;
+  const section = template.sections[sectionIndex];
+  const item = section.items.find((it) => it.id === issue.item_id);
+  if (!section || !item) return issue.message;
+  return `Seção ${sectionIndex + 1} (${section.title}) — Item "${item.description}": ${issue.message}`;
+}
+
 /** Aprova o dossiê: valida todo o modelo, regista data e bloqueia edições (FR23); visita ligada → concluída. */
 export async function approveChecklistFillDossierAction(
   sessionId: string,
@@ -860,7 +894,10 @@ export async function approveChecklistFillDossierAction(
   for (const sec of bundle.template.sections) {
     const issues = validateChecklistSection(sec, bundle.responses);
     if (issues.length > 0) {
-      return { ok: false, error: issues[0].message };
+      return {
+        ok: false,
+        error: formatIssueWithSectionAndItem(bundle.template, issues[0]),
+      };
     }
   }
 

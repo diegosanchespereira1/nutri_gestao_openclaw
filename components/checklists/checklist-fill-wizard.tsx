@@ -28,6 +28,7 @@ import {
 } from "@/lib/actions/checklist-fill";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
+  type SectionValidationIssue,
   validateChecklistSection,
   validateChecklistTemplate,
   type ChecklistFillOutcome,
@@ -69,6 +70,11 @@ function mergeClientResponsesWithServer(
       if (cAnn.length === 0 && sAnn.length > 0) {
         next = { ...next, annotation: s.annotation };
       }
+      const cValidUntil = (next.validUntil ?? "").trim();
+      const sValidUntil = (s.validUntil ?? "").trim();
+      if (cValidUntil.length === 0 && sValidUntil.length > 0) {
+        next = { ...next, validUntil: s.validUntil };
+      }
       out[item.id] = next;
     }
   }
@@ -87,7 +93,22 @@ const emptyItemState = (): FillItemResponseState => ({
   outcome: null,
   note: null,
   annotation: null,
+  validUntil: null,
 });
+
+function buildIssueMessageWithSectionAndItem(
+  sections: ChecklistTemplateWithSections["sections"],
+  issue: SectionValidationIssue,
+): string {
+  const sectionIndex = sections.findIndex((sec) =>
+    sec.items.some((item) => item.id === issue.item_id),
+  );
+  if (sectionIndex < 0) return issue.message;
+  const section = sections[sectionIndex];
+  const item = section.items.find((it) => it.id === issue.item_id);
+  if (!section || !item) return issue.message;
+  return `Seção ${sectionIndex + 1} (${section.title}) — Item "${item.description}": ${issue.message}`;
+}
 
 function scoreClassification(pct: number): {
   label: string;
@@ -255,7 +276,7 @@ export function ChecklistFillWizard({
   const patchDossierResponse = useCallback(
     (
       itemId: string,
-      patch: Partial<Pick<FillItemResponseState, "note" | "annotation">>,
+      patch: Partial<Pick<FillItemResponseState, "note" | "annotation" | "validUntil">>,
     ) => {
       setResponses((prev) => {
         const cur = prev[itemId] ?? emptyItemState();
@@ -281,6 +302,7 @@ export function ChecklistFillWizard({
           outcome: cur.outcome,
           note: cur.note ?? null,
           annotation: cur.annotation ?? null,
+          validUntil: cur.validUntil ?? null,
           persistMode,
         });
         if (!result.ok) return result;
@@ -328,6 +350,7 @@ export function ChecklistFillWizard({
           outcome: cur.outcome,
           note: cur.note ?? null,
           annotation: cur.annotation ?? null,
+          validUntil: cur.validUntil ?? null,
           persistMode: "full",
         });
         if (result.ok) reportSaved();
@@ -391,9 +414,10 @@ export function ChecklistFillWizard({
     const cur = responses[itemId] ?? emptyItemState();
     const note = outcome === "nc" ? cur.note : null;
     const annotation = cur.annotation ?? null;
+    const validUntil = cur.validUntil ?? null;
     setResponses((prev) => ({
       ...prev,
-      [itemId]: { outcome, note, annotation },
+      [itemId]: { outcome, note, annotation, validUntil },
     }));
     reportSaving();
     startTransition(async () => {
@@ -404,6 +428,7 @@ export function ChecklistFillWizard({
         outcome,
         note,
         annotation,
+        validUntil,
       });
       if (result.ok) {
         reportSaved();
@@ -429,6 +454,16 @@ export function ChecklistFillWizard({
       return {
         ...prev,
         [itemId]: { ...cur, annotation },
+      };
+    });
+  }
+
+  function setValidUntil(itemId: string, validUntil: string) {
+    setResponses((prev) => {
+      const cur = prev[itemId] ?? emptyItemState();
+      return {
+        ...prev,
+        [itemId]: { ...cur, validUntil },
       };
     });
   }
@@ -464,6 +499,7 @@ export function ChecklistFillWizard({
           outcome: cur.outcome,
           note: cur.note ?? null,
           annotation: cur.annotation ?? null,
+          validUntil: cur.validUntil ?? null,
           persistMode: "full",
         });
         if (result.ok) {
@@ -782,6 +818,25 @@ export function ChecklistFillWizard({
 
               {r.outcome !== null ? (
                 <div className="mt-3">
+                  <Label htmlFor={`valid-until-${item.id}`}>
+                    Válido até{" "}
+                    <span className="text-muted-foreground font-normal">(opcional)</span>
+                  </Label>
+                  <input
+                    id={`valid-until-${item.id}`}
+                    type="date"
+                    value={r.validUntil ?? ""}
+                    onChange={(e) => {
+                      setValidUntil(item.id, e.target.value);
+                    }}
+                    onBlur={() => persistItemOnBlur(item.id)}
+                    className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              ) : null}
+
+              {r.outcome !== null ? (
+                <div className="mt-3">
                   <Label htmlFor={`annotation-${item.id}`}>
                     Anotação{" "}
                     <span className="text-muted-foreground font-normal">(opcional)</span>
@@ -1044,7 +1099,9 @@ export function ChecklistFillWizard({
                     sec.items.some((it) => it.id === first.item_id),
                   );
                   if (idx >= 0) setSectionIndex(idx);
-                  setFinalizeDialogError(first.message);
+                  setFinalizeDialogError(
+                    buildIssueMessageWithSectionAndItem(sections, first),
+                  );
                   return;
                 }
                 setFinalizeDialogError(null);

@@ -36,6 +36,7 @@ export type ChecklistFillItemResponseRow = {
   outcome: ChecklistFillOutcome;
   note: string | null;
   item_annotation?: string | null;
+  valid_until?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -45,6 +46,8 @@ export type FillItemResponseState = {
   note: string | null;
   /** Nota de contexto opcional (guardada em `item_annotation`). */
   annotation: string | null;
+  /** Data de validade da análise (yyyy-mm-dd). */
+  validUntil: string | null;
 };
 
 export type SectionValidationIssue = {

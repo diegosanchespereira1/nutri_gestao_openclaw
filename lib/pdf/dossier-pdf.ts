@@ -114,6 +114,7 @@ export type DossierPdfItemInput = {
   outcome: ChecklistFillOutcome | null;
   note: string | null;
   annotation: string | null;
+  validUntil?: string | null;
   photoBuffers?: Buffer[];
 };
 
@@ -693,26 +694,25 @@ async function drawItemRow(
 
   ctx.y = bottom;
 
-  // ── Bloco de detalhes NC (nota + anotação + fotos) ──────────────────── //
-  if (isNc) {
-    await drawNcDetails(ctx, item);
-  }
+  // ── Bloco de detalhes do item (comentários + fotos) ──────────────────── //
+  await drawItemDetails(ctx, item);
 
   ctx.y -= 1; // pequeno respiro entre itens
 }
 
-/* ── Bloco de detalhes de não conformidade ─────────────────────────────── */
+/* ── Bloco de detalhes do item (inclui conformes) ──────────────────────── */
 
-async function drawNcDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void> {
+async function drawItemDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void> {
   const noteText = (item.note ?? "").trim().length > 0
     ? redactSupabaseUrlsForPdf(item.note!.trim())
     : "";
   const annText = (item.annotation ?? "").trim().length > 0
     ? redactSupabaseUrlsForPdf(item.annotation!.trim())
     : "";
+  const validUntilText = formatValidUntilForPdf(item.validUntil ?? null);
   const photoCount = item.photoBuffers?.length ?? 0;
 
-  if (!noteText && !annText && photoCount === 0) return;
+  if (!noteText && !annText && !validUntilText && photoCount === 0) return;
 
   const INDENT = 12;
   const BLOCK_W = CONTENT_W - INDENT;
@@ -721,8 +721,9 @@ async function drawNcDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void>
   const bodySize = 9;
   const padV = 8;
   const padH = 10;
+  const isNc = item.outcome === "nc";
 
-  // ── Nota de NC ──
+  // ── Comentário principal (descrição de NC quando aplicável) ──
   if (noteText) {
     const noteLines = wrapByWidth(noteText, ctx.font, bodySize, BLOCK_W - padH * 2);
     const bH = padV * 2 + labelSize + 4 + noteLines.length * (bodySize + 2.5);
@@ -731,10 +732,16 @@ async function drawNcDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void>
     const top = ctx.y;
     const btm = top - bH;
 
-    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: C.redLight, borderColor: C.redBorder, borderWidth: 0.5 });
-    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: 3, height: bH, color: C.redStripe });
+    const noteBg = isNc ? C.redLight : C.graySoft;
+    const noteBorder = isNc ? C.redBorder : C.grayBorder;
+    const noteStripe = isNc ? C.redStripe : C.textMuted;
+    const noteLabel = isNc ? "NAO CONFORMIDADE" : "COMENTARIO";
+    const noteLabelColor = isNc ? C.red : C.textMuted;
 
-    drawTextLine(ctx, "NAO CONFORMIDADE", BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, C.red);
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: noteBg, borderColor: noteBorder, borderWidth: 0.5 });
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: 3, height: bH, color: noteStripe });
+
+    drawTextLine(ctx, noteLabel, BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, noteLabelColor);
     let lTop = top - padV - labelSize - 4;
     for (const ln of noteLines) {
       drawTextLine(ctx, ln, BLOCK_X + padH, lTop, bodySize, ctx.font, C.textPrimary);
@@ -761,6 +768,22 @@ async function drawNcDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void>
       drawTextLine(ctx, ln, BLOCK_X + padH, lTop, bodySize, ctx.font, C.textPrimary);
       lTop -= bodySize + 2.5;
     }
+    ctx.y = btm;
+  }
+
+  // ── Validade da análise ──
+  if (validUntilText) {
+    const bH = padV * 2 + labelSize + 4 + (bodySize + 2.5);
+    ensureVerticalSpace(ctx, bH + 4);
+
+    const top = ctx.y;
+    const btm = top - bH;
+
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: C.graySoft, borderColor: C.grayBorder, borderWidth: 0.5 });
+    ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: 3, height: bH, color: C.textMuted });
+
+    drawTextLine(ctx, "VALIDADE", BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, C.textMuted);
+    drawTextLine(ctx, validUntilText, BLOCK_X + padH, top - padV - labelSize - 4, bodySize, ctx.font, C.textPrimary);
     ctx.y = btm;
   }
 
@@ -814,6 +837,13 @@ async function drawNcDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<void>
   }
 
   ctx.y -= 4; // respiro após bloco NC
+}
+
+function formatValidUntilForPdf(value: string | null): string {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return `Valido ate: ${value}`;
+  return `Valido ate: ${day}/${month}/${year}`;
 }
 
 /* ── Rodapé por página V2 ──────────────────────────────────────────────── */

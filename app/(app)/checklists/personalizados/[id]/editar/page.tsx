@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CustomChecklistEditor } from "@/components/checklists/custom-checklist-editor";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { loadCustomTemplateEditData } from "@/lib/actions/checklist-custom";
+import { cn } from "@/lib/utils";
 
 export default async function EditarCustomChecklistPage({
   params,
@@ -30,13 +32,13 @@ export default async function EditarCustomChecklistPage({
         <div className="flex flex-wrap gap-2">
           <Link
             href="/checklists/personalizados"
-            className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Lista de modelos
           </Link>
           <Link
             href="/checklists"
-            className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 hover:underline"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Catálogo
           </Link>

@@ -30,7 +30,7 @@ type Props = {
   itemResponseSource?: "global" | "custom";
   onPatchResponse?: (
     itemId: string,
-    patch: Partial<Pick<FillItemResponseState, "note" | "annotation">>,
+    patch: Partial<Pick<FillItemResponseState, "note" | "annotation" | "validUntil">>,
   ) => void;
 };
 
@@ -68,6 +68,7 @@ export function ChecklistFillDossierItemBody({
         outcome: r.outcome,
         note: r.note,
         annotation: r.annotation,
+        validUntil: r.validUntil,
       });
       setSavingItemId(null);
     },
@@ -194,6 +195,40 @@ export function ChecklistFillDossierItemBody({
               </div>
             ) : null}
 
+            {r.outcome !== null &&
+            (canEdit || (r.validUntil ?? "").trim().length > 0) ? (
+              <div className="mt-2">
+                {canEdit ? (
+                  <>
+                    <Label
+                      htmlFor={`dossier-valid-until-${item.id}`}
+                      className="text-muted-foreground"
+                    >
+                      Válido até (opcional)
+                    </Label>
+                    <input
+                      id={`dossier-valid-until-${item.id}`}
+                      type="date"
+                      disabled={busy}
+                      value={r.validUntil ?? ""}
+                      onChange={(e) =>
+                        onPatchResponse?.(item.id, { validUntil: e.target.value })
+                      }
+                      onBlur={() => void flushItem(item.id)}
+                      className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <p className="text-muted-foreground text-xs font-medium">Validade</p>
+                    <p className="text-foreground mt-0.5 whitespace-pre-wrap">
+                      {formatValidUntilLabel(r.validUntil)}
+                    </p>
+                  </>
+                )}
+              </div>
+            ) : null}
+
             {photos.length > 0 ? (
               <div className="mt-3">
                 <p className="text-muted-foreground mb-2 text-xs font-medium">
@@ -253,4 +288,11 @@ export function ChecklistFillDossierItemBody({
       />
     </>
   );
+}
+
+function formatValidUntilLabel(value: string | null): string {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  if (!year || !month || !day) return value;
+  return `Válido até: ${day}/${month}/${year}`;
 }

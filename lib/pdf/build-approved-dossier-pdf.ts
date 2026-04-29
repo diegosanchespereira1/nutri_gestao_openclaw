@@ -168,6 +168,7 @@ export async function buildApprovedDossierPdfBytes(
               outcome: null,
               note: null,
               annotation: null,
+              validUntil: null,
             };
             const photos = input.itemPhotos?.[it.id] ?? [];
             const photoBuffers: Buffer[] = [];
@@ -182,6 +183,7 @@ export async function buildApprovedDossierPdfBytes(
               outcome: r.outcome,
               note: r.note,
               annotation: r.annotation,
+              validUntil: r.validUntil,
               photoBuffers,
             };
           }),

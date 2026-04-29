@@ -123,7 +123,7 @@ export function ChecklistFillDossierPdfCard({
   return (
     <div className="border-border rounded-lg border bg-background p-4 text-sm">
       <p className="text-foreground font-medium">PDF do relatório</p>
-      <p className="text-muted-foreground mt-1 text-xs">
+      <p className="text-foreground/85 mt-1 text-xs">
         Relatório com texto do dossiê, identificação do profissional (CRN) e fotos de evidência embutidas no PDF.
       </p>
 
@@ -135,7 +135,7 @@ export function ChecklistFillDossierPdfCard({
       ) : null}
 
       {job?.status === "ready" ? (
-        <p className="text-muted-foreground mt-2 text-xs">
+        <p className="text-foreground/85 mt-2 text-xs">
           Último PDF: {formatJobTime(job.updated_at ?? job.created_at)}
         </p>
       ) : null}

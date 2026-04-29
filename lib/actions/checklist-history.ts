@@ -16,6 +16,8 @@ export type ChecklistSessionSummary = {
   dossier_approved_at: string | null;
   status: "em_andamento" | "aprovado";
   template_name: string;
+  /** Origem do modelo: oficial (system), personalizado por estabelecimento (custom) ou da equipe (workspace). */
+  template_origin: "system" | "custom" | "workspace";
   portaria_ref: string | null;
   establishment_id: string;
   establishment_name: string;
@@ -135,7 +137,7 @@ export async function loadChecklistSessionsForClient(input: {
   let sessionQuery = supabase
     .from("checklist_fill_sessions")
     .select(
-      "id, user_id, establishment_id, template_id, custom_template_id, dossier_approved_at, area_id, score_percentage, score_points_earned, score_points_total, created_at, updated_at",
+      "id, user_id, establishment_id, template_id, custom_template_id, workspace_template_id, dossier_approved_at, area_id, score_percentage, score_points_earned, score_points_total, created_at, updated_at",
       { count: "exact" },
     )
     .in("establishment_id", estIds)
@@ -157,6 +159,37 @@ export async function loadChecklistSessionsForClient(input: {
   if (!sessions || sessions.length === 0) return empty;
 
   const sessionIds = sessions.map((s) => s.id);
+  const sessionUserIds = [...new Set(sessions.map((s) => String(s.user_id)).filter(Boolean))];
+
+  const profileNameByUserId = new Map<string, string>();
+  if (sessionUserIds.length > 0) {
+    const { data: profileRows } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", sessionUserIds);
+    for (const profile of profileRows ?? []) {
+      const fullName = String(profile.full_name ?? "").trim();
+      if (fullName.length > 0) {
+        profileNameByUserId.set(String(profile.user_id), fullName);
+      }
+    }
+  }
+
+  const teamMemberNameByUserId = new Map<string, string>();
+  if (sessionUserIds.length > 0) {
+    const { data: tmRows } = await supabase
+      .from("team_members")
+      .select("member_user_id, full_name")
+      .eq("owner_user_id", workspaceOwnerId)
+      .in("member_user_id", sessionUserIds);
+    for (const member of tmRows ?? []) {
+      const memberUserId = String(member.member_user_id ?? "").trim();
+      const memberName = String(member.full_name ?? "").trim();
+      if (memberUserId.length > 0 && memberName.length > 0) {
+        teamMemberNameByUserId.set(memberUserId, memberName);
+      }
+    }
+  }
 
   // 2.5. Numeração sequencial por cliente (ordem de criação, 1-based).
   const { data: allSessionIds } = await supabase
@@ -190,6 +223,13 @@ export async function loadChecklistSessionsForClient(input: {
   // 4. Coletar template IDs únicos para buscar nomes e total de itens
   const templateIds = [...new Set(sessions.map((s) => s.template_id).filter(Boolean))] as string[];
   const customTemplateIds = [...new Set(sessions.map((s) => s.custom_template_id).filter(Boolean))] as string[];
+  const workspaceTemplateIds = [
+    ...new Set(
+      sessions
+        .map((s) => (s as Record<string, unknown>).workspace_template_id as string | null)
+        .filter(Boolean),
+    ),
+  ] as string[];
 
   // Nomes de templates globais
   const templateNameMap = new Map<string, { name: string; portaria_ref: string }>();
@@ -212,6 +252,18 @@ export async function loadChecklistSessionsForClient(input: {
       .in("id", customTemplateIds);
     for (const ct of ctRows ?? []) {
       customTemplateNameMap.set(ct.id, ct.name);
+    }
+  }
+
+  // Nomes de templates do workspace (equipe)
+  const workspaceTemplateNameMap = new Map<string, string>();
+  if (workspaceTemplateIds.length > 0) {
+    const { data: wtRows } = await supabase
+      .from("checklist_workspace_templates")
+      .select("id, name")
+      .in("id", workspaceTemplateIds);
+    for (const wt of wtRows ?? []) {
+      workspaceTemplateNameMap.set(wt.id, wt.name);
     }
   }
 
@@ -271,6 +323,37 @@ export async function loadChecklistSessionsForClient(input: {
     }
   }
 
+  // Total de itens por template do workspace
+  const workspaceTemplateTotalItemsMap = new Map<string, number>();
+  if (workspaceTemplateIds.length > 0) {
+    const { data: wSecRows } = await supabase
+      .from("checklist_workspace_sections")
+      .select("id, workspace_template_id")
+      .in("workspace_template_id", workspaceTemplateIds);
+
+    const wSectionToTemplate = new Map<string, string>();
+    for (const s of wSecRows ?? []) {
+      wSectionToTemplate.set(s.id, s.workspace_template_id as string);
+    }
+
+    if (wSectionToTemplate.size > 0) {
+      const { data: wItemRows } = await supabase
+        .from("checklist_workspace_items")
+        .select("id, workspace_section_id")
+        .in("workspace_section_id", [...wSectionToTemplate.keys()]);
+
+      for (const item of wItemRows ?? []) {
+        const wtid = wSectionToTemplate.get(item.workspace_section_id as string);
+        if (wtid) {
+          workspaceTemplateTotalItemsMap.set(
+            wtid,
+            (workspaceTemplateTotalItemsMap.get(wtid) ?? 0) + 1,
+          );
+        }
+      }
+    }
+  }
+
   // 5.5. Nomes das áreas vinculadas às sessões
   const areaIds = [...new Set(
     sessions.map((s) => (s as Record<string, unknown>).area_id as string | null).filter(Boolean)
@@ -320,20 +403,37 @@ export async function loadChecklistSessionsForClient(input: {
     let templateName = "—";
     let portariaRef: string | null = null;
     let totalItems = 0;
+    let templateOrigin: "system" | "custom" | "workspace" = "system";
 
-    if (sess.template_id) {
+    const sessRowAny = sess as Record<string, unknown>;
+    const sessWorkspaceTemplateId =
+      (sessRowAny.workspace_template_id as string | null) ?? null;
+
+    if (sessWorkspaceTemplateId) {
+      templateOrigin = "workspace";
+      templateName =
+        workspaceTemplateNameMap.get(sessWorkspaceTemplateId) ??
+        "Modelo da equipe";
+      totalItems = workspaceTemplateTotalItemsMap.get(sessWorkspaceTemplateId) ?? 0;
+    } else if (sess.template_id) {
+      templateOrigin = "system";
       const tInfo = templateNameMap.get(sess.template_id);
       templateName = tInfo?.name ?? "Template";
       portariaRef = tInfo?.portaria_ref ?? null;
       totalItems = templateTotalItemsMap.get(sess.template_id) ?? 0;
     } else if (sess.custom_template_id) {
-      templateName = customTemplateNameMap.get(sess.custom_template_id) ?? "Template personalizado";
+      templateOrigin = "custom";
+      templateName =
+        customTemplateNameMap.get(sess.custom_template_id) ?? "Template personalizado";
       totalItems = customTemplateTotalItemsMap.get(sess.custom_template_id) ?? 0;
     }
 
     const answeredCount = counts.conforme + counts.nc + counts.na;
     const pendingCount = Math.max(0, totalItems - answeredCount);
-    const startedByLabel = sess.user_id === user.id ? ownUserLabel : "Membro da equipe";
+    const startedByLabel =
+      profileNameByUserId.get(String(sess.user_id)) ??
+      teamMemberNameByUserId.get(String(sess.user_id)) ??
+      (sess.user_id === user.id ? ownUserLabel : "Profissional não identificado");
 
     const sessRaw = sess as Record<string, unknown>;
     const areaId = (sessRaw.area_id as string | null) ?? null;
@@ -347,6 +447,7 @@ export async function loadChecklistSessionsForClient(input: {
       dossier_approved_at: sess.dossier_approved_at ?? null,
       status: sess.dossier_approved_at ? "aprovado" : "em_andamento",
       template_name: templateName,
+      template_origin: templateOrigin,
       portaria_ref: portariaRef,
       establishment_id: sess.establishment_id,
       establishment_name: est.name,
@@ -388,7 +489,9 @@ export async function loadChecklistSessionNcItems(
   // VALIDAÇÃO: verificar que a sessão pertence a um estabelecimento de um cliente do usuário.
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("id, establishment_id, template_id, custom_template_id")
+    .select(
+      "id, establishment_id, template_id, custom_template_id, workspace_template_id",
+    )
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -412,7 +515,9 @@ export async function loadChecklistSessionNcItems(
   // Buscar respostas NC desta sessão
   const { data: ncResponses } = await supabase
     .from("checklist_fill_item_responses")
-    .select("id, template_item_id, custom_item_id, note, item_annotation")
+    .select(
+      "id, template_item_id, custom_item_id, workspace_item_id, note, item_annotation",
+    )
     .eq("session_id", sessionId)
     .eq("outcome", "nc");
 
@@ -427,6 +532,10 @@ export async function loadChecklistSessionNcItems(
   const customItemIds = ncResponses
     .filter((r) => r.custom_item_id)
     .map((r) => r.custom_item_id as string);
+
+  const workspaceItemIds = ncResponses
+    .filter((r) => (r as Record<string, unknown>).workspace_item_id)
+    .map((r) => (r as Record<string, unknown>).workspace_item_id as string);
 
   // Buscar detalhes de itens globais
   const globalItemMap = new Map<string, { description: string; is_required: boolean }>();
@@ -458,18 +567,40 @@ export async function loadChecklistSessionNcItems(
     }
   }
 
+  // Buscar detalhes de itens do workspace (equipe)
+  const workspaceItemMap = new Map<
+    string,
+    { description: string; is_required: boolean }
+  >();
+  if (workspaceItemIds.length > 0) {
+    const { data: wItemRows } = await supabase
+      .from("checklist_workspace_items")
+      .select("id, description, is_required")
+      .in("id", workspaceItemIds);
+    for (const it of wItemRows ?? []) {
+      workspaceItemMap.set(it.id, {
+        description: it.description,
+        is_required: Boolean(it.is_required),
+      });
+    }
+  }
+
   // Montar resultado
   for (const r of ncResponses) {
+    const rowAny = r as Record<string, unknown>;
+    const workspaceItemId = rowAny.workspace_item_id as string | null;
     const itemInfo = r.template_item_id
       ? globalItemMap.get(r.template_item_id)
       : r.custom_item_id
         ? customItemMap.get(r.custom_item_id)
-        : null;
+        : workspaceItemId
+          ? workspaceItemMap.get(workspaceItemId)
+          : null;
 
     if (!itemInfo) continue;
 
     result.push({
-      item_id: (r.template_item_id ?? r.custom_item_id) as string,
+      item_id: (r.template_item_id ?? r.custom_item_id ?? workspaceItemId) as string,
       description: itemInfo.description,
       is_required: itemInfo.is_required,
       note: (r.note as string | null) ?? null,
@@ -522,7 +653,9 @@ export async function loadChecklistScoreHistory(
   // Sessões aprovadas com score
   const { data: sessions } = await supabase
     .from("checklist_fill_sessions")
-    .select("id, template_id, custom_template_id, dossier_approved_at, score_percentage, area_id")
+    .select(
+      "id, template_id, custom_template_id, workspace_template_id, dossier_approved_at, score_percentage, area_id",
+    )
     .in("establishment_id", estIds)
     .not("dossier_approved_at", "is", null)
     .not("score_percentage", "is", null)
@@ -537,6 +670,15 @@ export async function loadChecklistScoreHistory(
   const customTemplateIds = [...new Set(
     sessions.filter((s) => s.custom_template_id).map((s) => s.custom_template_id as string)
   )];
+  const workspaceTemplateIds = [
+    ...new Set(
+      sessions
+        .filter((s) => (s as Record<string, unknown>).workspace_template_id)
+        .map(
+          (s) => (s as Record<string, unknown>).workspace_template_id as string,
+        ),
+    ),
+  ];
 
   const templateNameMap = new Map<string, string>();
 
@@ -554,6 +696,14 @@ export async function loadChecklistScoreHistory(
       .in("id", customTemplateIds);
     for (const t of cRows ?? []) templateNameMap.set(t.id as string, t.name as string);
   }
+  if (workspaceTemplateIds.length > 0) {
+    const { data: wRows } = await supabase
+      .from("checklist_workspace_templates")
+      .select("id, name")
+      .in("id", workspaceTemplateIds);
+    for (const t of wRows ?? [])
+      templateNameMap.set(t.id as string, t.name as string);
+  }
 
   // Fetch area names
   const areaIds = [...new Set(sessions.filter((s) => s.area_id).map((s) => s.area_id as string))];
@@ -569,7 +719,10 @@ export async function loadChecklistScoreHistory(
   // Group by template
   const groups = new Map<string, { templateName: string; points: ScoreHistoryPoint[] }>();
   for (const s of sessions) {
-    const templateId = (s.template_id ?? s.custom_template_id) as string;
+    const sAny = s as Record<string, unknown>;
+    const templateId = (s.template_id ??
+      s.custom_template_id ??
+      (sAny.workspace_template_id as string | null)) as string;
     if (!templateId) continue;
     const templateName = templateNameMap.get(templateId) ?? "Template";
     if (!groups.has(templateId)) groups.set(templateId, { templateName, points: [] });

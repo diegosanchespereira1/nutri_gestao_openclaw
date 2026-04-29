@@ -140,8 +140,8 @@ type Props = {
   establishmentLabel: string;
   /** Nome da área física avaliada nesta sessão (quando definido). */
   areaName?: string | null;
-  /** Itens mapeiam para `checklist_template_items` ou `checklist_custom_items`. */
-  itemResponseSource: "global" | "custom";
+  /** Itens mapeiam para template global, personalizado ou modelo de workspace (equipe). */
+  itemResponseSource: "global" | "custom" | "workspace";
   backHref?: string;
   backLabel?: string;
   /**
@@ -514,6 +514,55 @@ export function ChecklistFillWizard({
   if (!section) {
     return (
       <p className="text-muted-foreground text-sm">Modelo sem seções.</p>
+    );
+  }
+
+  if (dossierApprovedAt && !viewOnlyDossier) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-muted-foreground text-sm">{establishmentLabel}</p>
+            <h2 className="text-foreground text-xl font-semibold tracking-tight">
+              {template.name}
+            </h2>
+            {areaName ? (
+              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary shadow-xs">
+                <MapPin className="size-4 shrink-0" aria-hidden />
+                {areaName}
+              </div>
+            ) : null}
+            <p className="text-muted-foreground mt-1 text-sm">
+              Este checklist já foi finalizado. Visualize abaixo o dossiê aprovado.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={backHref}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              {backLabel}
+            </Link>
+          </div>
+        </div>
+
+        <ChecklistFillDossierPreview
+          template={template}
+          responses={responses}
+          itemPhotos={livePhotos}
+          reviewEditable={false}
+          dossierApprovedAt={dossierApprovedAt}
+          heading="Dossiê aprovado"
+          intro="Relatório aprovado e em modo somente leitura."
+        />
+
+        <ChecklistFillDossierPdfCard
+          sessionId={sessionId}
+          dossierApprovedAt={dossierApprovedAt}
+          initialJob={initialPdfExport ?? null}
+          dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+        />
+      </div>
     );
   }
 

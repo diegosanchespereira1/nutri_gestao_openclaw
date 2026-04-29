@@ -7,6 +7,7 @@ import { after } from "next/server";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
+import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
@@ -169,7 +170,7 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   pdfClientLabel: string;
   /** Nome da área física avaliada nesta sessão (null quando não aplicável). */
   areaName: string | null;
-  itemResponseSource: "global" | "custom";
+  itemResponseSource: "global" | "custom" | "workspace";
   itemPhotos: Record<string, ChecklistFillPhotoView[]>;
   latestPdfExport: ChecklistFillPdfExportRow | null;
   /** Info do utilizador que criou o rascunho (pode ser diferente do utilizador atual). */
@@ -191,14 +192,19 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   const row = session as ChecklistFillSessionRow & {
     custom_template_id?: string | null;
+    workspace_template_id?: string | null;
   };
 
-  const itemResponseSource: "global" | "custom" = row.custom_template_id
-    ? "custom"
-    : "global";
+  const itemResponseSource: "global" | "custom" | "workspace" = row.workspace_template_id
+    ? "workspace"
+    : row.custom_template_id
+      ? "custom"
+      : "global";
 
   let template: ChecklistTemplateWithSections | null = null;
-  if (row.custom_template_id) {
+  if (row.workspace_template_id) {
+    template = await loadWorkspaceTemplateBundle(row.workspace_template_id);
+  } else if (row.custom_template_id) {
     template = await loadCustomTemplateUnified(row.custom_template_id);
   } else if (row.template_id) {
     template = await loadChecklistTemplateBundleById(row.template_id);
@@ -213,8 +219,10 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   const responses: FillResponsesMap = {};
   for (const raw of respRows ?? []) {
-    const r = raw as ChecklistFillItemResponseRow;
-    const key = r.template_item_id ?? r.custom_item_id;
+    const r = raw as ChecklistFillItemResponseRow & {
+      workspace_item_id?: string | null;
+    };
+    const key = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
     if (!key) continue;
     responses[key] = {
       outcome: r.outcome,
@@ -332,8 +340,10 @@ export async function loadFillResponsesMapForSession(
 
   const responses: FillResponsesMap = {};
   for (const raw of respRows ?? []) {
-    const r = raw as ChecklistFillItemResponseRow;
-    const key = r.template_item_id ?? r.custom_item_id;
+    const r = raw as ChecklistFillItemResponseRow & {
+      workspace_item_id?: string | null;
+    };
+    const key = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
     if (!key) continue;
     responses[key] = {
       outcome: r.outcome,
@@ -399,7 +409,7 @@ function buildResponseUpdatePayload(input: {
 export async function saveFillItemResponse(input: {
   sessionId: string;
   itemId: string;
-  itemResponseSource: "global" | "custom";
+  itemResponseSource: "global" | "custom" | "workspace";
   outcome: ChecklistFillOutcome | null;
   note: string | null;
   annotation: string | null;
@@ -421,7 +431,9 @@ export async function saveFillItemResponse(input: {
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("id, template_id, custom_template_id, dossier_approved_at, establishment_id")
+    .select(
+      "id, template_id, custom_template_id, workspace_template_id, dossier_approved_at, establishment_id",
+    )
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -442,8 +454,12 @@ export async function saveFillItemResponse(input: {
     };
   }
 
-  const sessionIsCustom = Boolean(sess.custom_template_id);
-  if (sessionIsCustom !== (itemResponseSource === "custom")) {
+  const sessionOrigin: "global" | "custom" | "workspace" = sess.workspace_template_id
+    ? "workspace"
+    : sess.custom_template_id
+      ? "custom"
+      : "global";
+  if (sessionOrigin !== itemResponseSource) {
     return { ok: false, error: "Tipo de item incompatível com a sessão." };
   }
 
@@ -454,7 +470,7 @@ export async function saveFillItemResponse(input: {
       .eq("id", itemId)
       .maybeSingle();
     if (!itemMeta) return { ok: false, error: "Item inválido." };
-  } else {
+  } else if (itemResponseSource === "custom") {
     const { data: itemMeta } = await supabase
       .from("checklist_custom_items")
       .select("id, custom_section_id")
@@ -471,22 +487,38 @@ export async function saveFillItemResponse(input: {
     if (!sec || sec.custom_template_id !== sess.custom_template_id) {
       return { ok: false, error: "Item inválido para este modelo." };
     }
+  } else {
+    const { data: itemMeta } = await supabase
+      .from("checklist_workspace_items")
+      .select("id, workspace_section_id")
+      .eq("id", itemId)
+      .maybeSingle();
+    if (!itemMeta) return { ok: false, error: "Item inválido." };
+
+    const { data: sec } = await supabase
+      .from("checklist_workspace_sections")
+      .select("workspace_template_id")
+      .eq("id", itemMeta.workspace_section_id as string)
+      .maybeSingle();
+
+    if (!sec || sec.workspace_template_id !== sess.workspace_template_id) {
+      return { ok: false, error: "Item inválido para este modelo." };
+    }
   }
 
+  const itemColumn =
+    itemResponseSource === "global"
+      ? "template_item_id"
+      : itemResponseSource === "custom"
+        ? "custom_item_id"
+        : "workspace_item_id";
+
   if (outcome === null) {
-    if (itemResponseSource === "global") {
-      await supabase
-        .from("checklist_fill_item_responses")
-        .delete()
-        .eq("session_id", sessionId)
-        .eq("template_item_id", itemId);
-    } else {
-      await supabase
-        .from("checklist_fill_item_responses")
-        .delete()
-        .eq("session_id", sessionId)
-        .eq("custom_item_id", itemId);
-    }
+    await supabase
+      .from("checklist_fill_item_responses")
+      .delete()
+      .eq("session_id", sessionId)
+      .eq(itemColumn, itemId);
     revalidatePath(`/checklists/preencher/${sessionId}`);
 
     const { data: sessMetaClear } = await supabase
@@ -512,78 +544,45 @@ export async function saveFillItemResponse(input: {
   }
   const normalizedValidUntil = (validUntil ?? "").trim() || null;
 
-  if (itemResponseSource === "global") {
-    const { data: existing } = await supabase
-      .from("checklist_fill_item_responses")
-      .select("id, note, item_annotation, valid_until")
-      .eq("session_id", sessionId)
-      .eq("template_item_id", itemId)
-      .maybeSingle();
+  const { data: existing } = await supabase
+    .from("checklist_fill_item_responses")
+    .select("id, note, item_annotation, valid_until")
+    .eq("session_id", sessionId)
+    .eq(itemColumn, itemId)
+    .maybeSingle();
 
-    if (existing) {
-      const payload = buildResponseUpdatePayload({
-        outcome,
-        noteTrim,
-        annotationTrim,
-        validUntil: normalizedValidUntil,
-        existingNote: existing.note as string | null,
-        existingAnnotation: existing.item_annotation as string | null,
-        existingValidUntil: existing.valid_until as string | null,
-        persistMode,
-      });
-      const { error } = await supabase
-        .from("checklist_fill_item_responses")
-        .update(payload)
-        .eq("id", existing.id as string);
-      if (error) return { ok: false, error: "Não foi possível salvar." };
-    } else {
-      const { error } = await supabase.from("checklist_fill_item_responses").insert({
-        session_id: sessionId,
-        template_item_id: itemId,
-        custom_item_id: null,
-        outcome,
-        note: noteTrim.length > 0 ? noteTrim : null,
-        item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
-        valid_until: normalizedValidUntil,
-      });
-      if (error) return { ok: false, error: "Não foi possível salvar." };
-    }
+  if (existing) {
+    const payload = buildResponseUpdatePayload({
+      outcome,
+      noteTrim,
+      annotationTrim,
+      validUntil: normalizedValidUntil,
+      existingNote: existing.note as string | null,
+      existingAnnotation: existing.item_annotation as string | null,
+      existingValidUntil: existing.valid_until as string | null,
+      persistMode,
+    });
+    const { error } = await supabase
+      .from("checklist_fill_item_responses")
+      .update(payload)
+      .eq("id", existing.id as string);
+    if (error) return { ok: false, error: "Não foi possível salvar." };
   } else {
-    const { data: existing } = await supabase
+    const insertPayload: Record<string, unknown> = {
+      session_id: sessionId,
+      template_item_id: null,
+      custom_item_id: null,
+      workspace_item_id: null,
+      outcome,
+      note: noteTrim.length > 0 ? noteTrim : null,
+      item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+      valid_until: normalizedValidUntil,
+    };
+    insertPayload[itemColumn] = itemId;
+    const { error } = await supabase
       .from("checklist_fill_item_responses")
-      .select("id, note, item_annotation, valid_until")
-      .eq("session_id", sessionId)
-      .eq("custom_item_id", itemId)
-      .maybeSingle();
-
-    if (existing) {
-      const payload = buildResponseUpdatePayload({
-        outcome,
-        noteTrim,
-        annotationTrim,
-        validUntil: normalizedValidUntil,
-        existingNote: existing.note as string | null,
-        existingAnnotation: existing.item_annotation as string | null,
-        existingValidUntil: existing.valid_until as string | null,
-        persistMode,
-      });
-      const { error } = await supabase
-        .from("checklist_fill_item_responses")
-        .update(payload)
-        .eq("id", existing.id as string);
-      if (error) return { ok: false, error: "Não foi possível salvar." };
-    } else {
-      const { error } = await supabase.from("checklist_fill_item_responses").insert({
-        session_id: sessionId,
-        template_item_id: null,
-        custom_item_id: itemId,
-        outcome,
-        note: noteTrim.length > 0 ? noteTrim : null,
-        item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
-        valid_until: normalizedValidUntil,
-      });
-      if (error) return { ok: false, error: "Não foi possível salvar." };
-    }
+      .insert(insertPayload);
+    if (error) return { ok: false, error: "Não foi possível salvar." };
   }
 
   revalidatePath(`/checklists/preencher/${sessionId}`);
@@ -626,6 +625,7 @@ export async function checkExistingOpenFillSession(input: {
   establishmentId: string;
   templateId: string | null;
   customTemplateId: string | null;
+  workspaceTemplateId?: string | null;
 }): Promise<ExistingOpenSession | null> {
   const supabase = await createClient();
   const {
@@ -640,6 +640,7 @@ export async function checkExistingOpenFillSession(input: {
   if (!ok) return null;
 
   const { establishmentId, templateId, customTemplateId } = input;
+  const workspaceTemplateId = input.workspaceTemplateId ?? null;
 
   // Buscar sessões abertas para esse par estabelecimento + template, ordenadas pela
   // mais recente. A nova RLS policy permite ler sessões de qualquer membro da equipe
@@ -655,6 +656,8 @@ export async function checkExistingOpenFillSession(input: {
     query = query.eq("template_id", templateId);
   } else if (customTemplateId) {
     query = query.eq("custom_template_id", customTemplateId);
+  } else if (workspaceTemplateId) {
+    query = query.eq("workspace_template_id", workspaceTemplateId);
   } else {
     return null;
   }

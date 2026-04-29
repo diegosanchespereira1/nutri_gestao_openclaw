@@ -15,7 +15,7 @@
 # Retrospective: optional | done
 
 generated: "2026-03-31T12:00:00Z"
-last_updated: "2026-04-16T21:00:00Z"
+last_updated: "2026-04-29T18:00:00Z"
 project: Nutricao_stratosTech
 project_key: NOKEY
 tracking_system: file-system
@@ -49,6 +49,9 @@ development_status:
   3-1-catalogo-checklists-portaria-campos-obrigatorios: done
   3-2-preenchimento-validacao-obrigatorios: done
   3-3-checklists-customizados-profissional: done
+  # Extra: modelos 100% customizáveis ao nível de workspace ("Equipe"), com soft-delete
+  # e tag visual diferenciando "Sistema" / "Equipe" no catálogo, listagem e histórico.
+  checklist-customizavel-workspace: done
   epic-3-retrospective: optional
 
   epic-4: done

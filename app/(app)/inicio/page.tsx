@@ -7,12 +7,14 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { DashboardClinicalSubsection } from "@/components/dashboard/dashboard-clinical-subsection";
 import { DashboardFocusPanel } from "@/components/dashboard/dashboard-focus-panel";
 import { FinancialPendingCard } from "@/components/dashboard/financial-pending-card";
+import { ChecklistValidityAlertGroups } from "@/components/dashboard/checklist-validity-alert-groups";
 import { RegulatoryAlertCard } from "@/components/dashboard/regulatory-alert-card";
 import { VisitsMonthBarChart } from "@/components/dashboard/visits-month-bar-chart";
 import { WeeklyBriefingWidget } from "@/components/dashboard/weekly-briefing-widget";
 import { VisitAgendaBlock } from "@/components/visits/visit-agenda-block";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadComplianceDashboardAlerts } from "@/lib/actions/compliance-deadlines";
+import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-alerts";
 import { loadFinancialDashboardSummary } from "@/lib/actions/financial-charges";
 import { loadExpiringContracts } from "@/lib/actions/client-contracts";
 import { ContractRenewalAlerts } from "@/components/dashboard/contract-renewal-alerts";
@@ -58,9 +60,10 @@ export default async function InicioPage({
     countClientsForOwner(supabase, workspaceOwnerId),
   ]);
   const hasClients = clientCount > 0;
-  const [{ rows }, complianceAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([
+  const [{ rows }, complianceAlerts, validityAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([
     loadScheduledVisitsForOwner(),
     loadComplianceDashboardAlerts(tz),
+    loadChecklistValidityAlerts(tz),
     loadFinancialDashboardSummary(tz),
     loadExpiringContracts(60),
   ]);
@@ -209,6 +212,30 @@ export default async function InicioPage({
             <VisitsMonthBarChart data={visitsByMonth} />
           </DashboardClinicalSubsection>
         ) : null}
+
+        <DashboardClinicalSubsection
+          id="validity-alerts-heading"
+          title="Validades de checklist"
+          actions={
+            <Link
+              href="/checklists"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "w-full justify-center sm:w-auto",
+              )}
+            >
+              Ver checklists
+            </Link>
+          }
+        >
+          {validityAlerts.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Sem itens vencidos ou a vencer nos próximos 7 dias.
+            </p>
+          ) : (
+            <ChecklistValidityAlertGroups alerts={validityAlerts} timeZone={tz} />
+          )}
+        </DashboardClinicalSubsection>
 
         <DashboardClinicalSubsection
           id="regulatory-alerts-heading"

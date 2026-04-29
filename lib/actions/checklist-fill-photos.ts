@@ -89,19 +89,45 @@ async function verifyCustomItemInSession(
   return Boolean(sec && sec.custom_template_id === customTemplateId);
 }
 
+async function verifyWorkspaceItemInSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceTemplateId: string,
+  itemId: string,
+): Promise<boolean> {
+  const { data: itemMeta } = await supabase
+    .from("checklist_workspace_items")
+    .select("id, workspace_section_id")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (!itemMeta) return false;
+  const { data: sec } = await supabase
+    .from("checklist_workspace_sections")
+    .select("workspace_template_id")
+    .eq("id", itemMeta.workspace_section_id as string)
+    .maybeSingle();
+  return Boolean(sec && sec.workspace_template_id === workspaceTemplateId);
+}
+
 async function assertSessionItem(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceOwnerId: string,
   sessionId: string,
   itemId: string,
-  itemResponseSource: "global" | "custom",
+  itemResponseSource: "global" | "custom" | "workspace",
 ): Promise<
-  | { ok: true; templateId: string | null; customTemplateId: string | null }
+  | {
+      ok: true;
+      templateId: string | null;
+      customTemplateId: string | null;
+      workspaceTemplateId: string | null;
+    }
   | { ok: false }
 > {
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("id, template_id, custom_template_id, establishment_id")
+    .select(
+      "id, template_id, custom_template_id, workspace_template_id, establishment_id",
+    )
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -133,17 +159,32 @@ async function assertSessionItem(
       ok: true,
       templateId: tid,
       customTemplateId: null,
+      workspaceTemplateId: null,
     };
   }
 
-  const cid = sess.custom_template_id as string | null;
-  if (!cid) return { ok: false };
-  const allowed = await verifyCustomItemInSession(supabase, cid, itemId);
+  if (itemResponseSource === "custom") {
+    const cid = sess.custom_template_id as string | null;
+    if (!cid) return { ok: false };
+    const allowed = await verifyCustomItemInSession(supabase, cid, itemId);
+    if (!allowed) return { ok: false };
+    return {
+      ok: true,
+      templateId: null,
+      customTemplateId: cid,
+      workspaceTemplateId: null,
+    };
+  }
+
+  const wid = sess.workspace_template_id as string | null;
+  if (!wid) return { ok: false };
+  const allowed = await verifyWorkspaceItemInSession(supabase, wid, itemId);
   if (!allowed) return { ok: false };
   return {
     ok: true,
     templateId: null,
-    customTemplateId: cid,
+    customTemplateId: null,
+    workspaceTemplateId: wid,
   };
 }
 
@@ -174,7 +215,7 @@ export async function loadSessionItemPhotosWithUrls(
   const { data: rows } = await supabase
     .from("checklist_fill_item_photos")
     .select(
-      "id, template_item_id, custom_item_id, storage_path, taken_at, latitude, longitude",
+      "id, template_item_id, custom_item_id, workspace_item_id, storage_path, taken_at, latitude, longitude",
     )
     .eq("session_id", sessionId)
     .order("created_at", { ascending: true });
@@ -186,12 +227,13 @@ export async function loadSessionItemPhotosWithUrls(
       id: string;
       template_item_id: string | null;
       custom_item_id: string | null;
+      workspace_item_id: string | null;
       storage_path: string;
       taken_at: string;
       latitude: number | null;
       longitude: number | null;
     };
-    const itemKey = r.template_item_id ?? r.custom_item_id;
+    const itemKey = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
     if (!itemKey) continue;
 
     const url = await signPhotoUrl(supabase, r.storage_path);
@@ -230,8 +272,12 @@ export async function uploadChecklistFillPhotoAction(
   const sessionId = String(formData.get("session_id") ?? "").trim();
   const itemId = String(formData.get("item_id") ?? "").trim();
   const sourceRaw = String(formData.get("item_response_source") ?? "").trim();
-  const itemResponseSource =
-    sourceRaw === "custom" ? ("custom" as const) : ("global" as const);
+  const itemResponseSource: "global" | "custom" | "workspace" =
+    sourceRaw === "custom"
+      ? "custom"
+      : sourceRaw === "workspace"
+        ? "workspace"
+        : "global";
 
   const file = formData.get("file");
   if (!sessionId || !itemId || !(file instanceof File)) {
@@ -277,9 +323,20 @@ export async function uploadChecklistFillPhotoAction(
     .eq("session_id", sessionId);
 
   if (itemResponseSource === "global") {
-    countQuery = countQuery.eq("template_item_id", itemId).is("custom_item_id", null);
+    countQuery = countQuery
+      .eq("template_item_id", itemId)
+      .is("custom_item_id", null)
+      .is("workspace_item_id", null);
+  } else if (itemResponseSource === "custom") {
+    countQuery = countQuery
+      .eq("custom_item_id", itemId)
+      .is("template_item_id", null)
+      .is("workspace_item_id", null);
   } else {
-    countQuery = countQuery.eq("custom_item_id", itemId).is("template_item_id", null);
+    countQuery = countQuery
+      .eq("workspace_item_id", itemId)
+      .is("template_item_id", null)
+      .is("custom_item_id", null);
   }
 
   const { count } = await countQuery;
@@ -322,6 +379,7 @@ export async function uploadChecklistFillPhotoAction(
     session_id: sessionId,
     template_item_id: itemResponseSource === "global" ? itemId : null,
     custom_item_id: itemResponseSource === "custom" ? itemId : null,
+    workspace_item_id: itemResponseSource === "workspace" ? itemId : null,
     storage_path: storagePath,
     original_filename: safeName,
     content_type: mime,

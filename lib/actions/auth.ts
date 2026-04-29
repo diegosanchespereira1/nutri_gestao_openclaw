@@ -71,6 +71,7 @@ export async function updateProfileAction(
   }
 
   const profilePayload = {
+    user_id: user.id,
     full_name,
     crn,
     phone,
@@ -78,39 +79,28 @@ export async function updateProfileAction(
     updated_at: new Date().toISOString(),
   };
 
-  const { data: updatedProfile, error: updateError } = await supabase
+  const { data: persistedProfile, error: upsertError } = await supabase
     .from("profiles")
-    .update(profilePayload)
-    .eq("user_id", user.id)
-    .select("id")
-    .maybeSingle();
+    .upsert(profilePayload, { onConflict: "user_id" })
+    .select("id, crn")
+    .single();
 
-  if (updateError) {
-    console.error("[updateProfileAction] profiles update failed", {
+  if (upsertError) {
+    console.error("[updateProfileAction] profiles upsert failed", {
       userId: user.id,
-      code: updateError.code,
-      message: updateError.message,
-      details: updateError.details,
-      hint: updateError.hint,
+      code: upsertError.code,
+      message: upsertError.message,
+      details: upsertError.details,
+      hint: upsertError.hint,
     });
     return { ok: false, error: "Não foi possível salvar. Tente novamente." };
   }
 
-  if (!updatedProfile) {
-    const { error: insertError } = await supabase.from("profiles").insert({
-      user_id: user.id,
-      ...profilePayload,
-    });
-    if (insertError) {
-      console.error("[updateProfileAction] profiles insert fallback failed", {
-        userId: user.id,
-        code: insertError.code,
-        message: insertError.message,
-        details: insertError.details,
-        hint: insertError.hint,
-      });
-      return { ok: false, error: "Não foi possível salvar. Tente novamente." };
-    }
+  if (!persistedProfile || String(persistedProfile.crn ?? "").trim() !== crn) {
+    return {
+      ok: false,
+      error: "Não foi possível atualizar o CRN. Tente novamente.",
+    };
   }
 
   const currentEmail = (user.email ?? "").trim().toLowerCase();

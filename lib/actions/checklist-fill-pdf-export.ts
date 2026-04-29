@@ -68,7 +68,10 @@ export async function generateDossierPdfAction(
   const storagePath = `${workspaceOwnerId}/${sessionId}/${jobId}.pdf`;
 
   try {
-    const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+    const bytes = await buildApprovedDossierPdfBytes(
+      supabase,
+      bundle.session.user_id,
+      {
       sessionId,
       template: bundle.template,
       responses: bundle.responses,
@@ -77,7 +80,8 @@ export async function generateDossierPdfAction(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
-    });
+      },
+    );
 
     const { error: upErr } = await supabase.storage
       .from(CHECKLIST_DOSSIER_PDFS_BUCKET)

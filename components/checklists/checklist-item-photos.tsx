@@ -143,7 +143,7 @@ const STEP_LABELS: Record<UploadStep, string> = {
 type Props = {
   sessionId: string;
   itemId: string;
-  itemResponseSource: "global" | "custom";
+  itemResponseSource: "global" | "custom" | "workspace";
   initialPhotos: ChecklistFillPhotoView[];
   disabled?: boolean;
   /** Chamado quando a lista de fotos muda (upload ou eliminação), para resumos agregados. */
@@ -190,84 +190,112 @@ export function ChecklistItemPhotos({
 
   const onFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
+      const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
       e.target.value = "";
-      if (!file || disabled || atLimit) return;
+      if (selectedFiles.length === 0 || disabled || atLimit) return;
 
       setUploadError(null);
 
-      if (file.type && !file.type.startsWith("image/")) {
-        setUploadError("Selecione um arquivo de imagem válido.");
+      const availableSlots = Math.max(
+        0,
+        CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM - photos.length,
+      );
+      const filesToUpload = selectedFiles.slice(0, availableSlots);
+      const skippedByLimit = selectedFiles.length - filesToUpload.length;
+      const batchErrors: string[] = [];
+      let uploadedCount = 0;
+      let currentPhotos = photos;
+
+      if (filesToUpload.length === 0) {
+        setUploadError("Limite de fotos por item atingido.");
         return;
       }
 
-      try {
-        // ── Etapa 1: comprimir ──
-        setUploadState({ status: "busy", step: "compressing", percent: 10 });
-        const compressed = await compressImage(file);
-        setUploadState({ status: "busy", step: "compressing", percent: 30 });
-
-        if (compressed.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {
-          setUploadState({ status: "idle" });
-          const maxMB = CHECKLIST_FILL_PHOTO_MAX_BYTES / 1024 / 1024;
-          const fileMB = (compressed.size / 1024 / 1024).toFixed(1);
-          setUploadError(
-            `Imagem muito grande mesmo após compressão. Máximo: ${maxMB}MB. Tamanho: ${fileMB}MB.`,
-          );
-          return;
+      for (const file of filesToUpload) {
+        if (file.type && !file.type.startsWith("image/")) {
+          batchErrors.push(`"${file.name}" não é uma imagem válida.`);
+          continue;
         }
 
-        // ── Etapa 2: localização (opcional — negação ou timeout não bloqueia o upload) ──
-        setUploadState({ status: "busy", step: "location", percent: 40 });
-        let lat = "";
-        let lng = "";
-        const pos = await getPositionOptional();
-        if (pos) {
-          lat = String(pos.coords.latitude);
-          lng = String(pos.coords.longitude);
+        try {
+          // ── Etapa 1: comprimir ──
+          setUploadState({ status: "busy", step: "compressing", percent: 10 });
+          const compressed = await compressImage(file);
+          setUploadState({ status: "busy", step: "compressing", percent: 30 });
+
+          if (compressed.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {
+            const maxMB = CHECKLIST_FILL_PHOTO_MAX_BYTES / 1024 / 1024;
+            const fileMB = (compressed.size / 1024 / 1024).toFixed(1);
+            batchErrors.push(
+              `"${file.name}" excede o limite após compressão (${fileMB}MB de ${maxMB}MB).`,
+            );
+            continue;
+          }
+
+          // ── Etapa 2: localização (opcional — negação ou timeout não bloqueia o upload) ──
+          setUploadState({ status: "busy", step: "location", percent: 40 });
+          let lat = "";
+          let lng = "";
+          const pos = await getPositionOptional();
+          if (pos) {
+            lat = String(pos.coords.latitude);
+            lng = String(pos.coords.longitude);
+          }
+          setUploadState({ status: "busy", step: "location", percent: 50 });
+
+          // ── Etapa 3: enviar ao servidor ──
+          setUploadState({ status: "busy", step: "uploading", percent: 55 });
+
+          const fd = new FormData();
+          fd.append("session_id", sessionId);
+          fd.append("item_id", itemId);
+          fd.append("item_response_source", itemResponseSource);
+          fd.append("file", compressed);
+          if (lat) fd.append("latitude", lat);
+          if (lng) fd.append("longitude", lng);
+
+          setUploadState({ status: "busy", step: "uploading", percent: 65 });
+          const res = await uploadChecklistFillPhotoAction(fd);
+
+          if (!res.ok) {
+            batchErrors.push(`"${file.name}": ${res.error}`);
+            continue;
+          }
+
+          // ── Etapa 4: finalizar ──
+          setUploadState({ status: "busy", step: "saving", percent: 95 });
+          currentPhotos = [...currentPhotos, res.photo];
+          uploadedCount += 1;
+          setPhotos(currentPhotos);
+          onPhotosChange?.(currentPhotos);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const normalizedMsg =
+            msg.includes("Failed to fetch") || msg.includes("network")
+              ? "Erro de rede ao enviar foto. Verifique a conexão e tente novamente."
+              : msg.includes("processar") || msg.includes("ler")
+                ? msg
+                : `Erro ao enviar foto: ${msg}`;
+          batchErrors.push(`"${file.name}": ${normalizedMsg}`);
         }
-        setUploadState({ status: "busy", step: "location", percent: 50 });
+      }
 
-        // ── Etapa 3: enviar ao servidor ──
-        setUploadState({ status: "busy", step: "uploading", percent: 55 });
-
-        const fd = new FormData();
-        fd.append("session_id", sessionId);
-        fd.append("item_id", itemId);
-        fd.append("item_response_source", itemResponseSource);
-        fd.append("file", compressed);
-        if (lat) fd.append("latitude", lat);
-        if (lng) fd.append("longitude", lng);
-
-        setUploadState({ status: "busy", step: "uploading", percent: 65 });
-        const res = await uploadChecklistFillPhotoAction(fd);
-
-        if (!res.ok) {
-          setUploadState({ status: "idle" });
-          setUploadError(res.error);
-          return;
-        }
-
-        // ── Etapa 4: finalizar ──
-        setUploadState({ status: "busy", step: "saving", percent: 95 });
-        const newPhotos = [...photos, res.photo];
-        setPhotos(newPhotos);
-        onPhotosChange?.(newPhotos);
+      if (uploadedCount > 0) {
         setUploadState({ status: "busy", step: "saving", percent: 100 });
-
         // Breve pausa para o usuário ver 100%
         await new Promise((r) => setTimeout(r, 400));
-        setUploadState({ status: "idle" });
-      } catch (err) {
-        setUploadState({ status: "idle" });
-        const msg = err instanceof Error ? err.message : String(err);
-        setUploadError(
-          msg.includes("Failed to fetch") || msg.includes("network")
-            ? "Erro de rede ao enviar foto. Verifique a conexão e tente novamente."
-            : msg.includes("processar") || msg.includes("ler")
-              ? msg
-              : `Erro ao enviar foto: ${msg}`,
+      }
+      setUploadState({ status: "idle" });
+
+      if (skippedByLimit > 0) {
+        batchErrors.push(
+          `${skippedByLimit} arquivo(s) não enviado(s) por limite de ${CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM} fotos por item.`,
         );
+      }
+      if (batchErrors.length > 0) {
+        setUploadError(batchErrors.join(" "));
+      } else {
+        setUploadError(null);
       }
     },
     [sessionId, itemId, itemResponseSource, photos, onPhotosChange, atLimit, disabled],
@@ -321,6 +349,7 @@ export function ChecklistItemPhotos({
           ref={inputGalleryRef}
           type="file"
           accept="image/*"
+          multiple
           className="sr-only"
           aria-hidden
           tabIndex={-1}

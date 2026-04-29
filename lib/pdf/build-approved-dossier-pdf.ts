@@ -30,6 +30,41 @@ export type ApprovedDossierPdfBundleInput = {
   areaName?: string | null;
 };
 
+async function loadProfessionalIdentity(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ fullName: string; crn: string }> {
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, crn")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const profileFullName = String(profile?.full_name ?? "").trim();
+  const profileCrn = String(profile?.crn ?? "").trim();
+  if (profileFullName.length > 0 && profileCrn.length > 0) {
+    return { fullName: profileFullName, crn: profileCrn };
+  }
+
+  // Fallback para membro da equipe: alguns utilizadores preenchem CRN apenas no registo
+  // de team member, então usamos este valor para não gerar PDF com CRN em branco.
+  const { data: member } = await supabase
+    .from("team_members")
+    .select("full_name, crn")
+    .eq("member_user_id", userId)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const memberFullName = String(member?.full_name ?? "").trim();
+  const memberCrn = String(member?.crn ?? "").trim();
+
+  return {
+    fullName: profileFullName || memberFullName,
+    crn: profileCrn || memberCrn,
+  };
+}
+
 async function downloadSignedAsset(url: string): Promise<Buffer | null> {
   try {
     const response = await fetch(url);
@@ -126,16 +161,12 @@ export async function buildApprovedDossierPdfBytes(
   userId: string,
   input: ApprovedDossierPdfBundleInput & { sessionId?: string },
 ): Promise<Uint8Array> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, crn")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const professional = await loadProfessionalIdentity(supabase, userId);
 
   const professionalName = foldTextForPdf(
-    String(profile?.full_name ?? "").trim() || "Profissional",
+    professional.fullName || "Profissional",
   );
-  const crn = foldTextForPdf(String(profile?.crn ?? "").trim());
+  const crn = foldTextForPdf(professional.crn);
 
   const logoBuffer = await loadTenantLogoBuffer(supabase);
 

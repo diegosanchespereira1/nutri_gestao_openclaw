@@ -3,14 +3,17 @@ import { CheckCircle2, Clock, ClipboardList, AlertTriangle, Star, MapPin } from 
 
 import { ChecklistSessionHistoryCard } from "@/components/checklists/checklist-session-history-card";
 import { ChecklistHistoryFilters } from "@/components/checklists/checklist-history-filters";
+import { ChecklistValidityAlertCard } from "@/components/dashboard/checklist-validity-alert-card";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
   CardContent,
 } from "@/components/ui/card";
 import { loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
+import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-alerts";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { createClient } from "@/lib/supabase/server";
+import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
@@ -86,6 +89,10 @@ export async function ClientChecklistHistorySection({
   }
 
   const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const tz = await fetchProfileTimeZone(supabase, user?.id ?? "");
 
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -163,6 +170,11 @@ export async function ClientChecklistHistorySection({
     : { data: [] };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
+  const validityAlerts = await loadChecklistValidityAlerts(tz, {
+    clientId,
+    limit: 12,
+    withinDays: 7,
+  });
 
   const basePath = embeddedInClientEdit
     ? `/clientes/${clientId}/editar`
@@ -193,6 +205,30 @@ export async function ClientChecklistHistorySection({
 
   return (
     <div className="space-y-6">
+      <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+        <div className="flex flex-col gap-2">
+          <h3 className="text-base font-semibold text-foreground tracking-tight">
+            Validades de checklist
+          </h3>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Itens vencidos ou com validade nos próximos 7 dias para este cliente.
+        </p>
+        {validityAlerts.length === 0 ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Sem itens vencidos ou a vencer nos próximos 7 dias.
+          </p>
+        ) : (
+          <ul className="mt-4 space-y-3" aria-label="Validades de checklist do cliente">
+            {validityAlerts.map((alert) => (
+              <li key={alert.responseId}>
+                <ChecklistValidityAlertCard alert={alert} timeZone={tz} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className={cn(
         "grid gap-3",
         avgScore !== null

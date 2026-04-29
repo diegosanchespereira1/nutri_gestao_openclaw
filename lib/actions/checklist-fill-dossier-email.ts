@@ -72,7 +72,10 @@ export async function trySendDossierEmailAfterApprove(
   if (bundle.session.scheduled_visit_id !== visitId) return;
 
   try {
-    const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+    const bytes = await buildApprovedDossierPdfBytes(
+      supabase,
+      bundle.session.user_id,
+      {
       sessionId,
       template: bundle.template,
       responses: bundle.responses,
@@ -81,7 +84,8 @@ export async function trySendDossierEmailAfterApprove(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
-    });
+      },
+    );
 
     const attachmentFilename = buildChecklistDossierPdfFilename({
       clientLabel: bundle.pdfClientLabel,
@@ -161,7 +165,10 @@ export async function resendDossierEmailAction(
   }
 
   try {
-    const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+    const bytes = await buildApprovedDossierPdfBytes(
+      supabase,
+      bundle.session.user_id,
+      {
       sessionId,
       template: bundle.template,
       responses: bundle.responses,
@@ -170,7 +177,8 @@ export async function resendDossierEmailAction(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
-    });
+      },
+    );
 
     const attachmentFilenameResend = buildChecklistDossierPdfFilename({
       clientLabel: bundle.pdfClientLabel,
@@ -333,7 +341,10 @@ export async function sendDossierPdfToClientFromSessionAction(
   const visitIdForStatus = bundle.session.scheduled_visit_id;
 
   try {
-    const bytes = await buildApprovedDossierPdfBytes(supabase, user.id, {
+    const bytes = await buildApprovedDossierPdfBytes(
+      supabase,
+      bundle.session.user_id,
+      {
       sessionId,
       template: bundle.template,
       responses: bundle.responses,
@@ -342,7 +353,8 @@ export async function sendDossierPdfToClientFromSessionAction(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
-    });
+      },
+    );
 
     const attachmentFilenameSession = buildChecklistDossierPdfFilename({
       clientLabel: bundle.pdfClientLabel,

@@ -48,7 +48,7 @@ type Props = {
   itemPhotos: Record<string, ChecklistFillPhotoView[]>;
   reviewEditable?: boolean;
   sessionId?: string;
-  itemResponseSource?: "global" | "custom";
+  itemResponseSource?: "global" | "custom" | "workspace";
   onPatchResponse?: (
     itemId: string,
     patch: Partial<Pick<FillItemResponseState, "note" | "annotation" | "validUntil">>,

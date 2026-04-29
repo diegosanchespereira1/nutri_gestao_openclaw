@@ -495,7 +495,7 @@ async function loadRecurringNcSessionCountByItem(input: {
   establishmentId: string;
   currentSessionId: string;
   template: ChecklistTemplateWithSections;
-  itemResponseSource: "global" | "custom";
+  itemResponseSource: "global" | "custom" | "workspace";
 }): Promise<Record<string, number>> {
   const {
     supabase,
@@ -525,6 +525,7 @@ async function loadRecurringNcSessionCountByItem(input: {
     session_id: string;
     template_item_id: string | null;
     custom_item_id: string | null;
+    workspace_item_id: string | null;
   };
 
   const respRows: NcRow[] = [];
@@ -532,7 +533,7 @@ async function loadRecurringNcSessionCountByItem(input: {
     const chunk = sessionIds.slice(i, i + NC_HISTORY_SESSION_CHUNK);
     const { data: part } = await supabase
       .from("checklist_fill_item_responses")
-      .select("session_id, template_item_id, custom_item_id")
+      .select("session_id, template_item_id, custom_item_id, workspace_item_id")
       .in("session_id", chunk)
       .eq("outcome", "nc");
     for (const r of part ?? []) {
@@ -546,7 +547,9 @@ async function loadRecurringNcSessionCountByItem(input: {
     const itemId =
       itemResponseSource === "global"
         ? r.template_item_id
-        : r.custom_item_id;
+        : itemResponseSource === "custom"
+          ? r.custom_item_id
+          : r.workspace_item_id;
     if (!itemId || !currentIds.has(itemId)) continue;
 
     let set = distinctSessionsByItem.get(itemId);

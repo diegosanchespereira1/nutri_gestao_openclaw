@@ -104,6 +104,7 @@ export function ChecklistSessionHistoryCard({
                 {session.template_name}
               </p>
               <StatusBadge status={session.status} />
+              <OriginBadge origin={session.template_origin} />
               {session.area_name ? (
                 <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
                   📍 {session.area_name}
@@ -113,14 +114,11 @@ export function ChecklistSessionHistoryCard({
                 <ScoreBadge pct={session.score_percentage} />
               ) : null}
             </div>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {session.establishment_name}
-              {" · "}
-              Iniciado por {session.started_by_label}
-              {" · "}
-              Última alteração em {formatDateTimeBR(session.updated_at)}
-              {session.portaria_ref ? ` · ${session.portaria_ref}` : ""}
-            </p>
+            <div className="mt-1 space-y-0.5 text-xs text-foreground/85">
+              <p>Nutricionista: {session.started_by_label}</p>
+              <p>Última alteração em {formatDateTimeBR(session.updated_at)}</p>
+              {session.portaria_ref ? <p>{session.portaria_ref}</p> : null}
+            </div>
           </div>
         </div>
 
@@ -322,6 +320,32 @@ function StatusBadge({ status }: { status: "em_andamento" | "aprovado" }) {
   return (
     <Badge className="bg-amber-100 text-amber-800 border-0 text-[10px] px-1.5 py-0">
       Em andamento
+    </Badge>
+  );
+}
+
+function OriginBadge({
+  origin,
+}: {
+  origin: "system" | "custom" | "workspace";
+}) {
+  if (origin === "workspace") {
+    return (
+      <Badge className="bg-primary/15 text-primary border-0 text-[10px] px-1.5 py-0">
+        Equipe
+      </Badge>
+    );
+  }
+  if (origin === "custom") {
+    return (
+      <Badge className="bg-purple-100 text-purple-800 border-0 text-[10px] px-1.5 py-0">
+        Personalizado
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="bg-blue-100 text-blue-800 border-0 text-[10px] px-1.5 py-0">
+      Sistema
     </Badge>
   );
 }

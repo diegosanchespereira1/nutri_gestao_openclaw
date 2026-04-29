@@ -11,6 +11,8 @@ export type ChecklistFillSessionRow = {
   establishment_id: string;
   template_id: string | null;
   custom_template_id?: string | null;
+  /** Modelo de workspace (equipe) — alternativo a template_id/custom_template_id. */
+  workspace_template_id?: string | null;
   scheduled_visit_id?: string | null;
   /** Área física avaliada nesta sessão (nullable). */
   area_id?: string | null;
@@ -33,6 +35,8 @@ export type ChecklistFillItemResponseRow = {
   session_id: string;
   template_item_id: string | null;
   custom_item_id: string | null;
+  /** Item de modelo do workspace (equipe). */
+  workspace_item_id?: string | null;
   outcome: ChecklistFillOutcome;
   note: string | null;
   item_annotation?: string | null;

@@ -4,6 +4,7 @@ import { ChecklistCatalog } from "@/components/checklists/checklist-catalog";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
 import { startChecklistFill } from "@/lib/actions/checklist-fill";
+import { loadWorkspaceTemplatesForCatalog } from "@/lib/actions/checklist-workspace";
 import { loadRecentChecklistEstablishmentsAction } from "@/lib/actions/establishments";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { cn } from "@/lib/utils";
@@ -20,10 +21,17 @@ export default async function ChecklistsPage({
     typeof sp.template === "string" && /^[0-9a-f-]{36}$/i.test(sp.template)
       ? sp.template
       : null;
-  const [{ templates }, { rows: recentEstablishments }] = await Promise.all([
-    loadChecklistCatalog(),
-    loadRecentChecklistEstablishmentsAction(3),
-  ]);
+  const focusWorkspaceTemplateId =
+    typeof sp.workspace_template === "string" &&
+    /^[0-9a-f-]{36}$/i.test(sp.workspace_template)
+      ? sp.workspace_template
+      : null;
+  const [{ templates }, { rows: workspaceTemplates }, { rows: recentEstablishments }] =
+    await Promise.all([
+      loadChecklistCatalog(),
+      loadWorkspaceTemplatesForCatalog(),
+      loadRecentChecklistEstablishmentsAction(3),
+    ]);
 
   return (
     <div className="space-y-6">
@@ -35,18 +43,33 @@ export default async function ChecklistsPage({
             </h1>
             <PageHelpHint ariaLabel="Como funciona a página de checklists">
               <p>
-                Catálogo oficial e modelos personalizados por estabelecimento. Use um template
-                global ou duplique-o para adicionar itens extra (FR14).
+                Catálogo oficial (Sistema), modelos da Equipe e personalizados por
+                estabelecimento. Use um template global, duplique-o, ou crie um
+                checklist 100% customizável (FR14).
               </p>
             </PageHelpHint>
           </div>
         </div>
-        <Link
-          href="/checklists/personalizados"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Modelos personalizados
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/checklists/equipe"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Modelos da equipe
+          </Link>
+          <Link
+            href="/checklists/personalizados"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Modelos personalizados
+          </Link>
+          <Link
+            href="/checklists/novo"
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
+            + Criar checklist personalizado
+          </Link>
+        </div>
       </div>
 
       {err === "missing" ? (
@@ -67,12 +90,14 @@ export default async function ChecklistsPage({
       ) : null}
 
       <ChecklistCatalog
-        key={focusTemplateId ?? "checklist-catalog-default"}
+        key={focusTemplateId ?? focusWorkspaceTemplateId ?? "checklist-catalog-default"}
         recentEstablishments={recentEstablishments}
         templates={templates}
+        workspaceTemplates={workspaceTemplates}
         startFillAction={startChecklistFill}
         duplicateTemplateAction={duplicateGlobalTemplateAction}
         focusTemplateId={focusTemplateId}
+        focusWorkspaceTemplateId={focusWorkspaceTemplateId}
       />
     </div>
   );

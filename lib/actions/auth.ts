@@ -89,6 +89,7 @@ export async function updateProfileAction(
     .maybeSingle();
 
   let persistedProfile = afterUpdate;
+  let profileSaved = Boolean(afterUpdate?.id);
 
   if (updateError) {
     console.error("[updateProfileAction] profiles update failed", {
@@ -122,26 +123,22 @@ export async function updateProfileAction(
       return { ok: false, error: "Não foi possível salvar. Tente novamente." };
     }
     persistedProfile = inserted;
+    profileSaved = Boolean(inserted?.id);
   }
 
   const persistedCrn = String(persistedProfile?.crn ?? "").trim();
-  if (!persistedProfile?.id || persistedCrn !== crn.trim()) {
-    return {
-      ok: false,
-      error: "Não foi possível atualizar o CRN. Tente novamente.",
-    };
-  }
-
   // Mantém o cadastro de equipe sincronizado quando o utilizador logado
   // também existe em `team_members` (membro convidado).
-  const { error: teamMemberSyncError } = await supabase
+  const { data: syncedTeamMember, error: teamMemberSyncError } = await supabase
     .from("team_members")
     .update({
       full_name,
       phone,
       crn,
     })
-    .eq("member_user_id", user.id);
+    .eq("member_user_id", user.id)
+    .select("id, crn")
+    .maybeSingle();
   if (teamMemberSyncError) {
     console.error("[updateProfileAction] team_members sync failed", {
       userId: user.id,
@@ -150,6 +147,15 @@ export async function updateProfileAction(
       details: teamMemberSyncError.details,
       hint: teamMemberSyncError.hint,
     });
+  }
+  const teamMemberCrn = String(syncedTeamMember?.crn ?? "").trim();
+  const crnSavedOnProfile = profileSaved && persistedCrn === crn.trim();
+  const crnSavedOnTeamMember = Boolean(syncedTeamMember?.id) && teamMemberCrn === crn.trim();
+  if (!crnSavedOnProfile && !crnSavedOnTeamMember) {
+    return {
+      ok: false,
+      error: "Não foi possível atualizar o CRN. Tente novamente.",
+    };
   }
 
   const currentEmail = (user.email ?? "").trim().toLowerCase();

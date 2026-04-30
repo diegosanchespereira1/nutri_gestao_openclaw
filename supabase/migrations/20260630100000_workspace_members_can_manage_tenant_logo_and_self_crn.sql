@@ -6,6 +6,9 @@
 drop policy if exists "tenant_logos_insert_own" on storage.objects;
 drop policy if exists "tenant_logos_update_own" on storage.objects;
 drop policy if exists "tenant_logos_delete_own" on storage.objects;
+drop policy if exists "tenant_logos_insert_workspace" on storage.objects;
+drop policy if exists "tenant_logos_update_workspace" on storage.objects;
+drop policy if exists "tenant_logos_delete_workspace" on storage.objects;
 
 create policy "tenant_logos_insert_workspace"
   on storage.objects for insert

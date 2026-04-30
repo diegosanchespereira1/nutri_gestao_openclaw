@@ -435,9 +435,6 @@ export async function updateTeamMemberAction(formData: FormData): Promise<void> 
   if (!user) redirect("/login");
 
   const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (accountOwnerId !== user.id) {
-    redirect("/equipe?err=forbidden");
-  }
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/equipe?err=missing");
@@ -473,7 +470,7 @@ export async function updateTeamMemberAction(formData: FormData): Promise<void> 
       notes,
     })
     .eq("id", id)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", accountOwnerId);
 
   if (error) {
     redirect(`/equipe/${id}/editar?err=save`);

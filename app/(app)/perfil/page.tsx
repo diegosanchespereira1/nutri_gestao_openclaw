@@ -21,6 +21,18 @@ export default async function PerfilPage() {
     .select("full_name, crn, phone, photo_storage_path, role")
     .eq("user_id", user!.id)
     .maybeSingle();
+  const { data: teamMember } = await supabase
+    .from("team_members")
+    .select("full_name, crn, phone")
+    .eq("member_user_id", user!.id)
+    .maybeSingle();
+
+  const effectiveFullName = String(profile?.full_name ?? "").trim()
+    || String(teamMember?.full_name ?? "").trim();
+  const effectiveCrn = String(profile?.crn ?? "").trim()
+    || String(teamMember?.crn ?? "").trim();
+  const effectivePhone = String(profile?.phone ?? "").trim()
+    || String(teamMember?.phone ?? "").trim();
 
   let defaultPhotoUrl: string | null = null;
   if (profile?.photo_storage_path) {
@@ -38,11 +50,11 @@ export default async function PerfilPage() {
         back={{ href: "/definicoes", label: "Definições" }}
       />
       <PerfilForm
-        defaultFullName={profile?.full_name ?? ""}
+        defaultFullName={effectiveFullName}
         defaultEmail={user?.email ?? ""}
         pendingEmail={isEmailChangePending ? pendingEmail : null}
-        defaultPhone={profile?.phone ?? ""}
-        defaultCrn={profile?.crn ?? ""}
+        defaultPhone={effectivePhone}
+        defaultCrn={effectiveCrn}
         defaultPhotoUrl={defaultPhotoUrl}
       />
     </PageLayout>

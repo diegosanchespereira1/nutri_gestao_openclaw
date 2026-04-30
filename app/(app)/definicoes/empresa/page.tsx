@@ -8,7 +8,6 @@ import {
   fetchTenantLogoStoragePath,
   getTenantLogoSignedUrl,
 } from "@/lib/tenant/logo-sync";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 /** Leitura do perfil após guardar — evita segmento estático com dados desatualizados. */
 export const dynamic = "force-dynamic";
@@ -22,9 +21,6 @@ export default async function DefinicoesEmpresaPage() {
     redirect("/login");
   }
 
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  const canManage = workspaceOwnerId === user.id;
-
   const logoPath = await fetchTenantLogoStoragePath(supabase);
   const defaultLogoUrl = await getTenantLogoSignedUrl(supabase, logoPath, 3600);
 
@@ -35,7 +31,7 @@ export default async function DefinicoesEmpresaPage() {
         description="Envie o logotipo da sua empresa para personalizar PDFs, e-mails e comunicações. Se nenhum logotipo for enviado, os documentos são gerados sem marca."
         back={{ href: "/definicoes", label: "Definições" }}
       />
-      <TenantLogoForm defaultLogoUrl={defaultLogoUrl} canManage={canManage} />
+      <TenantLogoForm defaultLogoUrl={defaultLogoUrl} canManage />
     </PageLayout>
   );
 }

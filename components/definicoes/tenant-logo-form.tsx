@@ -127,7 +127,7 @@ export function TenantLogoForm({
             <p id="tenant-logo-hint" className="text-muted-foreground text-xs">
               {canManage
                 ? "O arquivo fica armazenado em ambiente privado e apenas a sua equipe pode acessar."
-                : "Apenas o titular da conta pode alterar o logotipo. Peça ao administrador do workspace."}
+                : "Você não tem permissão para alterar o logotipo neste momento."}
             </p>
           </div>
 

@@ -132,6 +132,26 @@ export async function updateProfileAction(
     };
   }
 
+  // Mantém o cadastro de equipe sincronizado quando o utilizador logado
+  // também existe em `team_members` (membro convidado).
+  const { error: teamMemberSyncError } = await supabase
+    .from("team_members")
+    .update({
+      full_name,
+      phone,
+      crn,
+    })
+    .eq("member_user_id", user.id);
+  if (teamMemberSyncError) {
+    console.error("[updateProfileAction] team_members sync failed", {
+      userId: user.id,
+      code: teamMemberSyncError.code,
+      message: teamMemberSyncError.message,
+      details: teamMemberSyncError.details,
+      hint: teamMemberSyncError.hint,
+    });
+  }
+
   const currentEmail = (user.email ?? "").trim().toLowerCase();
   if (email !== currentEmail) {
     const origin = getServerAppOrigin();

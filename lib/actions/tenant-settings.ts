@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { resolveTenantLogoPathFromForm } from "@/lib/tenant/logo-sync";
+import {
+  fetchTenantLogoStoragePath,
+  resolveTenantLogoPathFromForm,
+} from "@/lib/tenant/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
@@ -24,34 +27,11 @@ export async function updateTenantLogoAction(
   }
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (workspaceOwnerId !== user.id) {
-    return {
-      ok: false,
-      error:
-        "Apenas o titular da conta pode gerenciar o logotipo da empresa. Peça ao administrador do workspace.",
-    };
-  }
-
-  const { data: currentProfile, error: loadError } = await supabase
-    .from("profiles")
-    .select("tenant_logo_storage_path")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (loadError) {
-    console.error("[updateTenantLogoAction] profile load failed", {
-      userId: user.id,
-      code: loadError.code,
-      message: loadError.message,
-    });
-    return { ok: false, error: "Não foi possível carregar o perfil." };
-  }
-
-  const previousPath = currentProfile?.tenant_logo_storage_path ?? null;
+  const previousPath = await fetchTenantLogoStoragePath(supabase);
 
   const logoRes = await resolveTenantLogoPathFromForm({
     supabase,
-    ownerUserId: user.id,
+    ownerUserId: workspaceOwnerId,
     formData,
     previousPath,
   });
@@ -66,16 +46,15 @@ export async function updateTenantLogoAction(
     };
   }
 
-  const { error: updateError } = await supabase
-    .from("profiles")
-    .update({
-      tenant_logo_storage_path: logoRes.path,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", user.id);
+  const { error: updateError } = await supabase.rpc(
+    "set_workspace_tenant_logo_storage_path",
+    {
+      p_path: logoRes.path,
+    },
+  );
 
   if (updateError) {
-    console.error("[updateTenantLogoAction] profiles update failed", {
+    console.error("[updateTenantLogoAction] workspace logo update failed", {
       userId: user.id,
       code: updateError.code,
       message: updateError.message,

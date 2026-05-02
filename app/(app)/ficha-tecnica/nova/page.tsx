@@ -1,4 +1,20 @@
-import { RecipeForm } from "@/components/technical-sheets/recipe-form";
+import dynamic from "next/dynamic";
+
+const RecipeForm = dynamic(
+  () =>
+    import("@/components/technical-sheets/recipe-form").then(
+      (mod) => mod.RecipeForm,
+    ),
+  {
+    loading: () => (
+      <div className="space-y-4 animate-pulse" aria-label="Carregando formulário…">
+        <div className="h-10 rounded-lg bg-muted w-64" />
+        <div className="h-48 rounded-xl bg-muted" />
+        <div className="h-48 rounded-xl bg-muted" />
+      </div>
+    ),
+  },
+);
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";

@@ -1,6 +1,24 @@
 import Link from "next/link";
+import dynamic from "next/dynamic";
 
-import { ChecklistCatalog } from "@/components/checklists/checklist-catalog";
+const ChecklistCatalog = dynamic(
+  () =>
+    import("@/components/checklists/checklist-catalog").then(
+      (mod) => mod.ChecklistCatalog,
+    ),
+  {
+    loading: () => (
+      <div className="space-y-3 animate-pulse" aria-label="Carregando catálogo…">
+        <div className="h-10 rounded-lg bg-muted w-full" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 rounded-xl bg-muted" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
+);
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
 import { startChecklistFill } from "@/lib/actions/checklist-fill";

@@ -3,7 +3,7 @@
 import { Eye, MapPin } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
 import { ChecklistFillDossierPreview } from "@/components/checklists/checklist-fill-dossier-preview";
@@ -90,6 +90,209 @@ const sectionSelectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full min-w-[12rem] max-w-xl rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
+
+/* ─── ChecklistFillItem — componente memoizado por item ─────────────────── */
+/**
+ * Extração do item de checklist em componente separado com React.memo.
+ * Com isso, ao alterar um item (ex: marcar "Conforme"), apenas ESSE item
+ * re-renderiza — os demais ficam em cache, eliminando o re-render em cascata
+ * de toda a seção a cada interação.
+ */
+type ChecklistFillItemProps = {
+  item: { id: string; description: string; is_required: boolean };
+  response: import("@/lib/types/checklist-fill").FillItemResponseState | undefined;
+  err: string | undefined;
+  recurringNcSessions: number;
+  sessionId: string;
+  itemResponseSource: "global" | "custom" | "workspace";
+  photos: ChecklistFillPhotoView[];
+  isPending: boolean;
+  formLocked: boolean;
+  onSetOutcome: (itemId: string, outcome: import("@/lib/types/checklist-fill").ChecklistFillOutcome | null) => void;
+  onSetNote: (itemId: string, note: string) => void;
+  onSetValidUntil: (itemId: string, validUntil: string) => void;
+  onSetAnnotation: (itemId: string, annotation: string) => void;
+  onPersistOnBlur: (itemId: string) => void;
+  onPhotosChange: (itemId: string, photos: ChecklistFillPhotoView[]) => void;
+};
+
+const ChecklistFillItem = memo(function ChecklistFillItem({
+  item,
+  response: r,
+  err,
+  recurringNcSessions,
+  sessionId,
+  itemResponseSource,
+  photos,
+  isPending,
+  formLocked,
+  onSetOutcome,
+  onSetNote,
+  onSetValidUntil,
+  onSetAnnotation,
+  onPersistOnBlur,
+  onPhotosChange,
+}: ChecklistFillItemProps) {
+  const requiredInvalid = item.is_required && Boolean(err);
+  const showRecurringNc = recurringNcSessions > 0;
+  const empty = r ?? { outcome: null, note: null, annotation: null, validUntil: null };
+
+  return (
+    <div
+      key={item.id}
+      className={cn(
+        "rounded-xl border border-border bg-white p-4 shadow-xs transition-[box-shadow,border-color] duration-150",
+        requiredInvalid
+          ? "border-destructive ring-destructive/35 ring-2"
+          : "border-border",
+      )}
+      aria-invalid={requiredInvalid || undefined}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <p className="text-foreground text-base leading-snug font-semibold tracking-tight sm:text-lg">
+          {item.description}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {showRecurringNc ? (
+            <span
+              className="bg-amber-500/15 text-amber-900 shrink-0 rounded-md px-2 py-0.5 text-xs font-medium"
+              title="Não conformidade em visitas anteriores neste estabelecimento"
+            >
+              Recorrente · {recurringNcSessions}×
+            </span>
+          ) : null}
+          {item.is_required ? (
+            <span className="bg-primary/15 text-primary shrink-0 rounded-md px-2 py-0.5 text-xs font-medium">
+              Obrigatório
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      {showRecurringNc ? (
+        <p
+          className="text-muted-foreground mt-2 border-l-2 border-amber-500/60 pl-3 text-xs"
+          role="status"
+        >
+          Este item foi assinalado como não conforme em{" "}
+          <span className="text-foreground font-medium">{recurringNcSessions}</span>{" "}
+          {recurringNcSessions === 1 ? "visita anterior" : "visitas anteriores"}{" "}
+          neste estabelecimento.
+        </p>
+      ) : null}
+
+      <div
+        className="mt-3 space-y-2"
+        role="radiogroup"
+        aria-label={item.description}
+        aria-invalid={requiredInvalid && empty.outcome === null ? true : undefined}
+      >
+        <Label
+          className={cn(
+            "text-xs",
+            requiredInvalid && empty.outcome === null
+              ? "text-destructive font-medium"
+              : "text-muted-foreground",
+          )}
+        >
+          Avaliação
+          {item.is_required ? <span className="sr-only"> (obrigatório)</span> : null}
+        </Label>
+        <div className="flex flex-wrap gap-4">
+          {(
+            [
+              ["conforme", "Conforme"],
+              ["nc", "Não conforme"],
+              ["na", "Não aplicável"],
+            ] as const
+          ).map(([value, label]) => (
+            <label key={value} className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={`outcome-${item.id}`}
+                value={value}
+                checked={empty.outcome === value}
+                onChange={() => onSetOutcome(item.id, value)}
+                className="border-input text-primary h-4 w-4"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <ChecklistItemPhotos
+        sessionId={sessionId}
+        itemId={item.id}
+        itemResponseSource={itemResponseSource}
+        initialPhotos={photos}
+        disabled={isPending || formLocked}
+        onPhotosChange={(p) => onPhotosChange(item.id, p)}
+      />
+
+      {empty.outcome === "nc" ? (
+        <div className="mt-3">
+          <Label htmlFor={`note-${item.id}`}>Descrição da não conformidade</Label>
+          <textarea
+            id={`note-${item.id}`}
+            rows={3}
+            value={empty.note ?? ""}
+            onChange={(e) => onSetNote(item.id, e.target.value)}
+            onBlur={() => onPersistOnBlur(item.id)}
+            className={textareaClass}
+            aria-invalid={Boolean(err)}
+            aria-describedby={err ? `err-${item.id}` : undefined}
+          />
+        </div>
+      ) : null}
+
+      {empty.outcome !== null ? (
+        <div className="mt-3">
+          <Label htmlFor={`valid-until-${item.id}`}>
+            Válido até{" "}
+            <span className="text-muted-foreground font-normal">(opcional)</span>
+          </Label>
+          <input
+            id={`valid-until-${item.id}`}
+            type="date"
+            value={empty.validUntil ?? ""}
+            onChange={(e) => onSetValidUntil(item.id, e.target.value)}
+            onBlur={() => onPersistOnBlur(item.id)}
+            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          />
+        </div>
+      ) : null}
+
+      {empty.outcome !== null ? (
+        <div className="mt-3">
+          <Label htmlFor={`annotation-${item.id}`}>
+            Anotação{" "}
+            <span className="text-muted-foreground font-normal">(opcional)</span>
+          </Label>
+          <textarea
+            id={`annotation-${item.id}`}
+            rows={3}
+            maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
+            value={empty.annotation ?? ""}
+            onChange={(e) => onSetAnnotation(item.id, e.target.value)}
+            onBlur={() => onPersistOnBlur(item.id)}
+            className={textareaClass}
+            aria-describedby={`annotation-hint-${item.id}`}
+          />
+          <p id={`annotation-hint-${item.id}`} className="text-muted-foreground mt-1 text-xs">
+            {(empty.annotation ?? "").length}/{MAX_CHECKLIST_ITEM_ANNOTATION_CHARS} caracteres
+          </p>
+        </div>
+      ) : null}
+
+      {err ? (
+        <p id={`err-${item.id}`} className="text-destructive mt-2 text-sm" role="alert">
+          {err}
+        </p>
+      ) : null}
+    </div>
+  );
+});
 
 const emptyItemState = (): FillItemResponseState => ({
   outcome: null,
@@ -427,63 +630,61 @@ export function ChecklistFillWizard({
     });
   }, [sections, responses]);
 
-  function setOutcome(itemId: string, outcome: ChecklistFillOutcome | null) {
-    const cur = responses[itemId] ?? emptyItemState();
-    const note = outcome === "nc" ? cur.note : null;
-    const annotation = cur.annotation ?? null;
-    const validUntil = cur.validUntil ?? null;
-    setResponses((prev) => ({
-      ...prev,
-      [itemId]: { outcome, note, annotation, validUntil },
-    }));
-    reportSaving();
-    startTransition(async () => {
-      const result = await saveFillItemResponse({
-        sessionId,
-        itemId,
-        itemResponseSource,
-        outcome,
-        note,
-        annotation,
-        validUntil,
+  // ── Handlers memoizados — estáveis entre renders para que React.memo
+  //    no ChecklistFillItem funcione corretamente e só re-renderize o item
+  //    cujo estado mudou, não todos os itens da seção.
+  const setOutcome = useCallback(
+    (itemId: string, outcome: ChecklistFillOutcome | null) => {
+      // Usa responsesRef para leitura síncrona sem capturar `responses` em closure
+      const cur = responsesRef.current[itemId] ?? emptyItemState();
+      const note = outcome === "nc" ? cur.note : null;
+      const annotation = cur.annotation ?? null;
+      const validUntil = cur.validUntil ?? null;
+      setResponses((prev) => ({
+        ...prev,
+        [itemId]: { outcome, note, annotation, validUntil },
+      }));
+      reportSaving();
+      startTransition(async () => {
+        const result = await saveFillItemResponse({
+          sessionId,
+          itemId,
+          itemResponseSource,
+          outcome,
+          note,
+          annotation,
+          validUntil,
+        });
+        if (result.ok) {
+          reportSaved();
+        } else {
+          reportSaveError(result.error);
+        }
       });
-      if (result.ok) {
-        reportSaved();
-      } else {
-        reportSaveError(result.error);
-      }
-    });
-  }
+    },
+    [sessionId, itemResponseSource],
+  );
 
-  function setNote(itemId: string, note: string) {
+  const setNote = useCallback((itemId: string, note: string) => {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
-      return {
-        ...prev,
-        [itemId]: { ...cur, note },
-      };
+      return { ...prev, [itemId]: { ...cur, note } };
     });
-  }
+  }, []);
 
-  function setAnnotation(itemId: string, annotation: string) {
+  const setAnnotation = useCallback((itemId: string, annotation: string) => {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
-      return {
-        ...prev,
-        [itemId]: { ...cur, annotation },
-      };
+      return { ...prev, [itemId]: { ...cur, annotation } };
     });
-  }
+  }, []);
 
-  function setValidUntil(itemId: string, validUntil: string) {
+  const setValidUntil = useCallback((itemId: string, validUntil: string) => {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
-      return {
-        ...prev,
-        [itemId]: { ...cur, validUntil },
-      };
+      return { ...prev, [itemId]: { ...cur, validUntil } };
     });
-  }
+  }, []);
 
   function handleNext() {
     setAdvanceError(null);
@@ -781,195 +982,26 @@ export function ChecklistFillWizard({
         aria-busy={isPending}
       >
         <legend className="sr-only">{section.title}</legend>
-        {section.items.map((item) => {
-          const r = responses[item.id] ?? emptyItemState();
-          const err = issueByItemId[item.id];
-          const requiredInvalid = item.is_required && Boolean(err);
-          const recurringNcSessions = recurringNcSessionCountByItemId[item.id] ?? 0;
-          const showRecurringNc = recurringNcSessions > 0;
-          return (
-            <div
-              key={item.id}
-              className={cn(
-                "rounded-xl border border-border bg-white p-4 shadow-xs transition-[box-shadow,border-color] duration-150",
-                requiredInvalid
-                  ? "border-destructive ring-destructive/35 ring-2"
-                  : "border-border",
-              )}
-              aria-invalid={requiredInvalid || undefined}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="text-foreground text-base leading-snug font-semibold tracking-tight sm:text-lg">
-                  {item.description}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {showRecurringNc ? (
-                    <span
-                      className="bg-amber-500/15 text-amber-900 shrink-0 rounded-md px-2 py-0.5 text-xs font-medium"
-                      title="Não conformidade em visitas anteriores neste estabelecimento"
-                    >
-                      Recorrente · {recurringNcSessions}×
-                    </span>
-                  ) : null}
-                  {item.is_required ? (
-                    <span className="bg-primary/15 text-primary shrink-0 rounded-md px-2 py-0.5 text-xs font-medium">
-                      Obrigatório
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              {showRecurringNc ? (
-                <p
-                  className="text-muted-foreground mt-2 border-l-2 border-amber-500/60 pl-3 text-xs"
-                  role="status"
-                >
-                  Este item foi assinalado como não conforme em{" "}
-                  <span className="text-foreground font-medium">
-                    {recurringNcSessions}
-                  </span>{" "}
-                  {recurringNcSessions === 1
-                    ? "visita anterior"
-                    : "visitas anteriores"}{" "}
-                  neste estabelecimento.
-                </p>
-              ) : null}
-
-              <div
-                className="mt-3 space-y-2"
-                role="radiogroup"
-                aria-label={item.description}
-                aria-invalid={requiredInvalid && r.outcome === null ? true : undefined}
-              >
-                <Label
-                  className={cn(
-                    "text-xs",
-                    requiredInvalid && r.outcome === null
-                      ? "text-destructive font-medium"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  Avaliação
-                  {item.is_required ? (
-                    <span className="sr-only"> (obrigatório)</span>
-                  ) : null}
-                </Label>
-                <div className="flex flex-wrap gap-4">
-                  {(
-                    [
-                      ["conforme", "Conforme"],
-                      ["nc", "Não conforme"],
-                      ["na", "Não aplicável"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <label
-                      key={value}
-                      className="flex cursor-pointer items-center gap-2 text-sm"
-                    >
-                      <input
-                        type="radio"
-                        name={`outcome-${item.id}`}
-                        value={value}
-                        checked={r.outcome === value}
-                        onChange={() => setOutcome(item.id, value)}
-                        className="border-input text-primary h-4 w-4"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <ChecklistItemPhotos
-                sessionId={sessionId}
-                itemId={item.id}
-                itemResponseSource={itemResponseSource}
-                initialPhotos={livePhotos[item.id] ?? EMPTY_ITEM_PHOTOS}
-                disabled={isPending || formLocked}
-                onPhotosChange={(photos) => handlePhotosChange(item.id, photos)}
-              />
-
-              {r.outcome === "nc" ? (
-                <div className="mt-3">
-                  <Label htmlFor={`note-${item.id}`}>
-                    Descrição da não conformidade
-                  </Label>
-                  <textarea
-                    id={`note-${item.id}`}
-                    rows={3}
-                    value={r.note ?? ""}
-                    onChange={(e) => {
-                      setNote(item.id, e.target.value);
-                    }}
-                    onBlur={() => persistItemOnBlur(item.id)}
-                    className={textareaClass}
-                    aria-invalid={Boolean(err)}
-                    aria-describedby={
-                      err ? `err-${item.id}` : undefined
-                    }
-                  />
-                </div>
-              ) : null}
-
-              {r.outcome !== null ? (
-                <div className="mt-3">
-                  <Label htmlFor={`valid-until-${item.id}`}>
-                    Válido até{" "}
-                    <span className="text-muted-foreground font-normal">(opcional)</span>
-                  </Label>
-                  <input
-                    id={`valid-until-${item.id}`}
-                    type="date"
-                    value={r.validUntil ?? ""}
-                    onChange={(e) => {
-                      setValidUntil(item.id, e.target.value);
-                    }}
-                    onBlur={() => persistItemOnBlur(item.id)}
-                    className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  />
-                </div>
-              ) : null}
-
-              {r.outcome !== null ? (
-                <div className="mt-3">
-                  <Label htmlFor={`annotation-${item.id}`}>
-                    Anotação{" "}
-                    <span className="text-muted-foreground font-normal">(opcional)</span>
-                  </Label>
-                  <textarea
-                    id={`annotation-${item.id}`}
-                    rows={3}
-                    maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
-                    value={r.annotation ?? ""}
-                    onChange={(e) => {
-                      setAnnotation(item.id, e.target.value);
-                    }}
-                    onBlur={() => persistItemOnBlur(item.id)}
-                    className={textareaClass}
-                    aria-describedby={`annotation-hint-${item.id}`}
-                  />
-                  <p
-                    id={`annotation-hint-${item.id}`}
-                    className="text-muted-foreground mt-1 text-xs"
-                  >
-                    {(r.annotation ?? "").length}/{MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}{" "}
-                    caracteres
-                  </p>
-                </div>
-              ) : null}
-
-              {err ? (
-                <p
-                  id={`err-${item.id}`}
-                  className="text-destructive mt-2 text-sm"
-                  role="alert"
-                >
-                  {err}
-                </p>
-              ) : null}
-            </div>
-          );
-        })}
+        {section.items.map((item) => (
+          <ChecklistFillItem
+            key={item.id}
+            item={item}
+            response={responses[item.id]}
+            err={issueByItemId[item.id]}
+            recurringNcSessions={recurringNcSessionCountByItemId[item.id] ?? 0}
+            sessionId={sessionId}
+            itemResponseSource={itemResponseSource}
+            photos={livePhotos[item.id] ?? EMPTY_ITEM_PHOTOS}
+            isPending={isPending}
+            formLocked={formLocked}
+            onSetOutcome={setOutcome}
+            onSetNote={setNote}
+            onSetValidUntil={setValidUntil}
+            onSetAnnotation={setAnnotation}
+            onPersistOnBlur={persistItemOnBlur}
+            onPhotosChange={handlePhotosChange}
+          />
+        ))}
       </fieldset>
 
       <div className="flex flex-col gap-4 border-t pt-4">

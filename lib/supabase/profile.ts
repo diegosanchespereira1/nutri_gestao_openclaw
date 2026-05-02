@@ -73,6 +73,32 @@ export async function fetchProfileTimeZone(
   return normalizeAppTimeZone(data.timezone);
 }
 
+/**
+ * Busca role e timezone do perfil em uma única query ao Supabase,
+ * evitando dois roundtrips separados no layout da área autenticada.
+ */
+export async function fetchProfileRoleAndTimeZone(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ role: ProfileRole | null; timeZone: string }> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role, timezone")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { role: null, timeZone: DEFAULT_PROFILE_TIME_ZONE };
+  }
+
+  const role = data.role && isProfileRole(data.role) ? data.role : null;
+  const timeZone = data.timezone
+    ? normalizeAppTimeZone(data.timezone)
+    : DEFAULT_PROFILE_TIME_ZONE;
+
+  return { role, timeZone };
+}
+
 export async function fetchProfileFullName(
   supabase: SupabaseClient,
   userId: string,

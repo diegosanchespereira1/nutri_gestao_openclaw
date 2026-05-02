@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { parseTeamJobRole } from "@/lib/constants/team-roles";
+import { canAccessAdminArea } from "@/lib/roles";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -212,6 +213,44 @@ export async function loadTeamMemberById(
 
   if (error || !data) return { row: null };
   return { row: data as TeamMemberRow };
+}
+
+async function canDeleteTeamMembersForUser(args: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  authUserId: string;
+  workspaceOwnerId: string;
+}): Promise<boolean> {
+  const { supabase, authUserId, workspaceOwnerId } = args;
+  if (workspaceOwnerId === authUserId) return true;
+
+  const [{ data: profile }, { data: actorTeamMember }] = await Promise.all([
+    supabase.from("profiles").select("role").eq("user_id", authUserId).maybeSingle(),
+    supabase
+      .from("team_members")
+      .select("job_role")
+      .eq("owner_user_id", workspaceOwnerId)
+      .eq("member_user_id", authUserId)
+      .maybeSingle(),
+  ]);
+
+  if (actorTeamMember?.job_role === "gestao") return true;
+  if (canAccessAdminArea(profile?.role ?? null)) return true;
+  return false;
+}
+
+export async function canCurrentUserDeleteTeamMembers(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  return canDeleteTeamMembersForUser({
+    supabase,
+    authUserId: user.id,
+    workspaceOwnerId,
+  });
 }
 
 export async function createTeamMemberAction(
@@ -560,18 +599,34 @@ export async function deleteTeamMemberAction(formData: FormData): Promise<void> 
   if (!user) redirect("/login");
 
   const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (accountOwnerId !== user.id) {
-    redirect("/equipe?err=forbidden");
-  }
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/equipe");
 
-  await supabase
+  const allowed = await canDeleteTeamMembersForUser({
+    supabase,
+    authUserId: user.id,
+    workspaceOwnerId: accountOwnerId,
+  });
+  if (!allowed) {
+    redirect("/equipe?err=forbidden");
+  }
+
+  const errorRedirectRaw = String(formData.get("error_redirect") ?? "").trim();
+  const errorRedirect =
+    errorRedirectRaw.length > 0 ? errorRedirectRaw : "/equipe";
+
+  const { error } = await supabase
     .from("team_members")
     .delete()
     .eq("id", id)
-    .eq("owner_user_id", user.id);
+    .eq("owner_user_id", accountOwnerId);
+
+  if (error) {
+    const qs = new URLSearchParams({ err: "save" });
+    const joiner = errorRedirect.includes("?") ? "&" : "?";
+    redirect(`${errorRedirect}${joiner}${qs.toString()}`);
+  }
 
   revalidatePath("/equipe");
   revalidatePath("/visitas");

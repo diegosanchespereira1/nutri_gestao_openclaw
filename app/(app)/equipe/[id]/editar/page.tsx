@@ -11,12 +11,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { deleteTeamMemberAction, loadTeamMemberById } from "@/lib/actions/team-members";
+import {
+  canCurrentUserDeleteTeamMembers,
+  deleteTeamMemberAction,
+  loadTeamMemberById,
+} from "@/lib/actions/team-members";
 
 const errMessages: Record<string, string> = {
   missing: "Preencha nome, área e cargo.",
   crn: "Na área da nutrição, o CRN é obrigatório.",
   save: "Não foi possível salvar. Tente novamente.",
+  forbidden: "Sem permissão para esta ação.",
 };
 
 type Props = {
@@ -29,6 +34,8 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
   const { err } = await searchParams;
   const { row } = await loadTeamMemberById(id);
   if (!row) notFound();
+
+  const canRemoveMember = await canCurrentUserDeleteTeamMembers();
 
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
@@ -62,22 +69,28 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
         </CardContent>
       </Card>
 
-      {/* ── Seção 2: Zona de perigo ─────────────────────────── */}
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
-        <h2 className="text-sm font-semibold text-destructive">
-          Zona de perigo
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Remover este membro desvincula-o de visitas futuras (campo de
-          responsável fica vazio).
-        </p>
-        <form action={deleteTeamMemberAction} className="mt-4">
-          <input type="hidden" name="id" value={row.id} />
-          <Button type="submit" variant="destructive" size="sm">
-            Remover membro
-          </Button>
-        </form>
-      </div>
+      {canRemoveMember ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
+          <h2 className="text-sm font-semibold text-destructive">
+            Zona de perigo
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Remover este membro desvincula-o de visitas futuras (campo de
+            responsável fica vazio).
+          </p>
+          <form action={deleteTeamMemberAction} className="mt-4">
+            <input type="hidden" name="id" value={row.id} />
+            <input
+              type="hidden"
+              name="error_redirect"
+              value={`/equipe/${row.id}/editar`}
+            />
+            <Button type="submit" variant="destructive" size="sm">
+              Remover membro
+            </Button>
+          </form>
+        </div>
+      ) : null}
     </PageLayout>
   );
 }

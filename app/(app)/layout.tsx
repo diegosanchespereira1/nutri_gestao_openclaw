@@ -6,10 +6,7 @@ import { AppTimeZoneProvider } from "@/components/app-timezone-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
-import {
-  fetchProfileRole,
-  fetchProfileTimeZone,
-} from "@/lib/supabase/profile";
+import { fetchProfileRoleAndTimeZone } from "@/lib/supabase/profile";
 
 export default async function AppAreaLayout({
   children,
@@ -24,9 +21,8 @@ export default async function AppAreaLayout({
     redirect("/login");
   }
 
-  const [role, timeZone, headersList] = await Promise.all([
-    fetchProfileRole(supabase, user.id),
-    fetchProfileTimeZone(supabase, user.id),
+  const [{ role, timeZone }, headersList] = await Promise.all([
+    fetchProfileRoleAndTimeZone(supabase, user.id),
     headers(),
   ]);
   const showAdminNav = canAccessAdminArea(role);

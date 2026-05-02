@@ -61,7 +61,8 @@ type Props = {
   templates: ChecklistTemplateWithSections[];
   /** Modelos 100% customizáveis criados pelo workspace (tag "Equipe"). */
   workspaceTemplates?: WorkspaceTemplateListRow[];
-  startFillAction: (formData: FormData) => Promise<void>;
+  /** Mantido para compatibilidade com páginas RSC; o catálogo usa fluxo batch interno. */
+  startFillAction?: (formData: FormData) => Promise<void>;
   duplicateTemplateAction: (formData: FormData) => Promise<void>;
   /** Abre e faz scroll ao cartão deste template (ex.: link do dashboard). */
   focusTemplateId?: string | null;
@@ -136,7 +137,6 @@ export function ChecklistCatalog({
   recentEstablishments,
   templates,
   workspaceTemplates = [],
-  startFillAction: _startFillAction, // mantido na interface para compatibilidade com o pai
   duplicateTemplateAction,
   focusTemplateId = null,
   focusWorkspaceTemplateId = null,

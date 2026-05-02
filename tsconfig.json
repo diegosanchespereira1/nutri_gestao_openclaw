@@ -42,6 +42,5 @@
     ".agents",
     ".cursor",
     "scaffold-nutri"
-  ],
-  "extends": "expo/tsconfig.base"
+  ]
 }

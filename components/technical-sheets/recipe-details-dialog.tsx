@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 
 import type { TechnicalRecipeWithLines } from "@/lib/types/technical-recipes";
-import { recipeContextLabel } from "@/lib/utils/technical-recipe-list-labels";
 import {
   Dialog,
   DialogContent,

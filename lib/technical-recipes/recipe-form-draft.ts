@@ -1,5 +1,4 @@
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
-import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
 
 export const RECIPE_FORM_DRAFT_VERSION = 1 as const;

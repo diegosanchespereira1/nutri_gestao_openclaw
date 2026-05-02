@@ -23,7 +23,7 @@
 | SEC-11 | LGPD operacional (produto/legal) | Contínua | **Backlog** | DPO, incidentes, DSAR, retenção |
 | SEC-12 | Prefixos middleware em falta | Alta | **Backlog** | Ver secção dedicada |
 | SEC-13 | HTML contratos — anti-XSS | Alta | **Backlog** | `contract-generator-dialog` + `generateContractHtml` |
-| SEC-14 | `npm audit` — dependências transitivas | Média | **Backlog** | `hono` / `@hono/node-server` (moderate); `npm audit fix` + testes |
+| SEC-14 | `npm audit` — dependências transitivas | Média | **Feito** | Next 16.x (corrige lock errado em Next 9) + remoção de `expo`; `overrides` PostCSS/tmp/uuid; `npm audit --omit=dev` = 0 |
 | SEC-15 | Rotas `(portal)` — modelo de acesso | Média | **Backlog** | Confirmar público vs autenticado vs convidado |
 | SEC-16 | CSP com nonces (fase 2) | Baixa | **Backlog** | Reduzir `unsafe-inline` / `unsafe-eval` |
 | SEC-17 | Documentação entrypoint auth | Baixa | **Backlog** | Next 16: `proxy.ts` em vez de `middleware.ts` na raiz |
@@ -93,9 +93,11 @@
 
 **Descrição:** Correr `npm audit` / `npm audit fix`; validar que `hono` e `@hono/node-server` sobem para versões sem advisory ou documentar excepção (origem: dependência transitiva — ex. tooling).
 
+**Estado (2026-04):** O relatório massivo (~113 issues) vinha sobretudo de **`next` resolvido como 9.3.3** no lockfile e da árvore **`expo`** (sem uso no código). Correcções aplicadas: `next@^16.2.4`, `eslint-config-next@16.2.4`, remoção de `expo`, `exceljs@^4.4.0`, `package.json` > `overrides` (`postcss@8.5.10`, `tmp@0.2.5`, `uuid@14.0.0`), `tsconfig.json` sem `extends: expo/tsconfig.base`. **Não** usar `npm audit fix --force` (reintroduz Next 9).
+
 **Critérios de aceitação:**
 
-- [ ] `npm audit --omit=dev` sem vulnerabilidades **high/critical** (política da equipa)
+- [x] `npm audit --omit=dev` sem vulnerabilidades reportadas (0 no ambiente validado)
 - [ ] CI alinhado com essa política (ajustar `--audit-level` só se justificado e documentado)
 
 ---

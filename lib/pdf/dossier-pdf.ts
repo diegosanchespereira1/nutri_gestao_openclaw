@@ -556,7 +556,6 @@ function drawSectionHeader(
   ctx: Ctx,
   section: DossierPdfSectionInput,
   index: number,
-  total: number,
 ): void {
   const sc = computeSectionScore(section);
   const { label: scoreLabel, palette } = sc.percentage !== null
@@ -918,7 +917,7 @@ export async function buildDossierPdfBytes(
   for (let i = 0; i < input.sections.length; i++) {
     const section = input.sections[i];
     ctx.y -= 4;
-    drawSectionHeader(ctx, section, i, input.sections.length);
+    drawSectionHeader(ctx, section, i);
     for (let j = 0; j < section.items.length; j++) {
       await drawItemRow(ctx, section.items[j], j);
     }

@@ -171,7 +171,11 @@ export async function loadChecklistValidityAlerts(
 
   const alerts = [...latestByScope.values()]
     .filter((alert) => alert.validUntil <= horizon)
-    .map(({ scopeKey: _scopeKey, ...alert }) => alert);
+    .map((alert) => {
+      const { scopeKey, ...rest } = alert;
+      void scopeKey;
+      return rest;
+    });
 
   alerts.sort((a, b) => {
     if (a.status !== b.status) return a.status === "vencido" ? -1 : 1;

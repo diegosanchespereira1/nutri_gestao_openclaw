@@ -31,10 +31,15 @@ export function useNavigationGuard(
   const { active, onConfirmLeave } = options;
   const [guardTriggered, setGuardTriggered] = useState(false);
   const onConfirmLeaveRef = useRef(onConfirmLeave);
-  onConfirmLeaveRef.current = onConfirmLeave;
-
   const activeRef = useRef(active);
-  activeRef.current = active;
+
+  useEffect(() => {
+    onConfirmLeaveRef.current = onConfirmLeave;
+  }, [onConfirmLeave]);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {

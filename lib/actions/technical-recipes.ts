@@ -735,7 +735,6 @@ export async function deleteTechnicalRecipeAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { error } = await supabase
     .from("technical_recipes")
@@ -1101,7 +1100,6 @@ export async function toggleTemplateStatusAction(
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { error } = await supabase
     .from("technical_recipes")

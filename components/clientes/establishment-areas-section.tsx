@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { GripVertical, Pencil, Plus, Trash2, X, Check, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -232,11 +232,6 @@ export function EstablishmentAreasSection({ establishmentId, initialAreas }: Pro
       return next.map((a, i) => ({ ...a, position: i }));
     });
   }
-
-  const editingArea =
-    editState.kind === "editing"
-      ? areas.find((a) => a.id === editState.areaId) ?? null
-      : null;
 
   return (
     <section aria-labelledby="areas-heading" className="space-y-3">

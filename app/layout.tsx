@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { SupabaseHashAuthRedirect } from "@/components/auth/supabase-hash-auth-redirect";
@@ -34,7 +35,7 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <script src="/runtime-env.js" />
+        <Script src="/runtime-env.js" strategy="beforeInteractive" />
         <SupabaseHashAuthRedirect />
         {children}
       </body>

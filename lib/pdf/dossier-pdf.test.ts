@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { buildDossierPdfBytes, foldTextForPdf } from "./dossier-pdf";
 
 describe("foldTextForPdf", () => {
-  it("remove diacríticos e espaços múltiplos", () => {
-    expect(foldTextForPdf("Avaliação  Técnica")).toBe("Avaliacao Tecnica");
-    expect(foldTextForPdf("  São  Paulo ")).toBe("Sao Paulo");
+  it("colapsa espaços e preserva acentos (fonte Unicode)", () => {
+    expect(foldTextForPdf("Avaliação  Técnica")).toBe("Avaliação Técnica");
+    expect(foldTextForPdf("  São  Paulo ")).toBe("São Paulo");
   });
 });
 

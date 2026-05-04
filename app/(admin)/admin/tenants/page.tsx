@@ -47,6 +47,7 @@ export default async function TenantsPage({
     reactivated: "Tenant reativado.",
     plan_updated: "Plano atualizado.",
     lgpd_unblocked: "Bloqueio LGPD revogado; utilizador pode voltar a aceder (se a sessão/ban for limpo).",
+    tenant_created: "Conta criada com sucesso.",
   };
   const errMessages: Record<string, string> = {
     invalid: "Dados inválidos.",
@@ -64,12 +65,20 @@ export default async function TenantsPage({
             {rows.length} profissional(is) registado(s)
           </p>
         </div>
-        <Link
-          href="/admin"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          ← Admin
-        </Link>
+        <div className="flex gap-2">
+          <Link
+            href="/admin/tenants/novo"
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
+            + Criar tenant
+          </Link>
+          <Link
+            href="/admin"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            ← Admin
+          </Link>
+        </div>
       </div>
 
       {ok && (
@@ -107,20 +116,28 @@ export default async function TenantsPage({
             <li key={t.id}>
               <Card>
                 <CardHeader className="pb-2">
-                  <div className="flex flex-wrap items-start gap-2">
-                    <CardTitle className="text-sm font-medium">
-                      {t.full_name ?? "(sem nome)"}
-                    </CardTitle>
-                    {t.lgpd_blocked_at != null && t.lgpd_unblocked_at == null ? (
-                      <Badge variant="destructive">LGPD bloqueado</Badge>
-                    ) : t.is_suspended ? (
-                      <Badge variant="destructive">Suspenso</Badge>
-                    ) : (
-                      <Badge variant="outline" className="border-green-500/50 text-green-700">
-                        Ativo
-                      </Badge>
-                    )}
-                    <Badge variant="secondary">{t.plan_slug}</Badge>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CardTitle className="text-sm font-medium">
+                        {t.full_name ?? "(sem nome)"}
+                      </CardTitle>
+                      {t.lgpd_blocked_at != null && t.lgpd_unblocked_at == null ? (
+                        <Badge variant="destructive">LGPD bloqueado</Badge>
+                      ) : t.is_suspended ? (
+                        <Badge variant="destructive">Suspenso</Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-green-500/50 text-green-700">
+                          Ativo
+                        </Badge>
+                      )}
+                      <Badge variant="secondary">{t.plan_slug}</Badge>
+                    </div>
+                    <Link
+                      href={`/admin/tenants/${t.id}`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-7 text-xs")}
+                    >
+                      Ver cockpit →
+                    </Link>
                   </div>
                   <p className="text-muted-foreground text-xs">
                     Desde {formatDate(t.created_at)}

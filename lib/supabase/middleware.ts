@@ -3,6 +3,13 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
 import {
+  APP_SESSION_LAST_COOKIE,
+  APP_SESSION_START_COOKIE,
+  appSessionCookieOptions,
+  getAppSessionAbsoluteMaxSec,
+  getAppSessionIdleTimeoutSec,
+} from "@/lib/auth/app-session-cookies";
+import {
   isAdminPath,
   isPathAllowedWhenLgpdBlocked,
   isProtectedPath,
@@ -64,6 +71,57 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const baseCookie = getSupabaseCookieOptions();
+
+  if (!user) {
+    supabaseResponse.cookies.delete(APP_SESSION_START_COOKIE);
+    supabaseResponse.cookies.delete(APP_SESSION_LAST_COOKIE);
+  } else {
+    const now = Math.floor(Date.now() / 1000);
+    const absSec = getAppSessionAbsoluteMaxSec();
+    const idleSec = getAppSessionIdleTimeoutSec();
+
+    const startRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
+    const lastRaw = request.cookies.get(APP_SESSION_LAST_COOKIE)?.value;
+    const startParsed = startRaw ? Number.parseInt(startRaw, 10) : NaN;
+    const lastParsed = lastRaw ? Number.parseInt(lastRaw, 10) : NaN;
+
+    const needSetStartCookie = !Number.isFinite(startParsed);
+    const anchorStart: number = needSetStartCookie ? now : startParsed;
+
+    let expired = now - anchorStart > absSec;
+
+    const activityRef = Number.isFinite(lastParsed) ? lastParsed : anchorStart;
+    if (!expired && now - activityRef > idleSec) {
+      expired = true;
+    }
+
+    if (expired) {
+      await supabase.auth.signOut();
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("reason", "session_expired");
+      const redirectRes = NextResponse.redirect(loginUrl);
+      copyCookies(supabaseResponse, redirectRes);
+      redirectRes.cookies.delete(APP_SESSION_START_COOKIE);
+      redirectRes.cookies.delete(APP_SESSION_LAST_COOKIE);
+      return redirectRes;
+    }
+
+    if (needSetStartCookie) {
+      supabaseResponse.cookies.set(
+        APP_SESSION_START_COOKIE,
+        String(now),
+        appSessionCookieOptions(baseCookie, absSec + 300),
+      );
+    }
+
+    supabaseResponse.cookies.set(
+      APP_SESSION_LAST_COOKIE,
+      String(now),
+      appSessionCookieOptions(baseCookie, idleSec + 300),
+    );
+  }
 
   if (
     user &&

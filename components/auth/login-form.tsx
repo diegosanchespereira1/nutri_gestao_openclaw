@@ -338,6 +338,15 @@ export function LoginForm() {
         </div>
       ) : null}
 
+      {searchParams.get("reason") === "session_expired" ? (
+        <p
+          className="text-amber-900 dark:text-amber-100 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2 text-sm"
+          role="status"
+        >
+          A sua sessão terminou por tempo limite ou inatividade. Volte a iniciar sessão para continuar.
+        </p>
+      ) : null}
+
       {step === "password" ? (
         <form
           onSubmit={handlePasswordSubmit}

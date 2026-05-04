@@ -14,8 +14,20 @@ const adminSections = [
   {
     href: "/admin/tenants",
     title: "Gestão de tenants",
-    description: "Listar, suspender e alterar plano de profissionais.",
+    description: "Listar, suspender, cockpit e alterar plano de profissionais.",
     emoji: "🏢",
+  },
+  {
+    href: "/admin/tenants/novo",
+    title: "Criar tenant",
+    description: "Criar conta de profissional directamente pelo admin.",
+    emoji: "➕",
+  },
+  {
+    href: "/admin/degustacao",
+    title: "Features de degustação",
+    description: "Configurar features activas para novos utilizadores self-service.",
+    emoji: "🧪",
   },
   {
     href: "/admin/planos",

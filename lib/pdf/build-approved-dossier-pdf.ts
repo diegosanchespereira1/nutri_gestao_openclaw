@@ -9,10 +9,11 @@ import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
 export function formatApprovedAtForDossierPdf(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("pt-BR", {
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
       dateStyle: "long",
       timeStyle: "short",
-    });
+    }).format(new Date(iso));
   } catch {
     return iso;
   }

@@ -13,6 +13,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
+const AUTH_STEP_TIMEOUT_MS = 10_000;
+
+function createTimeoutError(step: string): Error {
+  const error = new Error(`AUTH_TIMEOUT:${step}`);
+  error.name = "AuthTimeoutError";
+  return error;
+}
+
+async function withAuthTimeout<T>(promise: Promise<T>, step: string): Promise<T> {
+  return await Promise.race<T>([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(createTimeoutError(step)), AUTH_STEP_TIMEOUT_MS);
+    }),
+  ]);
+}
+
 export function LoginForm() {
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
@@ -137,125 +154,150 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    await logAuthTroubleshootingEvent({
-      event: "password_signin",
-      step: "password",
-      outcome: "attempt",
-    });
+    const startedAt = performance.now();
 
-    let signInData:
-      | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"]
-      | null = null;
-    let signErr:
-      | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"]
-      | null = null;
-
-    for (let attempt = 1; attempt <= 2; attempt += 1) {
-      const result = await supabase.auth.signInWithPassword({
-        email,
-        password,
+    try {
+      await logAuthTroubleshootingEvent({
+        event: "password_signin",
+        step: "password",
+        outcome: "attempt",
       });
-      signInData = result.data;
-      signErr = result.error;
 
-      if (!signErr) break;
+      let signInData:
+        | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"]
+        | null = null;
+      let signErr:
+        | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["error"]
+        | null = null;
 
-      const staleRefreshToken = isInvalidRefreshTokenError(signErr.message);
-      if (attempt === 1 && staleRefreshToken) {
+      for (let attempt = 1; attempt <= 2; attempt += 1) {
+        const result = await withAuthTimeout(
+          supabase.auth.signInWithPassword({
+            email,
+            password,
+          }),
+          "sign_in_with_password",
+        );
+        signInData = result.data;
+        signErr = result.error;
+
+        if (!signErr) break;
+
+        const staleRefreshToken = isInvalidRefreshTokenError(signErr.message);
+        if (attempt === 1 && staleRefreshToken) {
+          await logAuthTroubleshootingEvent({
+            event: "password_signin_stale_refresh_recovery",
+            step: "password",
+            outcome: "error",
+            errorCode: signErr.code,
+            errorMessage: signErr.message,
+          });
+          // Limpa sessão local potencialmente corrompida e tenta novamente.
+          await withAuthTimeout(supabase.auth.signOut(), "signout_stale_refresh");
+          continue;
+        }
+
+        break;
+      }
+
+      if (signErr) {
         await logAuthTroubleshootingEvent({
-          event: "password_signin_stale_refresh_recovery",
+          event: "password_signin_failed",
           step: "password",
           outcome: "error",
           errorCode: signErr.code,
           errorMessage: signErr.message,
         });
-        // Limpa sessão local potencialmente corrompida e tenta novamente.
-        await supabase.auth.signOut();
-        continue;
+        setError(mapSupabaseLoginError(signErr));
+        return;
       }
-
-      break;
-    }
-
-    if (signErr) {
       await logAuthTroubleshootingEvent({
-        event: "password_signin_failed",
-        step: "password",
-        outcome: "error",
-        errorCode: signErr.code,
-        errorMessage: signErr.message,
-      });
-      setError(mapSupabaseLoginError(signErr));
-      setLoading(false);
-      submitLockRef.current = false;
-      return;
-    }
-    await logAuthTroubleshootingEvent({
-      event: "password_signin_success",
-      step: "password",
-      outcome: "success",
-      userId: signInData.user?.id ?? null,
-    });
-
-    const { data: aal, error: aalErr } =
-      await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    if (aalErr) {
-      await logAuthTroubleshootingEvent({
-        event: "mfa_aal_check_failed",
-        step: "password",
-        outcome: "error",
-        errorCode: aalErr.code,
-        errorMessage: aalErr.message,
-        userId: signInData.user?.id ?? null,
-      });
-      setError(aalErr.message);
-      setLoading(false);
-      submitLockRef.current = false;
-      return;
-    }
-
-    if (aal?.nextLevel === "aal2" && aal?.currentLevel === "aal1") {
-      await logAuthTroubleshootingEvent({
-        event: "mfa_required",
+        event: "password_signin_success",
         step: "password",
         outcome: "success",
         userId: signInData.user?.id ?? null,
       });
-      const ok = await beginMfaChallenge(supabase);
-      setLoading(false);
-      if (!ok) await supabase.auth.signOut();
-      submitLockRef.current = false;
-      return;
-    }
 
-    let sessionData: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] | null =
-      null;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      const result = await supabase.auth.getSession();
-      sessionData = result.data;
-      if (sessionData.session) break;
-      await new Promise((resolve) => window.setTimeout(resolve, 120));
-    }
-    await logAuthTroubleshootingEvent({
-      event: "post_signin_session_check",
-      step: "password",
-      outcome: sessionData?.session ? "success" : "error",
-      hasSession: Boolean(sessionData?.session),
-      userId: signInData.user?.id ?? null,
-    });
-
-    if (!sessionData?.session) {
-      setError(
-        "Não foi possível concluir a sessão neste dispositivo. Tente novamente.",
+      const { data: aal, error: aalErr } = await withAuthTimeout(
+        supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+        "mfa_aal_check",
       );
+      if (aalErr) {
+        await logAuthTroubleshootingEvent({
+          event: "mfa_aal_check_failed",
+          step: "password",
+          outcome: "error",
+          errorCode: aalErr.code,
+          errorMessage: aalErr.message,
+          userId: signInData.user?.id ?? null,
+        });
+        setError(aalErr.message);
+        return;
+      }
+
+      if (aal?.nextLevel === "aal2" && aal?.currentLevel === "aal1") {
+        await logAuthTroubleshootingEvent({
+          event: "mfa_required",
+          step: "password",
+          outcome: "success",
+          userId: signInData.user?.id ?? null,
+        });
+        const ok = await beginMfaChallenge(supabase);
+        if (!ok) await withAuthTimeout(supabase.auth.signOut(), "mfa_begin_signout");
+        return;
+      }
+
+      let sessionData: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] | null =
+        null;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const result = await withAuthTimeout(
+          supabase.auth.getSession(),
+          "post_signin_get_session",
+        );
+        sessionData = result.data;
+        if (sessionData.session) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 120));
+      }
+      await logAuthTroubleshootingEvent({
+        event: "post_signin_session_check",
+        step: "password",
+        outcome: sessionData?.session ? "success" : "error",
+        hasSession: Boolean(sessionData?.session),
+        userId: signInData.user?.id ?? null,
+        metadata: {
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        },
+      });
+
+      if (!sessionData?.session) {
+        setError(
+          "Não foi possível concluir a sessão neste dispositivo. Tente novamente.",
+        );
+        return;
+      }
+
+      window.location.assign(next);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro inesperado";
+      const isTimeout = message.startsWith("AUTH_TIMEOUT:");
+      await logAuthTroubleshootingEvent({
+        event: isTimeout ? "password_signin_timeout" : "password_signin_exception",
+        step: "password",
+        outcome: "error",
+        errorMessage: message,
+        metadata: {
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        },
+      });
+      setError(
+        isTimeout
+          ? "A autenticação demorou mais do que o esperado. Verifique sua conexão e tente novamente."
+          : "Não foi possível concluir o login agora. Tente novamente.",
+      );
+    } finally {
       setLoading(false);
       submitLockRef.current = false;
-      return;
     }
-
-    setLoading(false);
-    submitLockRef.current = false;
-    window.location.assign(next);
   }
 
   async function handleMfaSubmit(e: React.FormEvent) {
@@ -266,39 +308,75 @@ export function LoginForm() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
+    const startedAt = performance.now();
 
-    const { error: vErr } = await supabase.auth.mfa.verify({
-      factorId,
-      challengeId,
-      code: mfaCode.replace(/\s/g, ""),
-    });
+    try {
+      const { error: vErr } = await withAuthTimeout(
+        supabase.auth.mfa.verify({
+          factorId,
+          challengeId,
+          code: mfaCode.replace(/\s/g, ""),
+        }),
+        "mfa_verify",
+      );
 
-    if (vErr) {
+      if (vErr) {
+        await logAuthTroubleshootingEvent({
+          event: "mfa_verify_failed",
+          step: "mfa",
+          outcome: "error",
+          errorCode: vErr.code,
+          errorMessage: vErr.message,
+        });
+        setError(vErr.message);
+        setMfaCode("");
+        await beginMfaChallenge(supabase);
+        return;
+      }
+
+      const { data: sessionData } = await withAuthTimeout(
+        supabase.auth.getSession(),
+        "mfa_post_verify_get_session",
+      );
       await logAuthTroubleshootingEvent({
-        event: "mfa_verify_failed",
+        event: "mfa_verify_success",
+        step: "mfa",
+        outcome: sessionData.session ? "success" : "error",
+        hasSession: Boolean(sessionData.session),
+        metadata: {
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        },
+      });
+
+      if (!sessionData.session) {
+        setError(
+          "Não foi possível concluir o segundo fator neste dispositivo. Tente novamente.",
+        );
+        return;
+      }
+
+      window.location.assign(next);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro inesperado";
+      const isTimeout = message.startsWith("AUTH_TIMEOUT:");
+      await logAuthTroubleshootingEvent({
+        event: isTimeout ? "mfa_verify_timeout" : "mfa_verify_exception",
         step: "mfa",
         outcome: "error",
-        errorCode: vErr.code,
-        errorMessage: vErr.message,
+        errorMessage: message,
+        metadata: {
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        },
       });
-      setError(vErr.message);
+      setError(
+        isTimeout
+          ? "A validação do 2FA demorou demais. Tente novamente."
+          : "Não foi possível validar o 2FA agora. Tente novamente.",
+      );
+    } finally {
       setLoading(false);
-      setMfaCode("");
-      await beginMfaChallenge(supabase);
       submitLockRef.current = false;
-      return;
     }
-
-    const { data: sessionData } = await supabase.auth.getSession();
-    await logAuthTroubleshootingEvent({
-      event: "mfa_verify_success",
-      step: "mfa",
-      outcome: sessionData.session ? "success" : "error",
-      hasSession: Boolean(sessionData.session),
-    });
-    setLoading(false);
-    submitLockRef.current = false;
-    window.location.assign(next);
   }
 
   return (

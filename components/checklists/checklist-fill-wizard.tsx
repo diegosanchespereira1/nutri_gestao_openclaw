@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import {
   approveChecklistFillDossierAction,
   loadFillResponsesMapForSession,
+  saveFillResponsesBatch,
   saveFillItemResponse,
   type FillActionResult,
 } from "@/lib/actions/checklist-fill";
@@ -230,7 +231,7 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
         itemId={item.id}
         itemResponseSource={itemResponseSource}
         initialPhotos={photos}
-        disabled={isPending || formLocked}
+        disabled={formLocked}
         onPhotosChange={(p) => onPhotosChange(item.id, p)}
       />
 
@@ -421,6 +422,8 @@ export function ChecklistFillWizard({
     if (prevSectionIndexForScrollRef.current === sectionIndex) return;
     prevSectionIndexForScrollRef.current = sectionIndex;
     window.scrollTo({ top: 0, behavior: "smooth" });
+    const doneTimer = setTimeout(() => setSectionNavLoading(false), 180);
+    return () => clearTimeout(doneTimer);
   }, [sectionIndex]);
 
   const [advanceError, setAdvanceError] = useState<string | null>(null);
@@ -439,6 +442,7 @@ export function ChecklistFillWizard({
     useState<ChecklistFillBatchItem | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
+  const [sectionNavLoading, setSectionNavLoading] = useState(false);
 
   const handleDossierReopened = useCallback(() => {
     setDossierApprovedAt(null);
@@ -529,22 +533,20 @@ export function ChecklistFillWizard({
       persistMode: "full" | "merge" = "merge",
     ): Promise<FillActionResult> => {
       const data = snapshot ?? responsesRef.current;
-      for (const itemId of Object.keys(data)) {
-        const cur = data[itemId];
-        if (!cur?.outcome) continue;
-        const result = await saveFillItemResponse({
-          sessionId,
-          itemId,
-          itemResponseSource,
-          outcome: cur.outcome,
-          note: cur.note ?? null,
-          annotation: cur.annotation ?? null,
-          validUntil: cur.validUntil ?? null,
-          persistMode,
-        });
-        if (!result.ok) return result;
-      }
-      return { ok: true };
+      const entries = Object.entries(data).map(([itemId, cur]) => ({
+        itemId,
+        outcome: cur?.outcome ?? null,
+        note: cur?.note ?? null,
+        annotation: cur?.annotation ?? null,
+        validUntil: cur?.validUntil ?? null,
+      }));
+      return saveFillResponsesBatch({
+        sessionId,
+        itemResponseSource,
+        entries,
+        persistMode,
+        withRevalidate: false,
+      });
     },
     [sessionId, itemResponseSource],
   );
@@ -590,6 +592,7 @@ export function ChecklistFillWizard({
           annotation: cur.annotation ?? null,
           validUntil: cur.validUntil ?? null,
           persistMode: "full",
+          withRevalidate: false,
         });
         if (result.ok) {
           clearDirtyItems([itemId]);
@@ -677,6 +680,7 @@ export function ChecklistFillWizard({
           note,
           annotation,
           validUntil,
+          withRevalidate: false,
         });
         if (result.ok) {
           reportSaved();
@@ -721,7 +725,7 @@ export function ChecklistFillWizard({
   function handleNext() {
     setAdvanceError(null);
     if (!section || isLast) return;
-    
+    setSectionNavLoading(true);
     // Salvar campos antes de ir para próxima seção
     saveCurrentSectionFields();
     setSectionIndex((i) => i + 1);
@@ -729,7 +733,7 @@ export function ChecklistFillWizard({
 
   function handlePrev() {
     setAdvanceError(null);
-    
+    setSectionNavLoading(true);
     // Salvar campos antes de ir para seção anterior
     saveCurrentSectionFields();
     setSectionIndex((i) => Math.max(0, i - 1));
@@ -751,24 +755,27 @@ export function ChecklistFillWizard({
       saveBatchInFlightRef.current = true;
       startTransition(async () => {
         reportSaving();
-        for (const itemId of itemIds) {
+        const entries = itemIds.map((itemId) => {
           const cur = responsesRef.current[itemId];
-          if (!cur?.outcome) continue;
-          const result = await saveFillItemResponse({
-            sessionId,
+          return {
             itemId,
-            itemResponseSource,
-            outcome: cur.outcome,
-            note: cur.note ?? null,
-            annotation: cur.annotation ?? null,
-            validUntil: cur.validUntil ?? null,
-            persistMode: "full",
-          });
-          if (!result.ok) {
-            saveBatchInFlightRef.current = false;
-            reportSaveError(result.error);
-            return;
-          }
+            outcome: cur?.outcome ?? null,
+            note: cur?.note ?? null,
+            annotation: cur?.annotation ?? null,
+            validUntil: cur?.validUntil ?? null,
+          };
+        });
+        const result = await saveFillResponsesBatch({
+          sessionId,
+          itemResponseSource,
+          entries,
+          persistMode: "full",
+          withRevalidate: false,
+        });
+        if (!result.ok) {
+          saveBatchInFlightRef.current = false;
+          reportSaveError(result.error);
+          return;
         }
         clearDirtyItems(itemIds);
         saveBatchInFlightRef.current = false;
@@ -936,6 +943,15 @@ export function ChecklistFillWizard({
           <p className="text-muted-foreground mt-1 text-sm">
             Seção {sectionIndex + 1} de {sections.length}: {section.title}
           </p>
+          {sectionNavLoading ? (
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
+              <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Carregando seção...
+            </span>
+          ) : null}
           {/* Task D: indicador de auto-save */}
           {saveStatus === "saving" && (
             <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
@@ -1030,10 +1046,21 @@ export function ChecklistFillWizard({
       ) : null}
 
       <fieldset
-        disabled={isPending || formLocked}
-        className="space-y-6"
+        disabled={formLocked}
+        className="relative space-y-6"
         aria-busy={isPending}
       >
+        {sectionNavLoading ? (
+          <div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-background/65 pt-6 backdrop-blur-[1px]">
+            <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
+              <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Atualizando seção...
+            </div>
+          </div>
+        ) : null}
         <legend className="sr-only">{section.title}</legend>
         {section.items.map((item) => (
           <ChecklistFillItem
@@ -1068,10 +1095,12 @@ export function ChecklistFillWizard({
                 id="checklist-section-jump"
                 className={sectionSelectClassName}
                 value={sectionIndex}
+                disabled={sectionNavLoading}
                 onChange={(e) => {
                   setAdvanceError(null);
                   const next = Number.parseInt(e.target.value, 10);
                   if (!Number.isFinite(next)) return;
+                  setSectionNavLoading(true);
                   saveCurrentSectionFields();
                   setSectionIndex(Math.min(Math.max(0, next), sections.length - 1));
                 }}
@@ -1095,31 +1124,31 @@ export function ChecklistFillWizard({
               type="button"
               variant="outline"
               onClick={() => saveProgressBatch("all", true)}
-              disabled={isPending}
+              disabled={formLocked || sectionNavLoading}
             >
-              Salvar agora
+              {isPending ? "Salvando..." : "Salvar agora"}
             </Button>
           ) : null}
           <Button
             type="button"
             variant="outline"
             onClick={handlePrev}
-            disabled={sectionIndex === 0 || isPending || formLocked}
+            disabled={sectionIndex === 0 || formLocked || sectionNavLoading}
           >
-            Seção anterior
+            {sectionNavLoading ? "Carregando..." : "Seção anterior"}
           </Button>
           <Button
             type="button"
             onClick={handleNext}
-            disabled={isPending || formLocked || isLast}
+            disabled={formLocked || isLast || sectionNavLoading}
           >
-            Próxima seção
+            {sectionNavLoading ? "Carregando..." : "Próxima seção"}
           </Button>
           {!formLocked ? (
             <Button
               type="button"
               variant={isLast ? "default" : "secondary"}
-              disabled={isPending}
+              disabled={formLocked || sectionNavLoading}
               onClick={() => {
                 setAdvanceError(null);
                 setFinalizeDialogError(null);

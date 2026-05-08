@@ -432,6 +432,8 @@ export async function saveFillItemResponse(input: {
   validUntil: string | null;
   /** merge: atualização parcial — não apaga note/anotação no BD se o cliente enviar vazio. */
   persistMode?: "full" | "merge";
+  /** Em autosave/batch, evita custo de revalidatePath a cada item. */
+  withRevalidate?: boolean;
 }): Promise<FillActionResult> {
   const supabase = await createClient();
   const auth = await requireWorkspaceAuthContext(supabase);
@@ -440,6 +442,7 @@ export async function saveFillItemResponse(input: {
   const { sessionId, itemId, itemResponseSource, outcome, note, annotation, validUntil } =
     input;
   const persistMode = input.persistMode ?? "full";
+  const withRevalidate = input.withRevalidate ?? true;
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
@@ -531,19 +534,21 @@ export async function saveFillItemResponse(input: {
       .delete()
       .eq("session_id", sessionId)
       .eq(itemColumn, itemId);
-    revalidatePath(`/checklists/preencher/${sessionId}`);
+    if (withRevalidate) {
+      revalidatePath(`/checklists/preencher/${sessionId}`);
 
-    const { data: sessMetaClear } = await supabase
-      .from("checklist_fill_sessions")
-      .select("scheduled_visit_id")
-      .eq("id", sessionId)
-      .maybeSingle();
+      const { data: sessMetaClear } = await supabase
+        .from("checklist_fill_sessions")
+        .select("scheduled_visit_id")
+        .eq("id", sessionId)
+        .maybeSingle();
 
-    const visitClear = sessMetaClear?.scheduled_visit_id;
-    if (visitClear) {
-      const vid = String(visitClear);
-      revalidatePath(`/visitas/${vid}`);
-      revalidatePath(`/visitas/${vid}/iniciar`);
+      const visitClear = sessMetaClear?.scheduled_visit_id;
+      if (visitClear) {
+        const vid = String(visitClear);
+        revalidatePath(`/visitas/${vid}`);
+        revalidatePath(`/visitas/${vid}/iniciar`);
+      }
     }
 
     return { ok: true };
@@ -597,19 +602,249 @@ export async function saveFillItemResponse(input: {
     if (error) return { ok: false, error: "Não foi possível salvar." };
   }
 
-  revalidatePath(`/checklists/preencher/${sessionId}`);
+  if (withRevalidate) {
+    revalidatePath(`/checklists/preencher/${sessionId}`);
 
-  const { data: sessMeta } = await supabase
+    const { data: sessMeta } = await supabase
+      .from("checklist_fill_sessions")
+      .select("scheduled_visit_id")
+      .eq("id", sessionId)
+      .maybeSingle();
+
+    const visitId = sessMeta?.scheduled_visit_id;
+    if (visitId) {
+      const vid = String(visitId);
+      revalidatePath(`/visitas/${vid}`);
+      revalidatePath(`/visitas/${vid}/iniciar`);
+    }
+  }
+
+  return { ok: true };
+}
+
+type SaveFillBatchEntry = {
+  itemId: string;
+  outcome: ChecklistFillOutcome | null;
+  note: string | null;
+  annotation: string | null;
+  validUntil: string | null;
+};
+
+export async function saveFillResponsesBatch(input: {
+  sessionId: string;
+  itemResponseSource: "global" | "custom" | "workspace";
+  entries: SaveFillBatchEntry[];
+  persistMode?: "full" | "merge";
+  withRevalidate?: boolean;
+}): Promise<FillActionResult> {
+  const supabase = await createClient();
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
+
+  const { sessionId, itemResponseSource } = input;
+  const persistMode = input.persistMode ?? "full";
+  const withRevalidate = input.withRevalidate ?? true;
+  if (!input.entries.length) return { ok: true };
+
+  const itemIds = Array.from(
+    new Set(input.entries.map((entry) => entry.itemId).filter(Boolean)),
+  );
+  if (itemIds.length === 0) return { ok: true };
+
+  const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("scheduled_visit_id")
+    .select(
+      "id, template_id, custom_template_id, workspace_template_id, dossier_approved_at, establishment_id, scheduled_visit_id",
+    )
     .eq("id", sessionId)
     .maybeSingle();
 
-  const visitId = sessMeta?.scheduled_visit_id;
-  if (visitId) {
-    const vid = String(visitId);
-    revalidatePath(`/visitas/${vid}`);
-    revalidatePath(`/visitas/${vid}/iniciar`);
+  if (!sess) return { ok: false, error: "Rascunho não encontrado." };
+
+  const estOwned = await assertEstablishmentOwned(
+    supabase,
+    auth.workspaceOwnerId,
+    sess.establishment_id as string,
+  );
+  if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
+
+  if (sess.dossier_approved_at) {
+    return {
+      ok: false,
+      error: "Dossiê já aprovado: não é possível alterar respostas (registro imutável, FR70).",
+    };
+  }
+
+  const sessionOrigin: "global" | "custom" | "workspace" = sess.workspace_template_id
+    ? "workspace"
+    : sess.custom_template_id
+      ? "custom"
+      : "global";
+  if (sessionOrigin !== itemResponseSource) {
+    return { ok: false, error: "Tipo de item incompatível com a sessão." };
+  }
+
+  const itemColumn =
+    itemResponseSource === "global"
+      ? "template_item_id"
+      : itemResponseSource === "custom"
+        ? "custom_item_id"
+        : "workspace_item_id";
+
+  const validItemIds = new Set<string>();
+  if (itemResponseSource === "global") {
+    const { data: rows } = await supabase
+      .from("checklist_template_items")
+      .select("id")
+      .in("id", itemIds);
+    for (const row of rows ?? []) validItemIds.add(String(row.id));
+  } else if (itemResponseSource === "custom") {
+    const { data: rows } = await supabase
+      .from("checklist_custom_items")
+      .select("id, custom_section_id")
+      .in("id", itemIds);
+    const sectionIds = Array.from(
+      new Set((rows ?? []).map((row) => String(row.custom_section_id))),
+    );
+    const { data: secRows } = await supabase
+      .from("checklist_custom_sections")
+      .select("id, custom_template_id")
+      .in("id", sectionIds);
+    const sectionTemplateMap = new Map<string, string>();
+    for (const sec of secRows ?? []) {
+      sectionTemplateMap.set(String(sec.id), String(sec.custom_template_id));
+    }
+    for (const row of rows ?? []) {
+      const sectionTemplateId = sectionTemplateMap.get(String(row.custom_section_id));
+      if (sectionTemplateId && sectionTemplateId === sess.custom_template_id) {
+        validItemIds.add(String(row.id));
+      }
+    }
+  } else {
+    const { data: rows } = await supabase
+      .from("checklist_workspace_items")
+      .select("id, workspace_section_id")
+      .in("id", itemIds);
+    const sectionIds = Array.from(
+      new Set((rows ?? []).map((row) => String(row.workspace_section_id))),
+    );
+    const { data: secRows } = await supabase
+      .from("checklist_workspace_sections")
+      .select("id, workspace_template_id")
+      .in("id", sectionIds);
+    const sectionTemplateMap = new Map<string, string>();
+    for (const sec of secRows ?? []) {
+      sectionTemplateMap.set(String(sec.id), String(sec.workspace_template_id));
+    }
+    for (const row of rows ?? []) {
+      const sectionTemplateId = sectionTemplateMap.get(String(row.workspace_section_id));
+      if (sectionTemplateId && sectionTemplateId === sess.workspace_template_id) {
+        validItemIds.add(String(row.id));
+      }
+    }
+  }
+
+  for (const itemId of itemIds) {
+    if (!validItemIds.has(itemId)) {
+      return { ok: false, error: "Item inválido para este modelo." };
+    }
+  }
+
+  const { data: existingRows } = await supabase
+    .from("checklist_fill_item_responses")
+    .select("id, note, item_annotation, valid_until, template_item_id, custom_item_id, workspace_item_id")
+    .eq("session_id", sessionId)
+    .in(itemColumn, itemIds);
+
+  const existingByItemId = new Map<
+    string,
+    {
+      id: string;
+      note: string | null;
+      item_annotation: string | null;
+      valid_until: string | null;
+    }
+  >();
+  for (const row of existingRows ?? []) {
+    const key =
+      (row.template_item_id as string | null) ??
+      (row.custom_item_id as string | null) ??
+      (row.workspace_item_id as string | null);
+    if (!key) continue;
+    existingByItemId.set(key, {
+      id: String(row.id),
+      note: (row.note as string | null) ?? null,
+      item_annotation: (row.item_annotation as string | null) ?? null,
+      valid_until: (row.valid_until as string | null) ?? null,
+    });
+  }
+
+  for (const entry of input.entries) {
+    const itemId = entry.itemId;
+    const existing = existingByItemId.get(itemId);
+    const normalizedValidUntil = (entry.validUntil ?? "").trim() || null;
+    const noteTrim = (entry.note ?? "").trim();
+    let annotationTrim = (entry.annotation ?? "").trim();
+    if (annotationTrim.length > MAX_CHECKLIST_ITEM_ANNOTATION_CHARS) {
+      annotationTrim = annotationTrim.slice(0, MAX_CHECKLIST_ITEM_ANNOTATION_CHARS);
+    }
+
+    if (entry.outcome === null) {
+      if (existing) {
+        const { error } = await supabase
+          .from("checklist_fill_item_responses")
+          .delete()
+          .eq("id", existing.id);
+        if (error) return { ok: false, error: "Não foi possível salvar." };
+        existingByItemId.delete(itemId);
+      }
+      continue;
+    }
+
+    if (existing) {
+      const payload = buildResponseUpdatePayload({
+        outcome: entry.outcome,
+        noteTrim,
+        annotationTrim,
+        validUntil: normalizedValidUntil,
+        existingNote: existing.note,
+        existingAnnotation: existing.item_annotation,
+        existingValidUntil: existing.valid_until,
+        persistMode,
+      });
+      const { error } = await supabase
+        .from("checklist_fill_item_responses")
+        .update(payload)
+        .eq("id", existing.id);
+      if (error) return { ok: false, error: "Não foi possível salvar." };
+      continue;
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      session_id: sessionId,
+      template_item_id: null,
+      custom_item_id: null,
+      workspace_item_id: null,
+      outcome: entry.outcome,
+      note: noteTrim.length > 0 ? noteTrim : null,
+      item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+      valid_until: normalizedValidUntil,
+    };
+    insertPayload[itemColumn] = itemId;
+    const { error } = await supabase
+      .from("checklist_fill_item_responses")
+      .insert(insertPayload);
+    if (error) return { ok: false, error: "Não foi possível salvar." };
+  }
+
+  if (withRevalidate) {
+    revalidatePath(`/checklists/preencher/${sessionId}`);
+    const visitId = sess.scheduled_visit_id;
+    if (visitId) {
+      const vid = String(visitId);
+      revalidatePath(`/visitas/${vid}`);
+      revalidatePath(`/visitas/${vid}/iniciar`);
+    }
   }
 
   return { ok: true };

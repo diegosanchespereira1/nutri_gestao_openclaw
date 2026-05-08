@@ -1,5 +1,5 @@
 -- Performance hardening for checklist flow + RLS initplan optimization on profiles.
--- NOTE: This migration is created only; do not execute against Supabase yet.
+-- Timestamp is after 20260707122000 so `supabase db push` applies in linear order.
 
 begin;
 

@@ -69,6 +69,7 @@ export function ChecklistFillDossierItemBody({
         note: r.note,
         annotation: r.annotation,
         validUntil: r.validUntil,
+        withRevalidate: false,
       });
       setSavingItemId(null);
     },

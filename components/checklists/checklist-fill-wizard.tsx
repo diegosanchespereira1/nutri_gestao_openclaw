@@ -95,6 +95,7 @@ const sectionSelectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full min-w-[12rem] max-w-xl rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
+const RADIO_AUTOSAVE_DEBOUNCE_MS = 500;
 
 /* ─── ChecklistFillItem — componente memoizado por item ─────────────────── */
 /**
@@ -454,6 +455,7 @@ export function ChecklistFillWizard({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyItemIdsRef = useRef<Set<string>>(new Set());
   const saveBatchInFlightRef = useRef(false);
 
@@ -479,6 +481,7 @@ export function ChecklistFillWizard({
   useEffect(() => {
     return () => {
       if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
+      if (autosaveTimerRef.current !== null) clearTimeout(autosaveTimerRef.current);
     };
   }, []);
 
@@ -671,25 +674,9 @@ export function ChecklistFillWizard({
         [itemId]: { outcome, note, annotation, validUntil },
       }));
       reportSaving();
-      startTransition(async () => {
-        const result = await saveFillItemResponse({
-          sessionId,
-          itemId,
-          itemResponseSource,
-          outcome,
-          note,
-          annotation,
-          validUntil,
-          withRevalidate: false,
-        });
-        if (result.ok) {
-          reportSaved();
-        } else {
-          reportSaveError(result.error);
-        }
-      });
+      scheduleRadioAutosave();
     },
-    [markItemDirty, sessionId, itemResponseSource],
+    [markItemDirty],
   );
 
   const setNote = useCallback((itemId: string, note: string) => {
@@ -785,7 +772,21 @@ export function ChecklistFillWizard({
     [clearDirtyItems, itemResponseSource, section, sessionId],
   );
 
+  function scheduleRadioAutosave() {
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      saveProgressBatch("all", false);
+    }, RADIO_AUTOSAVE_DEBOUNCE_MS);
+  }
+
   function saveCurrentSectionFields() {
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
     saveProgressBatch("section", false);
   }
 

@@ -92,6 +92,10 @@ function isPrefetchRequest(request: NextRequest): boolean {
   );
 }
 
+function isServerActionRequest(request: NextRequest): boolean {
+  return request.headers.has("next-action");
+}
+
 type MiddlewareProfileContext = {
   userId: string;
   role: ProfileRole | null;
@@ -145,6 +149,12 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (isPrefetchRequest(request)) {
+    return nextWithPathname(request);
+  }
+
+  // Server Actions já validam auth/autorização no próprio handler.
+  // Evita duplicar /auth/v1/user + queries de profile em cada autosave.
+  if (isServerActionRequest(request)) {
     return nextWithPathname(request);
   }
 

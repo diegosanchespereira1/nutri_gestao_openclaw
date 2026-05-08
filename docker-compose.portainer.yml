@@ -12,6 +12,11 @@
 #
 # 4) Build da imagem com NEXT_PUBLIC_* em --build-arg; no Portainer define também
 #    SUPABASE_SERVICE_ROLE_KEY na stack e Recreate após alterar.
+#
+# 5) Para múltiplas stacks no mesmo Portainer/Traefik, define variáveis diferentes:
+#    - APP_HOST (ex: dev.nutricao.stratostech.com.br)
+#    - TRAEFIK_ROUTER_NAME / TRAEFIK_SERVICE_NAME / TRAEFIK_MIDDLEWARE_NAME
+#    Evita conflito de labels entre stacks.
 
 services:
   nutricao_app:
@@ -38,15 +43,15 @@ services:
       start_period: 90s
     labels:
       - traefik.enable=true
-      - "traefik.http.routers.nutricao_app.rule=Host(`nutricao.stratostech.com.br`)"
-      - traefik.http.routers.nutricao_app.entrypoints=websecure
-      - traefik.http.routers.nutricao_app.tls.certresolver=letsencryptresolver
-      - traefik.http.routers.nutricao_app.priority=1
-      - traefik.http.routers.nutricao_app.service=nutricao_app
-      - traefik.http.middlewares.nutricao_sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
-      - traefik.http.routers.nutricao_app.middlewares=nutricao_sslheader
-      - traefik.http.services.nutricao_app.loadbalancer.server.port=3000
-      - traefik.http.services.nutricao_app.loadbalancer.passHostHeader=true
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.rule=Host(`${APP_HOST:-nutricao.stratostech.com.br}`)"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.entrypoints=websecure"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.priority=1"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.service=${TRAEFIK_SERVICE_NAME:-nutricao-app}"
+      - "traefik.http.middlewares.${TRAEFIK_MIDDLEWARE_NAME:-nutricao-sslheader}.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.middlewares=${TRAEFIK_MIDDLEWARE_NAME:-nutricao-sslheader}"
+      - "traefik.http.services.${TRAEFIK_SERVICE_NAME:-nutricao-app}.loadbalancer.server.port=3000"
+      - "traefik.http.services.${TRAEFIK_SERVICE_NAME:-nutricao-app}.loadbalancer.passHostHeader=true"
       - traefik.docker.network=HMLStratosNetwork
     networks:
       - HMLStratosNetwork

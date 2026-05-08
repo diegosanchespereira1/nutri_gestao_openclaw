@@ -206,9 +206,10 @@ export type PlatformMetrics = {
 export async function loadPlatformMetrics(): Promise<{
   metrics: PlatformMetrics | null;
 }> {
-  const { supabase } = await requireSuperAdmin();
+  await requireSuperAdmin();
+  const adminSupabase = createServiceRoleClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await adminSupabase
     .from("admin_platform_metrics")
     .select("*")
     .maybeSingle();

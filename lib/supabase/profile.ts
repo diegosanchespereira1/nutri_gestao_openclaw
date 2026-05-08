@@ -99,6 +99,35 @@ export async function fetchProfileRoleAndTimeZone(
   return { role, timeZone };
 }
 
+/**
+ * Busca role, timezone e full_name em uma única query para reduzir roundtrips
+ * no bootstrap da área autenticada.
+ */
+export async function fetchProfileShellContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ role: ProfileRole | null; timeZone: string; fullName: string | null }> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("role, timezone, full_name")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return { role: null, timeZone: DEFAULT_PROFILE_TIME_ZONE, fullName: null };
+  }
+
+  const role = data.role && isProfileRole(data.role) ? data.role : null;
+  const timeZone = data.timezone
+    ? normalizeAppTimeZone(data.timezone)
+    : DEFAULT_PROFILE_TIME_ZONE;
+  const fullName = typeof data.full_name === "string" && data.full_name.trim().length > 0
+    ? data.full_name
+    : null;
+
+  return { role, timeZone, fullName };
+}
+
 export async function fetchProfileFullName(
   supabase: SupabaseClient,
   userId: string,

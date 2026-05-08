@@ -171,7 +171,9 @@ export function LoginForm() {
         | null = null;
 
       for (let attempt = 1; attempt <= 2; attempt += 1) {
-        const result = await withAuthTimeout(
+        const result = await withAuthTimeout<
+          Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>
+        >(
           supabase.auth.signInWithPassword({
             email,
             password,
@@ -218,7 +220,9 @@ export function LoginForm() {
         userId: signInData.user?.id ?? null,
       });
 
-      const { data: aal, error: aalErr } = await withAuthTimeout(
+      const { data: aal, error: aalErr } = await withAuthTimeout<
+        Awaited<ReturnType<typeof supabase.auth.mfa.getAuthenticatorAssuranceLevel>>
+      >(
         supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
         "mfa_aal_check",
       );
@@ -250,7 +254,9 @@ export function LoginForm() {
       let sessionData: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] | null =
         null;
       for (let attempt = 0; attempt < 3; attempt += 1) {
-        const result = await withAuthTimeout(
+        const result = await withAuthTimeout<
+          Awaited<ReturnType<typeof supabase.auth.getSession>>
+        >(
           supabase.auth.getSession(),
           "post_signin_get_session",
         );
@@ -311,7 +317,9 @@ export function LoginForm() {
     const startedAt = performance.now();
 
     try {
-      const { error: vErr } = await withAuthTimeout(
+      const { error: vErr } = await withAuthTimeout<
+        Awaited<ReturnType<typeof supabase.auth.mfa.verify>>
+      >(
         supabase.auth.mfa.verify({
           factorId,
           challengeId,
@@ -334,7 +342,9 @@ export function LoginForm() {
         return;
       }
 
-      const { data: sessionData } = await withAuthTimeout(
+      const { data: sessionData } = await withAuthTimeout<
+        Awaited<ReturnType<typeof supabase.auth.getSession>>
+      >(
         supabase.auth.getSession(),
         "mfa_post_verify_get_session",
       );

@@ -10,10 +10,11 @@ import {
   extensionForImageMime,
   isAllowedChecklistPhotoContentType,
 } from "@/lib/constants/checklist-fill-photos-storage";
+import { requireWorkspaceAuthContext } from "@/lib/actions/auth-context";
+import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { createClient } from "@/lib/supabase/server";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import { sanitizeStorageFilename } from "@/lib/utils/storage-filename";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 type FillActionResult =
   | { ok: true; photo: ChecklistFillPhotoView }
@@ -221,22 +222,41 @@ export async function loadSessionItemPhotosWithUrls(
     .order("created_at", { ascending: true });
 
   const out: Record<string, ChecklistFillPhotoView[]> = {};
+  const typedRows = (rows ?? []) as Array<{
+    id: string;
+    template_item_id: string | null;
+    custom_item_id: string | null;
+    workspace_item_id: string | null;
+    storage_path: string;
+    taken_at: string;
+    latitude: number | null;
+    longitude: number | null;
+  }>;
 
-  for (const raw of rows ?? []) {
-    const r = raw as {
-      id: string;
-      template_item_id: string | null;
-      custom_item_id: string | null;
-      workspace_item_id: string | null;
-      storage_path: string;
-      taken_at: string;
-      latitude: number | null;
-      longitude: number | null;
-    };
+  const uniquePaths = Array.from(new Set(typedRows.map((r) => r.storage_path)));
+  const signedMap = new Map<string, string>();
+  if (uniquePaths.length > 0) {
+    const { data: signedRows, error } = await supabase.storage
+      .from(CHECKLIST_FILL_PHOTOS_BUCKET)
+      .createSignedUrls(uniquePaths, CHECKLIST_FILL_PHOTO_SIGNED_URL_SEC);
+    logBudgetEvent({
+      service: "storage",
+      endpoint: "/storage/v1/object/sign",
+      source: "loadSessionItemPhotosWithUrls",
+      count: uniquePaths.length,
+    });
+    if (!error) {
+      signedRows?.forEach((entry, idx) => {
+        const path = uniquePaths[idx];
+        if (path && entry?.signedUrl) signedMap.set(path, entry.signedUrl);
+      });
+    }
+  }
+
+  for (const r of typedRows) {
     const itemKey = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
     if (!itemKey) continue;
-
-    const url = await signPhotoUrl(supabase, r.storage_path);
+    const url = signedMap.get(r.storage_path);
     if (!url) continue;
 
     const view: ChecklistFillPhotoView = {
@@ -263,11 +283,8 @@ export async function uploadChecklistFillPhotoAction(
   formData: FormData,
 ): Promise<FillActionResult> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const sessionId = String(formData.get("session_id") ?? "").trim();
   const itemId = String(formData.get("item_id") ?? "").trim();
@@ -301,7 +318,7 @@ export async function uploadChecklistFillPhotoAction(
 
   const sessionOk = await assertSessionItem(
     supabase,
-    workspaceOwnerId,
+    auth.workspaceOwnerId,
     sessionId,
     itemId,
     itemResponseSource,
@@ -353,7 +370,7 @@ export async function uploadChecklistFillPhotoAction(
   const objectName = `${photoId}.${ext}`;
   // Pasta do bucket = titular do workspace (RLS em storage.objects), não auth.uid() —
   // senão membros da equipe falham no upload.
-  const storagePath = `${workspaceOwnerId}/${sessionId}/${objectName}`;
+  const storagePath = `${auth.workspaceOwnerId}/${sessionId}/${objectName}`;
 
   const buf = Buffer.from(await file.arrayBuffer());
   const { error: upErr } = await supabase.storage
@@ -362,6 +379,12 @@ export async function uploadChecklistFillPhotoAction(
       contentType: mime,
       upsert: false,
     });
+  logBudgetEvent({
+    service: "storage",
+    endpoint: "/storage/v1/object/upload",
+    source: "uploadChecklistFillPhotoAction",
+    userId: auth.userId,
+  });
 
   if (upErr) {
     return {
@@ -375,7 +398,7 @@ export async function uploadChecklistFillPhotoAction(
   const lng = parseOptionalCoord(String(formData.get("longitude") ?? ""));
 
   const insertRow = {
-    user_id: user.id,
+    user_id: auth.userId,
     session_id: sessionId,
     template_item_id: itemResponseSource === "global" ? itemId : null,
     custom_item_id: itemResponseSource === "custom" ? itemId : null,
@@ -394,6 +417,12 @@ export async function uploadChecklistFillPhotoAction(
     .insert(insertRow)
     .select("id, taken_at, latitude, longitude")
     .single();
+  logBudgetEvent({
+    service: "database",
+    endpoint: "public.checklist_fill_item_photos.insert",
+    source: "uploadChecklistFillPhotoAction",
+    userId: auth.userId,
+  });
 
   if (insErr || !inserted) {
     await supabase.storage.from(CHECKLIST_FILL_PHOTOS_BUCKET).remove([storagePath]);
@@ -427,11 +456,8 @@ export async function deleteChecklistFillPhotoAction(input: {
   sessionId: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const { photoId, sessionId } = input;
 
@@ -470,7 +496,7 @@ export async function deleteChecklistFillPhotoAction(input: {
     .eq("id", est.client_id)
     .maybeSingle();
 
-  if (!cl || cl.owner_user_id !== workspaceOwnerId) {
+  if (!cl || cl.owner_user_id !== auth.workspaceOwnerId) {
     return { ok: false, error: "Sem permissão." };
   }
 

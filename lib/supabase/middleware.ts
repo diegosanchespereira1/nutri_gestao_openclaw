@@ -20,6 +20,7 @@ import {
   profileLgpdBlocked,
   profileNeedsOnboarding,
 } from "@/lib/supabase/profile";
+import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
 
 const AUTH_MIDDLEWARE_TIMEOUT_MS = 4_500;
@@ -113,6 +114,12 @@ export async function updateSession(request: NextRequest) {
   try {
     const { data } = await withTimeout(supabase.auth.getUser(), "get_user");
     user = data.user;
+    logBudgetEvent({
+      service: "auth",
+      endpoint: "/auth/v1/user",
+      source: "middleware",
+      userId: user?.id ?? null,
+    });
   } catch (error) {
     logAuthMiddleware("error", requestId, "get_user_failed", {
       pathname,

@@ -44,6 +44,10 @@ import {
   getNextBatchItemAfterSession,
   type ChecklistFillBatchItem,
 } from "@/lib/checklist-fill-batch-storage";
+import {
+  hasResponseChanged,
+  pickBatchItemIdsForSave,
+} from "@/lib/checklists/save-batch";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
 /** Funde texto vazio no cliente com valores já persistidos (mesmo outcome). */
@@ -446,6 +450,8 @@ export function ChecklistFillWizard({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dirtyItemIdsRef = useRef<Set<string>>(new Set());
+  const saveBatchInFlightRef = useRef(false);
 
   function reportSaving() {
     if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
@@ -453,6 +459,7 @@ export function ChecklistFillWizard({
     setSaveErrorMsg(null);
   }
   function reportSaved() {
+    if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
     setSaveStatus("saved");
     setSaveErrorMsg(null);
     savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
@@ -469,6 +476,16 @@ export function ChecklistFillWizard({
     return () => {
       if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
     };
+  }, []);
+
+  const markItemDirty = useCallback((itemId: string) => {
+    dirtyItemIdsRef.current.add(itemId);
+  }, []);
+
+  const clearDirtyItems = useCallback((itemIds: string[]) => {
+    for (const itemId of itemIds) {
+      dirtyItemIdsRef.current.delete(itemId);
+    }
   }, []);
 
   const formLocked = dossierPreviewConfirmed || Boolean(dossierApprovedAt);
@@ -562,6 +579,7 @@ export function ChecklistFillWizard({
       startTransition(async () => {
         const cur = responsesRef.current[itemId];
         if (!cur?.outcome) return;
+        if (!dirtyItemIdsRef.current.has(itemId)) return;
         reportSaving();
         const result = await saveFillItemResponse({
           sessionId,
@@ -573,11 +591,13 @@ export function ChecklistFillWizard({
           validUntil: cur.validUntil ?? null,
           persistMode: "full",
         });
-        if (result.ok) reportSaved();
-        else reportSaveError(result.error);
+        if (result.ok) {
+          clearDirtyItems([itemId]);
+          reportSaved();
+        } else reportSaveError(result.error);
       });
     },
-    [sessionId, itemResponseSource],
+    [clearDirtyItems, sessionId, itemResponseSource],
   );
 
   const section = sections[sectionIndex];
@@ -640,6 +660,9 @@ export function ChecklistFillWizard({
       const note = outcome === "nc" ? cur.note : null;
       const annotation = cur.annotation ?? null;
       const validUntil = cur.validUntil ?? null;
+      if (hasResponseChanged(cur.outcome, outcome)) {
+        markItemDirty(itemId);
+      }
       setResponses((prev) => ({
         ...prev,
         [itemId]: { outcome, note, annotation, validUntil },
@@ -662,29 +685,38 @@ export function ChecklistFillWizard({
         }
       });
     },
-    [sessionId, itemResponseSource],
+    [markItemDirty, sessionId, itemResponseSource],
   );
 
   const setNote = useCallback((itemId: string, note: string) => {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
+      if (hasResponseChanged(cur.note ?? "", note)) {
+        markItemDirty(itemId);
+      }
       return { ...prev, [itemId]: { ...cur, note } };
     });
-  }, []);
+  }, [markItemDirty]);
 
   const setAnnotation = useCallback((itemId: string, annotation: string) => {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
+      if (hasResponseChanged(cur.annotation ?? "", annotation)) {
+        markItemDirty(itemId);
+      }
       return { ...prev, [itemId]: { ...cur, annotation } };
     });
-  }, []);
+  }, [markItemDirty]);
 
   const setValidUntil = useCallback((itemId: string, validUntil: string) => {
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
+      if (hasResponseChanged(cur.validUntil ?? "", validUntil)) {
+        markItemDirty(itemId);
+      }
       return { ...prev, [itemId]: { ...cur, validUntil } };
     });
-  }, []);
+  }, [markItemDirty]);
 
   function handleNext() {
     setAdvanceError(null);
@@ -703,30 +735,51 @@ export function ChecklistFillWizard({
     setSectionIndex((i) => Math.max(0, i - 1));
   }
 
-  function saveCurrentSectionFields() {
-    if (!section) return;
-    for (const item of section.items) {
-      const cur = responsesRef.current[item.id];
-      if (!cur?.outcome) continue;
-      reportSaving();
-      startTransition(async () => {
-        const result = await saveFillItemResponse({
-          sessionId,
-          itemId: item.id,
-          itemResponseSource,
-          outcome: cur.outcome,
-          note: cur.note ?? null,
-          annotation: cur.annotation ?? null,
-          validUntil: cur.validUntil ?? null,
-          persistMode: "full",
-        });
-        if (result.ok) {
-          reportSaved();
-        } else {
-          reportSaveError(result.error);
-        }
+  const saveProgressBatch = useCallback(
+    (scope: "section" | "all", forceAll: boolean) => {
+      if (!section || saveBatchInFlightRef.current) return;
+
+      const itemIds = pickBatchItemIdsForSave({
+        scope,
+        sectionItemIds: section.items.map((item) => item.id),
+        responses: responsesRef.current,
+        dirtyItemIds: dirtyItemIdsRef.current,
+        forceAll,
       });
-    }
+      if (itemIds.length === 0) return;
+
+      saveBatchInFlightRef.current = true;
+      startTransition(async () => {
+        reportSaving();
+        for (const itemId of itemIds) {
+          const cur = responsesRef.current[itemId];
+          if (!cur?.outcome) continue;
+          const result = await saveFillItemResponse({
+            sessionId,
+            itemId,
+            itemResponseSource,
+            outcome: cur.outcome,
+            note: cur.note ?? null,
+            annotation: cur.annotation ?? null,
+            validUntil: cur.validUntil ?? null,
+            persistMode: "full",
+          });
+          if (!result.ok) {
+            saveBatchInFlightRef.current = false;
+            reportSaveError(result.error);
+            return;
+          }
+        }
+        clearDirtyItems(itemIds);
+        saveBatchInFlightRef.current = false;
+        reportSaved();
+      });
+    },
+    [clearDirtyItems, itemResponseSource, section, sessionId],
+  );
+
+  function saveCurrentSectionFields() {
+    saveProgressBatch("section", false);
   }
 
   if (!section) {
@@ -1037,6 +1090,16 @@ export function ChecklistFillWizard({
           </div>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
+          {!formLocked ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => saveProgressBatch("all", true)}
+              disabled={isPending}
+            >
+              Salvar agora
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"

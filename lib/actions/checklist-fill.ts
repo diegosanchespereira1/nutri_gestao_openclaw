@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
+import { requireWorkspaceAuthContext } from "@/lib/actions/auth-context";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import {
   MAX_CHECKLIST_ITEM_ANNOTATION_CHARS,
@@ -52,12 +52,8 @@ async function assertEstablishmentOwned(
 
 export async function startChecklistFill(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) redirect("/login");
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const establishmentId = String(formData.get("establishment_id") ?? "").trim();
@@ -67,7 +63,7 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
     redirect("/checklists?err=missing");
   }
 
-  const ok = await assertEstablishmentOwned(supabase, workspaceOwnerId, establishmentId);
+  const ok = await assertEstablishmentOwned(supabase, auth.workspaceOwnerId, establishmentId);
   if (!ok) redirect("/checklists?err=forbidden");
 
   const { data: template } = await supabase
@@ -87,7 +83,7 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
       .select("id")
       .eq("id", areaIdRaw)
       .eq("establishment_id", establishmentId)
-      .eq("owner_user_id", workspaceOwnerId)
+      .eq("owner_user_id", auth.workspaceOwnerId)
       .maybeSingle();
     if (!area) redirect("/checklists?err=area");
     resolvedAreaId = area.id;
@@ -96,7 +92,7 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
   const { data: session, error } = await supabase
     .from("checklist_fill_sessions")
     .insert({
-      user_id: user.id,
+      user_id: auth.userId,
       establishment_id: establishmentId,
       template_id: templateId,
       custom_template_id: null,
@@ -112,12 +108,8 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
 
 export async function startChecklistCustomFill(formData: FormData): Promise<void> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) redirect("/login");
 
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
   const areaIdRawCustom = String(formData.get("area_id") ?? "").trim();
@@ -139,7 +131,7 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
       .select("id")
       .eq("id", areaIdRawCustom)
       .eq("establishment_id", ct.establishment_id as string)
-      .eq("owner_user_id", workspaceOwnerId)
+      .eq("owner_user_id", auth.workspaceOwnerId)
       .maybeSingle();
     if (area) resolvedAreaIdCustom = area.id;
   }
@@ -147,7 +139,7 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
   const { data: session, error } = await supabase
     .from("checklist_fill_sessions")
     .insert({
-      user_id: user.id,
+      user_id: auth.userId,
       establishment_id: ct.establishment_id as string,
       template_id: null,
       custom_template_id: customTemplateId,
@@ -335,12 +327,8 @@ export async function loadFillResponsesMapForSession(
   sessionId: string,
 ): Promise<LoadFillResponsesResult> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
@@ -352,7 +340,7 @@ export async function loadFillResponsesMapForSession(
 
   const estOwned = await assertEstablishmentOwned(
     supabase,
-    workspaceOwnerId,
+    auth.workspaceOwnerId,
     sess.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
@@ -446,12 +434,8 @@ export async function saveFillItemResponse(input: {
   persistMode?: "full" | "merge";
 }): Promise<FillActionResult> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const { sessionId, itemId, itemResponseSource, outcome, note, annotation, validUntil } =
     input;
@@ -469,7 +453,7 @@ export async function saveFillItemResponse(input: {
 
   const estOwned = await assertEstablishmentOwned(
     supabase,
-    workspaceOwnerId,
+    auth.workspaceOwnerId,
     sess.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
@@ -656,15 +640,15 @@ export async function checkExistingOpenFillSession(input: {
   workspaceTemplateId?: string | null;
 }): Promise<ExistingOpenSession | null> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return null;
 
   // Validar posse do estabelecimento (assertEstablishmentOwned como primeira verificação).
-  const ok = await assertEstablishmentOwned(supabase, workspaceOwnerId, input.establishmentId);
+  const ok = await assertEstablishmentOwned(
+    supabase,
+    auth.workspaceOwnerId,
+    input.establishmentId,
+  );
   if (!ok) return null;
 
   const { establishmentId, templateId, customTemplateId } = input;
@@ -702,7 +686,7 @@ export async function checkExistingOpenFillSession(input: {
 
     const responseCount = count ?? 0;
     if (responseCount > 0) {
-      const isMine = sess.user_id === user.id;
+      const isMine = sess.user_id === auth.userId;
       let startedByName: string | null = null;
       if (!isMine) {
         // Busca pelo team_members do workspace (RLS permite leitura via owner_user_id).
@@ -710,7 +694,7 @@ export async function checkExistingOpenFillSession(input: {
         const { data: member } = await supabase
           .from("team_members")
           .select("full_name")
-          .eq("owner_user_id", workspaceOwnerId)
+          .eq("owner_user_id", auth.workspaceOwnerId)
           .eq("member_user_id", sess.user_id)
           .maybeSingle();
         startedByName = member?.full_name ?? null;
@@ -754,19 +738,15 @@ export async function startChecklistFillBatch(input: {
   | { ok: false; error: string }
 > {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "not_authenticated" };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: "not_authenticated" };
   const { templateId, establishmentId, areaIds } = input;
 
   if (!templateId || !establishmentId) {
     return { ok: false, error: "missing_fields" };
   }
 
-  const owned = await assertEstablishmentOwned(supabase, workspaceOwnerId, establishmentId);
+  const owned = await assertEstablishmentOwned(supabase, auth.workspaceOwnerId, establishmentId);
   if (!owned) return { ok: false, error: "forbidden" };
 
   const { data: template } = await supabase
@@ -798,7 +778,7 @@ export async function startChecklistFillBatch(input: {
     const { data: session, error } = await supabase
       .from("checklist_fill_sessions")
       .insert({
-        user_id: user.id,
+        user_id: auth.userId,
         establishment_id: establishmentId,
         template_id: templateId,
         custom_template_id: null,
@@ -831,12 +811,8 @@ export async function deleteChecklistFillSessionAction(
   sessionId: string,
 ): Promise<FillActionResult> {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
@@ -855,7 +831,7 @@ export async function deleteChecklistFillSessionAction(
 
   const estOwned = await assertEstablishmentOwned(
     supabase,
-    workspaceOwnerId,
+    auth.workspaceOwnerId,
     sess.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para excluir este rascunho." };
@@ -933,15 +909,11 @@ export async function approveChecklistFillDossierAction(
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: auth.error };
   const estOwned = await assertEstablishmentOwned(
     supabase,
-    workspaceOwnerId,
+    auth.workspaceOwnerId,
     bundle.session.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para aprovar este dossiê." };

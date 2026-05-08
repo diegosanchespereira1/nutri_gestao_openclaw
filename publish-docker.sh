@@ -1,8 +1,13 @@
 #!/bin/bash
 
 # Script de Publish Docker - NutriGestão
-# Uso: ./publish-docker.sh [username] [version]
+# Uso clássico: ./publish-docker.sh [username] [version]
 # Exemplo: ./publish-docker.sh stratostech 0.1.0
+#
+# Modo dev (lê build args do .env.local):
+#   ./publish-docker.sh --dev
+#   ./publish-docker.sh --dev --tag dev-hml
+#   ./publish-docker.sh --dev --user stratostech --repo nutricao-stratostech --env-file .env.local
 
 set -e
 
@@ -14,9 +19,52 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Valores padrão (não usar USERNAME — no macOS é o login curto e sobrepõe $1)
-DOCKERHUB_USER=${1:-stratostech}
-VERSION=${2:-0.1.0}
+DOCKERHUB_USER="stratostech"
+VERSION="0.1.0"
 REPO="nutricao-gestao"
+ENV_FILE=".env.local"
+DEV_MODE=false
+DEV_TAG="dev"
+
+# Compatibilidade com uso antigo positional args.
+if [[ $# -gt 0 && "${1:0:1}" != "-" ]]; then
+  DOCKERHUB_USER="$1"
+  shift
+fi
+if [[ $# -gt 0 && "${1:0:1}" != "-" ]]; then
+  VERSION="$1"
+  shift
+fi
+
+# Flags novas.
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dev)
+      DEV_MODE=true
+      shift
+      ;;
+    --tag)
+      DEV_TAG="${2:-}"
+      shift 2
+      ;;
+    --user)
+      DOCKERHUB_USER="${2:-}"
+      shift 2
+      ;;
+    --repo)
+      REPO="${2:-}"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo -e "${RED}✗ Flag inválida: $1${NC}"
+      exit 1
+      ;;
+  esac
+done
 
 echo -e "${BLUE}═══════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}  Docker Hub Publisher - NutriGestão${NC}"
@@ -44,11 +92,59 @@ echo ""
 echo -e "${BLUE}📦 Informações da Build:${NC}"
 echo "  Docker Hub user: $DOCKERHUB_USER"
 echo "  Repositório: $REPO"
-echo "  Versão: $VERSION"
-echo "  URL Final: docker.io/$DOCKERHUB_USER/$REPO:$VERSION"
+if [[ "$DEV_MODE" == true ]]; then
+    echo "  Modo: DEV"
+    echo "  Tag: $DEV_TAG"
+    echo "  Env file: $ENV_FILE"
+    echo "  URL Final: docker.io/$DOCKERHUB_USER/$REPO:$DEV_TAG"
+else
+    echo "  Versão: $VERSION"
+    echo "  URL Final: docker.io/$DOCKERHUB_USER/$REPO:$VERSION"
+fi
 echo ""
 
-# Step 1: Build
+if [[ "$DEV_MODE" == true ]]; then
+    if [[ ! -f "$ENV_FILE" ]]; then
+        echo -e "${RED}✗ Arquivo de env não encontrado: $ENV_FILE${NC}"
+        exit 1
+    fi
+
+    # Lê apenas chaves necessárias para build (não exporta arquivo inteiro).
+    NEXT_PUBLIC_SUPABASE_URL_VALUE=$(awk -F= '/^NEXT_PUBLIC_SUPABASE_URL=/{sub(/^[^=]*=/,""); print; exit}' "$ENV_FILE")
+    NEXT_PUBLIC_SUPABASE_ANON_KEY_VALUE=$(awk -F= '/^NEXT_PUBLIC_SUPABASE_ANON_KEY=/{sub(/^[^=]*=/,""); print; exit}' "$ENV_FILE")
+    NEXT_PUBLIC_SITE_URL_VALUE=$(awk -F= '/^NEXT_PUBLIC_SITE_URL=/{sub(/^[^=]*=/,""); print; exit}' "$ENV_FILE")
+
+    if [[ -z "$NEXT_PUBLIC_SUPABASE_URL_VALUE" || -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY_VALUE" ]]; then
+        echo -e "${RED}✗ NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY ausentes em $ENV_FILE${NC}"
+        exit 1
+    fi
+
+    if [[ -z "$NEXT_PUBLIC_SITE_URL_VALUE" ]]; then
+        NEXT_PUBLIC_SITE_URL_VALUE="https://nutricao.stratostech.com.br"
+        echo -e "${YELLOW}⚠ NEXT_PUBLIC_SITE_URL ausente; usando fallback: $NEXT_PUBLIC_SITE_URL_VALUE${NC}"
+    fi
+
+    echo -e "${BLUE}[1/3] Build DEV com build-args do env...${NC}"
+    if docker buildx build \
+      --platform linux/amd64 \
+      --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL_VALUE" \
+      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY_VALUE" \
+      --build-arg NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL_VALUE" \
+      -t "$DOCKERHUB_USER/$REPO:$DEV_TAG" \
+      --push .; then
+        echo -e "${GREEN}✓ Buildx/push DEV concluído${NC}"
+    else
+        echo -e "${RED}✗ Erro durante buildx/push DEV${NC}"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${GREEN}✓ Publicação DEV concluída${NC}"
+    echo -e "${BLUE}🐳 Imagem:${NC} $DOCKERHUB_USER/$REPO:$DEV_TAG"
+    exit 0
+fi
+
+# Step 1: Build (modo clássico)
 echo -e "${BLUE}[1/4] Fazendo build da imagem Docker...${NC}"
 if docker build -t $REPO:$VERSION .; then
     echo -e "${GREEN}✓ Build concluído${NC}"

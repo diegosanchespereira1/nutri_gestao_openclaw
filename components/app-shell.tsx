@@ -68,9 +68,11 @@ function NavLinks({
 export function AppShell({
   children,
   showAdminNav = false,
+  userFirstName = null,
 }: {
   children: React.ReactNode;
   showAdminNav?: boolean;
+  userFirstName?: string | null;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -101,7 +103,7 @@ export function AppShell({
 
         <Separator className="bg-sidebar-border opacity-40" />
 
-        <AppShellUserGreeting />
+        <AppShellUserGreeting firstName={userFirstName} />
 
         <Separator className="bg-sidebar-border opacity-40" />
 
@@ -162,7 +164,7 @@ export function AppShell({
 
             <Separator className="bg-sidebar-border opacity-40" />
 
-            <AppShellUserGreeting />
+            <AppShellUserGreeting firstName={userFirstName} />
 
             <Separator className="bg-sidebar-border opacity-40" />
 

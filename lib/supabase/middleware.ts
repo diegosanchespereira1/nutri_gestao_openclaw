@@ -3,22 +3,24 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
 import {
+  APP_PROFILE_CTX_COOKIE,
   APP_SESSION_LAST_COOKIE,
   APP_SESSION_START_COOKIE,
   appSessionCookieOptions,
   getAppSessionAbsoluteMaxSec,
   getAppSessionIdleTimeoutSec,
+  getProfileCtxTtlSec,
 } from "@/lib/auth/app-session-cookies";
 import {
+  isAuthPublicPath,
   isAdminPath,
   isPathAllowedWhenLgpdBlocked,
   isProtectedPath,
 } from "@/lib/auth-paths";
-import { canAccessAdminArea } from "@/lib/roles";
+import { canAccessAdminArea, type ProfileRole } from "@/lib/roles";
 import {
-  fetchProfileRole,
-  profileLgpdBlocked,
-  profileNeedsOnboarding,
+  countClientsForOwner,
+  fetchProfileGuardContext,
 } from "@/lib/supabase/profile";
 import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
@@ -79,12 +81,72 @@ function nextWithPathname(request: NextRequest): NextResponse {
   });
 }
 
+function isPrefetchRequest(request: NextRequest): boolean {
+  const purpose = request.headers.get("purpose");
+  const nextRouterPrefetch = request.headers.get("next-router-prefetch");
+  const middlewarePrefetch = request.headers.get("x-middleware-prefetch");
+  return (
+    purpose === "prefetch" ||
+    nextRouterPrefetch === "1" ||
+    middlewarePrefetch === "1"
+  );
+}
+
+type MiddlewareProfileContext = {
+  userId: string;
+  role: ProfileRole | null;
+  timeZone: string;
+  fullName: string | null;
+  lgpdBlocked: boolean;
+  needsOnboarding: boolean;
+  cachedAt: number;
+};
+
+function parseProfileContextCookie(raw: string | undefined): MiddlewareProfileContext | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<MiddlewareProfileContext>;
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.timeZone !== "string" ||
+      typeof parsed.lgpdBlocked !== "boolean" ||
+      typeof parsed.needsOnboarding !== "boolean" ||
+      typeof parsed.cachedAt !== "number"
+    ) {
+      return null;
+    }
+    return {
+      userId: parsed.userId,
+      role: typeof parsed.role === "string" ? (parsed.role as ProfileRole) : null,
+      timeZone: parsed.timeZone,
+      fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
+      lgpdBlocked: parsed.lgpdBlocked,
+      needsOnboarding: parsed.needsOnboarding,
+      cachedAt: parsed.cachedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function updateSession(request: NextRequest) {
   const requestId = crypto.randomUUID();
   const startedAt = Date.now();
   const url = readSupabaseUrl();
   const anonKey = readSupabaseAnonKey();
   const pathname = request.nextUrl.pathname;
+  const pathNeedsAuthGuard =
+    isProtectedPath(pathname) ||
+    isAuthPublicPath(pathname) ||
+    pathname === "/conta-bloqueada";
+
+  if (!pathNeedsAuthGuard) {
+    return nextWithPathname(request);
+  }
+
+  if (isPrefetchRequest(request)) {
+    return nextWithPathname(request);
+  }
 
   if (!url || !anonKey) {
     return nextWithPathname(request);
@@ -140,6 +202,7 @@ export async function updateSession(request: NextRequest) {
   if (!user) {
     supabaseResponse.cookies.delete(APP_SESSION_START_COOKIE);
     supabaseResponse.cookies.delete(APP_SESSION_LAST_COOKIE);
+    supabaseResponse.cookies.delete(APP_PROFILE_CTX_COOKIE);
   } else {
     const now = Math.floor(Date.now() / 1000);
     const absSec = getAppSessionAbsoluteMaxSec();
@@ -212,26 +275,71 @@ export async function updateSession(request: NextRequest) {
     return redirectRes;
   }
 
+  let profileCtx: MiddlewareProfileContext | null = null;
+  if (user && isProtectedPath(pathname)) {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const profileCtxTtlSec = getProfileCtxTtlSec();
+    const cachedProfileCtx = parseProfileContextCookie(
+      request.cookies.get(APP_PROFILE_CTX_COOKIE)?.value,
+    );
+    const canReuseCache =
+      cachedProfileCtx?.userId === user.id &&
+      nowSec - cachedProfileCtx.cachedAt <= profileCtxTtlSec;
+
+    if (canReuseCache) {
+      profileCtx = cachedProfileCtx;
+    } else {
+      try {
+        const guard = await withTimeout(
+          fetchProfileGuardContext(supabase, user.id),
+          "fetch_profile_guard_context",
+        );
+        const needsOnboarding =
+          guard.onboardingCompletedAt == null &&
+          (await withTimeout(
+            countClientsForOwner(supabase, user.id),
+            "count_clients_for_owner",
+          )) === 0;
+        profileCtx = {
+          userId: user.id,
+          role: guard.role,
+          timeZone: guard.timeZone,
+          fullName: guard.fullName,
+          lgpdBlocked: guard.lgpdBlocked,
+          needsOnboarding,
+          cachedAt: nowSec,
+        };
+      } catch (error) {
+        logAuthMiddleware("warn", requestId, "profile_guard_context_failed", {
+          userId: user.id,
+          pathname,
+          error: error instanceof Error ? error.message : "unknown",
+        });
+        profileCtx = {
+          userId: user.id,
+          role: null,
+          timeZone: "America/Sao_Paulo",
+          fullName: null,
+          lgpdBlocked: false,
+          needsOnboarding: false,
+          cachedAt: nowSec,
+        };
+      }
+    }
+
+    supabaseResponse.cookies.set(
+      APP_PROFILE_CTX_COOKIE,
+      JSON.stringify(profileCtx),
+      appSessionCookieOptions(baseCookie, profileCtxTtlSec + 5),
+    );
+  }
+
   if (
     user &&
     isProtectedPath(pathname) &&
     !isPathAllowedWhenLgpdBlocked(pathname)
   ) {
-    let blocked = false;
-    try {
-      blocked = await withTimeout(
-        profileLgpdBlocked(supabase, user.id),
-        "profile_lgpd_blocked",
-      );
-    } catch (error) {
-      logAuthMiddleware("warn", requestId, "profile_lgpd_check_failed", {
-        userId: user.id,
-        pathname,
-        error: error instanceof Error ? error.message : "unknown",
-      });
-      blocked = false;
-    }
-    if (blocked) {
+    if (profileCtx?.lgpdBlocked) {
       const redirectRes = NextResponse.redirect(
         new URL("/conta-bloqueada", request.url),
       );
@@ -247,20 +355,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isProtectedPath(pathname)) {
     const onOnboardingRoute =
       pathname === "/onboarding" || pathname.startsWith("/onboarding/");
-    let needsOnboarding = false;
-    try {
-      needsOnboarding = await withTimeout(
-        profileNeedsOnboarding(supabase, user.id),
-        "profile_needs_onboarding",
-      );
-    } catch (error) {
-      logAuthMiddleware("warn", requestId, "profile_needs_onboarding_failed", {
-        userId: user.id,
-        pathname,
-        error: error instanceof Error ? error.message : "unknown",
-      });
-      needsOnboarding = false;
-    }
+    const needsOnboarding = profileCtx?.needsOnboarding ?? false;
     if (needsOnboarding && !onOnboardingRoute) {
       const redirectRes = NextResponse.redirect(
         new URL("/onboarding", request.url),
@@ -284,17 +379,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAdminPath(pathname)) {
-    let role = null;
-    try {
-      role = await withTimeout(fetchProfileRole(supabase, user.id), "fetch_profile_role");
-    } catch (error) {
-      logAuthMiddleware("warn", requestId, "fetch_profile_role_failed", {
-        userId: user.id,
-        pathname,
-        error: error instanceof Error ? error.message : "unknown",
-      });
-      role = null;
-    }
+    const role = profileCtx?.role ?? null;
     if (!canAccessAdminArea(role)) {
       const redirectRes = NextResponse.redirect(new URL("/inicio", request.url));
       copyCookies(supabaseResponse, redirectRes);

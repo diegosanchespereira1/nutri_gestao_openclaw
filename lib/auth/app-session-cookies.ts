@@ -5,9 +5,11 @@ export const APP_SESSION_START_COOKIE = "ng_sess_start";
 
 /** Última actividade (pedido HTTP à aplicação): inactividade = fim de sessão. */
 export const APP_SESSION_LAST_COOKIE = "ng_sess_last";
+export const APP_PROFILE_CTX_COOKIE = "ng_profile_ctx";
 
 const ABS_FALLBACK_SEC = 8 * 60 * 60; // 8 h
 const IDLE_FALLBACK_SEC = 45 * 60; // 45 min
+const PROFILE_CTX_TTL_FALLBACK_SEC = 30; // 30 s
 
 function parsePositiveInt(raw: string | undefined, fallback: number, min: number): number {
   if (raw == null || raw === "") return fallback;
@@ -36,6 +38,14 @@ export function getAppSessionIdleTimeoutSec(): number {
     process.env.AUTH_SESSION_IDLE_TIMEOUT_SEC,
     IDLE_FALLBACK_SEC,
     60, // mín. 1 min
+  );
+}
+
+export function getProfileCtxTtlSec(): number {
+  return parsePositiveInt(
+    process.env.AUTH_PROFILE_CTX_TTL_SEC,
+    PROFILE_CTX_TTL_FALLBACK_SEC,
+    10,
   );
 }
 

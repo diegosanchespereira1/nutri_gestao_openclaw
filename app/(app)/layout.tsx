@@ -1,30 +1,57 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { AppTimeZoneProvider } from "@/components/app-timezone-provider";
 import { Toaster } from "@/components/ui/sonner";
-import { canAccessAdminArea } from "@/lib/roles";
-import { createClient } from "@/lib/supabase/server";
-import { fetchProfileShellContext } from "@/lib/supabase/profile";
+import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
+import { canAccessAdminArea, type ProfileRole } from "@/lib/roles";
+import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
+
+type ProfileCtxCookie = {
+  userId: string;
+  role: ProfileRole | null;
+  timeZone: string;
+  fullName: string | null;
+};
+
+function parseProfileCtxCookie(raw: string | undefined): ProfileCtxCookie | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ProfileCtxCookie>;
+    if (
+      typeof parsed.userId !== "string" ||
+      typeof parsed.timeZone !== "string"
+    ) {
+      return null;
+    }
+    return {
+      userId: parsed.userId,
+      role: typeof parsed.role === "string" ? (parsed.role as ProfileRole) : null,
+      timeZone: parsed.timeZone,
+      fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
+    };
+  } catch {
+    return null;
+  }
+}
 
 export default async function AppAreaLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const [cookieStore, headersList] = await Promise.all([cookies(), headers()]);
+  const profileCtx = parseProfileCtxCookie(
+    cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
+  );
+  if (!profileCtx?.userId) {
     redirect("/login");
   }
 
-  const [{ role, timeZone, fullName }, headersList] = await Promise.all([
-    fetchProfileShellContext(supabase, user.id),
-    headers(),
-  ]);
+  const role = profileCtx.role;
+  const timeZone = profileCtx.timeZone || DEFAULT_PROFILE_TIME_ZONE;
+  const fullName = profileCtx.fullName;
   const userFirstName = fullName ? fullName.split(" ")[0] ?? null : null;
   const showAdminNav = canAccessAdminArea(role);
   const pathname = headersList.get("x-pathname") ?? "";

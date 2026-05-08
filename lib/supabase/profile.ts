@@ -158,3 +158,51 @@ export async function profileLgpdBlocked(
     data.lgpd_blocked_at != null && data.lgpd_unblocked_at == null
   );
 }
+
+export type ProfileGuardContext = {
+  role: ProfileRole | null;
+  timeZone: string;
+  fullName: string | null;
+  lgpdBlocked: boolean;
+  onboardingCompletedAt: string | null;
+};
+
+export async function fetchProfileGuardContext(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<ProfileGuardContext> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(
+      "role, timezone, full_name, lgpd_blocked_at, lgpd_unblocked_at, onboarding_completed_at",
+    )
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      role: null,
+      timeZone: DEFAULT_PROFILE_TIME_ZONE,
+      fullName: null,
+      lgpdBlocked: false,
+      onboardingCompletedAt: null,
+    };
+  }
+
+  const role = data.role && isProfileRole(data.role) ? data.role : null;
+  const timeZone = data.timezone
+    ? normalizeAppTimeZone(data.timezone)
+    : DEFAULT_PROFILE_TIME_ZONE;
+  const fullName = typeof data.full_name === "string" && data.full_name.trim().length > 0
+    ? data.full_name
+    : null;
+  const lgpdBlocked = data.lgpd_blocked_at != null && data.lgpd_unblocked_at == null;
+
+  return {
+    role,
+    timeZone,
+    fullName,
+    lgpdBlocked,
+    onboardingCompletedAt: data.onboarding_completed_at ?? null,
+  };
+}

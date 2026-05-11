@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, ChevronRight, Globe, Lock, UserCircle } from "lucide-react";
+import { Building2, Camera, ChevronRight, Globe, Lock, UserCircle } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -23,6 +23,13 @@ const settingsItems = [
     icon: Globe,
     label: "Região e fuso horário",
     description: "Configure o fuso horário para visitas e calendário.",
+  },
+  {
+    href: "/definicoes/checklist-fotos",
+    icon: Camera,
+    label: "Checklist e fotos",
+    description:
+      "Localização opcional nas fotos de evidência (guardado neste dispositivo).",
   },
   {
     href: "/definicoes/seguranca",

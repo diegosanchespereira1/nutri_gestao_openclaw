@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Camera, Images, Trash2, ZoomIn } from "lucide-react";
 
 import { PageHelpHint } from "@/components/help/page-help-hint";
@@ -14,6 +15,7 @@ import {
   CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM,
   CHECKLIST_FILL_PHOTO_MAX_BYTES,
 } from "@/lib/constants/checklist-fill-photos-storage";
+import { readChecklistPhotoGpsPreference } from "@/lib/preferences/checklist-photo-gps";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import { cn } from "@/lib/utils";
 
@@ -134,8 +136,7 @@ type UploadState =
 
 const STEP_LABELS: Record<UploadStep, string> = {
   compressing: "Comprimindo imagem…",
-  location:
-    "Localização opcional — aguardando permissão ou seguindo sem GPS…",
+  location: "A obter localização para a foto…",
   uploading: "Enviando ao servidor…",
   saving: "Salvando registro…",
 };
@@ -232,16 +233,18 @@ export function ChecklistItemPhotos({
             continue;
           }
 
-          // ── Etapa 2: localização (opcional — negação ou timeout não bloqueia o upload) ──
-          setUploadState({ status: "busy", step: "location", percent: 40 });
+          // ── Etapa 2: GPS só se o utilizador activou em Definições → Checklist e fotos ──
           let lat = "";
           let lng = "";
-          const pos = await getPositionOptional();
-          if (pos) {
-            lat = String(pos.coords.latitude);
-            lng = String(pos.coords.longitude);
+          if (readChecklistPhotoGpsPreference()) {
+            setUploadState({ status: "busy", step: "location", percent: 40 });
+            const pos = await getPositionOptional();
+            if (pos) {
+              lat = String(pos.coords.latitude);
+              lng = String(pos.coords.longitude);
+            }
+            setUploadState({ status: "busy", step: "location", percent: 50 });
           }
-          setUploadState({ status: "busy", step: "location", percent: 50 });
 
           // ── Etapa 3: enviar ao servidor ──
           setUploadState({ status: "busy", step: "uploading", percent: 55 });
@@ -330,8 +333,12 @@ export function ChecklistItemPhotos({
             <p>
               Em celular ou tablet, use <strong>Tirar foto</strong> para abrir a câmera;{" "}
               <strong>Galeria</strong> para escolher uma imagem já salva. Formatos JPEG,
-              PNG ou WebP até 6 MB. A localização é opcional: se você negar ou demorar a
-              responder, a foto é enviada mesmo assim, sem coordenadas.
+              PNG ou WebP até 6 MB. Por omissão não pedimos localização; para anexar GPS às
+              evidências, active a opção em{" "}
+              <Link href="/definicoes/checklist-fotos" className="text-primary font-medium underline-offset-2 hover:underline">
+                Definições → Checklist e fotos
+              </Link>
+              .
             </p>
           </PageHelpHint>
         </div>

@@ -36,7 +36,9 @@ async function revalidateAfterPhotoChange(
   supabase: Awaited<ReturnType<typeof createClient>>,
   sessionId: string,
 ): Promise<void> {
-  revalidatePath(`/checklists/preencher/${sessionId}`);
+  // Não invalidar a página de preenchimento aqui: `revalidatePath` dispara refresh
+  // RSC no cliente e interrompe o fluxo (ex.: após upload com barra a 100%).
+  // O componente já actualiza a lista de fotos com a resposta da Server Action.
 
   const { data: meta } = await supabase
     .from("checklist_fill_sessions")

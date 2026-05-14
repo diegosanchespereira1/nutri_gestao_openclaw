@@ -8,8 +8,26 @@
 #   ./publish-docker.sh --dev
 #   ./publish-docker.sh --dev --tag dev-hml
 #   ./publish-docker.sh --dev --user stratostech --repo nutricao-stratostech --env-file .env.local
+#
+# NEXT_SERVER_ACTIONS_ENCRYPTION_KEY (recomendado — Next.js Server Actions estáveis em Docker):
+#   - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(openssl rand -base64 32)" antes do script, ou
+#   - linha no .env.local: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=... (usado em --dev e no modo clássico
+#     se o ficheiro existir). Gere uma vez e reutilize entre builds do mesmo produto.
 
 set -e
+
+# Lê NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: variável de ambiente tem prioridade, senão primeira linha no ficheiro.
+read_server_actions_encryption_key() {
+  local from_file=""
+  if [[ -f "$ENV_FILE" ]]; then
+    from_file=$(awk -F= '/^NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=/{sub(/^[^=]*=/,""); print; exit}' "$ENV_FILE" 2>/dev/null || true)
+  fi
+  if [[ -n "${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-}" ]]; then
+    printf '%s' "$NEXT_SERVER_ACTIONS_ENCRYPTION_KEY"
+  elif [[ -n "$from_file" ]]; then
+    printf '%s' "$from_file"
+  fi
+}
 
 # Cores para output
 RED='\033[0;31m'
@@ -99,7 +117,14 @@ if [[ "$DEV_MODE" == true ]]; then
     echo "  URL Final: docker.io/$DOCKERHUB_USER/$REPO:$DEV_TAG"
 else
     echo "  Versão: $VERSION"
+    echo "  Env file (opcional, p/ chave de actions): $ENV_FILE"
     echo "  URL Final: docker.io/$DOCKERHUB_USER/$REPO:$VERSION"
+fi
+SA_KEY_PREVIEW="$(read_server_actions_encryption_key)"
+if [[ -n "$SA_KEY_PREVIEW" ]]; then
+    echo -e "  ${GREEN}NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: definida (build)${NC}"
+else
+    echo -e "  ${YELLOW}NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ausente — recomendado para produção${NC}"
 fi
 echo ""
 
@@ -124,12 +149,20 @@ if [[ "$DEV_MODE" == true ]]; then
         echo -e "${YELLOW}⚠ NEXT_PUBLIC_SITE_URL ausente; usando fallback: $NEXT_PUBLIC_SITE_URL_VALUE${NC}"
     fi
 
+    DEV_BUILD_ARGS=(
+      --platform linux/amd64
+      --build-arg "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL_VALUE"
+      --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY_VALUE"
+      --build-arg "NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL_VALUE"
+    )
+    SA_KEY_DEV="$(read_server_actions_encryption_key)"
+    if [[ -n "$SA_KEY_DEV" ]]; then
+      DEV_BUILD_ARGS+=(--build-arg "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$SA_KEY_DEV")
+    fi
+
     echo -e "${BLUE}[1/3] Build DEV com build-args do env...${NC}"
     if docker buildx build \
-      --platform linux/amd64 \
-      --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL_VALUE" \
-      --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY="$NEXT_PUBLIC_SUPABASE_ANON_KEY_VALUE" \
-      --build-arg NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_SITE_URL_VALUE" \
+      "${DEV_BUILD_ARGS[@]}" \
       -t "$DOCKERHUB_USER/$REPO:$DEV_TAG" \
       --push .; then
         echo -e "${GREEN}✓ Buildx/push DEV concluído${NC}"
@@ -145,8 +178,14 @@ if [[ "$DEV_MODE" == true ]]; then
 fi
 
 # Step 1: Build (modo clássico)
+CLASSIC_BUILD_ARGS=(-t "$REPO:$VERSION")
+SA_KEY_CLASSIC="$(read_server_actions_encryption_key)"
+if [[ -n "$SA_KEY_CLASSIC" ]]; then
+  CLASSIC_BUILD_ARGS+=(--build-arg "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$SA_KEY_CLASSIC")
+fi
+
 echo -e "${BLUE}[1/4] Fazendo build da imagem Docker...${NC}"
-if docker build -t $REPO:$VERSION .; then
+if docker build "${CLASSIC_BUILD_ARGS[@]}" .; then
     echo -e "${GREEN}✓ Build concluído${NC}"
 else
     echo -e "${RED}✗ Erro durante build${NC}"

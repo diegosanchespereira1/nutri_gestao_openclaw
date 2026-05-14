@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, MapPin } from "lucide-react";
+import { Eye, MapPin, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
@@ -258,14 +258,33 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
             Válido até{" "}
             <span className="text-muted-foreground font-normal">(opcional)</span>
           </Label>
-          <input
-            id={`valid-until-${item.id}`}
-            type="date"
-            value={empty.validUntil ?? ""}
-            onChange={(e) => onSetValidUntil(item.id, e.target.value)}
-            onBlur={() => onPersistOnBlur(item.id)}
-            className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              id={`valid-until-${item.id}`}
+              type="date"
+              value={empty.validUntil ?? ""}
+              onChange={(e) => onSetValidUntil(item.id, e.target.value)}
+              onBlur={() => onPersistOnBlur(item.id)}
+              disabled={formLocked}
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 min-w-[10rem] flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            {(empty.validUntil ?? "").trim() ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0 gap-1"
+                disabled={formLocked}
+                onClick={() => {
+                  onSetValidUntil(item.id, "");
+                  setTimeout(() => onPersistOnBlur(item.id), 0);
+                }}
+              >
+                <X className="size-4" aria-hidden />
+                Limpar data
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -699,13 +718,16 @@ export function ChecklistFillWizard({
     });
   }, [markItemDirty]);
 
-  const setValidUntil = useCallback((itemId: string, validUntil: string) => {
+  const setValidUntil = useCallback((itemId: string, raw: string) => {
+    const normalized = raw.trim() === "" ? null : raw;
     setResponses((prev) => {
       const cur = prev[itemId] ?? emptyItemState();
-      if (hasResponseChanged(cur.validUntil ?? "", validUntil)) {
+      const prevStr = cur.validUntil ?? "";
+      const nextStr = normalized ?? "";
+      if (hasResponseChanged(prevStr, nextStr)) {
         markItemDirty(itemId);
       }
-      return { ...prev, [itemId]: { ...cur, validUntil } };
+      return { ...prev, [itemId]: { ...cur, validUntil: normalized } };
     });
   }, [markItemDirty]);
 

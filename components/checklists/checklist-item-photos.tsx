@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { ImageViewerModal } from "@/components/image-viewer-modal";
 import {
   deleteChecklistFillPhotoAction,
-  uploadChecklistFillPhotoAction,
+  type ChecklistFillPhotoUploadResult,
 } from "@/lib/actions/checklist-fill-photos";
 import {
   CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM,
@@ -258,16 +258,28 @@ export function ChecklistItemPhotos({
           if (lng) fd.append("longitude", lng);
 
           setUploadState({ status: "busy", step: "uploading", percent: 65 });
-          const res = await uploadChecklistFillPhotoAction(fd);
-
-          if (!res.ok) {
-            batchErrors.push(`"${file.name}": ${res.error}`);
+          const httpRes = await fetch("/api/checklists/fill-session-photo", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin",
+          });
+          let uploadJson: ChecklistFillPhotoUploadResult;
+          try {
+            uploadJson = (await httpRes.json()) as ChecklistFillPhotoUploadResult;
+          } catch {
+            batchErrors.push(
+              `"${file.name}": Resposta inválida do servidor (${httpRes.status}).`,
+            );
+            continue;
+          }
+          if (!uploadJson.ok) {
+            batchErrors.push(`"${file.name}": ${uploadJson.error}`);
             continue;
           }
 
           // ── Etapa 4: finalizar ──
           setUploadState({ status: "busy", step: "saving", percent: 95 });
-          currentPhotos = [...currentPhotos, res.photo];
+          currentPhotos = [...currentPhotos, uploadJson.photo];
           uploadedCount += 1;
           setPhotos(currentPhotos);
           onPhotosChange?.(currentPhotos);

@@ -13,6 +13,11 @@
 # 4) Build da imagem com NEXT_PUBLIC_* em --build-arg; no Portainer define também
 #    SUPABASE_SERVICE_ROLE_KEY na stack e Recreate após alterar.
 #
+# 4b) Server Actions / deploy: defina NEXT_SERVER_ACTIONS_ENCRYPTION_KEY no build
+#     (ex.: openssl rand -base64 32) e a mesma chave em todos os replicas. Upload de
+#     fotos de checklist usa POST /api/checklists/fill-session-photo para evitar o
+#     erro "Server Action was not found" com cache ou versões mistas.
+#
 # 5) Para múltiplas stacks no mesmo Portainer/Traefik, define variáveis diferentes:
 #    - APP_HOST (ex: dev.nutricao.stratostech.com.br)
 #    - TRAEFIK_ROUTER_NAME / TRAEFIK_SERVICE_NAME / TRAEFIK_MIDDLEWARE_NAME

@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { AlertTriangle, ZoomIn } from "lucide-react";
+import { AlertTriangle, X, ZoomIn } from "lucide-react";
 
 import { saveFillItemResponse } from "@/lib/actions/checklist-fill";
+import { Button } from "@/components/ui/button";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import { Label } from "@/components/ui/label";
 import { ImageViewerModal } from "@/components/image-viewer-modal";
@@ -207,17 +208,38 @@ export function ChecklistFillDossierItemBody({
                     >
                       Válido até (opcional)
                     </Label>
-                    <input
-                      id={`dossier-valid-until-${item.id}`}
-                      type="date"
-                      disabled={busy}
-                      value={r.validUntil ?? ""}
-                      onChange={(e) =>
-                        onPatchResponse?.(item.id, { validUntil: e.target.value })
-                      }
-                      onBlur={() => void flushItem(item.id)}
-                      className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex h-10 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                    />
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        id={`dossier-valid-until-${item.id}`}
+                        type="date"
+                        disabled={busy}
+                        value={r.validUntil ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value.trim();
+                          onPatchResponse?.(item.id, {
+                            validUntil: v === "" ? null : e.target.value,
+                          });
+                        }}
+                        onBlur={() => void flushItem(item.id)}
+                        className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 min-w-[10rem] flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                      />
+                      {(r.validUntil ?? "").trim() ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 gap-1"
+                          disabled={busy}
+                          onClick={() => {
+                            onPatchResponse?.(item.id, { validUntil: null });
+                            setTimeout(() => void flushItem(item.id), 0);
+                          }}
+                        >
+                          <X className="size-4" aria-hidden />
+                          Limpar data
+                        </Button>
+                      ) : null}
+                    </div>
                   </>
                 ) : (
                   <>

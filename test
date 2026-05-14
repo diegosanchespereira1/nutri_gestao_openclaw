@@ -1,0 +1,57 @@
+version: "3.7"
+services:
+
+## --------------------------- ORION --------------------------- ##
+
+  supabase_studio:
+    image: supabase/studio:latest
+
+    networks:
+      - HMLStratosNetwork ## Nome da rede interna
+
+    environment:     
+    ## 🔗 Configuração do Supabase
+      - HOSTNAME=0.0.0.0
+      - SUPABASE_URL=http://supabase_kong:8000
+      - SUPABASE_PUBLIC_URL=https://dbhmlnutricao.stratostech.com.br
+      - SUPABASE_ANON_KEY=xxx      
+      - SUPABASE_SERVICE_KEY=.2x3Bqgnd8uarfJCKhxXCH9z3zNmtsTK4rFjnpugOrcQ
+      - AUTH_JWT_SECRET=xxxx
+
+    ## 🎨 Configuração de Branding
+      - DEFAULT_ORGANIZATION_NAME=StratosTech
+      - DEFAULT_PROJECT_NAME=StratosTech_Nutricao
+
+    ## 🐘 Configuração do Postgres (interno)
+      - POSTGRES_DB=postgres
+      - POSTGRES_HOST=supabase_db
+      - POSTGRES_PORT=5432
+      - POSTGRES_PASSWORD=
+      - PG_META_CRYPTO_KEY=3
+
+    ## 📊 Integração com Logflare
+      - LOGFLARE_URL=http://supabase_analytics
+      - LOGFLARE_API_KEY=
+      - LOGFLARE_PUBLIC_ACCESS_TOKEN=
+      - LOGFLARE_PRIVATE_ACCESS_TOKEN=
+      - NEXT_PUBLIC_ENABLE_LOGS=true
+      - NEXT_ANALYTICS_BACKEND_PROVIDER=postgres
+      - DEBUG=next:*
+
+    ## 🔍 Configuração do Meta
+      - STUDIO_PG_META_URL=http://supabase_meta:8080
+
+    ## 🤖 Configuração do OpenAI (opcional)
+      # - OPENAI_API_KEY=
+    ## configuracao para salvar snippets de SQL
+      - SNIPPETS_MANAGEMENT_FOLDER=/var/lib/studio/snippets
+    
+    volumes:
+      - ./volumes/studio/snippets:/var/lib/studio/snippets
+
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager

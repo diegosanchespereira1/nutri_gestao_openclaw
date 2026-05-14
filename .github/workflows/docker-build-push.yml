@@ -19,14 +19,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Validate Docker Hub credentials
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || secrets.DOCKER_HUB_USERNAME || vars.DOCKER_HUB_USERNAME || secrets.DOCKER_USERNAME || vars.DOCKER_USERNAME }}
+          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_HUB_TOKEN || secrets.DOCKER_HUB_PASSWORD || secrets.DOCKERHUB_PASSWORD }}
+        run: |
+          if [ -z "$DOCKERHUB_USER" ]; then
+            echo "::error::Usuário Docker Hub vazio. Confira: (1) Secret na aba **Actions** (não só Dependabot/Codespaces). (2) Ou crie a Repository **Variable** DOCKERHUB_USERNAME. (3) Se estiver em **Environment** secrets, adicione ao job 'environment: NOME_DO_ENV' ou duplique em Repository secrets."
+            exit 1
+          fi
+          if [ -z "$DOCKERHUB_PASS" ]; then
+            echo "::error::Token Docker Hub vazio. Crie o secret **DOCKERHUB_TOKEN** em Settings → Secrets and variables → **Actions** (ou duplique o Environment secret no repositório)."
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || secrets.DOCKER_HUB_USERNAME || vars.DOCKER_HUB_USERNAME || secrets.DOCKER_USERNAME || vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_HUB_TOKEN || secrets.DOCKER_HUB_PASSWORD || secrets.DOCKERHUB_PASSWORD }}
 
       - name: Extract metadata
         id: meta
@@ -61,14 +75,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Validate Docker Hub credentials
+        env:
+          DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || secrets.DOCKER_HUB_USERNAME || vars.DOCKER_HUB_USERNAME || secrets.DOCKER_USERNAME || vars.DOCKER_USERNAME }}
+          DOCKERHUB_PASS: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_HUB_TOKEN || secrets.DOCKER_HUB_PASSWORD || secrets.DOCKERHUB_PASSWORD }}
+        run: |
+          if [ -z "$DOCKERHUB_USER" ]; then
+            echo "::error::Usuário Docker Hub vazio. Confira: (1) Secret na aba **Actions** (não só Dependabot/Codespaces). (2) Ou crie a Repository **Variable** DOCKERHUB_USERNAME. (3) Se estiver em **Environment** secrets, adicione ao job 'environment: NOME_DO_ENV' ou duplique em Repository secrets."
+            exit 1
+          fi
+          if [ -z "$DOCKERHUB_PASS" ]; then
+            echo "::error::Token Docker Hub vazio. Crie o secret **DOCKERHUB_TOKEN** em Settings → Secrets and variables → **Actions** (ou duplique o Environment secret no repositório)."
+            exit 1
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || secrets.DOCKER_HUB_USERNAME || vars.DOCKER_HUB_USERNAME || secrets.DOCKER_USERNAME || vars.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_HUB_TOKEN || secrets.DOCKER_HUB_PASSWORD || secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build and push dev
         uses: docker/build-push-action@v7

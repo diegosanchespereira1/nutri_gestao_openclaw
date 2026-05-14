@@ -4,6 +4,7 @@ import { Eye, MapPin, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
 import { ChecklistFillDossierPreview } from "@/components/checklists/checklist-fill-dossier-preview";
@@ -532,13 +533,21 @@ export function ChecklistFillWizard({
 
   const formLocked = dossierPreviewConfirmed || Boolean(dossierApprovedAt);
 
-  /* ── Task B: guarda de navegação ── */
-  const { guardTriggered, confirmLeave, cancelLeave } = useNavigationGuard({
+  const [leaveLinkTarget, setLeaveLinkTarget] = useState<string | null>(null);
+  const leaveLinkTargetRef = useRef<string | null>(null);
+  const leavePromptOpenRef = useRef(false);
+  const [leaveActionBusy, setLeaveActionBusy] = useState(false);
+  const [leaveActionError, setLeaveActionError] = useState<string | null>(null);
+
+  /* ── Task B: guarda de navegação (Voltar do browser + links internos) ── */
+  const { guardTriggered, cancelLeave } = useNavigationGuard({
     active: !formLocked,
-    onConfirmLeave: () => {
-      router.push(backHref);
-    },
   });
+
+  const leaveDialogOpen = guardTriggered || leaveLinkTarget !== null;
+  useEffect(() => {
+    leavePromptOpenRef.current = leaveDialogOpen;
+  }, [leaveDialogOpen]);
 
   const showDossierPeekButton = useMemo(
     () => !dossierApprovedAt && !dossierPreviewConfirmed,
@@ -612,6 +621,101 @@ export function ChecklistFillWizard({
     }
     return { ok: true };
   }, [sessionId, template, sections, syncAllResponsesToServer]);
+
+  /** Grava rascunho completo no servidor sem exigir validação do template (saída segura). */
+  const persistDraftForLeave = useCallback(async (): Promise<FillActionResult> => {
+    const remote = await loadFillResponsesMapForSession(sessionId);
+    if (!remote.ok) return remote;
+    const merged = mergeClientResponsesWithServer(
+      responsesRef.current,
+      remote.responses,
+      template,
+    );
+    setResponses(merged);
+    responsesRef.current = merged;
+    return syncAllResponsesToServer(merged, "merge");
+  }, [sessionId, template, syncAllResponsesToServer]);
+
+  const clearLeaveLinkTarget = useCallback(() => {
+    leaveLinkTargetRef.current = null;
+    setLeaveLinkTarget(null);
+    leavePromptOpenRef.current = false;
+  }, []);
+
+  const handleCancelLeaveDialog = useCallback(() => {
+    cancelLeave();
+    clearLeaveLinkTarget();
+    setLeaveActionError(null);
+  }, [cancelLeave, clearLeaveLinkTarget]);
+
+  const handleConfirmLeaveDialog = useCallback(async () => {
+    setLeaveActionBusy(true);
+    setLeaveActionError(null);
+    try {
+      const result = await persistDraftForLeave();
+      if (!result.ok) {
+        setLeaveActionError(result.error);
+        return;
+      }
+      const dest = leaveLinkTargetRef.current ?? backHref;
+      clearLeaveLinkTarget();
+      cancelLeave();
+      router.push(dest);
+    } finally {
+      setLeaveActionBusy(false);
+    }
+  }, [persistDraftForLeave, backHref, clearLeaveLinkTarget, cancelLeave, router]);
+
+  /** Bloqueia navegação interna (sidebar, etc.) até confirmar gravação do rascunho. */
+  useEffect(() => {
+    if (formLocked) return;
+
+    function handleClickCapture(e: MouseEvent) {
+      if (leavePromptOpenRef.current) return;
+      if (e.defaultPrevented) return;
+      if (e.button !== 0) return;
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      const el = (e.target as Element | null)?.closest?.("a[href]");
+      if (!el || !(el instanceof HTMLAnchorElement)) return;
+      if (el.hasAttribute("download")) return;
+
+      const hrefAttr = el.getAttribute("href");
+      if (
+        !hrefAttr ||
+        hrefAttr.startsWith("#") ||
+        hrefAttr.startsWith("mailto:") ||
+        hrefAttr.startsWith("tel:")
+      ) {
+        return;
+      }
+
+      let url: URL;
+      try {
+        url = new URL(hrefAttr, window.location.origin);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith("/checklists/preencher/")) return;
+
+      const here = `${window.location.pathname}${window.location.search}`;
+      const there = `${url.pathname}${url.search}`;
+      if (there === here) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      const dest = `${url.pathname}${url.search}${url.hash}`;
+      leavePromptOpenRef.current = true;
+      leaveLinkTargetRef.current = dest;
+      setLeaveLinkTarget(dest);
+    }
+
+    document.addEventListener("click", handleClickCapture, true);
+    return () => document.removeEventListener("click", handleClickCapture, true);
+  }, [formLocked]);
 
   /** Grava nota/anotação só ao sair do campo — evita salvar a cada tecla. */
   const persistItemOnBlur = useCallback(
@@ -1414,30 +1518,42 @@ export function ChecklistFillWizard({
         </DialogContent>
       </Dialog>
 
-      {/* Task B: Dialog de guarda de navegação */}
-      <Dialog open={guardTriggered} onOpenChange={(open) => { if (!open) cancelLeave(); }}>
+      {/* Task B: Dialog de guarda de navegação (Voltar do browser ou link interno) */}
+      <Dialog
+        open={leaveDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCancelLeaveDialog();
+        }}
+      >
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Sair do preenchimento?</DialogTitle>
+            <DialogTitle>Sair do checklist?</DialogTitle>
             <DialogDescription>
-              Suas respostas foram salvas automaticamente. Você pode retomar
-              este preenchimento quando quiser — basta selecionar o mesmo
-              template e estabelecimento no catálogo.
+              Se sair agora, pode perder alterações que ainda não foram sincronizadas com o
+              servidor. Ao confirmar, gravamos todo o rascunho (respostas e textos já
+              introduzidos) e só depois mudamos de página.
             </DialogDescription>
           </DialogHeader>
+          {leaveActionError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {leaveActionError}
+            </p>
+          ) : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={cancelLeave}
+              disabled={leaveActionBusy}
+              onClick={handleCancelLeaveDialog}
             >
-              Ficar na página
+              Não, ficar
             </Button>
             <Button
               type="button"
-              onClick={confirmLeave}
+              disabled={leaveActionBusy}
+              onClick={() => void handleConfirmLeaveDialog()}
             >
-              Sair — rascunho salvo
+              {leaveActionBusy ? "A gravar…" : "Sim, gravar e sair"}
             </Button>
           </div>
         </DialogContent>
@@ -1546,11 +1662,17 @@ export function ChecklistFillWizard({
             <Button
               type="button"
               onClick={() => {
-                const next = multiAreaNextDialog;
-                setMultiAreaNextDialog(null);
-                if (next) {
+                void (async () => {
+                  const next = multiAreaNextDialog;
+                  if (!next) return;
+                  const r = await persistDraftForLeave();
+                  if (!r.ok) {
+                    toast.error(r.error);
+                    return;
+                  }
+                  setMultiAreaNextDialog(null);
                   router.push(`/checklists/preencher/${next.sessionId}`);
-                }
+                })();
               }}
             >
               Iniciar checklist

@@ -4,15 +4,15 @@
 # Uso clássico: ./publish-docker.sh [username] [version]
 # Exemplo: ./publish-docker.sh stratostech 0.1.0
 #
-# Modo dev (lê build args do .env.local):
+# Modo dev (lê build args do ficheiro de env — copiar .env.dev.example → .env.dev):
 #   ./publish-docker.sh --dev
+#   ./publish-docker.sh --dev --tag DEV
 #   ./publish-docker.sh --dev --tag dev-hml
-#   ./publish-docker.sh --dev --user stratostech --repo nutricao-stratostech --env-file .env.local
+#   ./publish-docker.sh --dev --tag dev --env-file .env.dev
 #
 # NEXT_SERVER_ACTIONS_ENCRYPTION_KEY (recomendado — Next.js Server Actions estáveis em Docker):
 #   - export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(openssl rand -base64 32)" antes do script, ou
-#   - linha no .env.local: NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=... (usado em --dev e no modo clássico
-#     se o ficheiro existir). Gere uma vez e reutilize entre builds do mesmo produto.
+#   - linha no .env.local ou .env.dev (conforme --env-file): NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=...
 
 set -e
 
@@ -39,7 +39,7 @@ NC='\033[0m' # No Color
 # Valores padrão (não usar USERNAME — no macOS é o login curto e sobrepõe $1)
 DOCKERHUB_USER="stratostech"
 VERSION="0.1.0"
-REPO="nutricao-gestao"
+REPO="nutricao-stratostech"
 ENV_FILE=".env.local"
 DEV_MODE=false
 DEV_TAG="dev"

@@ -41,6 +41,10 @@ export function getAppSessionIdleTimeoutSec(): number {
   );
 }
 
+/**
+ * TTL lógico (segundos) para reutilizar o JSON em `ng_profile_ctx` no middleware
+ * (`cachedAt`). Não deve ser usado como único maxAge do cookie no browser — ver middleware.
+ */
 export function getProfileCtxTtlSec(): number {
   return parsePositiveInt(
     process.env.AUTH_PROFILE_CTX_TTL_SEC,

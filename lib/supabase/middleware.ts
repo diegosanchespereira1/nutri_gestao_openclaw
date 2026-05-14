@@ -106,6 +106,33 @@ type MiddlewareProfileContext = {
   cachedAt: number;
 };
 
+/**
+ * Server Actions não passam por getUser() (evita /auth/v1/user a cada autosave).
+ * Actualiza só `ng_sess_last` quando a âncora `ng_sess_start` ainda está dentro do
+ * limite absoluto — evita falso “idle timeout” durante preenchimento de checklists.
+ */
+function bumpAppSessionLastForServerActionIfEligible(
+  request: NextRequest,
+): NextResponse | null {
+  const startRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
+  const startParsed = startRaw ? Number.parseInt(startRaw, 10) : NaN;
+  if (!Number.isFinite(startParsed)) return null;
+
+  const now = Math.floor(Date.now() / 1000);
+  const absSec = getAppSessionAbsoluteMaxSec();
+  if (now - startParsed > absSec) return null;
+
+  const baseCookie = getSupabaseCookieOptions();
+  const idleSec = getAppSessionIdleTimeoutSec();
+  const res = nextWithPathname(request);
+  res.cookies.set(
+    APP_SESSION_LAST_COOKIE,
+    String(now),
+    appSessionCookieOptions(baseCookie, idleSec + 300),
+  );
+  return res;
+}
+
 function parseProfileContextCookie(raw: string | undefined): MiddlewareProfileContext | null {
   if (!raw) return null;
   try {
@@ -155,7 +182,8 @@ export async function updateSession(request: NextRequest) {
   // Server Actions já validam auth/autorização no próprio handler.
   // Evita duplicar /auth/v1/user + queries de profile em cada autosave.
   if (isServerActionRequest(request)) {
-    return nextWithPathname(request);
+    const bumped = bumpAppSessionLastForServerActionIfEligible(request);
+    return bumped ?? nextWithPathname(request);
   }
 
   if (!url || !anonKey) {
@@ -337,10 +365,17 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
+    // maxAge do cookie deve cobrir a sessão da app: o TTL lógico (`cachedAt`) é curto
+    // para refrescar role/onboarding, mas se maxAge ≈ TTL o browser apaga o cookie e o
+    // layout (app) redirecciona para /login com pedido sem `ng_profile_ctx`.
+    const profileCookieMaxAge = Math.max(
+      profileCtxTtlSec + 5,
+      getAppSessionAbsoluteMaxSec() + 300,
+    );
     supabaseResponse.cookies.set(
       APP_PROFILE_CTX_COOKIE,
       JSON.stringify(profileCtx),
-      appSessionCookieOptions(baseCookie, profileCtxTtlSec + 5),
+      appSessionCookieOptions(baseCookie, profileCookieMaxAge),
     );
   }
 

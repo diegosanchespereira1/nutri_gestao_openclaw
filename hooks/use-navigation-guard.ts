@@ -5,16 +5,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type UseNavigationGuardOptions = {
   /** Ativar o guard. Passar false quando o dossiê estiver aprovado. */
   active: boolean;
-  /** Callback chamado APÓS o usuário confirmar a saída (para fazer redirect, etc.). */
-  onConfirmLeave: () => void;
 };
 
 type UseNavigationGuardReturn = {
-  /** true quando o modal de confirmação deve ser exibido (back button pressionado). */
+  /** true quando o modal de confirmação deve ser exibido (botão Voltar do browser pressionado). */
   guardTriggered: boolean;
-  /** Chamar quando o usuário confirma que quer sair. */
-  confirmLeave: () => void;
-  /** Chamar quando o usuário decide permanecer na página. */
+  /** Fecha o aviso de saída (Voltar do browser) sem navegar. */
   cancelLeave: () => void;
 };
 
@@ -24,18 +20,16 @@ type UseNavigationGuardReturn = {
  *
  * - `beforeunload` → aviso nativo do browser ao fechar aba / recarregar.
  * - `popstate` → ao pressionar Voltar, repõe a URL e exibe o modal customizado.
+ *
+ * A confirmação de saída e a gravação no servidor ficam a cargo do componente pai
+ * (ex.: botão «Gravar e sair» no diálogo).
  */
 export function useNavigationGuard(
   options: UseNavigationGuardOptions,
 ): UseNavigationGuardReturn {
-  const { active, onConfirmLeave } = options;
+  const { active } = options;
   const [guardTriggered, setGuardTriggered] = useState(false);
-  const onConfirmLeaveRef = useRef(onConfirmLeave);
   const activeRef = useRef(active);
-
-  useEffect(() => {
-    onConfirmLeaveRef.current = onConfirmLeave;
-  }, [onConfirmLeave]);
 
   useEffect(() => {
     activeRef.current = active;
@@ -71,14 +65,9 @@ export function useNavigationGuard(
     };
   }, []); // Apenas no mount/unmount — usa refs para aceder ao estado corrente.
 
-  const confirmLeave = useCallback(() => {
-    setGuardTriggered(false);
-    onConfirmLeaveRef.current();
-  }, []);
-
   const cancelLeave = useCallback(() => {
     setGuardTriggered(false);
   }, []);
 
-  return { guardTriggered, confirmLeave, cancelLeave };
+  return { guardTriggered, cancelLeave };
 }

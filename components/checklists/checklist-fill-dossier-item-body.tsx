@@ -6,6 +6,7 @@ import { AlertTriangle, X, ZoomIn } from "lucide-react";
 import { saveFillItemResponse } from "@/lib/actions/checklist-fill";
 import { Button } from "@/components/ui/button";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
+import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { Label } from "@/components/ui/label";
 import { ImageViewerModal } from "@/components/image-viewer-modal";
 import { cn } from "@/lib/utils";
@@ -81,6 +82,15 @@ export function ChecklistFillDossierItemBody({
     <>
       <ul className="space-y-3">
       {section.items.map((item) => {
+        if (isStructureOnlyItem(item)) {
+          return (
+            <li key={item.id} className="list-none">
+              <h4 className="text-foreground border-border/70 mt-4 border-b pb-1 text-sm font-semibold tracking-tight first:mt-0">
+                {item.description}
+              </h4>
+            </li>
+          );
+        }
         const r = responses[item.id] ?? emptyItem();
         const photos = itemPhotos[item.id] ?? [];
         const busy = savingItemId === item.id;

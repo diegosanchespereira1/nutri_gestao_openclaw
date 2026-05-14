@@ -29,6 +29,11 @@ export type ChecklistTemplateItemRow = {
   position: number;
   /** Peso do item para cálculo de pontuação. Padrão 1. */
   peso: number;
+  /**
+   * Título de subseção (sem opções de avaliação nem fotos). Padrão NutriGestão: ver
+   * `isStructureOnlyItem` e skill `nutrigestao-dev` → «Checklists — Subseções só indicador».
+   */
+  is_structure_only?: boolean;
   created_at: string;
 };
 

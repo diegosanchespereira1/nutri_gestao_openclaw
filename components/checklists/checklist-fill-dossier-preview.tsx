@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ChecklistFillDossierItemBody } from "@/components/checklists/checklist-fill-dossier-item-body";
+import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { cn } from "@/lib/utils";
 import type { FillItemResponseState, FillResponsesMap } from "@/lib/types/checklist-fill";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
@@ -24,6 +25,7 @@ function calcDossierScore(
   let total = 0;
   for (const sec of template.sections) {
     for (const item of sec.items) {
+      if (isStructureOnlyItem(item)) continue;
       const r = responses[item.id];
       if (!r?.outcome || r.outcome === "na") continue;
       const w = item.peso ?? 1;
@@ -136,6 +138,7 @@ export function ChecklistFillDossierPreview({
           let secEarned = 0;
           let secTotal = 0;
           for (const item of section.items) {
+            if (isStructureOnlyItem(item)) continue;
             const r = responses[item.id];
             if (!r?.outcome || r.outcome === "na") continue;
             const w = item.peso ?? 1;
@@ -189,7 +192,7 @@ export function ChecklistFillDossierPreview({
                   </span>
                 ) : null}
                 <span className="text-muted-foreground shrink-0 text-xs font-normal">
-                  {section.items.length} itens
+                  {section.items.filter((it) => !isStructureOnlyItem(it)).length} itens
                 </span>
               </button>
               {open ? (

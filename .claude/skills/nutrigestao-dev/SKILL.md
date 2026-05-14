@@ -118,6 +118,24 @@ $$ LANGUAGE plpgsql;
 ### Log de Auditoria (obrigatório para dados de paciente)
 Se a tabela contém dados de saúde/paciente, adicionar log de auditoria conforme padrão do Epic 11.
 
+## Checklists — Subseções só indicador (`is_structure_only`)
+
+Use este padrão sempre que um modelo (global, personalizado ou workspace) tiver **agrupadores de lista** no estilo regulatório: numeração + título (ex.: `1.2 — ACESSO`, `5.2.1 — Higienização…`), **sem** avaliação Conforme / Não conforme / N.A., **sem** fotos e **sem** peso no score.
+
+### Regras obrigatórias
+
+1. **Coluna:** `is_structure_only boolean NOT NULL DEFAULT false` nas três tabelas de itens (`checklist_template_items`, `checklist_custom_items`, `checklist_workspace_items` quando existir). Cabeçalhos de subseção: `true`; itens verificáveis: `false`.
+2. **Obrigatoriedade:** agrupadores com `is_required = false` (não entram na validação de “itens obrigatórios sem resposta”).
+3. **Ordem:** mesma `section_id` (ou equivalente em custom/workspace); `position` na ordem de leitura do anexo/PDF — cabeçalho imediatamente antes do primeiro item daquele bloco.
+4. **Texto:** cabeçalhos no formato **`N[.N…] — Título`** (travessão `—`). Itens avaliáveis continuam com **`[n.m.k] texto…`** no início da descrição, para distinguir no PDF e na UI.
+5. **Pontuação SQL:** `calculate_and_store_session_score` (e qualquer agregação equivalente) deve somar **apenas** itens com `coalesce(is_structure_only, false) = false` — linhas com `is_structure_only = true` nunca entram em numerador nem denominador.
+6. **Persistência de respostas:** Server Actions não devem gravar `outcome`/fotos para IDs marcados como estrutura (o batch já filtra; manter coerência em novos endpoints).
+7. **Código:** tratar agrupadores **apenas** via `isStructureOnlyItem()` em `lib/checklists/is-structure-only-item.ts` (fonte única). Na UI de preenchimento, só cabeçalho (`ChecklistFillStructureHeading` no wizard), sem radios nem `ChecklistItemPhotos`. No PDF/dossiê, reutilizar o mesmo helper.
+
+### Legado / cópias sem coluna preenchida
+
+O helper aplica **fallback conservador** (item opcional + descrição sem `[` + padrão numérico `—`) para não exibir avaliação em cabeçalhos antigos. Novos modelos devem sempre persistir `is_structure_only` explicitamente; evite descrições opcionais fora do padrão que imitem cabeçalhos.
+
 ## Implementação — Fluxo Passo a Passo
 
 ### 1. Migração SQL (se necessário)

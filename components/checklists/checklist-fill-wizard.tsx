@@ -45,6 +45,7 @@ import {
   getNextBatchItemAfterSession,
   type ChecklistFillBatchItem,
 } from "@/lib/checklist-fill-batch-storage";
+import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import {
   hasResponseChanged,
   pickBatchItemIdsForSave,
@@ -60,6 +61,7 @@ function mergeClientResponsesWithServer(
   const out: FillResponsesMap = { ...client };
   for (const sec of template.sections) {
     for (const item of sec.items) {
+      if (isStructureOnlyItem(item)) continue;
       const c = out[item.id];
       const s = server[item.id];
       if (!c?.outcome || !s?.outcome) continue;
@@ -97,6 +99,18 @@ const sectionSelectClassName =
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
 const RADIO_AUTOSAVE_DEBOUNCE_MS = 500;
 
+/** Cabeçalho de subseção (sem avaliação nem fotos). */
+function ChecklistFillStructureHeading({ description }: { description: string }) {
+  return (
+    <div
+      role="presentation"
+      className="border-border/60 text-foreground border-b pb-2 pt-5 first:pt-0"
+    >
+      <h3 className="text-sm font-semibold tracking-tight">{description}</h3>
+    </div>
+  );
+}
+
 /* ─── ChecklistFillItem — componente memoizado por item ─────────────────── */
 /**
  * Extração do item de checklist em componente separado com React.memo.
@@ -105,7 +119,7 @@ const RADIO_AUTOSAVE_DEBOUNCE_MS = 500;
  * de toda a seção a cada interação.
  */
 type ChecklistFillItemProps = {
-  item: { id: string; description: string; is_required: boolean };
+  item: { id: string; description: string; is_required: boolean; is_structure_only?: boolean };
   response: import("@/lib/types/checklist-fill").FillItemResponseState | undefined;
   err: string | undefined;
   recurringNcSessions: number;
@@ -137,6 +151,10 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
   onPersistOnBlur,
   onPhotosChange,
 }: ChecklistFillItemProps) {
+  if (isStructureOnlyItem(item)) {
+    return <ChecklistFillStructureHeading description={item.description} />;
+  }
+
   const requiredInvalid = item.is_required && Boolean(err);
   const showRecurringNc = recurringNcSessions > 0;
   const empty = r ?? { outcome: null, note: null, annotation: null, validUntil: null };
@@ -645,6 +663,7 @@ export function ChecklistFillWizard({
     let total = 0;
     for (const sec of sections) {
       for (const item of sec.items) {
+        if (isStructureOnlyItem(item)) continue;
         const r = responses[item.id];
         if (!r?.outcome || r.outcome === "na") continue;
         const w = item.peso ?? 1;
@@ -662,6 +681,7 @@ export function ChecklistFillWizard({
       let earned = 0;
       let total = 0;
       for (const item of sec.items) {
+        if (isStructureOnlyItem(item)) continue;
         const r = responses[item.id];
         if (!r?.outcome || r.outcome === "na") continue;
         const w = item.peso ?? 1;
@@ -1083,7 +1103,10 @@ export function ChecklistFillWizard({
           </div>
         ) : null}
         <legend className="sr-only">{section.title}</legend>
-        {section.items.map((item) => (
+        {section.items.map((item) =>
+          isStructureOnlyItem(item) ? (
+            <ChecklistFillStructureHeading key={item.id} description={item.description} />
+          ) : (
           <ChecklistFillItem
             key={item.id}
             item={item}
@@ -1101,7 +1124,7 @@ export function ChecklistFillWizard({
             onPersistOnBlur={persistItemOnBlur}
             onPhotosChange={handlePhotosChange}
           />
-        ))}
+          ))}
       </fieldset>
 
       <div className="flex flex-col gap-4 border-t pt-4">

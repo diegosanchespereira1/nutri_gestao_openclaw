@@ -1,3 +1,4 @@
+import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import type { ChecklistTemplateSectionWithItems } from "@/lib/types/checklists";
 
 /** Limite de caracteres para anotação opcional por item (FR20). */
@@ -68,6 +69,7 @@ export function validateChecklistSection(
 ): SectionValidationIssue[] {
   const issues: SectionValidationIssue[] = [];
   for (const item of section.items) {
+    if (isStructureOnlyItem(item)) continue;
     const r = responses[item.id];
     const outcome = r?.outcome ?? null;
     const note = (r?.note ?? "").trim();

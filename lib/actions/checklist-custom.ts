@@ -171,8 +171,11 @@ export async function loadCustomTemplateUnified(
   const mappedSections = (sections ?? []).map((sec) => {
     const secItems = itemsBySection.get(String(sec.id)) ?? [];
     const mappedItems = secItems.map((it) => {
-      total_item_count += 1;
-      if (Boolean(it.is_required)) required_item_count += 1;
+      const structureOnly = Boolean(it.is_structure_only);
+      if (!structureOnly) {
+        total_item_count += 1;
+        if (Boolean(it.is_required)) required_item_count += 1;
+      }
       return {
         id: String(it.id),
         section_id: String(sec.id),
@@ -180,6 +183,7 @@ export async function loadCustomTemplateUnified(
         is_required: Boolean(it.is_required),
         position: Number(it.position),
         peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
+        is_structure_only: structureOnly,
         created_at: String(it.created_at),
       };
     });

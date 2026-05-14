@@ -116,6 +116,8 @@ export type DossierPdfItemInput = {
   annotation: string | null;
   validUntil?: string | null;
   photoBuffers?: Buffer[];
+  /** Agrupador de subseção (sem avaliação no PDF). */
+  isStructureOnly?: boolean;
 };
 
 export type DossierPdfSectionInput = {
@@ -289,6 +291,7 @@ function drawKpiStrip(ctx: Ctx, input: DossierPdfBuildInput): void {
   let totalItems = 0, conformes = 0, ncs = 0, nas = 0;
   for (const sec of input.sections) {
     for (const it of sec.items) {
+      if (it.isStructureOnly) continue;
       totalItems += 1;
       if (it.outcome === "conforme") conformes += 1;
       else if (it.outcome === "nc") ncs += 1;
@@ -482,10 +485,11 @@ function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
   let rowTop = colsBtm;
   for (let i = 0; i < sections.length; i++) {
     const sec = sections[i];
+    const scored = sec.items.filter((it) => !it.isStructureOnly);
     const sc  = computeSectionScore(sec);
-    const ncs = sec.items.filter(it => it.outcome === "nc").length;
-    const oks = sec.items.filter(it => it.outcome === "conforme").length;
-    const nas = sec.items.filter(it => it.outcome === "na").length;
+    const ncs = scored.filter(it => it.outcome === "nc").length;
+    const oks = scored.filter(it => it.outcome === "conforme").length;
+    const nas = scored.filter(it => it.outcome === "na").length;
 
     const rowBtm = rowTop - ROW_H;
     if (i % 2 === 1) {
@@ -504,7 +508,7 @@ function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
 
     // Colunas numéricas
     const numCols = [
-      { w: COL_ITEMS_W, val: String(sec.items.length), color: C.textPrimary },
+      { w: COL_ITEMS_W, val: String(scored.length), color: C.textPrimary },
       { w: COL_OK_W,    val: String(oks),              color: C.green       },
       { w: COL_NC_W,    val: String(ncs),              color: ncs > 0 ? C.red : C.textMuted },
       { w: COL_NA_W,    val: String(nas),              color: C.textMuted   },
@@ -544,6 +548,7 @@ type SectionScore = { percentage: number | null; earned: number; total: number }
 function computeSectionScore(section: DossierPdfSectionInput): SectionScore {
   let earned = 0, total = 0;
   for (const it of section.items) {
+    if (it.isStructureOnly) continue;
     if (!it.outcome || it.outcome === "na") continue;
     total += 1;
     if (it.outcome === "conforme") earned += 1;
@@ -589,14 +594,15 @@ function drawSectionHeader(
 
   // Título da seção
   const titleX = badgeX + badgeW + 10;
-  const ncCount = section.items.filter(i => i.outcome === "nc").length;
+  const scoredItems = section.items.filter((i) => !i.isStructureOnly);
+  const ncCount = scoredItems.filter((i) => i.outcome === "nc").length;
   const pillsW = 120;
   const titleMaxW = CONTENT_W - (titleX - MARGIN_X) - pillsW - 10;
   const titleLines = wrapByWidth(section.title, ctx.fontBold, 11, titleMaxW).slice(0, 1);
   drawTextLine(ctx, titleLines[0] ?? "", titleX, top - 12, 11, ctx.fontBold, C.textPrimary);
 
   // Sub-linha: "X itens"
-  drawTextLine(ctx, `${section.items.length} itens`, titleX, top - 26, 8, ctx.font, C.textMuted);
+  drawTextLine(ctx, `${scoredItems.length} itens`, titleX, top - 26, 8, ctx.font, C.textMuted);
 
   // Badges direita: score% + NC pill
   const rightEdge = PAGE_W - MARGIN_X - 10;
@@ -637,6 +643,36 @@ async function drawItemRow(
   item: DossierPdfItemInput,
   rowIndex: number,
 ): Promise<void> {
+  if (item.isStructureOnly) {
+    const TEXT_SIZE = 10;
+    const descLines = wrapByWidth(
+      redactSupabaseUrlsForPdf(item.description),
+      ctx.fontBold,
+      TEXT_SIZE,
+      CONTENT_W - 24,
+    );
+    const rowH = Math.max(20, 10 + descLines.length * (TEXT_SIZE + 2.5));
+    ensureVerticalSpace(ctx, rowH + 4);
+    const top = ctx.y;
+    const bottom = top - rowH;
+    ctx.page.drawRectangle({
+      x: MARGIN_X,
+      y: bottom,
+      width: CONTENT_W,
+      height: rowH,
+      color: C.rowAlt,
+      borderColor: C.cardBorder,
+      borderWidth: 0.4,
+    });
+    let lineTop = top - 8;
+    for (const ln of descLines) {
+      drawTextLine(ctx, ln, MARGIN_X + 10, lineTop, TEXT_SIZE, ctx.fontBold, C.navy);
+      lineTop -= TEXT_SIZE + 2.5;
+    }
+    ctx.y = bottom - 2;
+    return;
+  }
+
   const palette = outcomePalette(item.outcome);
   const isNc = item.outcome === "nc";
   const STRIPE_W = 4;

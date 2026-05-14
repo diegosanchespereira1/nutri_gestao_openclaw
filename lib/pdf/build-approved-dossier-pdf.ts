@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { TENANT_LOGOS_BUCKET } from "@/lib/constants/tenant-logos-storage";
 import { fetchTenantLogoStoragePath } from "@/lib/tenant/logo-sync";
 import { buildDossierPdfBytes, foldTextForPdf } from "@/lib/pdf/dossier-pdf";
@@ -135,6 +136,7 @@ function computeScoreFromTemplate(
   let total = 0;
   for (const sec of template.sections) {
     for (const item of sec.items) {
+      if (isStructureOnlyItem(item)) continue;
       const r = responses[item.id];
       if (!r?.outcome || r.outcome === "na") continue;
       const w = item.peso ?? 1;
@@ -217,6 +219,7 @@ export async function buildApprovedDossierPdfBytes(
               annotation: r.annotation,
               validUntil: r.validUntil,
               photoBuffers,
+              isStructureOnly: isStructureOnlyItem(it),
             };
           }),
         ),

@@ -481,17 +481,29 @@ export async function saveFillItemResponse(input: {
   if (itemResponseSource === "global") {
     const { data: itemMeta } = await supabase
       .from("checklist_template_items")
-      .select("id")
+      .select("id, is_structure_only")
       .eq("id", itemId)
       .maybeSingle();
     if (!itemMeta) return { ok: false, error: "Item inválido." };
+    if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
+      return {
+        ok: false,
+        error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+      };
+    }
   } else if (itemResponseSource === "custom") {
     const { data: itemMeta } = await supabase
       .from("checklist_custom_items")
-      .select("id, custom_section_id")
+      .select("id, custom_section_id, is_structure_only")
       .eq("id", itemId)
       .maybeSingle();
     if (!itemMeta) return { ok: false, error: "Item inválido." };
+    if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
+      return {
+        ok: false,
+        error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+      };
+    }
 
     const { data: sec } = await supabase
       .from("checklist_custom_sections")
@@ -505,10 +517,16 @@ export async function saveFillItemResponse(input: {
   } else {
     const { data: itemMeta } = await supabase
       .from("checklist_workspace_items")
-      .select("id, workspace_section_id")
+      .select("id, workspace_section_id, is_structure_only")
       .eq("id", itemId)
       .maybeSingle();
     if (!itemMeta) return { ok: false, error: "Item inválido." };
+    if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
+      return {
+        ok: false,
+        error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+      };
+    }
 
     const { data: sec } = await supabase
       .from("checklist_workspace_sections")
@@ -646,10 +664,10 @@ export async function saveFillResponsesBatch(input: {
   const withRevalidate = input.withRevalidate ?? true;
   if (!input.entries.length) return { ok: true };
 
-  const itemIds = Array.from(
+  const requestedItemIds = Array.from(
     new Set(input.entries.map((entry) => entry.itemId).filter(Boolean)),
   );
-  if (itemIds.length === 0) return { ok: true };
+  if (requestedItemIds.length === 0) return { ok: true };
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
@@ -691,18 +709,26 @@ export async function saveFillResponsesBatch(input: {
         ? "custom_item_id"
         : "workspace_item_id";
 
+  const structureIds = new Set<string>();
   const validItemIds = new Set<string>();
   if (itemResponseSource === "global") {
     const { data: rows } = await supabase
       .from("checklist_template_items")
-      .select("id")
-      .in("id", itemIds);
-    for (const row of rows ?? []) validItemIds.add(String(row.id));
+      .select("id, is_structure_only")
+      .in("id", requestedItemIds);
+    for (const row of rows ?? []) {
+      const id = String(row.id);
+      if (Boolean((row as { is_structure_only?: boolean }).is_structure_only)) {
+        structureIds.add(id);
+      } else {
+        validItemIds.add(id);
+      }
+    }
   } else if (itemResponseSource === "custom") {
     const { data: rows } = await supabase
       .from("checklist_custom_items")
-      .select("id, custom_section_id")
-      .in("id", itemIds);
+      .select("id, custom_section_id, is_structure_only")
+      .in("id", requestedItemIds);
     const sectionIds = Array.from(
       new Set((rows ?? []).map((row) => String(row.custom_section_id))),
     );
@@ -716,15 +742,19 @@ export async function saveFillResponsesBatch(input: {
     }
     for (const row of rows ?? []) {
       const sectionTemplateId = sectionTemplateMap.get(String(row.custom_section_id));
-      if (sectionTemplateId && sectionTemplateId === sess.custom_template_id) {
-        validItemIds.add(String(row.id));
+      if (!sectionTemplateId || sectionTemplateId !== sess.custom_template_id) continue;
+      const id = String(row.id);
+      if (Boolean((row as { is_structure_only?: boolean }).is_structure_only)) {
+        structureIds.add(id);
+      } else {
+        validItemIds.add(id);
       }
     }
   } else {
     const { data: rows } = await supabase
       .from("checklist_workspace_items")
-      .select("id, workspace_section_id")
-      .in("id", itemIds);
+      .select("id, workspace_section_id, is_structure_only")
+      .in("id", requestedItemIds);
     const sectionIds = Array.from(
       new Set((rows ?? []).map((row) => String(row.workspace_section_id))),
     );
@@ -738,11 +768,22 @@ export async function saveFillResponsesBatch(input: {
     }
     for (const row of rows ?? []) {
       const sectionTemplateId = sectionTemplateMap.get(String(row.workspace_section_id));
-      if (sectionTemplateId && sectionTemplateId === sess.workspace_template_id) {
-        validItemIds.add(String(row.id));
+      if (!sectionTemplateId || sectionTemplateId !== sess.workspace_template_id) continue;
+      const id = String(row.id);
+      if (Boolean((row as { is_structure_only?: boolean }).is_structure_only)) {
+        structureIds.add(id);
+      } else {
+        validItemIds.add(id);
       }
     }
   }
+
+  const entries = input.entries.filter((e) => !structureIds.has(e.itemId));
+  if (entries.length === 0) {
+    return { ok: true };
+  }
+
+  const itemIds = Array.from(new Set(entries.map((entry) => entry.itemId).filter(Boolean)));
 
   for (const itemId of itemIds) {
     if (!validItemIds.has(itemId)) {
@@ -779,7 +820,7 @@ export async function saveFillResponsesBatch(input: {
     });
   }
 
-  for (const entry of input.entries) {
+  for (const entry of entries) {
     const itemId = entry.itemId;
     const existing = existingByItemId.get(itemId);
     const normalizedValidUntil = (entry.validUntil ?? "").trim() || null;

@@ -60,6 +60,7 @@ function assembleTemplates(
       is_required: Boolean(it.is_required),
       position: Number(it.position),
       peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
+      is_structure_only: Boolean(it.is_structure_only),
       created_at: String(it.created_at),
     };
     const list = itemsBySection.get(sectionId) ?? [];
@@ -80,6 +81,7 @@ function assembleTemplates(
     let total_item_count = 0;
     for (const sec of sections) {
       for (const it of sec.items) {
+        if (it.is_structure_only) continue;
         total_item_count += 1;
         if (it.is_required) required_item_count += 1;
       }

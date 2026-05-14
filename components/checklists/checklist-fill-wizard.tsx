@@ -112,7 +112,6 @@ type ChecklistFillItemProps = {
   sessionId: string;
   itemResponseSource: "global" | "custom" | "workspace";
   photos: ChecklistFillPhotoView[];
-  isPending: boolean;
   formLocked: boolean;
   onSetOutcome: (itemId: string, outcome: import("@/lib/types/checklist-fill").ChecklistFillOutcome | null) => void;
   onSetNote: (itemId: string, note: string) => void;
@@ -130,7 +129,6 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
   sessionId,
   itemResponseSource,
   photos,
-  isPending,
   formLocked,
   onSetOutcome,
   onSetNote,
@@ -423,6 +421,7 @@ export function ChecklistFillWizard({
       ? Math.max(0, template.sections.length - 1)
       : 0,
   );
+  const [sectionNavLoading, setSectionNavLoading] = useState(false);
   const [responses, setResponses] = useState<FillResponsesMap>(() => ({
     ...initialResponses,
   }));
@@ -462,7 +461,6 @@ export function ChecklistFillWizard({
     useState<ChecklistFillBatchItem | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
-  const [sectionNavLoading, setSectionNavLoading] = useState(false);
 
   const handleDossierReopened = useCallback(() => {
     setDossierApprovedAt(null);
@@ -675,6 +673,70 @@ export function ChecklistFillWizard({
     });
   }, [sections, responses]);
 
+  const saveProgressBatch = useCallback(
+    (scope: "section" | "all", forceAll: boolean) => {
+      if (!section || saveBatchInFlightRef.current) return;
+
+      const itemIds = pickBatchItemIdsForSave({
+        scope,
+        sectionItemIds: section.items.map((item) => item.id),
+        responses: responsesRef.current,
+        dirtyItemIds: dirtyItemIdsRef.current,
+        forceAll,
+      });
+      if (itemIds.length === 0) return;
+
+      saveBatchInFlightRef.current = true;
+      startTransition(async () => {
+        reportSaving();
+        const entries = itemIds.map((itemId) => {
+          const cur = responsesRef.current[itemId];
+          return {
+            itemId,
+            outcome: cur?.outcome ?? null,
+            note: cur?.note ?? null,
+            annotation: cur?.annotation ?? null,
+            validUntil: cur?.validUntil ?? null,
+          };
+        });
+        const result = await saveFillResponsesBatch({
+          sessionId,
+          itemResponseSource,
+          entries,
+          persistMode: "full",
+          withRevalidate: false,
+        });
+        if (!result.ok) {
+          saveBatchInFlightRef.current = false;
+          reportSaveError(result.error);
+          return;
+        }
+        clearDirtyItems(itemIds);
+        saveBatchInFlightRef.current = false;
+        reportSaved();
+      });
+    },
+    [clearDirtyItems, itemResponseSource, section, sessionId],
+  );
+
+  const scheduleRadioAutosave = useCallback(() => {
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      saveProgressBatch("all", false);
+    }, RADIO_AUTOSAVE_DEBOUNCE_MS);
+  }, [saveProgressBatch]);
+
+  const saveCurrentSectionFields = useCallback(() => {
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    saveProgressBatch("section", false);
+  }, [saveProgressBatch]);
+
   // ── Handlers memoizados — estáveis entre renders para que React.memo
   //    no ChecklistFillItem funcione corretamente e só re-renderize o item
   //    cujo estado mudou, não todos os itens da seção.
@@ -695,7 +757,7 @@ export function ChecklistFillWizard({
       reportSaving();
       scheduleRadioAutosave();
     },
-    [markItemDirty],
+    [markItemDirty, scheduleRadioAutosave],
   );
 
   const setNote = useCallback((itemId: string, note: string) => {
@@ -746,70 +808,6 @@ export function ChecklistFillWizard({
     // Salvar campos antes de ir para seção anterior
     saveCurrentSectionFields();
     setSectionIndex((i) => Math.max(0, i - 1));
-  }
-
-  const saveProgressBatch = useCallback(
-    (scope: "section" | "all", forceAll: boolean) => {
-      if (!section || saveBatchInFlightRef.current) return;
-
-      const itemIds = pickBatchItemIdsForSave({
-        scope,
-        sectionItemIds: section.items.map((item) => item.id),
-        responses: responsesRef.current,
-        dirtyItemIds: dirtyItemIdsRef.current,
-        forceAll,
-      });
-      if (itemIds.length === 0) return;
-
-      saveBatchInFlightRef.current = true;
-      startTransition(async () => {
-        reportSaving();
-        const entries = itemIds.map((itemId) => {
-          const cur = responsesRef.current[itemId];
-          return {
-            itemId,
-            outcome: cur?.outcome ?? null,
-            note: cur?.note ?? null,
-            annotation: cur?.annotation ?? null,
-            validUntil: cur?.validUntil ?? null,
-          };
-        });
-        const result = await saveFillResponsesBatch({
-          sessionId,
-          itemResponseSource,
-          entries,
-          persistMode: "full",
-          withRevalidate: false,
-        });
-        if (!result.ok) {
-          saveBatchInFlightRef.current = false;
-          reportSaveError(result.error);
-          return;
-        }
-        clearDirtyItems(itemIds);
-        saveBatchInFlightRef.current = false;
-        reportSaved();
-      });
-    },
-    [clearDirtyItems, itemResponseSource, section, sessionId],
-  );
-
-  function scheduleRadioAutosave() {
-    if (autosaveTimerRef.current !== null) {
-      clearTimeout(autosaveTimerRef.current);
-    }
-    autosaveTimerRef.current = setTimeout(() => {
-      autosaveTimerRef.current = null;
-      saveProgressBatch("all", false);
-    }, RADIO_AUTOSAVE_DEBOUNCE_MS);
-  }
-
-  function saveCurrentSectionFields() {
-    if (autosaveTimerRef.current !== null) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
-    saveProgressBatch("section", false);
   }
 
   if (!section) {
@@ -1095,7 +1093,6 @@ export function ChecklistFillWizard({
             sessionId={sessionId}
             itemResponseSource={itemResponseSource}
             photos={livePhotos[item.id] ?? EMPTY_ITEM_PHOTOS}
-            isPending={isPending}
             formLocked={formLocked}
             onSetOutcome={setOutcome}
             onSetNote={setNote}

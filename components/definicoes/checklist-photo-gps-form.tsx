@@ -14,6 +14,8 @@ export function ChecklistPhotoGpsForm() {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // Evita mismatch de hidratação: lê localStorage só após mount no cliente.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- preferência persistida no browser
     setEnabled(readChecklistPhotoGpsPreference());
     setHydrated(true);
   }, []);

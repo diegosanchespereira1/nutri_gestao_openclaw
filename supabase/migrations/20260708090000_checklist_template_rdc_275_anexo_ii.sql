@@ -6,11 +6,16 @@ insert into public.checklist_templates (
   id, name, portaria_ref, uf, applies_to, description, version, is_active
 ) values (
   'f1eebc99-9c0b-4ef8-bb6d-6bb9bd380d00'::uuid,
-  'RDC - 275',
+  'Checklist RDC nº 275',
   'RDC 275/2002',
   '*',
   array['empresa']::text[],
-  'Lista de Verificação das Boas Práticas de Fabricação (Anexo II) — estabelecimentos produtores/industrializadores de alimentos.',
+  $rdc275desc$
+Lista de Verificação das Boas Práticas de Fabricação (Anexo II) — estabelecimentos produtores/industrializadores de alimentos.
+
+Resolução - RDC nº 275, de 21 de outubro de 2002(*)
+Republicada no D.O.U de 06/11/2002
+$rdc275desc$,
   1,
   true
 )

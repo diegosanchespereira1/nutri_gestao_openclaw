@@ -146,6 +146,10 @@ export type DossierPdfBuildInput = {
     pointsEarned: number;
     pointsTotal: number;
   } | null;
+  /** Buffer PNG da assinatura da profissional (capturada no momento da aprovação). */
+  professionalSignatureBuffer?: Buffer | null;
+  /** Buffer PNG da assinatura do cliente/responsável (capturada no momento da aprovação). */
+  clientSignatureBuffer?: Buffer | null;
 };
 
 /* ── Dimensões da página ───────────────────────────────────────────────── */
@@ -881,6 +885,116 @@ function formatValidUntilForPdf(value: string | null): string {
   return `Valido ate: ${day}/${month}/${year}`;
 }
 
+/* ── Bloco de assinaturas ──────────────────────────────────────────────── */
+
+async function drawSignaturesSection(
+  ctx: Ctx,
+  input: DossierPdfBuildInput,
+): Promise<void> {
+  const hasProfSig = !!input.professionalSignatureBuffer;
+  const hasClientSig = !!input.clientSignatureBuffer;
+  if (!hasProfSig && !hasClientSig) return;
+
+  // Espaço antes do bloco
+  ctx.y -= 20;
+
+  const SECTION_LABEL_H = 26;
+  const SIG_BLOCK_H = 110; // altura do card de cada assinatura
+  const SIG_IMG_H = 64;
+  const SIG_IMG_MARGIN_V = 14;
+  const COL_GAP = 12;
+  const COL_W = (CONTENT_W - COL_GAP) / 2;
+
+  // Título da seção
+  ensureVerticalSpace(ctx, SECTION_LABEL_H + SIG_BLOCK_H + 8);
+
+  const secTop = ctx.y;
+  // Faixa de título — igual aos cabeçalhos de seção do checklist
+  ctx.page.drawRectangle({ x: MARGIN_X, y: secTop - SECTION_LABEL_H, width: CONTENT_W, height: SECTION_LABEL_H, color: C.navy });
+  drawTextLine(ctx, "ASSINATURAS", MARGIN_X + 10, secTop - 7, 9, ctx.fontBold, rgb(1, 1, 1));
+  ctx.y = secTop - SECTION_LABEL_H - 8;
+
+  // Cards lado a lado (profissional esquerda, cliente direita)
+  const cardsTop = ctx.y;
+  const cardsBottom = cardsTop - SIG_BLOCK_H;
+
+  const renderSigCard = async (
+    x: number,
+    label: string,
+    name: string,
+    sigBuffer: Buffer | null | undefined,
+  ) => {
+    // Fundo do card
+    ctx.page.drawRectangle({
+      x, y: cardsBottom, width: COL_W, height: SIG_BLOCK_H,
+      color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.6,
+    });
+
+    // Rótulo (Profissional / Cliente)
+    drawTextLine(ctx, label.toUpperCase(), x + 10, cardsTop - 8, 7, ctx.fontBold, C.textMuted);
+
+    // Área de assinatura
+    const sigAreaTop = cardsTop - 8 - 7 - 6;       // abaixo do label
+    const sigAreaH = SIG_IMG_H;
+    const sigAreaY = sigAreaTop - sigAreaH;
+
+    // Quadro tracejado da área de assinatura
+    ctx.page.drawRectangle({
+      x: x + 8, y: sigAreaY, width: COL_W - 16, height: sigAreaH,
+      color: rgb(1, 1, 1), borderColor: C.grayBorder, borderWidth: 0.5,
+    });
+
+    if (sigBuffer) {
+      // Embed e posicionamento centralizado da imagem de assinatura
+      const img = await embedImageSmart(ctx.pdf, sigBuffer);
+      if (img) {
+        const maxW = COL_W - 32;
+        const maxH = sigAreaH - SIG_IMG_MARGIN_V * 2;
+        const ratio = img.width / img.height;
+        let iw = maxW;
+        let ih = iw / ratio;
+        if (ih > maxH) { ih = maxH; iw = ih * ratio; }
+        ctx.page.drawImage(img, {
+          x: x + 8 + (COL_W - 16 - iw) / 2,
+          y: sigAreaY + (sigAreaH - ih) / 2,
+          width: iw,
+          height: ih,
+          opacity: 0.92,
+        });
+      }
+    } else {
+      // Placeholder quando não há assinatura
+      const ph = "Sem assinatura capturada";
+      const phW = ctx.font.widthOfTextAtSize(ph, 7.5);
+      drawTextLine(ctx, ph, x + 8 + (COL_W - 16 - phW) / 2, sigAreaY + sigAreaH - (sigAreaH - 9) / 2, 7.5, ctx.font, C.textFaint);
+    }
+
+    // Linha de identificação abaixo do quadro de assinatura
+    const nameTop = sigAreaY - 5;
+    const foldedName = foldTextForPdf(name);
+    drawTextLine(ctx, foldedName, x + 10, nameTop, 8, ctx.fontBold, C.navy);
+  };
+
+  const profName = foldTextForPdf(input.professionalName);
+  const clientLabelText = foldTextForPdf(input.clientLabel ?? "Responsável pelo estabelecimento");
+
+  await renderSigCard(
+    MARGIN_X,
+    "Profissional responsavel",
+    profName,
+    input.professionalSignatureBuffer,
+  );
+
+  await renderSigCard(
+    MARGIN_X + COL_W + COL_GAP,
+    "Cliente / Responsavel",
+    clientLabelText,
+    input.clientSignatureBuffer,
+  );
+
+  ctx.y = cardsBottom - 16;
+}
+
 /* ── Rodapé por página V2 ──────────────────────────────────────────────── */
 
 function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): void {
@@ -959,6 +1073,9 @@ export async function buildDossierPdfBytes(
     }
     ctx.y -= 10;
   }
+
+  // Bloco de assinaturas — renderizado após todas as seções, antes dos rodapés
+  await drawSignaturesSection(ctx, input);
 
   drawFooters(ctx, input);
 

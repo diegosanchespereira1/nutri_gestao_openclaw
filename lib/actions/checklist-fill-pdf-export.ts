@@ -82,6 +82,12 @@ export async function generateDossierPdfAction(
   const storagePath = `${workspaceOwnerId}/${sessionId}/${jobId}.pdf`;
 
   try {
+    // Carrega assinaturas salvas na sessão (podem ser null se não capturadas)
+    const sig = bundle.session as {
+      professional_signature_data_url?: string | null;
+      client_signature_data_url?: string | null;
+    };
+
     const bytes = await buildApprovedDossierPdfBytes(
       supabase,
       bundle.session.user_id,
@@ -94,6 +100,8 @@ export async function generateDossierPdfAction(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+      professionalSignatureDataUrl: sig.professional_signature_data_url ?? null,
+      clientSignatureDataUrl: sig.client_signature_data_url ?? null,
       },
     );
 

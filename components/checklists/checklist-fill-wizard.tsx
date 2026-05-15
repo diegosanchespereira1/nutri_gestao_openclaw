@@ -10,6 +10,10 @@ import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-f
 import { ChecklistFillDossierPreview } from "@/components/checklists/checklist-fill-dossier-preview";
 import { ChecklistReopenDialog } from "@/components/checklists/checklist-reopen-dialog";
 import { ChecklistItemPhotos } from "@/components/checklists/checklist-item-photos";
+import {
+  SignatureCaptureDialog,
+  type SignaturePair,
+} from "@/components/checklists/signature-capture-dialog";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
@@ -480,6 +484,10 @@ export function ChecklistFillWizard({
     useState<ChecklistFillBatchItem | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isApprovePending, startApproveTransition] = useTransition();
+
+  /* ── Assinaturas ── */
+  const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
+  const [pendingSignatures, setPendingSignatures] = useState<SignaturePair | null>(null);
 
   const handleDossierReopened = useCallback(() => {
     setDossierApprovedAt(null);
@@ -1407,26 +1415,8 @@ export function ChecklistFillWizard({
                       disabled={isApprovePending}
                       onClick={() => {
                         setApproveError(null);
-                        startApproveTransition(async () => {
-                          const synced = await runReconcileThenSync();
-                          if (!synced.ok) {
-                            setApproveError(synced.error);
-                            return;
-                          }
-                          const r = await approveChecklistFillDossierAction(sessionId);
-                          if (!r.ok) {
-                            setApproveError(r.error);
-                            return;
-                          }
-                          setDossierApprovedAt(r.approvedAt);
-                          const nextInBatch = getNextBatchItemAfterSession(sessionId);
-                          if (nextInBatch) {
-                            setMultiAreaNextDialog(nextInBatch);
-                          } else {
-                            clearChecklistFillBatch();
-                          }
-                          router.refresh();
-                        });
+                        // Abre o dialog de assinatura antes de aprovar
+                        setSignatureDialogOpen(true);
                       }}
                     >
                       {isApprovePending ? "Aprovando…" : "Aprovar dossiê"}
@@ -1680,6 +1670,46 @@ export function ChecklistFillWizard({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Dialog de captura de assinaturas — exibido antes de aprovar o dossiê */}
+      <SignatureCaptureDialog
+        open={signatureDialogOpen}
+        onOpenChange={(open) => {
+          setSignatureDialogOpen(open);
+          if (!open) setPendingSignatures(null);
+        }}
+        onConfirm={(signatures) => {
+          setPendingSignatures(signatures);
+          setSignatureDialogOpen(false);
+          setApproveError(null);
+          startApproveTransition(async () => {
+            const synced = await runReconcileThenSync();
+            if (!synced.ok) {
+              setApproveError(synced.error);
+              setPendingSignatures(null);
+              return;
+            }
+            const r = await approveChecklistFillDossierAction(
+              sessionId,
+              signatures,
+            );
+            if (!r.ok) {
+              setApproveError(r.error);
+              setPendingSignatures(null);
+              return;
+            }
+            setPendingSignatures(null);
+            setDossierApprovedAt(r.approvedAt);
+            const nextInBatch = getNextBatchItemAfterSession(sessionId);
+            if (nextInBatch) {
+              setMultiAreaNextDialog(nextInBatch);
+            } else {
+              clearChecklistFillBatch();
+            }
+            router.refresh();
+          });
+        }}
+      />
     </div>
   );
 }

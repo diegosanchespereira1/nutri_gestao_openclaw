@@ -30,6 +30,10 @@ export type ApprovedDossierPdfBundleInput = {
   clientLabel?: string;
   /** Nome da área avaliada (quando aplicável). */
   areaName?: string | null;
+  /** Data URL PNG da assinatura da profissional (capturada na aprovação do dossiê). */
+  professionalSignatureDataUrl?: string | null;
+  /** Data URL PNG da assinatura do cliente/responsável (capturada na aprovação do dossiê). */
+  clientSignatureDataUrl?: string | null;
 };
 
 async function loadProfessionalIdentity(
@@ -183,6 +187,21 @@ export async function buildApprovedDossierPdfBytes(
 
   const clientLabel = input.clientLabel ?? extractClientLabel(input.establishmentLabel);
 
+  // Converte data URL de assinatura (base64 PNG) em Buffer para o PDF
+  function dataUrlToBuffer(dataUrl: string | null | undefined): Buffer | null {
+    if (!dataUrl) return null;
+    const match = dataUrl.match(/^data:image\/(?:png|jpeg|webp);base64,(.+)$/);
+    if (!match?.[1]) return null;
+    try {
+      return Buffer.from(match[1], "base64");
+    } catch {
+      return null;
+    }
+  }
+
+  const professionalSignatureBuffer = dataUrlToBuffer(input.professionalSignatureDataUrl);
+  const clientSignatureBuffer = dataUrlToBuffer(input.clientSignatureDataUrl);
+
   const pdfInput = {
     templateName: input.template.name,
     establishmentLabel: input.establishmentLabel,
@@ -193,6 +212,8 @@ export async function buildApprovedDossierPdfBytes(
     logoBuffer,
     areaName: input.areaName ?? null,
     score,
+    professionalSignatureBuffer,
+    clientSignatureBuffer,
     sections: await Promise.all(
       input.template.sections.map(async (sec) => ({
         title: sec.title,

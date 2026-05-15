@@ -1,14 +1,39 @@
 import type { NextConfig } from "next";
 
-const supabaseOrigin = (() => {
-  const u = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!u) return "";
-  try {
-    return new URL(u).origin;
-  } catch {
-    return "";
+/** Origens connect-src derivadas do Supabase (HTTP + WSS no mesmo host). */
+function supabaseConnectOrigins(): string[] {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const out: string[] = [];
+  if (raw) {
+    try {
+      const u = new URL(raw);
+      out.push(u.origin);
+      if (u.protocol === "https:") {
+        out.push(`wss://${u.host}`);
+      }
+    } catch {
+      /* ignore */
+    }
   }
-})();
+  const extra = process.env.CSP_CONNECT_SRC_EXTRA?.trim();
+  if (extra) {
+    for (const part of extra.split(/[\s,]+/)) {
+      if (!part) continue;
+      try {
+        const u = new URL(part);
+        out.push(u.origin);
+        if (u.protocol === "https:") {
+          out.push(`wss://${u.host}`);
+        }
+      } catch {
+        if (part.startsWith("https://") || part.startsWith("wss://")) {
+          out.push(part);
+        }
+      }
+    }
+  }
+  return [...new Set(out)];
+}
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -35,8 +60,7 @@ const nextConfig: NextConfig = {
       });
     }
 
-    const connectParts = ["'self'"];
-    if (supabaseOrigin) connectParts.push(supabaseOrigin);
+    const connectParts = ["'self'", ...supabaseConnectOrigins()];
     connectParts.push("https://*.supabase.co", "wss://*.supabase.co");
 
     const isProd = process.env.NODE_ENV === "production";

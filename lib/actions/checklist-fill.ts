@@ -1166,6 +1166,7 @@ function formatIssueWithSectionAndItem(
 /** Aprova o dossiê: valida todo o modelo, regista data e bloqueia edições (FR23); visita ligada → concluída. */
 export async function approveChecklistFillDossierAction(
   sessionId: string,
+  signatures?: { professional: string; client: string } | null,
 ): Promise<ApproveDossierResult> {
   const bundle = await loadFillSessionPageData(sessionId);
   if (!bundle) return { ok: false, error: "Rascunho não encontrado." };
@@ -1196,9 +1197,25 @@ export async function approveChecklistFillDossierAction(
 
   const approvedAt = new Date().toISOString();
 
+  // Valida data URLs de assinatura (max ~500 KB cada, deve começar com data:image/)
+  const MAX_SIG_BYTES = 512 * 1024;
+  const validateSig = (url: string | undefined | null): string | null => {
+    if (!url) return null;
+    if (!url.startsWith("data:image/")) return null;
+    if (url.length > MAX_SIG_BYTES) return null;
+    return url;
+  };
+
+  const professionalSig = validateSig(signatures?.professional);
+  const clientSig = validateSig(signatures?.client);
+
   const { data: updated, error } = await supabase
     .from("checklist_fill_sessions")
-    .update({ dossier_approved_at: approvedAt })
+    .update({
+      dossier_approved_at: approvedAt,
+      ...(professionalSig !== null && { professional_signature_data_url: professionalSig }),
+      ...(clientSig !== null && { client_signature_data_url: clientSig }),
+    })
     .eq("id", sessionId)
     .is("dossier_approved_at", null)
     .select("dossier_approved_at")

@@ -84,6 +84,8 @@ export async function trySendDossierEmailAfterApprove(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+      professionalSignatureDataUrl: (bundle.session as { professional_signature_data_url?: string | null }).professional_signature_data_url ?? null,
+      clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
       },
     );
 
@@ -177,6 +179,8 @@ export async function resendDossierEmailAction(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+      professionalSignatureDataUrl: (bundle.session as { professional_signature_data_url?: string | null }).professional_signature_data_url ?? null,
+      clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
       },
     );
 
@@ -353,6 +357,8 @@ export async function sendDossierPdfToClientFromSessionAction(
       areaName: bundle.areaName,
       dossierApprovedAtIso: bundle.session.dossier_approved_at as string,
       itemPhotos: bundle.itemPhotos,
+      professionalSignatureDataUrl: (bundle.session as { professional_signature_data_url?: string | null }).professional_signature_data_url ?? null,
+      clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
       },
     );
 

@@ -4,6 +4,8 @@ import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { TENANT_LOGOS_BUCKET } from "@/lib/constants/tenant-logos-storage";
 import { fetchTenantLogoStoragePath } from "@/lib/tenant/logo-sync";
 import { buildDossierPdfBytes, foldTextForPdf } from "@/lib/pdf/dossier-pdf";
+import { DEFAULT_PDF_SETTINGS } from "@/lib/constants/checklist-pdf-settings";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import type { FillResponsesMap } from "@/lib/types/checklist-fill";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
@@ -26,7 +28,7 @@ export type ApprovedDossierPdfBundleInput = {
   establishmentLabel: string;
   dossierApprovedAtIso: string;
   itemPhotos?: Record<string, ChecklistFillPhotoView[]>;
-  /** Rótulo “limpo” do cliente (fallback: extraído do establishmentLabel). */
+  /** Rótulo "limpo" do cliente (fallback: extraído do establishmentLabel). */
   clientLabel?: string;
   /** Nome da área avaliada (quando aplicável). */
   areaName?: string | null;
@@ -101,6 +103,31 @@ async function loadTenantLogoBuffer(
   return downloadSignedAsset(data.signedUrl);
 }
 
+async function loadPdfSettings(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ headerBgColor: string; headerTextColor: string; accentColor: string }> {
+  try {
+    const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, userId);
+    const { data } = await supabase
+      .from("checklist_pdf_settings")
+      .select("header_bg_color, header_text_color, accent_color")
+      .eq("workspace_owner_id", workspaceOwnerId)
+      .maybeSingle();
+
+    if (!data) return { ...DEFAULT_PDF_SETTINGS };
+
+    return {
+      headerBgColor:   String(data.header_bg_color   ?? DEFAULT_PDF_SETTINGS.headerBgColor),
+      headerTextColor: String(data.header_text_color ?? DEFAULT_PDF_SETTINGS.headerTextColor),
+      accentColor:     String(data.accent_color      ?? DEFAULT_PDF_SETTINGS.accentColor),
+    };
+  } catch {
+    // best-effort: retorna padrão se a migration ainda não foi aplicada
+    return { ...DEFAULT_PDF_SETTINGS };
+  }
+}
+
 type SessionScore = {
   percentage: number;
   pointsEarned: number;
@@ -172,14 +199,16 @@ export async function buildApprovedDossierPdfBytes(
   userId: string,
   input: ApprovedDossierPdfBundleInput & { sessionId?: string },
 ): Promise<Uint8Array> {
-  const professional = await loadProfessionalIdentity(supabase, userId);
+  const [professional, logoBuffer, pdfSettings] = await Promise.all([
+    loadProfessionalIdentity(supabase, userId),
+    loadTenantLogoBuffer(supabase),
+    loadPdfSettings(supabase, userId),
+  ]);
 
   const professionalName = foldTextForPdf(
     professional.fullName || "Profissional",
   );
   const crn = foldTextForPdf(professional.crn);
-
-  const logoBuffer = await loadTenantLogoBuffer(supabase);
 
   let score: SessionScore = null;
   if (input.sessionId) {
@@ -225,6 +254,10 @@ export async function buildApprovedDossierPdfBytes(
     clientSignerName,
     signedAtLabel,
     documentHash: input.documentHash ?? null,
+    // Cores personalizadas do cabeçalho
+    headerBgColor:   pdfSettings.headerBgColor,
+    headerTextColor: pdfSettings.headerTextColor,
+    accentColor:     pdfSettings.accentColor,
     sections: await Promise.all(
       input.template.sections.map(async (sec) => ({
         title: sec.title,

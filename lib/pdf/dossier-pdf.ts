@@ -18,6 +18,18 @@ import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
 import { PdfTheme } from "@/lib/pdf/dossier-pdf-theme";
 
 /**
+ * Converte cor hex #RRGGBB para rgb() do pdf-lib.
+ * Retorna o fallback se o valor for inválido ou ausente.
+ */
+function hexToRgb(hex: string | null | undefined, fallback: RGB): RGB {
+  if (!hex) return fallback;
+  const m = hex.trim().match(/^#?([0-9A-Fa-f]{6})$/);
+  if (!m) return fallback;
+  const n = parseInt(m[1], 16);
+  return rgb(((n >> 16) & 0xff) / 255, ((n >> 8) & 0xff) / 255, (n & 0xff) / 255);
+}
+
+/**
  * Normaliza espaços e remove caracteres de controle.
  * Com a fonte Inter (Unicode completo), acentos e cedilhas são preservados.
  * Anteriormente removia diacríticos para WinAnsi — não é mais necessário.
@@ -156,6 +168,12 @@ export type DossierPdfBuildInput = {
   signedAtLabel?: string | null;
   /** Hash SHA-256 hex único desta versão aprovada do dossiê. */
   documentHash?: string | null;
+  /** Cor de fundo do cabeçalho em hex (#RRGGBB). Padrão: #1B2A4A (navy). */
+  headerBgColor?: string | null;
+  /** Cor do texto principal do cabeçalho em hex (#RRGGBB). Padrão: #FFFFFF (branco). */
+  headerTextColor?: string | null;
+  /** Cor de acento (linha base, eyebrow, score box) em hex (#RRGGBB). Padrão: #0EA5E9 (sky). */
+  accentColor?: string | null;
 };
 
 /* ── Dimensões da página ───────────────────────────────────────────────── */
@@ -201,17 +219,22 @@ function formatPoints(value: number): string {
   return value.toFixed(2).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
-/* ── Cabeçalho V2 — banda navy full-width ──────────────────────────────── */
+/* ── Cabeçalho V2 — banda full-width com cores configuráveis ────────────── */
 
 async function drawHeader(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> {
   const BAND_H = 108;
   const bandBottom = PAGE_H - BAND_H;
 
-  // Fundo navy full-width
-  ctx.page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: BAND_H, color: C.navy });
+  // Cores configuráveis (fallback para defaults da paleta)
+  const headerBg   = hexToRgb(input.headerBgColor,   C.navy);
+  const headerText = hexToRgb(input.headerTextColor, C.white);
+  const accentCol  = hexToRgb(input.accentColor,     C.sky);
 
-  // Linha de acento sky na base da banda
-  ctx.page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: 3, color: C.sky });
+  // Fundo full-width
+  ctx.page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: BAND_H, color: headerBg });
+
+  // Linha de acento na base da banda
+  ctx.page.drawRectangle({ x: 0, y: bandBottom, width: PAGE_W, height: 3, color: accentCol });
 
   // ── Logo (círculo branco com logo dentro) ──
   const logoSize = 56;
@@ -223,10 +246,10 @@ async function drawHeader(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> 
   if (input.logoBuffer) logo = await embedImageSmart(ctx.pdf, input.logoBuffer);
 
   if (logo) {
-    // Quadrado branco com borda sky
+    // Quadrado branco com borda de acento
     ctx.page.drawRectangle({
       x: logoX, y: logoY, width: logoSize, height: logoSize,
-      color: C.white, borderColor: C.sky, borderWidth: 1,
+      color: C.white, borderColor: accentCol, borderWidth: 1,
     });
     const ratio = logo.width / logo.height;
     let w = logoSize - 8, h = logoSize - 8;
@@ -239,18 +262,18 @@ async function drawHeader(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> 
   const scoreBoxW = 110;
   const textW = PAGE_W - textX - scoreBoxW - MARGIN_X - 16;
 
-  // Eyebrow — label do documento
-  drawTextLine(ctx, "DOSSIE DE AUDITORIA", textX, PAGE_H - 18, 7.5, ctx.fontBold, C.sky);
+  // Eyebrow — label do documento (cor de acento)
+  drawTextLine(ctx, "DOSSIE DE AUDITORIA", textX, PAGE_H - 18, 7.5, ctx.fontBold, accentCol);
 
-  // Título — nome do checklist
+  // Título — nome do checklist (cor de texto configurável)
   const titleLines = wrapByWidth(input.templateName, ctx.fontBold, 16, textW).slice(0, 2);
   let titleTop = PAGE_H - 32;
   for (const line of titleLines) {
-    drawTextLine(ctx, line, textX, titleTop, 16, ctx.fontBold, C.white);
+    drawTextLine(ctx, line, textX, titleTop, 16, ctx.fontBold, headerText);
     titleTop -= 19;
   }
 
-  // Subtítulo — estabelecimento
+  // Subtítulo — estabelecimento (leve opacidade em relação ao headerText)
   const estLabel = foldTextForPdf(input.clientLabel || input.establishmentLabel);
   drawTextLine(ctx, estLabel, textX, titleTop - 2, 9.5, ctx.font, rgb(0.78, 0.82, 0.88));
 
@@ -268,12 +291,12 @@ async function drawHeader(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> 
     const boxH = BAND_H - 20;
     const boxY = bandBottom + (BAND_H - boxH) / 2;
 
-    // Caixa com borda colorida
+    // Fundo levemente mais escuro que o cabeçalho
     ctx.page.drawRectangle({
       x: boxX, y: boxY, width: scoreBoxW, height: boxH,
       color: rgb(0.11, 0.19, 0.34), borderColor: palette.ink, borderWidth: 1,
     });
-    // Topo colorido
+    // Topo colorido (cor de status, não de acento)
     ctx.page.drawRectangle({ x: boxX, y: boxY + boxH - 4, width: scoreBoxW, height: 4, color: palette.ink });
 
     const pctStr = `${percentage}%`;
@@ -1104,6 +1127,10 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
   const IMG_MAX_H = 15;   // altura máxima das miniaturas de assinatura
   const IMG_MAX_W = 44;   // largura máxima das miniaturas de assinatura
 
+  // Cores configuráveis no rodapé (mesmas do cabeçalho)
+  const accentCol = hexToRgb(input.accentColor, C.sky);
+  const headerBg  = hexToRgb(input.headerBgColor, C.navy);
+
   // Incorpora imagens uma única vez no documento (pdf-lib não deduplica automaticamente)
   let proImg:    PDFImage | null = null;
   let clientImg: PDFImage | null = null;
@@ -1133,8 +1160,8 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
       start: { x: 0, y: FOOTER_H }, end: { x: PAGE_W, y: FOOTER_H },
       thickness: 0.5, color: C.cardBorder,
     });
-    // Barra navy lateral esquerda (acento visual)
-    page.drawRectangle({ x: 0, y: 0, width: 3, height: FOOTER_H, color: C.navy });
+    // Barra lateral esquerda (cor configurável do cabeçalho)
+    page.drawRectangle({ x: 0, y: 0, width: 3, height: FOOTER_H, color: headerBg });
 
     // ── Zona de assinaturas (y = INFO_H … FOOTER_H) ────────────────────
     // Separador horizontal entre as duas zonas
@@ -1208,15 +1235,29 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
     const clientSub   = (clientName && clientOrg) ? clientOrg : "";
     drawSigItem(col2X, halfW, clientImg, clientLabel, clientSub);
 
-    // ── Zona de informações (y = 0 … INFO_H) — sem repetir nome/CRN (já no card de assinaturas)
+    // ── Zona de informações (y = 0 … INFO_H) ───────────────────────────
+    // Esquerda: "Documento assinado eletronicamente"
     const docLine = foldTextForPdf("Documento assinado eletronicamente - NutriGestao");
     page.drawText(docLine, { x: MARGIN_X, y: 17, size: 7, font: ctx.font, color: C.textFaint });
 
+    // Hash SHA-256 (linha abaixo, esquerda)
     if (input.documentHash) {
       const hashLine = foldTextForPdf(`SHA-256: ${input.documentHash}`);
       page.drawText(hashLine, { x: MARGIN_X, y: 5.5, size: 6.5, font: ctx.font, color: C.textFaint });
     }
 
+    // Centro: branding discreto "Sistema desenvolvido por Stratos Tech"
+    const brandStr = "Sistema desenvolvido por Stratos Tech";
+    const bw = ctx.font.widthOfTextAtSize(brandStr, 6);
+    page.drawText(brandStr, {
+      x: (PAGE_W - bw) / 2,
+      y: 5.5,
+      size: 6,
+      font: ctx.font,
+      color: rgb(0.72, 0.73, 0.76),
+    });
+
+    // Direita: número de página
     const pageStr = `Pagina ${i + 1} de ${total}`;
     const pw = ctx.font.widthOfTextAtSize(pageStr, 7);
     page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: 17, size: 7, font: ctx.font, color: C.textMuted });

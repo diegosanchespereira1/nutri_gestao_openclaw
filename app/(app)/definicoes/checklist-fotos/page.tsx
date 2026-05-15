@@ -1,17 +1,40 @@
 import { MapPin } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { ChecklistPhotoGpsForm } from "@/components/definicoes/checklist-photo-gps-form";
+import { ChecklistPdfSettingsForm } from "@/components/definicoes/checklist-pdf-settings-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { getPdfSettingsAction } from "@/lib/actions/checklist-pdf-settings";
+import { createClient } from "@/lib/supabase/server";
 
-export default function ChecklistFotosDefinicoesPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ChecklistFotosDefinicoesPage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // Apenas titulares podem editar; membros de equipa só lêem
+  const { data: member } = await supabase
+    .from("team_members")
+    .select("owner_user_id")
+    .eq("member_user_id", user.id)
+    .maybeSingle();
+
+  const canManage = !member?.owner_user_id;
+
+  const pdfSettings = await getPdfSettingsAction();
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Checklist e fotos"
-        description="Preferências para anexar evidências fotográficas nos relatórios."
+        description="Preferências de fotos, GPS e personalização visual do PDF de dossiê."
         back={{ href: "/definicoes", label: "Definições" }}
       />
+
+      {/* GPS nas fotos */}
       <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
         <MapPin className="text-primary mt-0.5 size-5 shrink-0" aria-hidden />
         <p>
@@ -20,6 +43,12 @@ export default function ChecklistFotosDefinicoesPage() {
         </p>
       </div>
       <ChecklistPhotoGpsForm />
+
+      {/* Personalização visual do PDF */}
+      <ChecklistPdfSettingsForm
+        initialSettings={pdfSettings}
+        canManage={canManage}
+      />
     </PageLayout>
   );
 }

@@ -130,7 +130,7 @@ export async function loadReopenEventsForSession(
   const { data, error } = await supabase
     .from("checklist_fill_session_reopen_events")
     .select(
-      "id, session_id, reopened_by_label, reopened_by_role, justification, previous_approved_at, created_at",
+      "id, session_id, reopened_by_label, reopened_by_role, justification, previous_approved_at, previous_document_hash, created_at",
     )
     .eq("session_id", sessionId)
     .order("created_at", { ascending: false })
@@ -197,6 +197,15 @@ export async function reopenChecklistFillDossierAction(
   const prevScore =
     prevScoreRaw !== null && Number.isFinite(prevScoreRaw) ? prevScoreRaw : null;
 
+  // Hash do dossiê que está sendo cancelado — preservado na auditoria
+  const { data: sessionWithHash } = await supabase
+    .from("checklist_fill_sessions")
+    .select("document_hash")
+    .eq("id", sessionId)
+    .maybeSingle();
+  const prevDocumentHash = (sessionWithHash as { document_hash?: string | null } | null)
+    ?.document_hash ?? null;
+
   const reopenedByLabel = await resolveActorDisplayName(supabase, user.id, workspaceOwnerId);
 
   const { error: auditInsertErr } = await supabase
@@ -210,6 +219,7 @@ export async function reopenChecklistFillDossierAction(
       justification: trimmed,
       previous_approved_at: prevApproved,
       previous_score_percentage: prevScore,
+      previous_document_hash: prevDocumentHash,
     });
 
   if (auditInsertErr) {
@@ -256,6 +266,7 @@ export async function reopenChecklistFillDossierAction(
       score_percentage: null,
       score_points_earned: null,
       score_points_total: null,
+      document_hash: null,
     })
     .eq("id", sessionId)
     .not("dossier_approved_at", "is", null)

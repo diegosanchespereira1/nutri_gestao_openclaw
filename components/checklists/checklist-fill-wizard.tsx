@@ -104,6 +104,7 @@ const sectionSelectClassName =
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
 const RADIO_AUTOSAVE_DEBOUNCE_MS = 500;
 
+/* ── Visualização de assinaturas após aprovação ─────────────────────── */
 /** Cabeçalho de subseção (sem avaliação nem fotos). */
 function ChecklistFillStructureHeading({ description }: { description: string }) {
   return (
@@ -416,6 +417,17 @@ type Props = {
   initialReopenEvents?: ChecklistFillSessionReopenEventRow[];
   /** PDFs `ready` da sessão (versões / obsoletos). */
   pdfExportHistory?: ChecklistFillPdfExportRow[];
+  /** Nome limpo do cliente/estabelecimento (para exibir no dialog de assinatura). */
+  clientLabel?: string;
+  /** Nome da profissional (para exibir no dialog de assinatura). */
+  professionalName?: string;
+  /** CRN da profissional (para exibir no dialog de assinatura). */
+  professionalCrn?: string;
+  /** Assinaturas salvas (para exibir após aprovação). */
+  initialProfessionalSignatureDataUrl?: string | null;
+  initialClientSignatureDataUrl?: string | null;
+  initialClientSignerName?: string | null;
+  initialDocumentHash?: string | null;
 };
 
 export function ChecklistFillWizard({
@@ -436,6 +448,13 @@ export function ChecklistFillWizard({
   canReopenDossier = false,
   initialReopenEvents = [],
   pdfExportHistory = [],
+  clientLabel,
+  professionalName,
+  professionalCrn,
+  initialProfessionalSignatureDataUrl = null,
+  initialClientSignatureDataUrl = null,
+  initialClientSignerName = null,
+  initialDocumentHash = null,
 }: Props) {
   const router = useRouter();
   const sections = template.sections;
@@ -488,6 +507,19 @@ export function ChecklistFillWizard({
   /* ── Assinaturas ── */
   const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
   const [pendingSignatures, setPendingSignatures] = useState<SignaturePair | null>(null);
+  // Assinaturas persistidas — inicializadas com os dados vindos do servidor
+  const [savedProfessionalSig, setSavedProfessionalSig] = useState<string | null>(
+    initialProfessionalSignatureDataUrl ?? null,
+  );
+  const [savedClientSig, setSavedClientSig] = useState<string | null>(
+    initialClientSignatureDataUrl ?? null,
+  );
+  const [savedClientSignerName, setSavedClientSignerName] = useState<string | null>(
+    initialClientSignerName ?? null,
+  );
+  const [savedDocumentHash, setSavedDocumentHash] = useState<string | null>(
+    initialDocumentHash ?? null,
+  );
 
   const handleDossierReopened = useCallback(() => {
     setDossierApprovedAt(null);
@@ -1013,6 +1045,14 @@ export function ChecklistFillWizard({
           dossierApprovedAt={dossierApprovedAt}
           heading="Dossiê aprovado"
           intro="Relatório aprovado e em modo somente leitura."
+          professionalSignatureDataUrl={savedProfessionalSig}
+          clientSignatureDataUrl={savedClientSig}
+          clientSignerName={savedClientSignerName}
+          professionalName={professionalName}
+          professionalCrn={professionalCrn}
+          clientLabel={clientLabel}
+          documentHash={savedDocumentHash}
+          reopenEvents={initialReopenEvents}
         />
 
         <ChecklistFillDossierPdfCard
@@ -1075,6 +1115,14 @@ export function ChecklistFillWizard({
               ? "Este dossiê já foi aprovado e está em modo somente leitura."
               : "Modo de visualização. Use \"Continuar preenchendo\" para editar esta sessão."
           }
+          professionalSignatureDataUrl={savedProfessionalSig}
+          clientSignatureDataUrl={savedClientSig}
+          clientSignerName={savedClientSignerName}
+          professionalName={professionalName}
+          professionalCrn={professionalCrn}
+          clientLabel={clientLabel}
+          documentHash={savedDocumentHash}
+          reopenEvents={initialReopenEvents}
         />
       </div>
     );
@@ -1397,6 +1445,14 @@ export function ChecklistFillWizard({
                   itemResponseSource={itemResponseSource}
                   onPatchResponse={patchDossierResponse}
                   dossierApprovedAt={dossierApprovedAt}
+                  professionalSignatureDataUrl={savedProfessionalSig}
+                  clientSignatureDataUrl={savedClientSig}
+                  clientSignerName={savedClientSignerName}
+                  professionalName={professionalName}
+                  professionalCrn={professionalCrn}
+                  clientLabel={clientLabel}
+                  documentHash={savedDocumentHash}
+                  reopenEvents={initialReopenEvents}
                 />
                 {dossierPreviewConfirmed && !dossierApprovedAt ? (
                   <div className="border-border space-y-3 rounded-lg border bg-muted/20 p-4">
@@ -1678,6 +1734,9 @@ export function ChecklistFillWizard({
           setSignatureDialogOpen(open);
           if (!open) setPendingSignatures(null);
         }}
+        professionalName={professionalName}
+        professionalCrn={professionalCrn}
+        clientLabel={clientLabel}
         onConfirm={(signatures) => {
           setPendingSignatures(signatures);
           setSignatureDialogOpen(false);
@@ -1698,6 +1757,11 @@ export function ChecklistFillWizard({
               setPendingSignatures(null);
               return;
             }
+            // Persiste assinaturas e hash localmente para exibição imediata
+            setSavedProfessionalSig(signatures.professional);
+            setSavedClientSig(signatures.client);
+            setSavedClientSignerName(signatures.clientSignerName);
+            setSavedDocumentHash(r.documentHash ?? null);
             setPendingSignatures(null);
             setDossierApprovedAt(r.approvedAt);
             const nextInBatch = getNextBatchItemAfterSession(sessionId);

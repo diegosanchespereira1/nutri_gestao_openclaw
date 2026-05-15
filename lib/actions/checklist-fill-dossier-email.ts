@@ -86,6 +86,8 @@ export async function trySendDossierEmailAfterApprove(
       itemPhotos: bundle.itemPhotos,
       professionalSignatureDataUrl: (bundle.session as { professional_signature_data_url?: string | null }).professional_signature_data_url ?? null,
       clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
+      clientSignerName: (bundle.session as { client_signer_name?: string | null }).client_signer_name ?? null,
+      documentHash: (bundle.session as { document_hash?: string | null }).document_hash ?? null,
       },
     );
 
@@ -181,6 +183,8 @@ export async function resendDossierEmailAction(
       itemPhotos: bundle.itemPhotos,
       professionalSignatureDataUrl: (bundle.session as { professional_signature_data_url?: string | null }).professional_signature_data_url ?? null,
       clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
+      clientSignerName: (bundle.session as { client_signer_name?: string | null }).client_signer_name ?? null,
+      documentHash: (bundle.session as { document_hash?: string | null }).document_hash ?? null,
       },
     );
 
@@ -359,6 +363,8 @@ export async function sendDossierPdfToClientFromSessionAction(
       itemPhotos: bundle.itemPhotos,
       professionalSignatureDataUrl: (bundle.session as { professional_signature_data_url?: string | null }).professional_signature_data_url ?? null,
       clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
+      clientSignerName: (bundle.session as { client_signer_name?: string | null }).client_signer_name ?? null,
+      documentHash: (bundle.session as { document_hash?: string | null }).document_hash ?? null,
       },
     );
 

@@ -52,6 +52,39 @@ export default async function ChecklistPreencherPage({
     : { canReopen: false };
   const initialReopenEvents = await loadReopenEventsForSession(sessionId);
 
+  // Carrega nome e CRN do profissional para exibição no dialog de assinatura
+  let professionalName: string | undefined;
+  let professionalCrn: string | undefined;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name, crn")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    professionalName = (profile?.full_name as string | null) ?? undefined;
+    professionalCrn = (profile?.crn as string | null) ?? undefined;
+    // Fallback: team_members
+    if (!professionalName || !professionalCrn) {
+      const { data: member } = await supabase
+        .from("team_members")
+        .select("full_name, crn")
+        .eq("member_user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!professionalName) professionalName = (member?.full_name as string | null) ?? undefined;
+      if (!professionalCrn) professionalCrn = (member?.crn as string | null) ?? undefined;
+    }
+  }
+
+  // Assinaturas já salvas (para re-exibição se o dossiê já foi aprovado)
+  const sessionRow = bundle.session as {
+    professional_signature_data_url?: string | null;
+    client_signature_data_url?: string | null;
+    client_signer_name?: string | null;
+    document_hash?: string | null;
+  };
+
   const createdAt = new Date(bundle.session.created_at);
   const createdAtLabel = createdAt.toLocaleString("pt-BR", {
     day: "2-digit",
@@ -119,6 +152,13 @@ export default async function ChecklistPreencherPage({
         dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
         canReopenDossier={canReopenDossier}
         initialReopenEvents={initialReopenEvents}
+        clientLabel={bundle.pdfClientLabel}
+        professionalName={professionalName}
+        professionalCrn={professionalCrn}
+        initialProfessionalSignatureDataUrl={sessionRow.professional_signature_data_url ?? null}
+        initialClientSignatureDataUrl={sessionRow.client_signature_data_url ?? null}
+        initialClientSignerName={sessionRow.client_signer_name ?? null}
+        initialDocumentHash={sessionRow.document_hash ?? null}
       />
     </div>
   );

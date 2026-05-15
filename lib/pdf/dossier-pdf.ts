@@ -150,6 +150,12 @@ export type DossierPdfBuildInput = {
   professionalSignatureBuffer?: Buffer | null;
   /** Buffer PNG da assinatura do cliente/responsável (capturada no momento da aprovação). */
   clientSignatureBuffer?: Buffer | null;
+  /** Nome digitado pelo signatário do cliente no momento da aprovação. */
+  clientSignerName?: string | null;
+  /** Data/hora da coleta das assinaturas, já formatada (ex: "14/05/2026 às 10:32"). */
+  signedAtLabel?: string | null;
+  /** Hash SHA-256 hex único desta versão aprovada do dossiê. */
+  documentHash?: string | null;
 };
 
 /* ── Dimensões da página ───────────────────────────────────────────────── */
@@ -158,7 +164,7 @@ const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 const MARGIN_X = 36;
 const MARGIN_TOP = 0;   // header começa no topo absoluto
-const MARGIN_BOTTOM = 48;
+const MARGIN_BOTTOM = 60;
 const CONTENT_W = PAGE_W - MARGIN_X * 2;
 
 type Ctx = {
@@ -886,144 +892,341 @@ function formatValidUntilForPdf(value: string | null): string {
 }
 
 /* ── Bloco de assinaturas ──────────────────────────────────────────────── */
+/*
+ * Layout de cada card — coordenadas rastreadas top-down a partir de cardsTop:
+ *
+ *   PAD_TOP (8px)
+ *   rótulo do papel  (7pt)
+ *   gap (5px)
+ *   imagem da assinatura (SIG_IMG_H = 60px)
+ *   gap (LINE_GAP = 5px)
+ *   linha divisória (1px, navy)
+ *   gap (LINE_GAP = 5px)
+ *   nome do signatário (9pt bold)
+ *   gap (3px)
+ *   subtítulo CRN / organização (7.5pt muted)
+ *   gap (3px)
+ *   data/hora (7pt faint, se disponível)
+ *   PAD_BOTTOM (8px)
+ *
+ * CARD_H = 8 + 7 + 5 + 60 + 5 + 1 + 5 + 9 + 3 + 7.5 + 3 + 7 + 8 = 128.5
+ * (com timestamp; sem timestamp remove 3+7 = 10 → 118.5)
+ */
 
 async function drawSignaturesSection(
   ctx: Ctx,
   input: DossierPdfBuildInput,
 ): Promise<void> {
-  const hasProfSig = !!input.professionalSignatureBuffer;
-  const hasClientSig = !!input.clientSignatureBuffer;
-  if (!hasProfSig && !hasClientSig) return;
-
-  // Espaço antes do bloco
   ctx.y -= 20;
 
   const SECTION_LABEL_H = 26;
-  const SIG_BLOCK_H = 110; // altura do card de cada assinatura
-  const SIG_IMG_H = 64;
-  const SIG_IMG_MARGIN_V = 14;
-  const COL_GAP = 12;
-  const COL_W = (CONTENT_W - COL_GAP) / 2;
+  const COL_GAP   = 14;
+  const COL_W     = (CONTENT_W - COL_GAP) / 2;
+  const PAD_X     = 10;   // padding horizontal interno
+  const PAD_TOP   = 8;
+  const PAD_BOT   = 8;
+  const ROLE_SIZE = 7;
+  const SIG_IMG_H = 60;
+  const LINE_GAP  = 5;
+  const NAME_SIZE = 9;
+  const SUB_SIZE  = 7.5;
+  const DATE_SIZE = 7;
+  const hasDate   = !!input.signedAtLabel;
 
-  // Título da seção
-  ensureVerticalSpace(ctx, SECTION_LABEL_H + SIG_BLOCK_H + 8);
+  // Altura total do card
+  const CARD_H = PAD_TOP + ROLE_SIZE + 5 + SIG_IMG_H + LINE_GAP + 1 + LINE_GAP
+    + NAME_SIZE + 3 + SUB_SIZE + (hasDate ? 3 + DATE_SIZE : 0) + PAD_BOT;
 
+  ensureVerticalSpace(ctx, SECTION_LABEL_H + CARD_H + 20);
+
+  // ── Faixa de título ──
   const secTop = ctx.y;
-  // Faixa de título — igual aos cabeçalhos de seção do checklist
-  ctx.page.drawRectangle({ x: MARGIN_X, y: secTop - SECTION_LABEL_H, width: CONTENT_W, height: SECTION_LABEL_H, color: C.navy });
+  ctx.page.drawRectangle({
+    x: MARGIN_X, y: secTop - SECTION_LABEL_H,
+    width: CONTENT_W, height: SECTION_LABEL_H,
+    color: C.navy,
+  });
   drawTextLine(ctx, "ASSINATURAS", MARGIN_X + 10, secTop - 7, 9, ctx.fontBold, rgb(1, 1, 1));
+
+  // Data/hora alinhada à direita no cabeçalho
+  if (hasDate) {
+    const dateStr = foldTextForPdf(`Coletado em: ${input.signedAtLabel!}`);
+    const dw = ctx.font.widthOfTextAtSize(dateStr, 7.5);
+    drawTextLine(ctx, dateStr,
+      MARGIN_X + CONTENT_W - dw - 10, secTop - 9,
+      7.5, ctx.font, rgb(0.7, 0.78, 0.90));
+  }
+
   ctx.y = secTop - SECTION_LABEL_H - 8;
-
-  // Cards lado a lado (profissional esquerda, cliente direita)
   const cardsTop = ctx.y;
-  const cardsBottom = cardsTop - SIG_BLOCK_H;
+  const cardBot  = cardsTop - CARD_H;
 
-  const renderSigCard = async (
-    x: number,
-    label: string,
-    name: string,
-    sigBuffer: Buffer | null | undefined,
-  ) => {
-    // Fundo do card
+  /**
+   * Renderiza um card de assinatura usando posicionamento top-down explícito.
+   * Cada elemento é calculado a partir de cardsTop, sem acumular erros.
+   */
+  const renderCard = async (opts: {
+    x: number;
+    roleLabel: string;
+    signerName: string;
+    subtitle: string;
+    sigBuffer: Buffer | null | undefined;
+  }) => {
+    const { x, roleLabel, signerName, subtitle, sigBuffer } = opts;
+    const innerW = COL_W - PAD_X * 2;
+
+    // ── Fundo do card ──
     ctx.page.drawRectangle({
-      x, y: cardsBottom, width: COL_W, height: SIG_BLOCK_H,
+      x, y: cardBot, width: COL_W, height: CARD_H,
       color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.6,
     });
 
-    // Rótulo (Profissional / Cliente)
-    drawTextLine(ctx, label.toUpperCase(), x + 10, cardsTop - 8, 7, ctx.fontBold, C.textMuted);
+    // ── Rótulo do papel (top-down) ──
+    const roleLabelY = cardsTop - PAD_TOP;          // âncora: topo do texto
+    const roleFolded = foldTextForPdf(roleLabel.toUpperCase());
+    // clip para não ultrapassar a largura do card
+    let roleClipped = roleFolded;
+    while (roleClipped.length > 4 &&
+      ctx.fontBold.widthOfTextAtSize(roleClipped, ROLE_SIZE) > innerW) {
+      roleClipped = roleClipped.slice(0, -1);
+    }
+    drawTextLine(ctx, roleClipped, x + PAD_X, roleLabelY, ROLE_SIZE, ctx.fontBold, C.textMuted);
 
-    // Área de assinatura
-    const sigAreaTop = cardsTop - 8 - 7 - 6;       // abaixo do label
-    const sigAreaH = SIG_IMG_H;
-    const sigAreaY = sigAreaTop - sigAreaH;
-
-    // Quadro tracejado da área de assinatura
-    ctx.page.drawRectangle({
-      x: x + 8, y: sigAreaY, width: COL_W - 16, height: sigAreaH,
-      color: rgb(1, 1, 1), borderColor: C.grayBorder, borderWidth: 0.5,
-    });
+    // ── Área da imagem ──
+    const imgTop  = roleLabelY - ROLE_SIZE - 5;    // top da área de imagem
+    const imgAreaY = imgTop - SIG_IMG_H;           // y inferior da área (pdf-lib = bottom-left)
 
     if (sigBuffer) {
-      // Embed e posicionamento centralizado da imagem de assinatura
       const img = await embedImageSmart(ctx.pdf, sigBuffer);
       if (img) {
-        const maxW = COL_W - 32;
-        const maxH = sigAreaH - SIG_IMG_MARGIN_V * 2;
+        const maxW = innerW;
+        const maxH = SIG_IMG_H - 6;
         const ratio = img.width / img.height;
-        let iw = maxW;
-        let ih = iw / ratio;
+        let iw = maxW; let ih = iw / ratio;
         if (ih > maxH) { ih = maxH; iw = ih * ratio; }
         ctx.page.drawImage(img, {
-          x: x + 8 + (COL_W - 16 - iw) / 2,
-          y: sigAreaY + (sigAreaH - ih) / 2,
-          width: iw,
-          height: ih,
-          opacity: 0.92,
+          x: x + PAD_X + (innerW - iw) / 2,
+          y: imgAreaY + (SIG_IMG_H - ih) / 2,
+          width: iw, height: ih, opacity: 0.92,
         });
       }
-    } else {
-      // Placeholder quando não há assinatura
-      const ph = "Sem assinatura capturada";
-      const phW = ctx.font.widthOfTextAtSize(ph, 7.5);
-      drawTextLine(ctx, ph, x + 8 + (COL_W - 16 - phW) / 2, sigAreaY + sigAreaH - (sigAreaH - 9) / 2, 7.5, ctx.font, C.textFaint);
     }
 
-    // Linha de identificação abaixo do quadro de assinatura
-    const nameTop = sigAreaY - 5;
-    const foldedName = foldTextForPdf(name);
-    drawTextLine(ctx, foldedName, x + 10, nameTop, 8, ctx.fontBold, C.navy);
-  };
-
-  const profName = foldTextForPdf(input.professionalName);
-  const clientLabelText = foldTextForPdf(input.clientLabel ?? "Responsável pelo estabelecimento");
-
-  await renderSigCard(
-    MARGIN_X,
-    "Profissional responsavel",
-    profName,
-    input.professionalSignatureBuffer,
-  );
-
-  await renderSigCard(
-    MARGIN_X + COL_W + COL_GAP,
-    "Cliente / Responsavel",
-    clientLabelText,
-    input.clientSignatureBuffer,
-  );
-
-  ctx.y = cardsBottom - 16;
-}
-
-/* ── Rodapé por página V2 ──────────────────────────────────────────────── */
-
-function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): void {
-  const total = ctx.pdf.getPageCount();
-  for (let i = 0; i < total; i++) {
-    const page = ctx.pdf.getPage(i);
-    const footerH = 28;
-    const footerY = 0;
-
-    // Fundo footer navy suave
-    page.drawRectangle({ x: 0, y: footerY, width: PAGE_W, height: footerH, color: rgb(0.945, 0.949, 0.957) });
-    page.drawLine({
-      start: { x: 0, y: footerY + footerH },
-      end: { x: PAGE_W, y: footerY + footerH },
-      thickness: 0.5, color: C.cardBorder,
+    // ── Linha de assinatura ──
+    const lineY = imgAreaY - LINE_GAP;
+    ctx.page.drawLine({
+      start: { x: x + PAD_X, y: lineY },
+      end:   { x: x + COL_W - PAD_X, y: lineY },
+      thickness: 0.8, color: C.navy,
     });
 
-    const left = foldTextForPdf(
+    // ── Nome do signatário ──
+    const nameY = lineY - LINE_GAP;                // âncora: topo do texto
+    const nameFolded = foldTextForPdf(signerName);
+    // trunca se necessário para não sair do card
+    let nameTrunc = nameFolded;
+    while (nameTrunc.length > 4 &&
+      ctx.fontBold.widthOfTextAtSize(nameTrunc, NAME_SIZE) > innerW) {
+      nameTrunc = nameTrunc.slice(0, -1);
+    }
+    drawTextLine(ctx, nameTrunc, x + PAD_X, nameY, NAME_SIZE, ctx.fontBold, C.navy);
+
+    // ── Subtítulo ──
+    const subY = nameY - NAME_SIZE - 3;
+    const subFolded = foldTextForPdf(subtitle);
+    let subTrunc = subFolded;
+    while (subTrunc.length > 4 &&
+      ctx.font.widthOfTextAtSize(subTrunc, SUB_SIZE) > innerW) {
+      subTrunc = subTrunc.slice(0, -1);
+    }
+    if (subTrunc) {
+      drawTextLine(ctx, subTrunc, x + PAD_X, subY, SUB_SIZE, ctx.font, C.textMuted);
+    }
+
+    // ── Data/hora (apenas se disponível) ──
+    if (hasDate) {
+      const dateY = subY - SUB_SIZE - 3;
+      const dateFolded = foldTextForPdf(input.signedAtLabel!);
+      drawTextLine(ctx, dateFolded, x + PAD_X, dateY, DATE_SIZE, ctx.font, C.textFaint);
+    }
+  };
+
+  // Dados dos signatários
+  const profSubtitle    = input.crn ? `CRN ${input.crn}` : "Responsavel tecnica";
+  const clientSignerName = foldTextForPdf(input.clientSignerName ?? "");
+  const clientOrg        = foldTextForPdf(input.clientLabel ?? "Responsavel pelo estabelecimento");
+
+  await renderCard({
+    x: MARGIN_X,
+    roleLabel: "Profissional responsavel",
+    signerName: input.professionalName,
+    subtitle: profSubtitle,
+    sigBuffer: input.professionalSignatureBuffer,
+  });
+
+  await renderCard({
+    x: MARGIN_X + COL_W + COL_GAP,
+    roleLabel: "Cliente / Responsavel",
+    signerName: clientSignerName || clientOrg,
+    subtitle: clientSignerName ? clientOrg : "",
+    sigBuffer: input.clientSignatureBuffer,
+  });
+
+  // ── Hash do documento (abaixo dos cards) ──────────────────────────────
+  if (input.documentHash) {
+    const hashY = cardBot - 10;
+    const line1 = `SHA-256: ${input.documentHash.slice(0, 32)}`;
+    const line2 = input.documentHash.slice(32);
+    drawTextLine(ctx, line1, MARGIN_X, hashY,      6.5, ctx.font, C.textFaint);
+    drawTextLine(ctx, line2, MARGIN_X, hashY - 9,  6.5, ctx.font, C.textFaint);
+    ctx.y = hashY - 9 - 6.5 - 8;
+  } else {
+    ctx.y = cardBot - 16;
+  }
+}
+
+/* ── Rodapé por página — estilo DocuSign ───────────────────────────────── */
+
+/**
+ * Rodapé de 52 px em duas zonas:
+ *
+ *  ┌──────────────────────────────────────────────────────────┐ ← y=52
+ *  │ [sig] Assinado: Profissional | CRN ×× │ [sig] Cliente ── │  zona de assinaturas (26 px)
+ *  ├──────────────────────────────────────────────────────────┤ ← y=26
+ *  │ Nome profissional | CRN   ·   Documento NutriGestão   Pág│  zona de info (26 px)
+ *  └──────────────────────────────────────────────────────────┘ ← y=0
+ *
+ * Se não há assinaturas capturadas, a zona de assinaturas mostra apenas os
+ * rótulos de papel ("Profissional responsável / Cliente") sem imagem.
+ */
+async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> {
+  const FOOTER_H  = 52;
+  const SIG_H     = 26;   // altura da zona de assinaturas
+  const INFO_H    = 26;   // altura da zona de informações
+  const IMG_MAX_H = 15;   // altura máxima das miniaturas de assinatura
+  const IMG_MAX_W = 44;   // largura máxima das miniaturas de assinatura
+
+  // Incorpora imagens uma única vez no documento (pdf-lib não deduplica automaticamente)
+  let proImg:    PDFImage | null = null;
+  let clientImg: PDFImage | null = null;
+  if (input.professionalSignatureBuffer) {
+    proImg    = await embedImageSmart(ctx.pdf, input.professionalSignatureBuffer);
+  }
+  if (input.clientSignatureBuffer) {
+    clientImg = await embedImageSmart(ctx.pdf, input.clientSignatureBuffer);
+  }
+
+  const total = ctx.pdf.getPageCount();
+  // Largura útil dividida ao meio (coluna de cada signatário)
+  const halfW   = CONTENT_W / 2;
+  const col1X   = MARGIN_X;
+  const col2X   = MARGIN_X + halfW;
+  const dividerX = col2X;
+
+  for (let i = 0; i < total; i++) {
+    const page = ctx.pdf.getPage(i);
+
+    // ── Fundo e borda superior ──────────────────────────────────────────
+    page.drawRectangle({
+      x: 0, y: 0, width: PAGE_W, height: FOOTER_H,
+      color: rgb(0.943, 0.947, 0.957),
+    });
+    page.drawLine({
+      start: { x: 0, y: FOOTER_H }, end: { x: PAGE_W, y: FOOTER_H },
+      thickness: 0.5, color: C.cardBorder,
+    });
+    // Barra navy lateral esquerda (acento visual)
+    page.drawRectangle({ x: 0, y: 0, width: 3, height: FOOTER_H, color: C.navy });
+
+    // ── Zona de assinaturas (y = INFO_H … FOOTER_H) ────────────────────
+    // Separador horizontal entre as duas zonas
+    page.drawLine({
+      start: { x: 3, y: INFO_H }, end: { x: PAGE_W, y: INFO_H },
+      thickness: 0.4, color: C.cardBorder,
+    });
+    // Separador vertical entre os dois signatários
+    page.drawLine({
+      start: { x: dividerX, y: INFO_H + 2 }, end: { x: dividerX, y: FOOTER_H - 2 },
+      thickness: 0.35, color: C.cardBorder,
+    });
+
+    /**
+     * Desenha um item de assinatura numa coluna do rodapé.
+     * colX: x inicial da coluna   colW: largura da coluna
+     * img: miniatura (ou null)    label: linha bold (quem assinou)   sub: linha faint (papel/CRN)
+     */
+    const drawSigItem = (
+      colX: number,
+      colW: number,
+      img: PDFImage | null,
+      label: string,
+      sub: string,
+    ) => {
+      const PAD    = 6;
+      const centerY = INFO_H + SIG_H / 2;  // centro vertical da zona de assinaturas
+
+      let textStartX = colX + PAD;
+
+      if (img) {
+        const ratio = img.width / img.height;
+        let iw = IMG_MAX_W; let ih = iw / ratio;
+        if (ih > IMG_MAX_H) { ih = IMG_MAX_H; iw = ih * ratio; }
+        page.drawImage(img, {
+          x: colX + PAD,
+          y: centerY - ih / 2,
+          width: iw, height: ih, opacity: 0.90,
+        });
+        textStartX = colX + PAD + iw + 4;
+      }
+
+      const maxTxtW = colX + colW - textStartX - PAD;
+
+      let labelTrunc = foldTextForPdf(label);
+      while (labelTrunc.length > 4 && ctx.fontBold.widthOfTextAtSize(labelTrunc, 7) > maxTxtW) {
+        labelTrunc = labelTrunc.slice(0, -1);
+      }
+      page.drawText(labelTrunc, { x: textStartX, y: centerY + 1.5, size: 7, font: ctx.fontBold, color: C.navy });
+
+      if (sub) {
+        let subTrunc = foldTextForPdf(sub);
+        while (subTrunc.length > 4 && ctx.font.widthOfTextAtSize(subTrunc, 6.5) > maxTxtW) {
+          subTrunc = subTrunc.slice(0, -1);
+        }
+        page.drawText(subTrunc, { x: textStartX, y: centerY - 7.5, size: 6.5, font: ctx.font, color: C.textMuted });
+      }
+    };
+
+    // Profissional
+    const profSub   = input.crn ? `CRN ${input.crn}` : "Profissional responsavel";
+    const profLabel = `Assinado: ${foldTextForPdf(input.professionalName)}`;
+    drawSigItem(col1X, halfW, proImg, profLabel, profSub);
+
+    // Cliente / responsável
+    const clientName  = foldTextForPdf(input.clientSignerName ?? "");
+    const clientOrg   = foldTextForPdf(input.clientLabel ?? "");
+    const clientLabel = clientName
+      ? `Assinado: ${clientName}`
+      : (clientOrg ? `Assinado: ${clientOrg}` : "Cliente / Responsavel");
+    const clientSub   = (clientName && clientOrg) ? clientOrg : "";
+    drawSigItem(col2X, halfW, clientImg, clientLabel, clientSub);
+
+    // ── Zona de informações (y = 0 … INFO_H) ────────────────────────────
+    const infoTextY = 9;  // baseline do texto de informação
+
+    const leftStr = foldTextForPdf(
       `${input.professionalName}${input.crn ? `  |  CRN ${input.crn}` : ""}`,
     );
-    page.drawText(left, { x: MARGIN_X, y: footerY + 9, size: 7.5, font: ctx.font, color: C.textMuted });
+    page.drawText(leftStr, { x: MARGIN_X, y: infoTextY, size: 7, font: ctx.font, color: C.textMuted });
 
-    const center = "Documento gerado eletronicamente - NutriGestao";
-    const cw = ctx.font.widthOfTextAtSize(center, 7.5);
-    page.drawText(center, { x: (PAGE_W - cw) / 2, y: footerY + 9, size: 7.5, font: ctx.font, color: C.textFaint });
+    // Linha central: "Documento assinado eletronicamente" + hash abreviado (primeiros 16 chars)
+    const hashSnippet = input.documentHash ? ` · ${input.documentHash.slice(0, 16)}…` : "";
+    const centerStr = `Documento assinado eletronicamente - NutriGestao${hashSnippet}`;
+    const cw = ctx.font.widthOfTextAtSize(centerStr, 7);
+    page.drawText(centerStr, { x: (PAGE_W - cw) / 2, y: infoTextY, size: 7, font: ctx.font, color: C.textFaint });
 
-    const pageText = `Pagina ${i + 1} de ${total}`;
-    const pw = ctx.font.widthOfTextAtSize(pageText, 7.5);
-    page.drawText(pageText, { x: PAGE_W - MARGIN_X - pw, y: footerY + 9, size: 7.5, font: ctx.font, color: C.textMuted });
+    const pageStr = `Pagina ${i + 1} de ${total}`;
+    const pw = ctx.font.widthOfTextAtSize(pageStr, 7);
+    page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: infoTextY, size: 7, font: ctx.font, color: C.textMuted });
   }
 }
 
@@ -1077,7 +1280,7 @@ export async function buildDossierPdfBytes(
   // Bloco de assinaturas — renderizado após todas as seções, antes dos rodapés
   await drawSignaturesSection(ctx, input);
 
-  drawFooters(ctx, input);
+  await drawFooters(ctx, input);
 
   return pdf.save();
 }

@@ -34,6 +34,10 @@ export type ApprovedDossierPdfBundleInput = {
   professionalSignatureDataUrl?: string | null;
   /** Data URL PNG da assinatura do cliente/responsável (capturada na aprovação do dossiê). */
   clientSignatureDataUrl?: string | null;
+  /** Nome digitado pelo signatário do cliente no momento da aprovação. */
+  clientSignerName?: string | null;
+  /** Hash SHA-256 hex único desta versão aprovada do dossiê. */
+  documentHash?: string | null;
 };
 
 async function loadProfessionalIdentity(
@@ -201,12 +205,16 @@ export async function buildApprovedDossierPdfBytes(
 
   const professionalSignatureBuffer = dataUrlToBuffer(input.professionalSignatureDataUrl);
   const clientSignatureBuffer = dataUrlToBuffer(input.clientSignatureDataUrl);
+  const clientSignerName = input.clientSignerName ?? null;
+
+  // Data/hora da aprovação formatada para exibir nas assinaturas do PDF
+  const signedAtLabel = formatApprovedAtForDossierPdf(input.dossierApprovedAtIso);
 
   const pdfInput = {
     templateName: input.template.name,
     establishmentLabel: input.establishmentLabel,
     clientLabel,
-    approvedAtLabel: formatApprovedAtForDossierPdf(input.dossierApprovedAtIso),
+    approvedAtLabel: signedAtLabel,
     professionalName,
     crn,
     logoBuffer,
@@ -214,6 +222,9 @@ export async function buildApprovedDossierPdfBytes(
     score,
     professionalSignatureBuffer,
     clientSignatureBuffer,
+    clientSignerName,
+    signedAtLabel,
+    documentHash: input.documentHash ?? null,
     sections: await Promise.all(
       input.template.sections.map(async (sec) => ({
         title: sec.title,

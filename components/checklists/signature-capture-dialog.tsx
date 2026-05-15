@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Eraser, Pen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -16,8 +18,9 @@ import { cn } from "@/lib/utils";
 /* ── Tipos ────────────────────────────────────────────────────────────── */
 
 export type SignaturePair = {
-  professional: string; // data URL PNG
-  client: string;       // data URL PNG
+  professional: string;   // data URL PNG
+  client: string;         // data URL PNG
+  clientSignerName: string; // nome digitado pelo signatário do cliente
 };
 
 type Step = "professional" | "client";
@@ -27,8 +30,12 @@ interface SignatureCaptureDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Chamado quando ambas as assinaturas são confirmadas */
   onConfirm: (signatures: SignaturePair) => void;
-  /** Nome da profissional (exibido como rótulo) */
+  /** Nome da profissional (CRN incluso se disponível) */
   professionalName?: string;
+  /** CRN da profissional */
+  professionalCrn?: string;
+  /** Nome do cliente/estabelecimento do cadastro */
+  clientLabel?: string;
 }
 
 /* ── Utilitário de canvas ────────────────────────────────────────────── */
@@ -37,14 +44,13 @@ function isCanvasEmpty(canvas: HTMLCanvasElement): boolean {
   const ctx = canvas.getContext("2d");
   if (!ctx) return true;
   const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  // Se todos os pixels alpha === 0 → canvas vazio
   for (let i = 3; i < data.length; i += 4) {
     if (data[i] !== 0) return false;
   }
   return true;
 }
 
-/* ── Componente interno: painel de assinatura ────────────────────────── */
+/* ── Painel de assinatura ────────────────────────────────────────────── */
 
 interface SignaturePadProps {
   onDataUrl: (url: string | null) => void;
@@ -56,7 +62,6 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
   const [isEmpty, setIsEmpty] = useState(true);
 
-  /* Ajusta resolução para telas HiDPI */
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -70,33 +75,22 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#1e293b"; // slate-900
+    ctx.strokeStyle = "#1e293b";
   }, []);
 
-  const getPoint = (
-    e: React.MouseEvent | React.TouchEvent | React.PointerEvent,
-    canvas: HTMLCanvasElement,
-  ) => {
+  const getPoint = (e: React.PointerEvent, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
-    if ("touches" in e) {
-      const t = e.touches[0];
-      return { x: t.clientX - rect.left, y: t.clientY - rect.top };
-    }
-    const me = e as React.MouseEvent;
-    return { x: me.clientX - rect.left, y: me.clientY - rect.top };
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
-  const startDrawing = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      e.preventDefault();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      drawing.current = true;
-      lastPoint.current = getPoint(e, canvas);
-      canvas.setPointerCapture(e.pointerId);
-    },
-    [],
-  );
+  const startDrawing = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    drawing.current = true;
+    lastPoint.current = getPoint(e, canvas);
+    canvas.setPointerCapture(e.pointerId);
+  }, []);
 
   const draw = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     e.preventDefault();
@@ -105,17 +99,13 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-
     const point = getPoint(e, canvas);
     const prev = lastPoint.current ?? point;
-
     ctx.beginPath();
     ctx.moveTo(prev.x, prev.y);
     ctx.lineTo(point.x, point.y);
     ctx.stroke();
-
     lastPoint.current = point;
-
     if (isCanvasEmpty(canvas)) {
       setIsEmpty(true);
       onDataUrl(null);
@@ -130,9 +120,7 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
     lastPoint.current = null;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (!isCanvasEmpty(canvas)) {
-      onDataUrl(canvas.toDataURL("image/png"));
-    }
+    if (!isCanvasEmpty(canvas)) onDataUrl(canvas.toDataURL("image/png"));
   }, [onDataUrl]);
 
   const clearCanvas = useCallback(() => {
@@ -147,22 +135,18 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
   }, [onDataUrl]);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-1">
       <div className="relative">
         <canvas
           ref={canvasRef}
           className={cn(
-            "w-full h-40 rounded-lg border-2 cursor-crosshair touch-none",
-            "bg-white",
-            isEmpty
-              ? "border-border border-dashed"
-              : "border-primary/40",
+            "w-full h-36 rounded-lg border-2 cursor-crosshair touch-none bg-white block",
+            isEmpty ? "border-border border-dashed" : "border-primary/40",
           )}
           onPointerDown={startDrawing}
           onPointerMove={draw}
           onPointerUp={stopDrawing}
           onPointerLeave={stopDrawing}
-          style={{ display: "block" }}
         />
         {isEmpty && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -173,17 +157,16 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
           </div>
         )}
       </div>
-
       {!isEmpty && (
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={clearCanvas}
-          className="text-muted-foreground h-8 text-xs"
+          className="text-muted-foreground h-7 text-xs"
         >
           <Eraser className="mr-1.5 h-3.5 w-3.5" />
-          Limpar assinatura
+          Limpar
         </Button>
       )}
     </div>
@@ -197,50 +180,49 @@ export function SignatureCaptureDialog({
   onOpenChange,
   onConfirm,
   professionalName,
+  professionalCrn,
+  clientLabel,
 }: SignatureCaptureDialogProps) {
   const [step, setStep] = useState<Step>("professional");
   const [professionalDataUrl, setProfessionalDataUrl] = useState<string | null>(null);
   const [clientDataUrl, setClientDataUrl] = useState<string | null>(null);
+  const [clientSignerName, setClientSignerName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  /* Reset ao fechar/reabrir */
   useEffect(() => {
     if (!open) {
       setStep("professional");
       setProfessionalDataUrl(null);
       setClientDataUrl(null);
+      setClientSignerName("");
       setError(null);
     }
   }, [open]);
 
-  const handleNextOrConfirm = () => {
+  const handleNext = () => {
     setError(null);
-
-    if (step === "professional") {
-      if (!professionalDataUrl) {
-        setError("Por favor, adicione a assinatura antes de continuar.");
-        return;
-      }
-      setStep("client");
+    if (!professionalDataUrl) {
+      setError("Por favor, assine antes de continuar.");
       return;
     }
+    setStep("client");
+  };
 
-    // step === "client"
+  const handleConfirm = () => {
+    setError(null);
+    if (!clientSignerName.trim()) {
+      setError("Digite o nome de quem está assinando pelo cliente.");
+      return;
+    }
     if (!clientDataUrl) {
-      setError("Por favor, adicione a assinatura do cliente antes de confirmar.");
+      setError("Por favor, assine antes de confirmar.");
       return;
     }
-
     onConfirm({
       professional: professionalDataUrl!,
       client: clientDataUrl,
+      clientSignerName: clientSignerName.trim(),
     });
-  };
-
-  const handleBack = () => {
-    setError(null);
-    setStep("professional");
-    setClientDataUrl(null);
   };
 
   const isProfessional = step === "professional";
@@ -254,83 +236,99 @@ export function SignatureCaptureDialog({
           </DialogTitle>
           <DialogDescription>
             {isProfessional
-              ? `${professionalName ? `${professionalName} — ` : ""}Responsável técnica pela avaliação.`
+              ? "Responsável técnica pela avaliação."
               : "Responsável pelo estabelecimento avaliado."}
           </DialogDescription>
         </DialogHeader>
 
         {/* Indicador de etapa */}
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span
-            className={cn(
-              "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
-              isProfessional
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            1
-          </span>
-          <span className={isProfessional ? "text-foreground font-medium" : ""}>
-            Profissional
-          </span>
+          <span className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+            isProfessional ? "bg-primary text-primary-foreground" : "bg-muted",
+          )}>1</span>
+          <span className={isProfessional ? "text-foreground font-medium" : ""}>Profissional</span>
           <div className="h-px flex-1 bg-border" />
-          <span
-            className={cn(
-              "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
-              !isProfessional
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            2
-          </span>
-          <span className={!isProfessional ? "text-foreground font-medium" : ""}>
-            Cliente
-          </span>
+          <span className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+            !isProfessional ? "bg-primary text-primary-foreground" : "bg-muted",
+          )}>2</span>
+          <span className={!isProfessional ? "text-foreground font-medium" : ""}>Cliente</span>
         </div>
 
-        {/* Preview da assinatura profissional quando no passo do cliente */}
-        {!isProfessional && professionalDataUrl && (
-          <div className="rounded-md border bg-muted/30 p-2">
-            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Assinatura da profissional ✓
-            </p>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={professionalDataUrl}
-              alt="Assinatura da profissional"
-              className="max-h-14 w-auto opacity-70"
-            />
+        {/* Passo 1 — Profissional */}
+        {isProfessional && (
+          <div className="space-y-3">
+            {/* Preview de como ficará no PDF */}
+            {professionalName && (
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Aparecerá no dossiê como:&nbsp;
+                <span className="text-foreground font-semibold">{professionalName}</span>
+                {professionalCrn && (
+                  <span className="text-foreground"> — CRN {professionalCrn}</span>
+                )}
+              </div>
+            )}
+            <SignaturePad key="professional" onDataUrl={setProfessionalDataUrl} />
           </div>
         )}
 
-        {/* Canvas de assinatura — key força remontagem ao trocar de etapa */}
-        <SignaturePad
-          key={step}
-          onDataUrl={isProfessional ? setProfessionalDataUrl : setClientDataUrl}
-        />
+        {/* Passo 2 — Cliente */}
+        {!isProfessional && (
+          <div className="space-y-3">
+            {/* Preview da assinatura profissional */}
+            {professionalDataUrl && (
+              <div className="rounded-md border bg-muted/30 p-2">
+                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Profissional ✓
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={professionalDataUrl} alt="Assinatura da profissional" className="max-h-12 w-auto opacity-70" />
+              </div>
+            )}
 
-        {error && (
-          <p className="text-destructive text-sm" role="alert">
-            {error}
-          </p>
+            {/* Nome do signatário — campo obrigatório */}
+            <div className="space-y-1.5">
+              <Label htmlFor="client-signer-name" className="text-sm font-medium">
+                Nome de quem está assinando
+              </Label>
+              <Input
+                id="client-signer-name"
+                placeholder="Ex: João da Silva"
+                value={clientSignerName}
+                onChange={(e) => setClientSignerName(e.target.value)}
+                autoComplete="name"
+              />
+              {/* Subtítulo com nome do estabelecimento */}
+              {clientLabel && (
+                <p className="text-muted-foreground text-xs">
+                  Responsável por:{" "}
+                  <span className="text-foreground font-medium">{clientLabel}</span>
+                </p>
+              )}
+            </div>
+
+            <SignaturePad key="client" onDataUrl={setClientDataUrl} />
+          </div>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
+        {error && (
+          <p className="text-destructive text-sm" role="alert">{error}</p>
+        )}
+
+        <div className="flex items-center justify-between gap-2">
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            onClick={isProfessional ? () => onOpenChange(false) : handleBack}
+            onClick={isProfessional ? () => onOpenChange(false) : () => { setError(null); setStep("professional"); setClientDataUrl(null); }}
           >
             {isProfessional ? "Cancelar" : "← Voltar"}
           </Button>
-
           <Button
             type="button"
             size="sm"
-            onClick={handleNextOrConfirm}
+            onClick={isProfessional ? handleNext : handleConfirm}
           >
             {isProfessional ? "Próximo →" : "Confirmar e aprovar dossiê"}
           </Button>

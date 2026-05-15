@@ -1121,9 +1121,9 @@ async function drawSignaturesSection(
  * rótulos de papel ("Profissional responsável / Cliente") sem imagem.
  */
 async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> {
-  const FOOTER_H  = 52;
+  const FOOTER_H  = 60;   // = MARGIN_BOTTOM — 3 linhas na zona de informações
   const SIG_H     = 26;   // altura da zona de assinaturas
-  const INFO_H    = 26;   // altura da zona de informações
+  const INFO_H    = 34;   // altura da zona de informações (3 linhas: doc · hash · branding)
   const IMG_MAX_H = 15;   // altura máxima das miniaturas de assinatura
   const IMG_MAX_W = 44;   // largura máxima das miniaturas de assinatura
 
@@ -1235,32 +1235,36 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
     const clientSub   = (clientName && clientOrg) ? clientOrg : "";
     drawSigItem(col2X, halfW, clientImg, clientLabel, clientSub);
 
-    // ── Zona de informações (y = 0 … INFO_H) ───────────────────────────
-    // Esquerda: "Documento assinado eletronicamente"
-    const docLine = foldTextForPdf("Documento assinado eletronicamente - NutriGestao");
-    page.drawText(docLine, { x: MARGIN_X, y: 17, size: 7, font: ctx.font, color: C.textFaint });
+    // ── Zona de informações (y = 0 … INFO_H = 34) — 3 linhas bem separadas ──
+    //
+    //  y ≈ 25  │ "Documento assinado eletronicamente"  ···  "Pagina X de Y"
+    //  y ≈ 15  │ SHA-256: <hash completo>   (apenas quando presente)
+    //  y ≈  5  │        Sistema desenvolvido por Stratos Tech        (centrado)
 
-    // Hash SHA-256 (linha abaixo, esquerda)
+    // Linha 1 — doc + página
+    const docLine = foldTextForPdf("Documento assinado eletronicamente - NutriGestao");
+    page.drawText(docLine, { x: MARGIN_X, y: 25, size: 7, font: ctx.font, color: C.textFaint });
+
+    const pageStr = `Pagina ${i + 1} de ${total}`;
+    const pw = ctx.font.widthOfTextAtSize(pageStr, 7);
+    page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: 25, size: 7, font: ctx.font, color: C.textMuted });
+
+    // Linha 2 — hash SHA-256 (somente se existir)
     if (input.documentHash) {
       const hashLine = foldTextForPdf(`SHA-256: ${input.documentHash}`);
-      page.drawText(hashLine, { x: MARGIN_X, y: 5.5, size: 6.5, font: ctx.font, color: C.textFaint });
+      page.drawText(hashLine, { x: MARGIN_X, y: 15, size: 6.5, font: ctx.font, color: C.textFaint });
     }
 
-    // Centro: branding discreto "Sistema desenvolvido por Stratos Tech"
+    // Linha 3 — branding discreto, sempre centralizado
     const brandStr = "Sistema desenvolvido por Stratos Tech";
     const bw = ctx.font.widthOfTextAtSize(brandStr, 6);
     page.drawText(brandStr, {
       x: (PAGE_W - bw) / 2,
-      y: 5.5,
+      y: 5,
       size: 6,
       font: ctx.font,
       color: rgb(0.72, 0.73, 0.76),
     });
-
-    // Direita: número de página
-    const pageStr = `Pagina ${i + 1} de ${total}`;
-    const pw = ctx.font.widthOfTextAtSize(pageStr, 7);
-    page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: 17, size: 7, font: ctx.font, color: C.textMuted });
   }
 }
 

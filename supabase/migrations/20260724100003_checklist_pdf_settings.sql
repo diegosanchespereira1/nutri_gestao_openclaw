@@ -54,3 +54,6 @@ create policy "owner_update_pdf_settings"
   on public.checklist_pdf_settings for update
   using (workspace_owner_id = auth.uid())
   with check (workspace_owner_id = auth.uid());
+
+-- Concede acesso à tabela para o role authenticated (RLS filtra as linhas)
+grant select, insert, update on public.checklist_pdf_settings to authenticated;

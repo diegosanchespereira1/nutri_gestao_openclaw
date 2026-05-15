@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { ChecklistFillDossierItemBody } from "@/components/checklists/checklist-fill-dossier-item-body";
 import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
-import { formatDocumentHashLines } from "@/lib/checklists/document-hash";
+import { formatDocumentHash } from "@/lib/checklists/document-hash";
 import { cn } from "@/lib/utils";
 import type { FillItemResponseState, FillResponsesMap } from "@/lib/types/checklist-fill";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
@@ -122,6 +122,12 @@ export function ChecklistFillDossierPreview({
     : reviewEditable
       ? "Revise os textos abaixo; salve ao sair de cada campo. Em seguida, você pode aprovar o dossiê."
       : "Checklist, fotos e notas agregados por seção. Expanda cada bloco para revisar o detalhe.";
+
+  const hasSigImages = Boolean(professionalSignatureDataUrl || clientSignatureDataUrl);
+  const hasReopenHashes = reopenEvents.some((ev) => Boolean(ev.previous_document_hash));
+  const showApprovedFooter =
+    Boolean(dossierApprovedAt) &&
+    (hasSigImages || Boolean(documentHash) || hasReopenHashes);
 
   return (
     <div
@@ -240,13 +246,12 @@ export function ChecklistFillDossierPreview({
         })}
       </div>
 
-      {/* Bloco de assinaturas — no rodapé do dossiê, somente após aprovação */}
-      {dossierApprovedAt && (professionalSignatureDataUrl || clientSignatureDataUrl) ? (
+      {/* Bloco de assinaturas / identificador — após aprovação */}
+      {showApprovedFooter ? (
         <div className="mt-6 overflow-hidden rounded-lg border border-border bg-muted/20">
-          {/* Cabeçalho compacto */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Assinaturas
+              {hasSigImages ? "Assinaturas" : "Documento"}
             </span>
             <span className="text-[10px] text-muted-foreground/70">
               Coletado em{" "}
@@ -257,13 +262,13 @@ export function ChecklistFillDossierPreview({
                 year: "numeric",
                 hour: "2-digit",
                 minute: "2-digit",
-              }).format(new Date(dossierApprovedAt))}
+              }).format(new Date(dossierApprovedAt!))}
               {" · "}Documento assinado eletronicamente
             </span>
           </div>
 
-          {/* Dois signatários lado a lado — layout compacto */}
-          <div className="grid grid-cols-2 divide-x divide-border">
+          {hasSigImages ? (
+            <div className="grid grid-cols-2 divide-x divide-border">
             {/* Profissional */}
             <div className="flex items-center gap-3 px-4 py-3">
               {professionalSignatureDataUrl ? (
@@ -314,24 +319,19 @@ export function ChecklistFillDossierPreview({
               </div>
             </div>
           </div>
+          ) : null}
 
           {/* Hash SHA-256 do documento vigente */}
-          {documentHash ? (() => {
-            const [line1, line2] = formatDocumentHashLines(documentHash);
-            return (
-              <div className="border-t border-border px-4 py-2.5">
-                <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-                  Identificador do documento · SHA-256
-                </p>
-                <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/80 break-all">
-                  {line1}
-                </p>
-                <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/80 break-all">
-                  {line2}
-                </p>
-              </div>
-            );
-          })() : null}
+          {documentHash ? (
+            <div className="border-t border-border px-4 py-2.5">
+              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                Identificador do documento · SHA-256
+              </p>
+              <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/80">
+                {formatDocumentHash(documentHash)}
+              </p>
+            </div>
+          ) : null}
 
           {/* Hashes de versões anteriores canceladas por reabertura */}
           {reopenEvents.filter((ev) => ev.previous_document_hash).map((ev) => (

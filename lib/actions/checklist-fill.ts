@@ -1198,73 +1198,35 @@ export async function approveChecklistFillDossierAction(
 
   const approvedAt = new Date().toISOString();
 
-  // ── 1. Aprovação (obrigatória) — update mínimo sem colunas novas ────────
-  const { data: updated, error } = await supabase
-    .from("checklist_fill_sessions")
-    .update({ dossier_approved_at: approvedAt })
-    .eq("id", sessionId)
-    .is("dossier_approved_at", null)
-    .select("dossier_approved_at")
-    .maybeSingle();
+  const MAX_SIG_BYTES = 512 * 1024;
+  const validateSig = (url: string | undefined | null): string | null => {
+    if (!url) return null;
+    if (!url.startsWith("data:image/")) return null;
+    if (url.length > MAX_SIG_BYTES) return null;
+    return url;
+  };
 
-  if (error || !updated?.dossier_approved_at) {
-    console.error("[approveChecklistFillDossierAction] Falha ao aprovar sessão:", error);
-    return { ok: false, error: "Não foi possível aprovar o dossiê." };
-  }
+  const professionalSig =
+    signatures?.professional || signatures?.client
+      ? validateSig(signatures.professional)
+      : null;
+  const clientSig =
+    signatures?.professional || signatures?.client
+      ? validateSig(signatures.client)
+      : null;
+  const clientSignerNameForSave =
+    (signatures?.clientSignerName ?? "").trim().slice(0, 200) || null;
 
-  // ── 2. Assinaturas (best-effort) — update separado para não bloquear ───
-  // Se a migration ainda não foi aplicada ou outro erro ocorrer,
-  // a aprovação já está registrada e o dossiê não é perdido.
-  if (signatures?.professional || signatures?.client) {
-    const MAX_SIG_BYTES = 512 * 1024;
-    const validateSig = (url: string | undefined | null): string | null => {
-      if (!url) return null;
-      if (!url.startsWith("data:image/")) return null;
-      if (url.length > MAX_SIG_BYTES) return null;
-      return url;
-    };
-
-    const professionalSig = validateSig(signatures.professional);
-    const clientSig = validateSig(signatures.client);
-
-    const clientSignerName = (signatures.clientSignerName ?? "").trim().slice(0, 200) || null;
-
-    if (professionalSig !== null || clientSig !== null || clientSignerName) {
-      const sigPatch: Record<string, string | null> = {};
-      if (professionalSig) sigPatch["professional_signature_data_url"] = professionalSig;
-      if (clientSig) sigPatch["client_signature_data_url"] = clientSig;
-      if (clientSignerName) sigPatch["client_signer_name"] = clientSignerName;
-
-      const { error: sigErr } = await supabase
-        .from("checklist_fill_sessions")
-        .update(sigPatch)
-        .eq("id", sessionId);
-
-      if (sigErr) {
-        // Não impede a aprovação — loga para diagnóstico.
-        // Causa mais comum: migration ainda não aplicada no banco.
-        console.error(
-          "[approveChecklistFillDossierAction] Falha ao salvar assinaturas (best-effort).",
-          "Verifique se a migration 20260724100000 foi aplicada.",
-          sigErr,
-        );
-      }
-    }
-  }
-
-  // ── 3. Hash do documento (best-effort) ─────────────────────────────────
-  // SHA-256 determinístico: sessionId + approved_at + signatários + dados das assinaturas.
-  // Identifica digitalmente e de forma única esta versão aprovada do dossiê.
+  // SHA-256: mesmos valores que serão persistidos (evita divergência hash vs BD).
   let documentHash: string | null = null;
   try {
-    // Carrega nome/CRN do profissional para incluir no hash (mesmo lookup do PDF)
     const { data: profProfile } = await supabase
       .from("profiles")
       .select("full_name, crn")
       .eq("user_id", auth.userId)
       .maybeSingle();
     let profName = String(profProfile?.full_name ?? "").trim();
-    let profCrn  = String(profProfile?.crn ?? "").trim();
+    let profCrn = String(profProfile?.crn ?? "").trim();
     if (!profName || !profCrn) {
       const { data: profMember } = await supabase
         .from("team_members")
@@ -1274,7 +1236,7 @@ export async function approveChecklistFillDossierAction(
         .limit(1)
         .maybeSingle();
       if (!profName) profName = String(profMember?.full_name ?? "").trim();
-      if (!profCrn)  profCrn  = String(profMember?.crn ?? "").trim();
+      if (!profCrn) profCrn = String(profMember?.crn ?? "").trim();
     }
 
     documentHash = generateDocumentHash({
@@ -1282,36 +1244,83 @@ export async function approveChecklistFillDossierAction(
       approvedAtIso: approvedAt,
       professionalName: profName,
       crn: profCrn,
-      clientSignerName: (signatures?.clientSignerName ?? "").trim() || null,
-      professionalSignatureDataUrl: signatures?.professional ?? null,
-      clientSignatureDataUrl: signatures?.client ?? null,
+      clientSignerName: clientSignerNameForSave,
+      professionalSignatureDataUrl: professionalSig,
+      clientSignatureDataUrl: clientSig,
     });
-
-    const { error: hashErr } = await supabase
-      .from("checklist_fill_sessions")
-      .update({ document_hash: documentHash })
-      .eq("id", sessionId);
-
-    if (hashErr) {
-      console.error(
-        "[approveChecklistFillDossierAction] Falha ao salvar document_hash (best-effort).",
-        "Verifique se a migration 20260724100002 foi aplicada.",
-        hashErr,
-      );
-      documentHash = null;
-    }
   } catch (e) {
     console.error("[approveChecklistFillDossierAction] Erro ao gerar document_hash:", e);
     documentHash = null;
   }
 
-  // ── 4. Pontuação (best-effort) ──────────────────────────────────────────
+  const sigPatch: Record<string, string | null> = {};
+  if (professionalSig) sigPatch.professional_signature_data_url = professionalSig;
+  if (clientSig) sigPatch.client_signature_data_url = clientSig;
+  if (clientSignerNameForSave) sigPatch.client_signer_name = clientSignerNameForSave;
+
+  // ── Aprovação + assinaturas + hash num único update (evita aprovação sem hash no BD / race com refresh)
+  const approvalPayload: Record<string, unknown> = {
+    dossier_approved_at: approvedAt,
+    ...sigPatch,
+    document_hash: documentHash,
+  };
+
+  const { data: updated, error } = await supabase
+    .from("checklist_fill_sessions")
+    .update(approvalPayload)
+    .eq("id", sessionId)
+    .is("dossier_approved_at", null)
+    .select("dossier_approved_at, document_hash")
+    .maybeSingle();
+
+  let finalUpdated = updated;
+  let finalDocumentHash = documentHash;
+
+  if (error && documentHash) {
+    const errText = `${(error as { message?: string }).message ?? ""} ${JSON.stringify(error)}`.toLowerCase();
+    if (
+      errText.includes("document_hash") ||
+      errText.includes("42703") ||
+      (errText.includes("column") && errText.includes("does not exist"))
+    ) {
+      const { document_hash: _omit, ...withoutHash } = approvalPayload;
+      const retry = await supabase
+        .from("checklist_fill_sessions")
+        .update(withoutHash)
+        .eq("id", sessionId)
+        .is("dossier_approved_at", null)
+        .select("dossier_approved_at, document_hash")
+        .maybeSingle();
+      if (!retry.error && retry.data?.dossier_approved_at) {
+        finalUpdated = retry.data;
+        finalDocumentHash = null;
+        console.warn(
+          "[approveChecklistFillDossierAction] Coluna document_hash ausente no BD — aprovação concluída sem persistir hash. Aplique migration 20260724100002.",
+        );
+      }
+    }
+  }
+
+  if (error && !finalUpdated?.dossier_approved_at) {
+    console.error("[approveChecklistFillDossierAction] Falha ao aprovar sessão:", error);
+    return { ok: false, error: "Não foi possível aprovar o dossiê." };
+  }
+
+  if (!finalUpdated?.dossier_approved_at) {
+    console.error("[approveChecklistFillDossierAction] Falha ao aprovar sessão:", error);
+    return { ok: false, error: "Não foi possível aprovar o dossiê." };
+  }
+
+  const persistedHash =
+    (finalUpdated as { document_hash?: string | null }).document_hash ?? finalDocumentHash;
+
+  // ── 2. Pontuação (best-effort) ──────────────────────────────────────────
   // Calcular e persistir a pontuação (best-effort: não impede a aprovação se falhar)
   await supabase.rpc("calculate_and_store_session_score", {
     p_session_id: sessionId,
   });
 
-  const at = String(updated.dossier_approved_at);
+  const at = String(finalUpdated.dossier_approved_at);
 
   const visitId = bundle.session.scheduled_visit_id;
   if (visitId) {
@@ -1341,6 +1350,6 @@ export async function approveChecklistFillDossierAction(
     });
   }
 
-  return { ok: true, approvedAt: at, documentHash };
+  return { ok: true, approvedAt: at, documentHash: persistedHash };
 }
 

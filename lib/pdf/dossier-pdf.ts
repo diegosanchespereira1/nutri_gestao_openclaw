@@ -1052,7 +1052,7 @@ async function drawSignaturesSection(
   };
 
   // Dados dos signatários
-  const profSubtitle    = input.crn ? `CRN ${input.crn}` : "Responsavel tecnica";
+  const profSubtitle = input.crn ? `CRN ${input.crn}` : "Responsavel tecnica";
   const clientSignerName = foldTextForPdf(input.clientSignerName ?? "");
   const clientOrg        = foldTextForPdf(input.clientLabel ?? "Responsavel pelo estabelecimento");
 
@@ -1072,14 +1072,12 @@ async function drawSignaturesSection(
     sigBuffer: input.clientSignatureBuffer,
   });
 
-  // ── Hash do documento (abaixo dos cards) ──────────────────────────────
+  // ── Hash do documento (abaixo dos cards, alinhado à esquerda) ─────────
   if (input.documentHash) {
     const hashY = cardBot - 10;
-    const line1 = `SHA-256: ${input.documentHash.slice(0, 32)}`;
-    const line2 = input.documentHash.slice(32);
-    drawTextLine(ctx, line1, MARGIN_X, hashY,      6.5, ctx.font, C.textFaint);
-    drawTextLine(ctx, line2, MARGIN_X, hashY - 9,  6.5, ctx.font, C.textFaint);
-    ctx.y = hashY - 9 - 6.5 - 8;
+    const hashLine = `SHA-256: ${input.documentHash}`;
+    drawTextLine(ctx, hashLine, MARGIN_X, hashY, 6.5, ctx.font, C.textFaint);
+    ctx.y = hashY - 6.5 - 8;
   } else {
     ctx.y = cardBot - 16;
   }
@@ -1093,7 +1091,7 @@ async function drawSignaturesSection(
  *  ┌──────────────────────────────────────────────────────────┐ ← y=52
  *  │ [sig] Assinado: Profissional | CRN ×× │ [sig] Cliente ── │  zona de assinaturas (26 px)
  *  ├──────────────────────────────────────────────────────────┤ ← y=26
- *  │ Nome profissional | CRN   ·   Documento NutriGestão   Pág│  zona de info (26 px)
+ *  │ Documento eletrônico + SHA-256 (esq.)              Pág n │  zona de info (26 px)
  *  └──────────────────────────────────────────────────────────┘ ← y=0
  *
  * Se não há assinaturas capturadas, a zona de assinaturas mostra apenas os
@@ -1210,23 +1208,18 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
     const clientSub   = (clientName && clientOrg) ? clientOrg : "";
     drawSigItem(col2X, halfW, clientImg, clientLabel, clientSub);
 
-    // ── Zona de informações (y = 0 … INFO_H) ────────────────────────────
-    const infoTextY = 9;  // baseline do texto de informação
+    // ── Zona de informações (y = 0 … INFO_H) — sem repetir nome/CRN (já no card de assinaturas)
+    const docLine = foldTextForPdf("Documento assinado eletronicamente - NutriGestao");
+    page.drawText(docLine, { x: MARGIN_X, y: 17, size: 7, font: ctx.font, color: C.textFaint });
 
-    const leftStr = foldTextForPdf(
-      `${input.professionalName}${input.crn ? `  |  CRN ${input.crn}` : ""}`,
-    );
-    page.drawText(leftStr, { x: MARGIN_X, y: infoTextY, size: 7, font: ctx.font, color: C.textMuted });
-
-    // Linha central: "Documento assinado eletronicamente" + hash abreviado (primeiros 16 chars)
-    const hashSnippet = input.documentHash ? ` · ${input.documentHash.slice(0, 16)}…` : "";
-    const centerStr = `Documento assinado eletronicamente - NutriGestao${hashSnippet}`;
-    const cw = ctx.font.widthOfTextAtSize(centerStr, 7);
-    page.drawText(centerStr, { x: (PAGE_W - cw) / 2, y: infoTextY, size: 7, font: ctx.font, color: C.textFaint });
+    if (input.documentHash) {
+      const hashLine = foldTextForPdf(`SHA-256: ${input.documentHash}`);
+      page.drawText(hashLine, { x: MARGIN_X, y: 5.5, size: 6.5, font: ctx.font, color: C.textFaint });
+    }
 
     const pageStr = `Pagina ${i + 1} de ${total}`;
     const pw = ctx.font.widthOfTextAtSize(pageStr, 7);
-    page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: infoTextY, size: 7, font: ctx.font, color: C.textMuted });
+    page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: 17, size: 7, font: ctx.font, color: C.textMuted });
   }
 }
 

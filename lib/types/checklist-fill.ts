@@ -21,6 +21,11 @@ export type ChecklistFillSessionRow = {
   area_name?: string | null;
   /** Quando definido, o dossiê foi aprovado e as respostas/fotos não podem mudar (FR23/FR70). */
   dossier_approved_at?: string | null;
+  /** SHA-256 hex da versão aprovada do dossiê (nulo após reabertura até nova aprovação). */
+  document_hash?: string | null;
+  professional_signature_data_url?: string | null;
+  client_signature_data_url?: string | null;
+  client_signer_name?: string | null;
   /** Pontuação percentual de conformidade (0-100), persistida ao aprovar o dossiê. */
   score_percentage?: number | null;
   /** Pontos obtidos (conforme × peso). */

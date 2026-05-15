@@ -521,6 +521,20 @@ export function ChecklistFillWizard({
     initialDocumentHash ?? null,
   );
 
+  useEffect(() => {
+    setSavedDocumentHash(initialDocumentHash ?? null);
+  }, [initialDocumentHash]);
+
+  useEffect(() => {
+    setSavedProfessionalSig(initialProfessionalSignatureDataUrl ?? null);
+    setSavedClientSig(initialClientSignatureDataUrl ?? null);
+    setSavedClientSignerName(initialClientSignerName ?? null);
+  }, [
+    initialProfessionalSignatureDataUrl,
+    initialClientSignatureDataUrl,
+    initialClientSignerName,
+  ]);
+
   const handleDossierReopened = useCallback(() => {
     setDossierApprovedAt(null);
     setDossierPreviewConfirmed(false);

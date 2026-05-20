@@ -3,9 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
+
+/** Template candidato a ser usado como base ao criar um novo checklist da equipe. */
+export type BaseCandidateTemplate = {
+  id: string;
+  name: string;
+  type: "official" | "workspace";
+  subtitle: string;
+};
 
 export type WorkspaceTemplateListRow = {
   id: string;
@@ -778,4 +787,124 @@ export async function startWorkspaceTemplateFillBatch(input: {
     firstSessionId: first,
     totalSessions: sessionIds.length,
   };
+}
+
+/* ─── Base template para criação ──────────────────────────────────────── */
+
+/**
+ * Carrega todos os templates disponíveis como base para criação de novo
+ * checklist da equipe: catálogo oficial + modelos da própria equipe.
+ */
+export async function loadBaseTemplateCandidates(): Promise<
+  BaseCandidateTemplate[]
+> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const [officialResult, workspaceResult] = await Promise.all([
+    supabase
+      .from("checklist_templates")
+      .select("id, name, portaria_ref, uf")
+      .eq("is_active", true)
+      .order("name"),
+    supabase
+      .from("checklist_workspace_templates")
+      .select("id, name, created_by_user_id")
+      .eq("owner_user_id", workspaceOwnerId)
+      .is("archived_at", null)
+      .order("name"),
+  ]);
+
+  const candidates: BaseCandidateTemplate[] = [];
+
+  for (const t of officialResult.data ?? []) {
+    const ref = t.portaria_ref ? String(t.portaria_ref) : "";
+    const uf =
+      t.uf && t.uf !== "*" ? ` · ${String(t.uf)}` : "";
+    candidates.push({
+      id: String(t.id),
+      name: String(t.name),
+      type: "official",
+      subtitle: ref + uf || "Catálogo oficial",
+    });
+  }
+
+  // Busca nomes dos criadores dos modelos da equipe
+  const userIds = [
+    ...new Set(
+      (workspaceResult.data ?? []).map((t) =>
+        String(t.created_by_user_id),
+      ),
+    ),
+  ];
+  const profileNames = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", userIds);
+    for (const p of profiles ?? []) {
+      const name = String(p.full_name ?? "").trim();
+      if (name.length > 0) profileNames.set(String(p.user_id), name);
+    }
+  }
+
+  for (const t of workspaceResult.data ?? []) {
+    const creator = profileNames.get(String(t.created_by_user_id));
+    candidates.push({
+      id: String(t.id),
+      name: String(t.name),
+      type: "workspace",
+      subtitle: creator ? `Equipe · ${creator}` : "Modelo da equipe",
+    });
+  }
+
+  return candidates;
+}
+
+/**
+ * Retorna as seções de um template (oficial ou da equipe) formatadas para
+ * uso como ponto de partida no WorkspaceChecklistBuilder.
+ */
+export async function fetchBaseTemplateSectionsAction(
+  templateId: string,
+  type: "official" | "workspace",
+): Promise<WorkspaceEditSection[] | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  if (type === "official") {
+    const bundle = await loadChecklistTemplateBundleById(templateId);
+    if (!bundle) return null;
+    return bundle.sections
+      .map((sec) => ({
+        title: sec.title,
+        items: sec.items
+          .filter((it) => !(it as { is_structure_only?: boolean }).is_structure_only)
+          .map((it) => ({
+            description: it.description,
+            is_required: it.is_required,
+          })),
+      }))
+      .filter((sec) => sec.items.length > 0);
+  }
+
+  // workspace
+  const template = await loadWorkspaceTemplateForEdit(templateId);
+  if (!template) return null;
+  return template.sections.map((sec) => ({
+    title: sec.title,
+    items: sec.items.map((it) => ({
+      description: it.description,
+      is_required: it.is_required,
+    })),
+  }));
 }

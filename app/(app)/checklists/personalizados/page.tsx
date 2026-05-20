@@ -69,6 +69,14 @@ export default async function ChecklistsPersonalizadosPage({
                 <p className="text-muted-foreground text-sm">
                   {r.establishment_label}
                 </p>
+                {r.created_by_name && (
+                  <p className="text-muted-foreground text-xs mt-0.5">
+                    Criado por{" "}
+                    <span className="text-foreground/80 font-medium">
+                      {r.created_by_name}
+                    </span>
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap gap-2">
                 <Link

@@ -4,9 +4,15 @@ import { useMemo, useState, useTransition } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
   Loader2,
   Plus,
+  Search,
   Trash2,
+  Users,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -16,7 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   createWorkspaceTemplateAction,
+  fetchBaseTemplateSectionsAction,
   updateWorkspaceTemplateAction,
+  type BaseCandidateTemplate,
   type WorkspaceEditItem,
   type WorkspaceEditSection,
   type WorkspaceTemplateInput,
@@ -28,6 +36,8 @@ type Props = {
   templateId?: string;
   initialName?: string;
   initialSections?: WorkspaceEditSection[];
+  /** Disponível apenas em mode="create" — lista de candidatos a base. */
+  baseTemplates?: BaseCandidateTemplate[];
 };
 
 type EditableItem = WorkspaceEditItem & { tempId: string };
@@ -53,6 +63,7 @@ export function WorkspaceChecklistBuilder({
   templateId,
   initialName = "",
   initialSections,
+  baseTemplates = [],
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -76,6 +87,58 @@ export function WorkspaceChecklistBuilder({
   });
   const [error, setError] = useState<string | null>(null);
 
+  // ── Base template picker state ──────────────────────────────────────────
+  const [pickerOpen, setPickerOpen] = useState(
+    mode === "create" && baseTemplates.length > 0,
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [baseLoadedName, setBaseLoadedName] = useState<string | null>(null);
+  const [baseLoading, startBaseTransition] = useTransition();
+
+  const filteredCandidates = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return baseTemplates;
+    return baseTemplates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.subtitle.toLowerCase().includes(q),
+    );
+  }, [baseTemplates, searchQuery]);
+
+  function handleUseBase(candidate: BaseCandidateTemplate) {
+    startBaseTransition(async () => {
+      const result = await fetchBaseTemplateSectionsAction(
+        candidate.id,
+        candidate.type,
+      );
+      if (!result || result.length === 0) return;
+
+      setSections(
+        result.map((sec) => ({
+          tempId: makeId(),
+          title: sec.title,
+          items:
+            sec.items.length > 0
+              ? sec.items.map((it) => ({
+                  tempId: makeId(),
+                  description: it.description,
+                  is_required: it.is_required,
+                }))
+              : [{ tempId: makeId(), description: "", is_required: false }],
+        })),
+      );
+
+      // Sugere o nome baseado no template selecionado
+      if (!name.trim()) {
+        setName(`${candidate.name} (personalizado)`);
+      }
+
+      setBaseLoadedName(candidate.name);
+      setPickerOpen(false);
+    });
+  }
+
+  // ── Seções ─────────────────────────────────────────────────────────────
   const totalItems = useMemo(
     () => sections.reduce((acc, sec) => acc + sec.items.length, 0),
     [sections],
@@ -184,6 +247,7 @@ export function WorkspaceChecklistBuilder({
     );
   }
 
+  // ── Submit ─────────────────────────────────────────────────────────────
   function handleSubmit() {
     setError(null);
     const trimmedName = name.trim();
@@ -240,6 +304,127 @@ export function WorkspaceChecklistBuilder({
 
   return (
     <div className="space-y-6">
+
+      {/* ── Picker: partir de um modelo existente (apenas no create) ── */}
+      {mode === "create" && baseTemplates.length > 0 && (
+        <div className="rounded-xl border border-border bg-card shadow-xs">
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            aria-expanded={pickerOpen}
+          >
+            <div className="flex items-center gap-2">
+              <BookOpen className="size-4 text-muted-foreground shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  Partir de um modelo existente
+                </p>
+                {baseLoadedName ? (
+                  <p className="text-xs text-emerald-600">
+                    Modelo &quot;{baseLoadedName}&quot; carregado como base
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Opcional — escolha um template para pré-preencher as seções
+                  </p>
+                )}
+              </div>
+            </div>
+            {pickerOpen ? (
+              <ChevronUp className="size-4 text-muted-foreground shrink-0" />
+            ) : (
+              <ChevronDown className="size-4 text-muted-foreground shrink-0" />
+            )}
+          </button>
+
+          {pickerOpen && (
+            <div className="border-t border-border px-4 pb-4 pt-3 space-y-3">
+              {/* Campo de busca */}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar pelo nome ou tipo do modelo…"
+                  className="pl-8 pr-8"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Limpar busca"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Lista de resultados */}
+              {filteredCandidates.length === 0 ? (
+                <p className="py-4 text-center text-sm text-muted-foreground">
+                  Nenhum modelo encontrado para &quot;{searchQuery}&quot;.
+                </p>
+              ) : (
+                <ul className="max-h-64 overflow-y-auto divide-y divide-border rounded-lg border border-border">
+                  {filteredCandidates.map((candidate) => (
+                    <li
+                      key={`${candidate.type}-${candidate.id}`}
+                      className="flex items-center justify-between gap-3 px-3 py-2.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {candidate.name}
+                        </p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {candidate.type === "official" ? (
+                            <BookOpen className="size-3 text-muted-foreground shrink-0" />
+                          ) : (
+                            <Users className="size-3 text-muted-foreground shrink-0" />
+                          )}
+                          <p className="truncate text-xs text-muted-foreground">
+                            {candidate.subtitle}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleUseBase(candidate)}
+                        disabled={baseLoading}
+                        className="shrink-0"
+                      >
+                        {baseLoading ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : null}
+                        Usar como base
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                {baseTemplates.length} modelo
+                {baseTemplates.length !== 1 ? "s" : ""} disponíve
+                {baseTemplates.length !== 1 ? "is" : "l"} ·{" "}
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(false)}
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  Começar do zero
+                </button>
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Nome do checklist ── */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
         <div className="space-y-2">
           <Label htmlFor="workspace-template-name">Nome do checklist</Label>
@@ -264,6 +449,7 @@ export function WorkspaceChecklistBuilder({
         preenchimento.
       </div>
 
+      {/* ── Seções ── */}
       <div className="space-y-4">
         {sections.map((sec, secIdx) => (
           <section

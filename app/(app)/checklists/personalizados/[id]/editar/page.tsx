@@ -49,6 +49,7 @@ export default async function EditarCustomChecklistPage({
         customTemplateId={id}
         templateName={bundle.name}
         sections={bundle.sections}
+        createdByName={bundle.created_by_name}
       />
     </div>
   );

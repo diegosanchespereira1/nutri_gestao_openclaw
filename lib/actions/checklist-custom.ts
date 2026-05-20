@@ -33,6 +33,8 @@ export type CustomTemplateListRow = {
   source_template_id: string;
   updated_at: string;
   establishment_label: string;
+  created_by_user_id: string;
+  created_by_name: string | null;
 };
 
 async function assertEstablishmentOwned(
@@ -54,23 +56,72 @@ async function assertEstablishmentOwned(
   return Boolean(cl && cl.owner_user_id === workspaceOwnerId);
 }
 
-/** Dados para o editor (inclui flag de item extra). */
+/**
+ * Verifica se o usuário (ou seu workspace) tem acesso ao template personalizado
+ * via propriedade do estabelecimento associado.
+ */
+async function assertCustomTemplateWorkspaceAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  customTemplateId: string,
+  userId: string,
+): Promise<boolean> {
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, userId);
+  const { data: ct } = await supabase
+    .from("checklist_custom_templates")
+    .select("id, establishment_id")
+    .eq("id", customTemplateId)
+    .maybeSingle();
+  if (!ct) return false;
+  return assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    ct.establishment_id as string,
+  );
+}
+
+/** Dados para o editor (inclui flag de item extra e nome do criador). */
 export async function loadCustomTemplateEditData(
   customTemplateId: string,
-): Promise<{ name: string; sections: CustomEditSection[] } | null> {
+): Promise<{
+  name: string;
+  sections: CustomEditSection[];
+  created_by_name: string | null;
+} | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: ct, error: cErr } = await supabase
     .from("checklist_custom_templates")
-    .select("id, name")
+    .select("id, name, user_id, establishment_id")
     .eq("id", customTemplateId)
     .maybeSingle();
 
   if (cErr || !ct) return null;
+
+  // Verifica acesso via propriedade do estabelecimento (workspace-level)
+  const owned = await assertEstablishmentOwned(
+    supabase,
+    workspaceOwnerId,
+    ct.establishment_id as string,
+  );
+  if (!owned) return null;
+
+  // Busca nome do criador
+  let created_by_name: string | null = null;
+  if (ct.user_id) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", ct.user_id as string)
+      .maybeSingle();
+    const n = String(profile?.full_name ?? "").trim();
+    if (n.length > 0) created_by_name = n;
+  }
 
   const { data: sections } = await supabase
     .from("checklist_custom_sections")
@@ -113,7 +164,50 @@ export async function loadCustomTemplateEditData(
   return {
     name: String(ct.name),
     sections: mappedSections,
+    created_by_name,
   };
+}
+
+/** Renomeia um template personalizado (qualquer membro do workspace pode fazê-lo). */
+export async function renameCustomTemplateAction(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const customTemplateId = String(
+    formData.get("custom_template_id") ?? "",
+  ).trim();
+  const name = String(formData.get("name") ?? "").trim();
+
+  if (!customTemplateId) return { ok: false, error: "Modelo não encontrado." };
+  if (!name) return { ok: false, error: "O nome não pode estar vazio." };
+  if (name.length > 200)
+    return {
+      ok: false,
+      error: "O nome deve ter no máximo 200 caracteres.",
+    };
+
+  const ok = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    customTemplateId,
+    user.id,
+  );
+  if (!ok) return { ok: false, error: "Sem permissão para editar este modelo." };
+
+  const { error } = await supabase
+    .from("checklist_custom_templates")
+    .update({ name })
+    .eq("id", customTemplateId);
+
+  if (error) return { ok: false, error: "Não foi possível salvar o nome." };
+
+  revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
+  revalidatePath("/checklists/personalizados");
+  return { ok: true };
 }
 
 /** Constrói o mesmo formato do catálogo global para reutilizar o wizard de preenchimento. */
@@ -225,7 +319,7 @@ export async function listCustomTemplatesForOwner(): Promise<{
 
   const { data: customs, error } = await supabase
     .from("checklist_custom_templates")
-    .select("id, name, establishment_id, source_template_id, updated_at")
+    .select("id, name, establishment_id, source_template_id, updated_at, user_id")
     .order("updated_at", { ascending: false });
 
   if (error || !customs) return { rows: [] };
@@ -265,6 +359,22 @@ export async function listCustomTemplatesForOwner(): Promise<{
     estMap.set(e.id, `${e.name} — ${clientLabel}`);
   }
 
+  // Busca nomes dos criadores
+  const userIds = [
+    ...new Set(customs.map((c) => c.user_id as string).filter(Boolean)),
+  ];
+  const profileNames = new Map<string, string>();
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", userIds);
+    for (const p of profiles ?? []) {
+      const name = String(p.full_name ?? "").trim();
+      if (name.length > 0) profileNames.set(String(p.user_id), name);
+    }
+  }
+
   return {
     rows: customs.map((r) => ({
       id: r.id as string,
@@ -275,6 +385,8 @@ export async function listCustomTemplatesForOwner(): Promise<{
       establishment_label:
         estMap.get(r.establishment_id as string) ??
         (r.establishment_id as string),
+      created_by_user_id: r.user_id as string,
+      created_by_name: profileNames.get(r.user_id as string) ?? null,
     })),
   };
 }
@@ -372,13 +484,13 @@ export async function addCustomSectionAction(formData: FormData): Promise<void> 
   const title = String(formData.get("title") ?? "").trim();
   if (!customTemplateId || !title) return;
 
-  const { data: ct } = await supabase
-    .from("checklist_custom_templates")
-    .select("id")
-    .eq("id", customTemplateId)
-    .maybeSingle();
-
-  if (!ct) return;
+  // Qualquer membro do workspace pode editar
+  const ok = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    customTemplateId,
+    user.id,
+  );
+  if (!ok) return;
 
   const { count } = await supabase
     .from("checklist_custom_sections")
@@ -394,6 +506,84 @@ export async function addCustomSectionAction(formData: FormData): Promise<void> 
   });
 
   if (error) return;
+
+  revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
+}
+
+export async function deleteCustomItemAction(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const customItemId = String(formData.get("custom_item_id") ?? "").trim();
+  const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
+  if (!customItemId || !customTemplateId) return;
+
+  // Qualquer membro do workspace pode editar (não apenas o criador original)
+  const ok = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    customTemplateId,
+    user.id,
+  );
+  if (!ok) return;
+
+  // Verifica que o item pertence a uma seção desse template
+  const { data: it } = await supabase
+    .from("checklist_custom_items")
+    .select("id, custom_section_id, checklist_custom_sections!inner(custom_template_id)")
+    .eq("id", customItemId)
+    .maybeSingle();
+
+  const secRef = it?.checklist_custom_sections as unknown as
+    | { custom_template_id: string }
+    | null;
+  if (!it || secRef?.custom_template_id !== customTemplateId) return;
+
+  await supabase.from("checklist_custom_items").delete().eq("id", customItemId);
+
+  revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
+}
+
+export async function deleteCustomSectionAction(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+
+  const customSectionId = String(formData.get("custom_section_id") ?? "").trim();
+  const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
+  if (!customSectionId || !customTemplateId) return;
+
+  // Qualquer membro do workspace pode editar (não apenas o criador original)
+  const ok = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    customTemplateId,
+    user.id,
+  );
+  if (!ok) return;
+
+  // Verifica que a seção pertence ao template
+  const { data: sec } = await supabase
+    .from("checklist_custom_sections")
+    .select("id")
+    .eq("id", customSectionId)
+    .eq("custom_template_id", customTemplateId)
+    .maybeSingle();
+  if (!sec) return;
+
+  // Exclui todos os itens da seção primeiro
+  await supabase
+    .from("checklist_custom_items")
+    .delete()
+    .eq("custom_section_id", customSectionId);
+
+  await supabase
+    .from("checklist_custom_sections")
+    .delete()
+    .eq("id", customSectionId);
 
   revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
 }
@@ -414,13 +604,13 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
 
   if (!customSectionId || !customTemplateId || !description) return;
 
-  const { data: ct } = await supabase
-    .from("checklist_custom_templates")
-    .select("id")
-    .eq("id", customTemplateId)
-    .maybeSingle();
-
-  if (!ct) return;
+  // Qualquer membro do workspace pode editar
+  const ok = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    customTemplateId,
+    user.id,
+  );
+  if (!ok) return;
 
   const { data: sec } = await supabase
     .from("checklist_custom_sections")

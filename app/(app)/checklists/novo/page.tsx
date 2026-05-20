@@ -1,8 +1,11 @@
 import Link from "next/link";
 
 import { WorkspaceChecklistBuilder } from "@/components/checklists/workspace-checklist-builder";
+import { loadBaseTemplateCandidates } from "@/lib/actions/checklist-workspace";
 
-export default function NewWorkspaceChecklistPage() {
+export default async function NewWorkspaceChecklistPage() {
+  const baseTemplates = await loadBaseTemplateCandidates();
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -23,7 +26,7 @@ export default function NewWorkspaceChecklistPage() {
         </Link>
       </div>
 
-      <WorkspaceChecklistBuilder mode="create" />
+      <WorkspaceChecklistBuilder mode="create" baseTemplates={baseTemplates} />
     </div>
   );
 }

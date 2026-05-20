@@ -78,6 +78,36 @@ function getPositionOptional(): Promise<GeolocationPosition | null> {
 const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 0.85;
 
+/** Detecta arquivos HEIC/HEIF por MIME type ou extensão do nome. */
+function isHeicFile(file: File): boolean {
+  const type = file.type.toLowerCase();
+  if (type === "image/heic" || type === "image/heif") return true;
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  return ext === "heic" || ext === "heif";
+}
+
+/**
+ * Converte HEIC/HEIF para JPEG usando heic2any (carregado de forma lazy).
+ * Necessário para Chrome, Android e outros navegadores que não decodificam
+ * HEIC nativamente no canvas (apenas Safari/iOS suporta HEIC nativo).
+ */
+async function convertHeicToJpeg(file: File): Promise<File> {
+  // Importação dinâmica para não impactar o bundle principal
+  const heic2any = (await import("heic2any")).default;
+  const result = await (heic2any as (opts: {
+    blob: Blob;
+    toType: string;
+    quality: number;
+  }) => Promise<Blob | Blob[]>)({
+    blob: file,
+    toType: "image/jpeg",
+    quality: 0.9,
+  });
+  const blob = Array.isArray(result) ? result[0]! : result;
+  const baseName = file.name.replace(/\.[^.]+$/, "");
+  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
+}
+
 /**
  * Redimensiona e converte a imagem para JPEG via Canvas.
  * Resolve dois problemas de mobile:
@@ -86,8 +116,6 @@ const JPEG_QUALITY = 0.85;
  */
 function compressImage(file: File): Promise<File> {
   return new Promise((resolve, reject) => {
-    // Se já for pequeno e JPEG/PNG/WebP, pode não precisar comprimir
-    // Mas comprimimos sempre para garantir compatibilidade de formato
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -128,13 +156,14 @@ function compressImage(file: File): Promise<File> {
   });
 }
 
-type UploadStep = "compressing" | "location" | "uploading" | "saving";
+type UploadStep = "converting" | "compressing" | "location" | "uploading" | "saving";
 
 type UploadState =
   | { status: "idle" }
   | { status: "busy"; step: UploadStep; percent: number };
 
 const STEP_LABELS: Record<UploadStep, string> = {
+  converting: "Convertendo HEIC para JPEG…",
   compressing: "Comprimindo imagem…",
   location: "A obter localização para a foto…",
   uploading: "Enviando ao servidor…",
@@ -219,10 +248,24 @@ export function ChecklistItemPhotos({
         }
 
         try {
-          // ── Etapa 1: comprimir ──
-          setUploadState({ status: "busy", step: "compressing", percent: 10 });
-          const compressed = await compressImage(file);
-          setUploadState({ status: "busy", step: "compressing", percent: 30 });
+          // ── Etapa 1: converter HEIC → JPEG (se necessário) ──
+          let fileToProcess = file;
+          if (isHeicFile(file)) {
+            setUploadState({ status: "busy", step: "converting", percent: 5 });
+            try {
+              fileToProcess = await convertHeicToJpeg(file);
+            } catch {
+              batchErrors.push(
+                `"${file.name}": Não foi possível converter o formato HEIC. Tente abrir a foto no app Fotos do iPhone e exportar como JPEG.`,
+              );
+              continue;
+            }
+          }
+
+          // ── Etapa 2: comprimir ──
+          setUploadState({ status: "busy", step: "compressing", percent: 15 });
+          const compressed = await compressImage(fileToProcess);
+          setUploadState({ status: "busy", step: "compressing", percent: 35 });
 
           if (compressed.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {
             const maxMB = CHECKLIST_FILL_PHOTO_MAX_BYTES / 1024 / 1024;
@@ -344,9 +387,10 @@ export function ChecklistItemPhotos({
           <PageHelpHint ariaLabel="Como anexar fotos de evidência a este item">
             <p>
               Em celular ou tablet, use <strong>Tirar foto</strong> para abrir a câmera;{" "}
-              <strong>Galeria</strong> para escolher uma imagem já salva. Formatos JPEG,
-              PNG ou WebP até 6 MB. Por omissão não pedimos localização; para anexar GPS às
-              evidências, active a opção em{" "}
+              <strong>Galeria</strong> para escolher uma imagem já salva. Suporta JPEG,
+              PNG, WebP e <strong>HEIC</strong> (padrão do iPhone) até 6 MB — arquivos
+              HEIC são convertidos automaticamente para JPEG. Por omissão não pedimos
+              localização; para anexar GPS às evidências, ative a opção em{" "}
               <Link href="/definicoes/checklist-fotos" className="text-primary font-medium underline-offset-2 hover:underline">
                 Definições → Checklist e fotos
               </Link>

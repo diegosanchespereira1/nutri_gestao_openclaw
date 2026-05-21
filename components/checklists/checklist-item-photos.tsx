@@ -15,6 +15,10 @@ import {
   CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM,
   CHECKLIST_FILL_PHOTO_MAX_BYTES,
 } from "@/lib/constants/checklist-fill-photos-storage";
+import {
+  convertHeicToJpegFile,
+  fileLooksLikeHeic,
+} from "@/lib/images/heic-client";
 import { readChecklistPhotoGpsPreference } from "@/lib/preferences/checklist-photo-gps";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import { cn } from "@/lib/utils";
@@ -77,36 +81,6 @@ function getPositionOptional(): Promise<GeolocationPosition | null> {
 
 const MAX_DIMENSION = 1920;
 const JPEG_QUALITY = 0.85;
-
-/** Detecta arquivos HEIC/HEIF por MIME type ou extensão do nome. */
-function isHeicFile(file: File): boolean {
-  const type = file.type.toLowerCase();
-  if (type === "image/heic" || type === "image/heif") return true;
-  const ext = file.name.split(".").pop()?.toLowerCase();
-  return ext === "heic" || ext === "heif";
-}
-
-/**
- * Converte HEIC/HEIF para JPEG usando heic2any (carregado de forma lazy).
- * Necessário para Chrome, Android e outros navegadores que não decodificam
- * HEIC nativamente no canvas (apenas Safari/iOS suporta HEIC nativo).
- */
-async function convertHeicToJpeg(file: File): Promise<File> {
-  // Importação dinâmica para não impactar o bundle principal
-  const heic2any = (await import("heic2any")).default;
-  const result = await (heic2any as (opts: {
-    blob: Blob;
-    toType: string;
-    quality: number;
-  }) => Promise<Blob | Blob[]>)({
-    blob: file,
-    toType: "image/jpeg",
-    quality: 0.9,
-  });
-  const blob = Array.isArray(result) ? result[0]! : result;
-  const baseName = file.name.replace(/\.[^.]+$/, "");
-  return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
-}
 
 /**
  * Redimensiona e converte a imagem para JPEG via Canvas.
@@ -248,23 +222,47 @@ export function ChecklistItemPhotos({
         }
 
         try {
-          // ── Etapa 1: converter HEIC → JPEG (se necessário) ──
+          // ── Etapa 1: converter HEIC → JPEG (detecção por MIME, extensão ou magic bytes) ──
           let fileToProcess = file;
-          if (isHeicFile(file)) {
+          let heicConverted = false;
+          const likelyHeic = await fileLooksLikeHeic(file);
+          if (likelyHeic) {
             setUploadState({ status: "busy", step: "converting", percent: 5 });
             try {
-              fileToProcess = await convertHeicToJpeg(file);
+              fileToProcess = await convertHeicToJpegFile(file);
+              heicConverted = true;
             } catch {
               batchErrors.push(
-                `"${file.name}": Não foi possível converter o formato HEIC. Tente abrir a foto no app Fotos do iPhone e exportar como JPEG.`,
+                `"${file.name}": Não foi possível converter HEIC. Em Ajustes → Câmera, ative «Mais compatível» (JPEG) ou exporte a foto como JPEG no app Fotos.`,
               );
               continue;
             }
           }
 
-          // ── Etapa 2: comprimir ──
+          // ── Etapa 2: comprimir (Canvas); fallback HEIC se a leitura falhar ──
           setUploadState({ status: "busy", step: "compressing", percent: 15 });
-          const compressed = await compressImage(fileToProcess);
+          let compressed: File;
+          try {
+            compressed = await compressImage(fileToProcess);
+          } catch {
+            if (!heicConverted) {
+              setUploadState({ status: "busy", step: "converting", percent: 10 });
+              try {
+                fileToProcess = await convertHeicToJpegFile(file);
+                compressed = await compressImage(fileToProcess);
+              } catch {
+                batchErrors.push(
+                  `"${file.name}": Não foi possível processar a imagem. Tente outra foto ou exporte como JPEG.`,
+                );
+                continue;
+              }
+            } else {
+              batchErrors.push(
+                `"${file.name}": Não foi possível processar a imagem após conversão HEIC.`,
+              );
+              continue;
+            }
+          }
           setUploadState({ status: "busy", step: "compressing", percent: 35 });
 
           if (compressed.size > CHECKLIST_FILL_PHOTO_MAX_BYTES) {

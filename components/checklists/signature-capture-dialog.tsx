@@ -36,7 +36,7 @@ interface SignatureCaptureDialogProps {
   professionalCrn?: string;
   /** Nome do cliente/estabelecimento do cadastro */
   clientLabel?: string;
-  /** Quando false, pula a etapa de assinatura do cliente. Padrão: true. */
+  /** Quando false, a etapa do cliente continua visível, mas assinatura e nome são opcionais. */
   clientSignatureRequired?: boolean;
 }
 
@@ -208,14 +208,6 @@ export function SignatureCaptureDialog({
       setError("Por favor, assine antes de continuar.");
       return;
     }
-    if (!clientSignatureRequired) {
-      onConfirm({
-        professional: professionalDataUrl,
-        client: "",
-        clientSignerName: "",
-      });
-      return;
-    }
     setStep("client");
   };
 
@@ -230,6 +222,12 @@ export function SignatureCaptureDialog({
         setError("Por favor, assine antes de confirmar.");
         return;
       }
+    } else if (clientSignerName.trim() && !clientDataUrl) {
+      setError("Assine no campo abaixo ou deixe nome e assinatura em branco para continuar sem assinatura do cliente.");
+      return;
+    } else if (!clientSignerName.trim() && clientDataUrl) {
+      setError("Informe o nome de quem assinou ou limpe a assinatura para continuar sem assinatura do cliente.");
+      return;
     }
     onConfirm({
       professional: professionalDataUrl!,
@@ -249,29 +247,30 @@ export function SignatureCaptureDialog({
           </DialogTitle>
           <DialogDescription>
             {isProfessional
-              ? clientSignatureRequired
-                ? "Responsável técnica pela avaliação."
-                : "Responsável técnica pela avaliação. A assinatura do cliente está desativada nas configurações."
-              : "Responsável pelo estabelecimento avaliado."}
+              ? "Responsável técnica pela avaliação."
+              : clientSignatureRequired
+                ? "Responsável pelo estabelecimento avaliado."
+                : "Responsável pelo estabelecimento avaliado. Assinatura opcional — pode aprovar sem preencher."}
           </DialogDescription>
         </DialogHeader>
 
         {/* Indicador de etapa */}
-        {clientSignatureRequired ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className={cn(
-              "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
-              isProfessional ? "bg-primary text-primary-foreground" : "bg-muted",
-            )}>1</span>
-            <span className={isProfessional ? "text-foreground font-medium" : ""}>Profissional</span>
-            <div className="h-px flex-1 bg-border" />
-            <span className={cn(
-              "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
-              !isProfessional ? "bg-primary text-primary-foreground" : "bg-muted",
-            )}>2</span>
-            <span className={!isProfessional ? "text-foreground font-medium" : ""}>Cliente</span>
-          </div>
-        ) : null}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+            isProfessional ? "bg-primary text-primary-foreground" : "bg-muted",
+          )}>1</span>
+          <span className={isProfessional ? "text-foreground font-medium" : ""}>Profissional</span>
+          <div className="h-px flex-1 bg-border" />
+          <span className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold",
+            !isProfessional ? "bg-primary text-primary-foreground" : "bg-muted",
+          )}>2</span>
+          <span className={!isProfessional ? "text-foreground font-medium" : ""}>
+            Cliente
+            {!clientSignatureRequired ? " (opcional)" : ""}
+          </span>
+        </div>
 
         {/* Passo 1 — Profissional */}
         {isProfessional && (
@@ -304,10 +303,12 @@ export function SignatureCaptureDialog({
               </div>
             )}
 
-            {/* Nome do signatário — campo obrigatório */}
             <div className="space-y-1.5">
               <Label htmlFor="client-signer-name" className="text-sm font-medium">
                 Nome de quem está assinando
+                {!clientSignatureRequired ? (
+                  <span className="text-muted-foreground font-normal"> (opcional)</span>
+                ) : null}
               </Label>
               <Input
                 id="client-signer-name"
@@ -326,6 +327,11 @@ export function SignatureCaptureDialog({
             </div>
 
             <SignaturePad key="client" onDataUrl={setClientDataUrl} />
+            {!clientSignatureRequired ? (
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Deixe em branco para aprovar o dossiê apenas com a assinatura da profissional.
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -347,11 +353,7 @@ export function SignatureCaptureDialog({
             size="sm"
             onClick={isProfessional ? handleNext : handleConfirm}
           >
-            {isProfessional
-              ? clientSignatureRequired
-                ? "Próximo →"
-                : "Confirmar e aprovar dossiê"
-              : "Confirmar e aprovar dossiê"}
+            {isProfessional ? "Próximo →" : "Confirmar e aprovar dossiê"}
           </Button>
         </div>
       </DialogContent>

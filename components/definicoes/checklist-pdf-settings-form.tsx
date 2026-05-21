@@ -277,8 +277,8 @@ export function ChecklistPdfSettingsForm({
                 Exigir assinatura do cliente ao aprovar o dossiê
               </Label>
               <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
-                Desmarque se o cliente não precisa assinar digitalmente no fechamento do
-                checklist. O PDF e o dossiê exibirão apenas a assinatura da profissional.
+                Desmarque para tornar a assinatura do cliente opcional no fechamento do checklist.
+                O passo do cliente continua visível; se não assinar, o dossiê fica só com a assinatura da profissional.
               </p>
             </div>
           </div>

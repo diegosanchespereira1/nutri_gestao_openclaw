@@ -428,6 +428,8 @@ type Props = {
   initialClientSignatureDataUrl?: string | null;
   initialClientSignerName?: string | null;
   initialDocumentHash?: string | null;
+  /** Quando false, a assinatura do cliente não é exigida na aprovação. */
+  clientSignatureRequired?: boolean;
 };
 
 export function ChecklistFillWizard({
@@ -455,6 +457,7 @@ export function ChecklistFillWizard({
   initialClientSignatureDataUrl = null,
   initialClientSignerName = null,
   initialDocumentHash = null,
+  clientSignatureRequired = true,
 }: Props) {
   const router = useRouter();
   const sections = template.sections;
@@ -1751,6 +1754,7 @@ export function ChecklistFillWizard({
         professionalName={professionalName}
         professionalCrn={professionalCrn}
         clientLabel={clientLabel}
+        clientSignatureRequired={clientSignatureRequired}
         onConfirm={(signatures) => {
           setPendingSignatures(signatures);
           setSignatureDialogOpen(false);
@@ -1773,8 +1777,8 @@ export function ChecklistFillWizard({
             }
             // Persiste assinaturas e hash localmente para exibição imediata
             setSavedProfessionalSig(signatures.professional);
-            setSavedClientSig(signatures.client);
-            setSavedClientSignerName(signatures.clientSignerName);
+            setSavedClientSig(signatures.client || null);
+            setSavedClientSignerName(signatures.clientSignerName || null);
             setSavedDocumentHash(r.documentHash ?? null);
             setPendingSignatures(null);
             setDossierApprovedAt(r.approvedAt);

@@ -23,6 +23,7 @@ import {
   loadReopenEventsForSession,
 } from "@/lib/actions/checklist-fill-reopen";
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
+import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,6 +52,7 @@ export default async function ChecklistPreencherPage({
     ? await getChecklistReopenEligibility(supabase, user.id)
     : { canReopen: false };
   const initialReopenEvents = await loadReopenEventsForSession(sessionId);
+  const clientSignatureRequired = await getClientSignatureRequiredAction();
 
   // Carrega nome e CRN do profissional para exibição no dialog de assinatura
   let professionalName: string | undefined;
@@ -159,6 +161,7 @@ export default async function ChecklistPreencherPage({
         initialClientSignatureDataUrl={sessionRow.client_signature_data_url ?? null}
         initialClientSignerName={sessionRow.client_signer_name ?? null}
         initialDocumentHash={sessionRow.document_hash ?? null}
+        clientSignatureRequired={clientSignatureRequired}
       />
     </div>
   );

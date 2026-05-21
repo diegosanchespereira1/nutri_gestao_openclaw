@@ -11,6 +11,7 @@ import {
   type ChecklistPdfSettings,
 } from "@/lib/constants/checklist-pdf-settings";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
 const initial: SavePdfSettingsResult | undefined = undefined;
@@ -197,6 +198,9 @@ export function ChecklistPdfSettingsForm({
   const [headerBg,   setHeaderBg]   = useState(initialSettings.headerBgColor);
   const [headerText, setHeaderText] = useState(initialSettings.headerTextColor);
   const [accent,     setAccent]     = useState(initialSettings.accentColor);
+  const [clientSignatureRequired, setClientSignatureRequired] = useState(
+    initialSettings.clientSignatureRequired,
+  );
 
   const [toast, setToast] = useState<{
     id: number;
@@ -228,6 +232,7 @@ export function ChecklistPdfSettingsForm({
     setHeaderBg(DEFAULT_PDF_SETTINGS.headerBgColor);
     setHeaderText(DEFAULT_PDF_SETTINGS.headerTextColor);
     setAccent(DEFAULT_PDF_SETTINGS.accentColor);
+    setClientSignatureRequired(DEFAULT_PDF_SETTINGS.clientSignatureRequired);
   }
 
   const allValid =
@@ -237,97 +242,134 @@ export function ChecklistPdfSettingsForm({
 
   return (
     <div className="max-w-xl space-y-6">
-      <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <div className="mb-5 space-y-1">
-          <h2 className="text-sm font-semibold text-foreground">
-            Cores do cabeçalho do PDF
-          </h2>
-          <p className="text-xs text-muted-foreground">
-            Personalize as cores da banda de cabeçalho que aparece no PDF de dossiê
-            gerado ao finalizar cada checklist. O logotipo da empresa é inserido
-            automaticamente a partir do upload em{" "}
-            <strong>Definições → Empresa e logotipo</strong>.
-          </p>
-        </div>
+      <form action={formAction} className="space-y-6">
+        <input type="hidden" name="header_bg_color" value={headerBg} />
+        <input type="hidden" name="header_text_color" value={headerText} />
+        <input type="hidden" name="accent_color" value={accent} />
+        {clientSignatureRequired ? (
+          <input type="hidden" name="client_signature_required" value="on" />
+        ) : null}
 
-        {/* Pré-visualização ao vivo */}
-        <div className="mb-5">
-          <p className="mb-2 text-xs font-medium text-muted-foreground">
-            Pré-visualização
-          </p>
-          <PdfHeaderPreview
-            bgColor={allValid ? headerBg : DEFAULT_PDF_SETTINGS.headerBgColor}
-            textColor={allValid ? headerText : DEFAULT_PDF_SETTINGS.headerTextColor}
-            accentColor={allValid ? accent : DEFAULT_PDF_SETTINGS.accentColor}
-          />
-        </div>
-
-        <form action={formAction} className="space-y-5">
-          {/* Campos hidden para o formData com os valores controlados */}
-          <input type="hidden" name="header_bg_color"   value={headerBg} />
-          <input type="hidden" name="header_text_color" value={headerText} />
-          <input type="hidden" name="accent_color"      value={accent} />
-
-          <ColorField
-            id="header-bg-color"
-            name="_header_bg_color_display"
-            label="Cor de fundo do cabeçalho"
-            description="Fundo da banda superior do cabeçalho. Cores escuras ficam mais elegantes."
-            value={headerBg}
-            onChange={setHeaderBg}
-            disabled={!canManage || isPending}
-          />
-
-          <ColorField
-            id="header-text-color"
-            name="_header_text_color_display"
-            label="Cor do texto do cabeçalho"
-            description="Cor do título do checklist e dos metadados dentro do cabeçalho."
-            value={headerText}
-            onChange={setHeaderText}
-            disabled={!canManage || isPending}
-          />
-
-          <ColorField
-            id="accent-color"
-            name="_accent_color_display"
-            label="Cor de acento"
-            description="Linha de rodapé do cabeçalho, etiqueta 'DOSSIÊ', caixa de score e detalhes."
-            value={accent}
-            onChange={setAccent}
-            disabled={!canManage || isPending}
-          />
-
-          {state?.ok === false && (
-            <p className="text-sm text-destructive" role="alert">
-              {state.error}
-            </p>
-          )}
-
-          {!canManage && (
+        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+          <div className="mb-5 space-y-1">
+            <h2 className="text-sm font-semibold text-foreground">
+              Assinatura do cliente no dossiê
+            </h2>
             <p className="text-xs text-muted-foreground">
-              Apenas o titular da conta pode alterar estas configurações.
+              Define se a assinatura do responsável pelo estabelecimento é obrigatória ao
+              aprovar o dossiê. A assinatura da profissional continua sempre obrigatória.
             </p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="submit"
-              disabled={!canManage || isPending || !allValid}
-            >
-              {isPending ? "Salvando…" : "Salvar cores"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleReset}
-              disabled={!canManage || isPending}
-            >
-              Restaurar padrão
-            </Button>
           </div>
-        </form>
-      </section>
+
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="client-signature-required"
+              checked={clientSignatureRequired}
+              disabled={!canManage || isPending}
+              onCheckedChange={(v) => setClientSignatureRequired(v === true)}
+              className="mt-0.5"
+            />
+            <div className="min-w-0 flex-1">
+              <Label
+                htmlFor="client-signature-required"
+                className="text-sm font-normal leading-snug"
+              >
+                Exigir assinatura do cliente ao aprovar o dossiê
+              </Label>
+              <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+                Desmarque se o cliente não precisa assinar digitalmente no fechamento do
+                checklist. O PDF e o dossiê exibirão apenas a assinatura da profissional.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
+          <div className="mb-5 space-y-1">
+            <h2 className="text-sm font-semibold text-foreground">
+              Cores do cabeçalho do PDF
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Personalize as cores da banda de cabeçalho que aparece no PDF de dossiê
+              gerado ao finalizar cada checklist. O logotipo da empresa é inserido
+              automaticamente a partir do upload em{" "}
+              <strong>Definições → Empresa e logotipo</strong>.
+            </p>
+          </div>
+
+          <div className="mb-5">
+            <p className="mb-2 text-xs font-medium text-muted-foreground">
+              Pré-visualização
+            </p>
+            <PdfHeaderPreview
+              bgColor={allValid ? headerBg : DEFAULT_PDF_SETTINGS.headerBgColor}
+              textColor={allValid ? headerText : DEFAULT_PDF_SETTINGS.headerTextColor}
+              accentColor={allValid ? accent : DEFAULT_PDF_SETTINGS.accentColor}
+            />
+          </div>
+
+          <div className="space-y-5">
+            <ColorField
+              id="header-bg-color"
+              name="_header_bg_color_display"
+              label="Cor de fundo do cabeçalho"
+              description="Fundo da banda superior do cabeçalho. Cores escuras ficam mais elegantes."
+              value={headerBg}
+              onChange={setHeaderBg}
+              disabled={!canManage || isPending}
+            />
+
+            <ColorField
+              id="header-text-color"
+              name="_header_text_color_display"
+              label="Cor do texto do cabeçalho"
+              description="Cor do título do checklist e dos metadados dentro do cabeçalho."
+              value={headerText}
+              onChange={setHeaderText}
+              disabled={!canManage || isPending}
+            />
+
+            <ColorField
+              id="accent-color"
+              name="_accent_color_display"
+              label="Cor de acento"
+              description="Linha de rodapé do cabeçalho, etiqueta 'DOSSIÊ', caixa de score e detalhes."
+              value={accent}
+              onChange={setAccent}
+              disabled={!canManage || isPending}
+            />
+          </div>
+        </section>
+
+        {state?.ok === false && (
+          <p className="text-sm text-destructive" role="alert">
+            {state.error}
+          </p>
+        )}
+
+        {!canManage && (
+          <p className="text-xs text-muted-foreground">
+            Apenas o titular da conta pode alterar estas configurações.
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="submit"
+            disabled={!canManage || isPending || !allValid}
+          >
+            {isPending ? "Salvando…" : "Salvar configurações"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleReset}
+            disabled={!canManage || isPending}
+          >
+            Restaurar padrão
+          </Button>
+        </div>
+      </form>
 
       {toast ? (
         <div

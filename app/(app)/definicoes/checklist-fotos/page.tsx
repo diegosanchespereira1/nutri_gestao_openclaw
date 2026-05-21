@@ -30,7 +30,7 @@ export default async function ChecklistFotosDefinicoesPage() {
     <PageLayout variant="form">
       <PageHeader
         title="Checklist e fotos"
-        description="Preferências de fotos, GPS e personalização visual do PDF de dossiê."
+        description="Preferências de fotos, GPS, assinaturas e personalização visual do PDF de dossiê."
         back={{ href: "/definicoes", label: "Definições" }}
       />
 

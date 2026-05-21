@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 
 import { requireWorkspaceAuthContext } from "@/lib/actions/auth-context";
+import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { generateDocumentHash } from "@/lib/checklists/document-hash";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
@@ -1197,6 +1198,7 @@ export async function approveChecklistFillDossierAction(
   if (!estOwned) return { ok: false, error: "Sem permissão para aprovar este dossiê." };
 
   const approvedAt = new Date().toISOString();
+  const clientSignatureRequired = await getClientSignatureRequiredAction();
 
   const MAX_SIG_BYTES = 512 * 1024;
   const validateSig = (url: string | undefined | null): string | null => {
@@ -1206,16 +1208,25 @@ export async function approveChecklistFillDossierAction(
     return url;
   };
 
-  const professionalSig =
-    signatures?.professional || signatures?.client
-      ? validateSig(signatures.professional)
-      : null;
-  const clientSig =
-    signatures?.professional || signatures?.client
-      ? validateSig(signatures.client)
-      : null;
+  const hasSignaturePayload = Boolean(
+    signatures?.professional || signatures?.client || signatures?.clientSignerName,
+  );
+  const professionalSig = hasSignaturePayload ? validateSig(signatures?.professional) : null;
+  const clientSig = hasSignaturePayload ? validateSig(signatures?.client) : null;
   const clientSignerNameForSave =
     (signatures?.clientSignerName ?? "").trim().slice(0, 200) || null;
+
+  if (!professionalSig) {
+    return { ok: false, error: "A assinatura da profissional é obrigatória para aprovar o dossiê." };
+  }
+  if (clientSignatureRequired) {
+    if (!clientSig) {
+      return { ok: false, error: "A assinatura do cliente é obrigatória para aprovar o dossiê." };
+    }
+    if (!clientSignerNameForSave) {
+      return { ok: false, error: "Informe o nome de quem assina pelo cliente." };
+    }
+  }
 
   // SHA-256: mesmos valores que serão persistidos (evita divergência hash vs BD).
   let documentHash: string | null = null;

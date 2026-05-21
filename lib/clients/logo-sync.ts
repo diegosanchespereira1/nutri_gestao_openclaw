@@ -95,3 +95,30 @@ export async function getClientLogoSignedUrl(
   if (error || !data?.signedUrl) return null;
   return data.signedUrl;
 }
+
+/**
+ * Gera URLs assinadas para múltiplos logos numa única chamada HTTP ao Storage.
+ * Retorna um Map de storagePath → signedUrl (ou null em caso de erro por item).
+ */
+export async function getClientLogoSignedUrls(
+  supabase: SupabaseClient,
+  storagePaths: string[],
+  expiresSec = 3600,
+): Promise<Map<string, string>> {
+  const unique = [...new Set(storagePaths.filter((p) => p.trim().length > 0))];
+  if (unique.length === 0) return new Map();
+
+  const { data, error } = await supabase.storage
+    .from(CLIENT_LOGOS_BUCKET)
+    .createSignedUrls(unique, expiresSec);
+
+  if (error || !data) return new Map();
+
+  const result = new Map<string, string>();
+  for (const item of data) {
+    if (item.path && item.signedUrl) {
+      result.set(item.path, item.signedUrl);
+    }
+  }
+  return result;
+}

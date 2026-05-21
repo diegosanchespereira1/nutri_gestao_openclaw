@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { LayoutDashboard } from "lucide-react";
 
@@ -28,11 +29,10 @@ import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { FirstClientReminderToast } from "@/components/dashboard/first-client-reminder-toast";
 import { createClient } from "@/lib/supabase/server";
-import {
-  countClientsForOwner,
-  fetchProfileTimeZone,
-} from "@/lib/supabase/profile";
+import { countClientsForOwner } from "@/lib/supabase/profile";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
+import { DEFAULT_PROFILE_TIME_ZONE, normalizeAppTimeZone } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
 const clinicalQuickLinkClass =
@@ -47,18 +47,34 @@ export default async function InicioPage({
   const bemvindo = sp.bemvindo === "1";
   const onboardingMinimal = sp.onboarding === "minimal";
 
-  const supabase = await createClient();
+  const [supabase, cookieStore] = await Promise.all([
+    createClient(),
+    cookies(),
+  ]);
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
     redirect("/login");
   }
+
+  // Lê o timezone do cookie de sessão (já populado pelo middleware)
+  // evitando uma query extra à tabela profiles.
+  const profileCtxRaw = cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value;
+  let tz = DEFAULT_PROFILE_TIME_ZONE;
+  if (profileCtxRaw) {
+    try {
+      const parsed = JSON.parse(profileCtxRaw) as { timeZone?: string };
+      if (typeof parsed.timeZone === "string" && parsed.timeZone.trim().length > 0) {
+        tz = normalizeAppTimeZone(parsed.timeZone);
+      }
+    } catch {
+      // cookie inválido — usa default
+    }
+  }
+
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  const [tz, clientCount] = await Promise.all([
-    fetchProfileTimeZone(supabase, user.id),
-    countClientsForOwner(supabase, workspaceOwnerId),
-  ]);
+  const clientCount = await countClientsForOwner(supabase, workspaceOwnerId);
   const hasClients = clientCount > 0;
   const [{ rows }, complianceAlerts, validityAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([
     loadScheduledVisitsForOwner(),

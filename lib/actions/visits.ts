@@ -15,7 +15,18 @@ function parseTargetType(raw: unknown): VisitTargetType | null {
   return null;
 }
 
-export async function loadScheduledVisitsForOwner(): Promise<{
+/**
+ * Carrega visitas agendadas dentro de uma janela de tempo.
+ * Por padrão busca 6 meses para trás + 90 dias para frente,
+ * o suficiente para o dashboard (gráfico de 6 meses + agenda do dia).
+ * Evita trazer o histórico completo de todos os tempos.
+ */
+export async function loadScheduledVisitsForOwner(options?: {
+  /** Início da janela (ISO string). Default: 6 meses atrás. */
+  from?: string;
+  /** Fim da janela (ISO string). Default: 90 dias à frente. */
+  to?: string;
+}): Promise<{
   rows: ScheduledVisitWithTargets[];
 }> {
   const supabase = await createClient();
@@ -23,6 +34,26 @@ export async function loadScheduledVisitsForOwner(): Promise<{
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { rows: [] };
+
+  const now = new Date();
+  const from =
+    options?.from ??
+    new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth() - 6,
+        now.getUTCDate(),
+      ),
+    ).toISOString();
+  const to =
+    options?.to ??
+    new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 90,
+      ),
+    ).toISOString();
 
   const { data, error } = await supabase
     .from("scheduled_visits")
@@ -34,6 +65,8 @@ export async function loadScheduledVisitsForOwner(): Promise<{
       team_members ( id, full_name, job_role )
     `,
     )
+    .gte("scheduled_start", from)
+    .lte("scheduled_start", to)
     .order("scheduled_start", { ascending: true });
 
   if (error || !data) return { rows: [] };

@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
-import { getClientLogoSignedUrl } from "@/lib/clients/logo-sync";
+import { getClientLogoSignedUrls } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import type {
@@ -60,16 +60,21 @@ export default async function ClientesPage({
   });
 
   const supabase = await createClient();
+  // Coleta todos os paths de logo de uma vez e gera as URLs assinadas
+  // em uma única chamada HTTP ao Storage (evita N round-trips).
+  const logoPaths = rows
+    .filter((r) => r.kind === "pj" && r.logo_storage_path)
+    .map((r) => r.logo_storage_path as string);
+  const logoUrlMap = await getClientLogoSignedUrls(supabase, logoPaths);
+
   const rowsWithLogos: { row: ClientRow; logoUrl: string | null }[] =
-    await Promise.all(
-      rows.map(async (row) => ({
-        row,
-        logoUrl:
-          row.kind === "pj" && row.logo_storage_path
-            ? await getClientLogoSignedUrl(supabase, row.logo_storage_path)
-            : null,
-      })),
-    );
+    rows.map((row) => ({
+      row,
+      logoUrl:
+        row.kind === "pj" && row.logo_storage_path
+          ? (logoUrlMap.get(row.logo_storage_path) ?? null)
+          : null,
+    }));
 
   const hasFilters = !!(q || situacao !== "all" || segmentos.length > 0);
 

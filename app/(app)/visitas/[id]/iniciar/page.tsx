@@ -210,10 +210,8 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
     const {
       data: { user: wizardUser },
     } = await supabaseWizard.auth.getUser();
-    const workspaceTemplateLocked =
-      model.fill.itemResponseSource === "workspace" && !model.fill.template.is_active;
     const { canReopen: canReopenDossier } =
-      workspaceTemplateLocked || !wizardUser
+      model.fill.itemResponseSource === "workspace" || !wizardUser
         ? { canReopen: false }
         : await getChecklistReopenEligibility(supabaseWizard, wizardUser.id);
     const initialReopenEvents = await loadReopenEventsForSession(sessionParam);

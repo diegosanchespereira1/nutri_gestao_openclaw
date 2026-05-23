@@ -507,16 +507,10 @@ export async function updateWorkspaceTemplateAction(
       );
 
       if (usedItemIds.size > 0) {
-        // Arquiva o template automaticamente para sinalizar que está bloqueado.
-        await supabase
-          .from("checklist_workspace_templates")
-          .update({ archived_at: new Date().toISOString() })
-          .eq("id", templateId);
-
         return {
           ok: false,
           error:
-            "Não é possível salvar com o mesmo nome. Este modelo foi bloqueado porque já foi usado em checklists finalizados. Crie um novo checklist com um nome diferente.",
+            "Não é possível salvar com o mesmo nome. Este modelo já foi usado em checklists finalizados e não pode ser alterado. Crie um novo checklist com um nome diferente.",
         };
       }
 

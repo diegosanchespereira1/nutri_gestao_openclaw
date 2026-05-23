@@ -172,11 +172,11 @@ export async function reopenChecklistFillDossierAction(
     return { ok: false, error: "Este checklist não está finalizado." };
   }
 
-  if (bundle.itemResponseSource === "workspace" && !bundle.template.is_active) {
+  if (bundle.itemResponseSource === "workspace") {
     return {
       ok: false,
       error:
-        "Este checklist não pode ser reaberto. O modelo da equipe utilizado foi bloqueado — as sessões associadas são imutáveis. Crie um novo checklist a partir de um modelo com nome diferente.",
+        "Checklists de modelos da equipe não podem ser reabertos após aprovação. Crie um novo preenchimento se necessário.",
     };
   }
 

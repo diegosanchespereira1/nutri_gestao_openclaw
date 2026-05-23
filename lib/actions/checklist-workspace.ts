@@ -137,15 +137,12 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   // Verifica quais templates já foram usados em ao menos 1 sessão de preenchimento.
   const usedTemplateIds = new Set<string>();
   if (templateIds.length > 0) {
-    const { data: sessionRefs } = await supabase
-      .from("checklist_fill_sessions")
-      .select("workspace_template_id")
-      .in("workspace_template_id", templateIds)
-      .limit(templateIds.length);
-    for (const ref of sessionRefs ?? []) {
-      if (ref.workspace_template_id) {
-        usedTemplateIds.add(String(ref.workspace_template_id));
-      }
+    for (const tid of templateIds) {
+      const { count } = await supabase
+        .from("checklist_fill_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_template_id", tid);
+      if ((count ?? 0) > 0) usedTemplateIds.add(tid);
     }
   }
 

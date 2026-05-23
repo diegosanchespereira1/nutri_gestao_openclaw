@@ -64,9 +64,9 @@ export default async function ChecklistsPersonalizadosPage({
               key={r.id}
               className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="min-w-0">
-                <p className="text-foreground font-medium">{r.name}</p>
-                <p className="text-muted-foreground text-sm">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-foreground font-medium">{r.name}</p>
+                <p className="truncate text-muted-foreground text-sm">
                   {r.establishment_label}
                 </p>
                 {r.created_by_name && (
@@ -77,14 +77,21 @@ export default async function ChecklistsPersonalizadosPage({
                     </span>
                   </p>
                 )}
+                {r.has_been_used && (
+                  <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                    Modelo em uso — não pode ser editado. Use-o como base para criar um novo.
+                  </p>
+                )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Link
-                  href={`/checklists/personalizados/${r.id}/editar`}
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-                >
-                  Editar
-                </Link>
+              <div className="flex flex-shrink-0 flex-wrap gap-2">
+                {!r.has_been_used && (
+                  <Link
+                    href={`/checklists/personalizados/${r.id}/editar`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  >
+                    Editar
+                  </Link>
+                )}
                 <form action={startChecklistCustomFill} className="contents">
                   <input type="hidden" name="custom_template_id" value={r.id} />
                   <Button type="submit" size="sm">

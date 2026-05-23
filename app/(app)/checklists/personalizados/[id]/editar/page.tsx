@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { CustomChecklistEditor } from "@/components/checklists/custom-checklist-editor";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadCustomTemplateEditData } from "@/lib/actions/checklist-custom";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export default async function EditarCustomChecklistPage({
@@ -15,6 +16,16 @@ export default async function EditarCustomChecklistPage({
   const bundle = await loadCustomTemplateEditData(id);
   if (!bundle) {
     notFound();
+  }
+
+  const supabase = await createClient();
+  const { count: sessionCount } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("custom_template_id", id);
+
+  if ((sessionCount ?? 0) > 0) {
+    redirect("/checklists/personalizados");
   }
 
   return (

@@ -35,6 +35,8 @@ export type CustomTemplateListRow = {
   establishment_label: string;
   created_by_user_id: string;
   created_by_name: string | null;
+  /** true quando já existe ao menos 1 sessão de preenchimento usando este modelo. */
+  has_been_used: boolean;
 };
 
 async function assertEstablishmentOwned(
@@ -375,6 +377,17 @@ export async function listCustomTemplatesForOwner(): Promise<{
     }
   }
 
+  // Verifica quais modelos já foram usados em ao menos 1 sessão de preenchimento.
+  const customIds = customs.map((c) => c.id as string);
+  const usedCustomIds = new Set<string>();
+  for (const cid of customIds) {
+    const { count } = await supabase
+      .from("checklist_fill_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("custom_template_id", cid);
+    if ((count ?? 0) > 0) usedCustomIds.add(cid);
+  }
+
   return {
     rows: customs.map((r) => ({
       id: r.id as string,
@@ -387,6 +400,7 @@ export async function listCustomTemplatesForOwner(): Promise<{
         (r.establishment_id as string),
       created_by_user_id: r.user_id as string,
       created_by_name: profileNames.get(r.user_id as string) ?? null,
+      has_been_used: usedCustomIds.has(r.id as string),
     })),
   };
 }

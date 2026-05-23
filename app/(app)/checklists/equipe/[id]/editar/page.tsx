@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { WorkspaceChecklistBuilder } from "@/components/checklists/workspace-checklist-builder";
 import { loadWorkspaceTemplateForEdit } from "@/lib/actions/checklist-workspace";
 import type { WorkspaceEditSection } from "@/lib/actions/checklist-workspace";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EditWorkspaceChecklistPage({
   params,
@@ -18,6 +19,17 @@ export default async function EditWorkspaceChecklistPage({
   }
   if (template.archived_at) {
     notFound();
+  }
+
+  // Bloqueia edição de templates já utilizados em ao menos 1 sessão.
+  const supabase = await createClient();
+  const { count: sessionCount } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_template_id", id);
+
+  if ((sessionCount ?? 0) > 0) {
+    redirect("/checklists/equipe");
   }
 
   const initialSections: WorkspaceEditSection[] = template.sections.map((sec) => ({

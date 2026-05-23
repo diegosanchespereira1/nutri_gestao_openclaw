@@ -87,71 +87,77 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
             <li
               key={tpl.id}
               className={cn(
-                "rounded-xl border bg-card p-4 shadow-xs transition-colors",
+                "min-w-0 rounded-xl border bg-card p-4 shadow-xs transition-colors",
                 highlighted ? "border-primary ring-2 ring-primary/20" : "border-border",
               )}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                    Equipe
-                  </span>
-                  <p className="mt-2 truncate text-sm font-semibold text-foreground">
-                    {tpl.name}
+              <div className="min-w-0">
+                <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  Equipe
+                </span>
+                <p className="mt-2 truncate text-sm font-semibold text-foreground">
+                  {tpl.name}
+                </p>
+                <div className="mt-1 space-y-0.5 text-xs text-foreground/85">
+                  <p className="truncate">
+                    Criado por:{" "}
+                    <span className="text-foreground/95">
+                      {tpl.created_by_name ?? "Equipe"}
+                    </span>
                   </p>
-                  <div className="mt-1 space-y-0.5 text-xs text-foreground/85">
-                    <p>
-                      Criado por:{" "}
-                      <span className="text-foreground/95">
-                        {tpl.created_by_name ?? "Equipe"}
-                      </span>
-                    </p>
-                    <p>Última alteração em {formatDate(tpl.updated_at)}</p>
-                  </div>
-                  <div className="mt-2 flex items-center gap-3 rounded-lg bg-muted/50 px-2.5 py-1.5">
-                    <span className="text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {tpl.required_item_count}
-                      </span>{" "}
-                      obrigatório{tpl.required_item_count !== 1 ? "s" : ""}
-                    </span>
-                    <span className="text-muted-foreground/40">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {tpl.total_item_count}
-                      </span>{" "}
-                      {tpl.total_item_count === 1 ? "item" : "itens"}
-                    </span>
-                  </div>
+                  <p className="truncate">Última alteração em {formatDate(tpl.updated_at)}</p>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-muted/50 px-2.5 py-1.5">
+                  <span className="text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {tpl.required_item_count}
+                    </span>{" "}
+                    obrigatório{tpl.required_item_count !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-muted-foreground/40">·</span>
+                  <span className="text-xs text-muted-foreground">
+                    <span className="font-semibold text-foreground">
+                      {tpl.total_item_count}
+                    </span>{" "}
+                    {tpl.total_item_count === 1 ? "item" : "itens"}
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2">
+              {tpl.has_been_used && (
+                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                  Modelo em uso — não pode ser editado. Use-o como base para criar um novo.
+                </p>
+              )}
+
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                 <Link
                   href={`/checklists?workspace_template=${tpl.id}`}
                   className={cn(
                     buttonVariants({ size: "sm" }),
-                    "min-w-0 flex-1 sm:flex-none",
+                    tpl.has_been_used ? "col-span-2" : "",
                   )}
                 >
                   <Play className="size-3.5" />
                   Preencher
                 </Link>
-                <Link
-                  href={`/checklists/equipe/${tpl.id}/editar`}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "min-w-0",
-                  )}
-                >
-                  <Pencil className="size-3.5" />
-                  Editar
-                </Link>
+                {!tpl.has_been_used && (
+                  <Link
+                    href={`/checklists/equipe/${tpl.id}/editar`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  >
+                    <Pencil className="size-3.5" />
+                    Editar
+                  </Link>
+                )}
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-destructive hover:text-destructive"
+                  className={cn(
+                    "text-destructive hover:text-destructive",
+                    tpl.has_been_used ? "col-span-2 sm:col-span-1" : "",
+                  )}
                   onClick={() => setArchivingTpl(tpl)}
                 >
                   <Archive className="size-3.5" />

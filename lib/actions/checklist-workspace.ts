@@ -24,6 +24,8 @@ export type WorkspaceTemplateListRow = {
   total_item_count: number;
   required_item_count: number;
   updated_at: string;
+  /** true quando já existe ao menos 1 sessão de preenchimento usando este modelo. */
+  has_been_used: boolean;
 };
 
 export type WorkspaceEditItem = {
@@ -132,6 +134,21 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
     }
   }
 
+  // Verifica quais templates já foram usados em ao menos 1 sessão de preenchimento.
+  const usedTemplateIds = new Set<string>();
+  if (templateIds.length > 0) {
+    const { data: sessionRefs } = await supabase
+      .from("checklist_fill_sessions")
+      .select("workspace_template_id")
+      .in("workspace_template_id", templateIds)
+      .limit(templateIds.length);
+    for (const ref of sessionRefs ?? []) {
+      if (ref.workspace_template_id) {
+        usedTemplateIds.add(String(ref.workspace_template_id));
+      }
+    }
+  }
+
   return {
     rows: templates.map((t) => ({
       id: String(t.id),
@@ -141,6 +158,7 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
       total_item_count: counts.get(String(t.id))?.total ?? 0,
       required_item_count: counts.get(String(t.id))?.required ?? 0,
       updated_at: String(t.updated_at),
+      has_been_used: usedTemplateIds.has(String(t.id)),
     })),
   };
 }

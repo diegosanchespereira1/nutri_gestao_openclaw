@@ -130,13 +130,10 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 </p>
               )}
 
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Link
                   href={`/checklists?workspace_template=${tpl.id}`}
-                  className={cn(
-                    buttonVariants({ size: "sm" }),
-                    tpl.has_been_used ? "col-span-2" : "",
-                  )}
+                  className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
                 >
                   <Play className="size-3.5" />
                   Preencher
@@ -144,7 +141,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 {!tpl.has_been_used && (
                   <Link
                     href={`/checklists/equipe/${tpl.id}/editar`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full sm:w-auto")}
                   >
                     <Pencil className="size-3.5" />
                     Editar
@@ -154,10 +151,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className={cn(
-                    "text-destructive hover:text-destructive",
-                    tpl.has_been_used ? "col-span-2 sm:col-span-1" : "",
-                  )}
+                  className="w-full text-destructive hover:text-destructive sm:w-auto"
                   onClick={() => setArchivingTpl(tpl)}
                 >
                   <Archive className="size-3.5" />

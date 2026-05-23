@@ -48,9 +48,12 @@ export default async function ChecklistPreencherPage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const { canReopen: canReopenDossier } = user
-    ? await getChecklistReopenEligibility(supabase, user.id)
-    : { canReopen: false };
+  const workspaceTemplateLocked =
+    bundle.itemResponseSource === "workspace" && !bundle.template.is_active;
+  const { canReopen: canReopenDossier } =
+    workspaceTemplateLocked || !user
+      ? { canReopen: false }
+      : await getChecklistReopenEligibility(supabase, user.id);
   const initialReopenEvents = await loadReopenEventsForSession(sessionId);
   const clientSignatureRequired = await getClientSignatureRequiredAction();
 

@@ -23,7 +23,10 @@ import { PageHelpHint } from "@/components/help/page-help-hint";
 import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
 import { startChecklistFill } from "@/lib/actions/checklist-fill";
 import { loadWorkspaceTemplatesForCatalog } from "@/lib/actions/checklist-workspace";
-import { loadRecentChecklistEstablishmentsAction } from "@/lib/actions/establishments";
+import {
+  loadRecentChecklistEstablishmentsAction,
+  loadEstablishmentPickerOptionById,
+} from "@/lib/actions/establishments";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -44,12 +47,23 @@ export default async function ChecklistsPage({
     /^[0-9a-f-]{36}$/i.test(sp.workspace_template)
       ? sp.workspace_template
       : null;
-  const [{ templates }, { rows: workspaceTemplates }, { rows: recentEstablishments }] =
+  const initialEstablishmentId =
+    typeof sp.est === "string" && /^[0-9a-f-]{36}$/i.test(sp.est) ? sp.est : null;
+
+  const [{ templates }, { rows: workspaceTemplates }, { rows: recentRaw }, preselected] =
     await Promise.all([
       loadChecklistCatalog(),
       loadWorkspaceTemplatesForCatalog(),
       loadRecentChecklistEstablishmentsAction(3),
+      initialEstablishmentId
+        ? loadEstablishmentPickerOptionById(initialEstablishmentId)
+        : Promise.resolve(null),
     ]);
+
+  // Garante que o estabelecimento pré-selecionado aparece como primeira opção recente
+  const recentEstablishments = preselected
+    ? [preselected, ...recentRaw.filter((r) => r.id !== preselected.id)].slice(0, 3)
+    : recentRaw;
 
   return (
     <div className="space-y-6">
@@ -108,7 +122,7 @@ export default async function ChecklistsPage({
       ) : null}
 
       <ChecklistCatalog
-        key={focusTemplateId ?? focusWorkspaceTemplateId ?? "checklist-catalog-default"}
+        key={initialEstablishmentId ?? focusTemplateId ?? focusWorkspaceTemplateId ?? "checklist-catalog-default"}
         recentEstablishments={recentEstablishments}
         templates={templates}
         workspaceTemplates={workspaceTemplates}
@@ -116,6 +130,7 @@ export default async function ChecklistsPage({
         duplicateTemplateAction={duplicateGlobalTemplateAction}
         focusTemplateId={focusTemplateId}
         focusWorkspaceTemplateId={focusWorkspaceTemplateId}
+        initialEstablishmentId={initialEstablishmentId}
       />
     </div>
   );

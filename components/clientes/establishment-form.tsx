@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useActionState } from "react";
 
 import {
@@ -8,17 +9,19 @@ import {
   updateEstablishmentAction,
 } from "@/lib/actions/establishments";
 import {
-  ESTABLISHMENT_TYPES,
+  ESTABLISHMENT_CATEGORIES,
+  ESTABLISHMENT_TYPES_BY_CATEGORY,
+  categoryFromType,
+  establishmentCategoryLabel,
   establishmentTypeLabel,
 } from "@/lib/constants/establishment-types";
-import type { EstablishmentType } from "@/lib/types/establishments";
+import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const initial: EstablishmentFormResult | undefined = undefined;
 
-// Dentro do Card (bg-card = branco), select usa bg-card para consistência
 const selectClass =
   "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
@@ -45,10 +48,24 @@ export function EstablishmentForm({
   };
 }) {
   const action =
-    mode === "create"
-      ? createEstablishmentAction
-      : updateEstablishmentAction;
+    mode === "create" ? createEstablishmentAction : updateEstablishmentAction;
   const [state, formAction] = useActionState(action, initial);
+
+  const initialCategory: EstablishmentCategory | "" =
+    mode === "edit" ? categoryFromType(defaults.establishment_type) : "";
+  const initialType: EstablishmentType | "" =
+    mode === "edit" ? defaults.establishment_type : "";
+
+  const [category, setCategory] = useState<EstablishmentCategory | "">(initialCategory);
+  const [selectedType, setSelectedType] = useState<EstablishmentType | "">(initialType);
+
+  function handleCategoryChange(value: EstablishmentCategory | "") {
+    setCategory(value);
+    setSelectedType("");
+  }
+
+  const typesForCategory =
+    category !== "" ? ESTABLISHMENT_TYPES_BY_CATEGORY[category] : [];
 
   return (
     <form action={formAction} className="space-y-6">
@@ -76,25 +93,58 @@ export function EstablishmentForm({
           />
         </div>
 
+        {/* Categoria — filtra os tipos disponíveis */}
         <div className="space-y-2">
-          <Label htmlFor="est-type">Tipo de estabelecimento</Label>
+          <Label htmlFor="est-category">Categoria</Label>
           <select
-            id="est-type"
-            name="establishment_type"
+            id="est-category"
             required
-            defaultValue={defaults.establishment_type}
+            value={category}
+            onChange={(e) =>
+              handleCategoryChange(e.target.value as EstablishmentCategory | "")
+            }
             className={selectClass}
           >
-            {ESTABLISHMENT_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {establishmentTypeLabel[t]}
+            <option value="" disabled>
+              Selecione a categoria…
+            </option>
+            {ESTABLISHMENT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {establishmentCategoryLabel[c]}
               </option>
             ))}
           </select>
           <p className="text-muted-foreground text-xs">
-            Define portarias e fluxos de visita aplicáveis.
+            Define o enquadramento do estabelecimento para fins de visita e
+            protocolos.
           </p>
         </div>
+
+        {/* Tipo — só aparece após categoria ser escolhida */}
+        {category !== "" ? (
+          <div className="space-y-2">
+            <Label htmlFor="est-type">Tipo de estabelecimento</Label>
+            <select
+              id="est-type"
+              name="establishment_type"
+              required
+              value={selectedType}
+              onChange={(e) =>
+                setSelectedType(e.target.value as EstablishmentType)
+              }
+              className={selectClass}
+            >
+              <option value="" disabled>
+                Selecione o tipo…
+              </option>
+              {typesForCategory.map((t) => (
+                <option key={t} value={t}>
+                  {establishmentTypeLabel[t]}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
       </fieldset>
 
       <div className="border-t border-border" />
@@ -128,7 +178,12 @@ export function EstablishmentForm({
         <div className="grid gap-4 sm:grid-cols-3">
           <div className="space-y-2 sm:col-span-1">
             <Label htmlFor="est-city">Localidade</Label>
-            <Input id="est-city" name="city" defaultValue={defaults.city} placeholder="Opcional" />
+            <Input
+              id="est-city"
+              name="city"
+              defaultValue={defaults.city}
+              placeholder="Opcional"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="est-state">UF</Label>

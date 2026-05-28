@@ -7,7 +7,7 @@ import { parseTeamJobRole } from "@/lib/constants/team-roles";
 import { canAccessAdminArea } from "@/lib/roles";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
 
 function parseProfessionalArea(raw: unknown): ProfessionalArea | null {
@@ -223,17 +223,12 @@ async function canDeleteTeamMembersForUser(args: {
   const { supabase, authUserId, workspaceOwnerId } = args;
   if (workspaceOwnerId === authUserId) return true;
 
-  const [{ data: profile }, { data: actorTeamMember }] = await Promise.all([
-    supabase.from("profiles").select("role").eq("user_id", authUserId).maybeSingle(),
-    supabase
-      .from("team_members")
-      .select("job_role")
-      .eq("owner_user_id", workspaceOwnerId)
-      .eq("member_user_id", authUserId)
-      .maybeSingle(),
-  ]);
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", authUserId)
+    .maybeSingle();
 
-  if (actorTeamMember?.job_role === "gestao") return true;
   if (canAccessAdminArea(profile?.role ?? null)) return true;
   return false;
 }
@@ -474,6 +469,8 @@ export async function updateTeamMemberAction(formData: FormData): Promise<void> 
   if (!user) redirect("/login");
 
   const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  if (isTeamMember(user.id, accountOwnerId)) redirect("/equipe?err=forbidden");
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/equipe?err=missing");

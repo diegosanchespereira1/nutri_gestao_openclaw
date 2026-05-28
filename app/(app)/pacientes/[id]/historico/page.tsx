@@ -28,7 +28,7 @@ export default async function HistoricoPacientePage({
     notFound();
   }
 
-  const backHref = `/pacientes/${id}/editar`;
+  const backHref = `/pacientes/${id}`;
 
   return (
     <div className="space-y-6">
@@ -39,7 +39,7 @@ export default async function HistoricoPacientePage({
           "text-muted-foreground hover:text-foreground -ml-2 h-auto px-2 py-1",
         )}
       >
-        ← Editar paciente
+        ← Prontuário
       </Link>
 
       <div>

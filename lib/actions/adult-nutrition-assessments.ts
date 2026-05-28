@@ -74,20 +74,12 @@ export async function createAdultNutritionAssessmentAction(
 
   const { data: patient } = await supabase
     .from("patients")
-    .select("id, client_id")
+    .select("id, user_id")
     .eq("id", patientId)
     .maybeSingle();
 
-  if (!patient) return { ok: false, error: "Paciente não encontrado." };
-
-  const { data: clientRow } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", patient.client_id)
-    .maybeSingle();
-
-  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
-    return { ok: false, error: "Sem permissão para este paciente." };
+  if (!patient || patient.user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Paciente não encontrado." };
   }
 
   const patient_group = parsePatientGroup(formData.get("patient_group"));

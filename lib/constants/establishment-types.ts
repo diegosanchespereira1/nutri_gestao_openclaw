@@ -1,28 +1,84 @@
 import type { ClientBusinessSegment } from "@/lib/constants/client-business-segment";
-import type { EstablishmentType } from "@/lib/types/establishments";
+import type {
+  EstablishmentCategory,
+  EstablishmentType,
+} from "@/lib/types/establishments";
 
-/** Valores persistidos em `establishments.establishment_type` (PRD FR7). */
-export const ESTABLISHMENT_TYPES: readonly EstablishmentType[] = [
+// ── Types by category ───────────────────────────────────────────────────────
+
+export const ATENDIMENTO_TYPES: readonly EstablishmentType[] = [
+  "clinica",
   "escola",
   "hospital",
-  "clinica",
   "lar_idosos",
+] as const;
+
+export const ASSESSORIA_TYPES: readonly EstablishmentType[] = [
+  "restaurante",
+  "frigorifico",
+  "mercado",
+  "cozinha_industrial",
   "empresa",
 ] as const;
 
+export const ALL_ESTABLISHMENT_TYPES: readonly EstablishmentType[] = [
+  ...ATENDIMENTO_TYPES,
+  ...ASSESSORIA_TYPES,
+] as const;
+
+/** @deprecated Use ALL_ESTABLISHMENT_TYPES or per-category constants. */
+export const ESTABLISHMENT_TYPES = ALL_ESTABLISHMENT_TYPES;
+
+// ── Category labels ─────────────────────────────────────────────────────────
+
+export const ESTABLISHMENT_CATEGORIES: readonly EstablishmentCategory[] = [
+  "atendimento_nutricional",
+  "assessoria_alimentacao",
+] as const;
+
+export const establishmentCategoryLabel: Record<EstablishmentCategory, string> =
+  {
+    atendimento_nutricional: "Atendimento Nutricional",
+    assessoria_alimentacao: "Assessoria em Serviços de Alimentação",
+  };
+
+export const ESTABLISHMENT_TYPES_BY_CATEGORY: Record<
+  EstablishmentCategory,
+  readonly EstablishmentType[]
+> = {
+  atendimento_nutricional: ATENDIMENTO_TYPES,
+  assessoria_alimentacao: ASSESSORIA_TYPES,
+};
+
+// ── Type labels ─────────────────────────────────────────────────────────────
+
 export const establishmentTypeLabel: Record<EstablishmentType, string> = {
+  clinica: "Clínica",
   escola: "Escola",
   hospital: "Hospital",
-  clinica: "Clínica",
   lar_idosos: "Lar de idosos",
+  restaurante: "Restaurante",
+  frigorifico: "Frigorífico",
+  mercado: "Mercado",
+  cozinha_industrial: "Cozinha industrial",
   empresa: "Empresa",
 };
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+export function categoryFromType(
+  type: EstablishmentType,
+): EstablishmentCategory {
+  return (ATENDIMENTO_TYPES as readonly string[]).includes(type)
+    ? "atendimento_nutricional"
+    : "assessoria_alimentacao";
+}
 
 export function parseEstablishmentType(
   raw: unknown,
 ): EstablishmentType | null {
   if (typeof raw !== "string") return null;
-  return ESTABLISHMENT_TYPES.includes(raw as EstablishmentType)
+  return (ALL_ESTABLISHMENT_TYPES as readonly string[]).includes(raw)
     ? (raw as EstablishmentType)
     : null;
 }

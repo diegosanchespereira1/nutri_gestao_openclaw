@@ -493,6 +493,33 @@ export async function updateWorkspaceTemplateAction(
     };
   }
 
+  // Bloquear edição se houver sessões aprovadas com itens de validade futura em uso
+  const todayIso = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const { data: approvedSessions } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id")
+    .eq("workspace_template_id", templateId)
+    .not("dossier_approved_at", "is", null);
+
+  if (approvedSessions && approvedSessions.length > 0) {
+    const approvedIds = approvedSessions.map((s) => (s as { id: string }).id);
+    const { count: futureValidCount } = await supabase
+      .from("checklist_fill_item_responses")
+      .select("id", { count: "exact", head: true })
+      .in("session_id", approvedIds)
+      .not("valid_until", "is", null)
+      .gte("valid_until", todayIso);
+
+    if ((futureValidCount ?? 0) > 0) {
+      return {
+        ok: false,
+        error:
+          "Este modelo não pode ser editado pois possui itens com validade futura em uso em checklists aprovados. " +
+          "Crie uma nova versão do modelo para fazer alterações.",
+      };
+    }
+  }
+
   // Apaga seções existentes (cascade nos itens). Itens em respostas aprovadas
   // serão preservados pelo ON DELETE CASCADE → impede a exclusão se houver
   // resposta. Para garantir que o histórico não quebre, criamos um snapshot:

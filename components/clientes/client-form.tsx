@@ -56,9 +56,17 @@ import {
   CLIENT_BUSINESS_SEGMENTS,
   clientBusinessSegmentLabel,
 } from "@/lib/constants/client-business-segment";
+import {
+  ESTABLISHMENT_CATEGORIES,
+  ESTABLISHMENT_TYPES_BY_CATEGORY,
+  categoryFromType,
+  establishmentCategoryLabel,
+  establishmentTypeLabel,
+} from "@/lib/constants/establishment-types";
 import { clientLifecycleLabel } from "@/lib/constants/client-lifecycle";
 import { MAX_CLIENT_LOGO_BYTES } from "@/lib/constants/client-logos-storage";
 import type { ClientKind, ClientLifecycleStatus } from "@/lib/types/clients";
+import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
 import type { PatientSex } from "@/lib/types/patients";
 
 const initial: ClientFormResult | undefined = undefined;
@@ -148,6 +156,7 @@ export function ClientForm({
   teamMembersForSelect = [],
   defaultResponsibleTeamMemberId = null,
   defaultEstName = "",
+  defaultEstType,
   defaultEstAddressLine1 = "",
   defaultEstAddressLine2 = "",
   defaultEstCity = "",
@@ -211,6 +220,7 @@ export function ClientForm({
   defaultResponsibleTeamMemberId?: string | null;
   /** Campos do estabelecimento 1:1 (apenas PJ). */
   defaultEstName?: string;
+  defaultEstType?: EstablishmentType;
   defaultEstAddressLine1?: string;
   defaultEstAddressLine2?: string;
   defaultEstCity?: string;
@@ -232,6 +242,17 @@ export function ClientForm({
     }
     return "identificacao";
   });
+
+  const initialEstCategory: EstablishmentCategory | "" = defaultEstType
+    ? categoryFromType(defaultEstType)
+    : "";
+  const [estCategory, setEstCategory] = useState<EstablishmentCategory | "">(initialEstCategory);
+  const [estType, setEstType] = useState<EstablishmentType | "">(defaultEstType ?? "");
+
+  function handleEstCategoryChange(cat: EstablishmentCategory | "") {
+    setEstCategory(cat);
+    setEstType("");
+  }
 
   const [segmentValue, setSegmentValue] = useState(defaultBusinessSegment);
   const [customSegments, setCustomSegments] =
@@ -638,6 +659,57 @@ export function ClientForm({
                     autoComplete="organization"
                   />
                 </div>
+
+                {/* Categoria */}
+                <div className="space-y-2">
+                  <Label htmlFor="est-category">Categoria</Label>
+                  <select
+                    id="est-category"
+                    required
+                    value={estCategory}
+                    onChange={(e) =>
+                      handleEstCategoryChange(
+                        e.target.value as EstablishmentCategory | "",
+                      )
+                    }
+                    className={selectClassName}
+                  >
+                    <option value="" disabled>
+                      Selecione a categoria…
+                    </option>
+                    {ESTABLISHMENT_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>
+                        {establishmentCategoryLabel[c]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Tipo — só aparece após categoria */}
+                {estCategory !== "" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="est-type">Tipo de estabelecimento</Label>
+                    <select
+                      id="est-type"
+                      name="est_type"
+                      required
+                      value={estType}
+                      onChange={(e) =>
+                        setEstType(e.target.value as EstablishmentType)
+                      }
+                      className={selectClassName}
+                    >
+                      <option value="" disabled>
+                        Selecione o tipo…
+                      </option>
+                      {ESTABLISHMENT_TYPES_BY_CATEGORY[estCategory].map((t) => (
+                        <option key={t} value={t}>
+                          {establishmentTypeLabel[t]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null}
                 <div className="space-y-2">
                   <Label htmlFor="est-address1">
                     Endereço (linha 1) (opcional)

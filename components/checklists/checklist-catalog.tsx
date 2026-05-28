@@ -68,6 +68,8 @@ type Props = {
   focusTemplateId?: string | null;
   /** Mesma lógica para um workspace template. */
   focusWorkspaceTemplateId?: string | null;
+  /** Pré-seleciona um estabelecimento ao abrir o catálogo (ex.: vindo do cadastro do cliente). */
+  initialEstablishmentId?: string | null;
 };
 
 type SelectedTemplateSource = "system" | "workspace";
@@ -140,6 +142,7 @@ export function ChecklistCatalog({
   duplicateTemplateAction,
   focusTemplateId = null,
   focusWorkspaceTemplateId = null,
+  initialEstablishmentId = null,
 }: Props) {
   const router = useRouter();
 
@@ -303,6 +306,14 @@ export function ChecklistCatalog({
     void loadDropdownOptions(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pré-selecionar estabelecimento quando vindo de outra página via URL (?est=)
+  useEffect(() => {
+    if (!initialEstablishmentId) return;
+    const option = recentEstablishments.find((r) => r.id === initialEstablishmentId);
+    if (option) selectEstablishment(option);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialEstablishmentId]);
 
   // Carregar áreas sempre que o estabelecimento mudar
   useEffect(() => {
@@ -1262,7 +1273,7 @@ export function ChecklistCatalog({
                   {/* Painel */}
                   {areaDropdownOpen && (
                     <div
-                      className="absolute bottom-full left-0 z-50 mb-1 w-56 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
+                      className="absolute bottom-9 left-0 z-50 mb-2 w-56 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
                       role="listbox"
                       aria-multiselectable="true"
                       aria-label="Áreas do estabelecimento"

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClipboardList } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -37,6 +38,8 @@ export async function EstablishmentChecklistHistorySection({
     offset: 0,
   });
 
+  const applyHref = `/checklists?est=${encodeURIComponent(establishmentId)}`;
+
   if (rows.length === 0) {
     return (
       <div className="py-4 text-center space-y-3">
@@ -44,10 +47,11 @@ export async function EstablishmentChecklistHistorySection({
           Nenhum checklist realizado neste estabelecimento.
         </p>
         <Link
-          href="/checklists"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          href={applyHref}
+          className={cn(buttonVariants({ size: "sm" }))}
         >
-          Ir ao catálogo de checklists →
+          <ClipboardList className="mr-1.5 h-4 w-4" />
+          Aplicar novo checklist
         </Link>
       </div>
     );
@@ -55,6 +59,15 @@ export async function EstablishmentChecklistHistorySection({
 
   return (
     <div className="space-y-3">
+      <div className="flex justify-end">
+        <Link
+          href={applyHref}
+          className={cn(buttonVariants({ size: "sm" }))}
+        >
+          <ClipboardList className="mr-1.5 h-4 w-4" />
+          Aplicar novo checklist
+        </Link>
+      </div>
       <ul className="divide-y divide-border/50 rounded-lg border border-border overflow-hidden bg-white">
         {rows.map((session) => (
           <li key={session.id} className="flex items-start justify-between gap-3 px-4 py-3">

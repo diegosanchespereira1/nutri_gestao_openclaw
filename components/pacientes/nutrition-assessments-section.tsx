@@ -19,9 +19,11 @@ import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-asse
 export async function NutritionAssessmentsSection({
   patientId,
   defaultAge,
+  isMinor = false,
 }: {
   patientId: string;
   defaultAge?: number;
+  isMinor?: boolean;
 }) {
   const { rows } = await loadNutritionAssessmentsForPatient(patientId);
 
@@ -65,6 +67,7 @@ export async function NutritionAssessmentsSection({
       generalTab={generalTabContent}
       adultTab={adultTabContent}
       geriatricTab={geriatricTabContent}
+      showAdultTabs={!isMinor}
     />
   );
 }

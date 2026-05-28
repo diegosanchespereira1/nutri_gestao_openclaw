@@ -1818,7 +1818,7 @@ CREATE TABLE IF NOT EXISTS "public"."establishments" (
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     CONSTRAINT "establishments_state_len" CHECK ((("state" IS NULL) OR ("char_length"("state") = 2))),
-    CONSTRAINT "establishments_type_check" CHECK (("establishment_type" = ANY (ARRAY['escola'::"text", 'hospital'::"text", 'clinica'::"text", 'lar_idosos'::"text", 'empresa'::"text"])))
+    CONSTRAINT "establishments_type_check" CHECK (("establishment_type" = ANY (ARRAY['escola'::"text", 'hospital'::"text", 'clinica'::"text", 'lar_idosos'::"text", 'restaurante'::"text", 'frigorifico'::"text", 'mercado'::"text", 'cozinha_industrial'::"text", 'empresa'::"text"])))
 );
 
 
@@ -2700,7 +2700,7 @@ CREATE TABLE IF NOT EXISTS "public"."pop_templates" (
     "position" integer DEFAULT 0 NOT NULL,
     CONSTRAINT "pop_templates_body_len" CHECK (("char_length"(TRIM(BOTH FROM "body")) > 0)),
     CONSTRAINT "pop_templates_name_len" CHECK (("char_length"(TRIM(BOTH FROM "name")) > 0)),
-    CONSTRAINT "pop_templates_type_check" CHECK (("establishment_type" = ANY (ARRAY['escola'::"text", 'hospital'::"text", 'clinica'::"text", 'lar_idosos'::"text", 'empresa'::"text"])))
+    CONSTRAINT "pop_templates_type_check" CHECK (("establishment_type" = ANY (ARRAY['escola'::"text", 'hospital'::"text", 'clinica'::"text", 'lar_idosos'::"text", 'restaurante'::"text", 'frigorifico'::"text", 'mercado'::"text", 'cozinha_industrial'::"text", 'empresa'::"text"])))
 );
 
 
@@ -4577,7 +4577,7 @@ CREATE POLICY "client_exam_documents_select_own" ON "public"."client_exam_docume
 ALTER TABLE "public"."clients" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "clients_delete_own" ON "public"."clients" FOR DELETE TO "authenticated" USING ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid")))));
+CREATE POLICY "clients_delete_own" ON "public"."clients" FOR DELETE TO "authenticated" USING ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))));
 
 
 
@@ -4595,7 +4595,7 @@ CREATE POLICY "clients_select_own" ON "public"."clients" FOR SELECT TO "authenti
 
 
 
-CREATE POLICY "clients_update_own" ON "public"."clients" FOR UPDATE TO "authenticated" USING ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))))) WITH CHECK ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid")))));
+CREATE POLICY "clients_update_own" ON "public"."clients" FOR UPDATE TO "authenticated" USING ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")))) WITH CHECK ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))));
 
 
 
@@ -4757,9 +4757,9 @@ CREATE POLICY "establishment_pops_update_own" ON "public"."establishment_pops" F
 ALTER TABLE "public"."establishments" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "establishments_delete_own" ON "public"."establishments" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
+CREATE POLICY "establishments_delete_own" ON "public"."establishments" FOR DELETE TO "authenticated" USING (((EXISTS ( SELECT 1
    FROM "public"."clients" "c"
-  WHERE (("c"."id" = "establishments"."client_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))));
+  WHERE (("c"."id" = "establishments"."client_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))));
 
 
 
@@ -4775,11 +4775,11 @@ CREATE POLICY "establishments_select_own" ON "public"."establishments" FOR SELEC
 
 
 
-CREATE POLICY "establishments_update_own" ON "public"."establishments" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+CREATE POLICY "establishments_update_own" ON "public"."establishments" FOR UPDATE TO "authenticated" USING (((EXISTS ( SELECT 1
    FROM "public"."clients" "c"
-  WHERE (("c"."id" = "establishments"."client_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")))))) WITH CHECK ((EXISTS ( SELECT 1
+  WHERE (("c"."id" = "establishments"."client_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")))) WITH CHECK (((EXISTS ( SELECT 1
    FROM "public"."clients" "c"
-  WHERE (("c"."id" = "establishments"."client_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND ("c"."kind" = 'pj'::"text")))));
+  WHERE (("c"."id" = "establishments"."client_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND ("c"."kind" = 'pj'::"text")))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))));
 
 
 
@@ -4841,16 +4841,14 @@ CREATE POLICY "financial_charges_update_own" ON "public"."financial_charges" FOR
 
 
 CREATE POLICY "owner via patient chain" ON "public"."patient_geriatric_assessments" USING (("patient_id" IN ( SELECT "p"."id"
-   FROM ("public"."patients" "p"
-     JOIN "public"."clients" "c" ON (("c"."id" = "p"."client_id")))
-  WHERE ("c"."owner_user_id" = "auth"."uid"()))));
+   FROM "public"."patients" "p"
+  WHERE ("p"."user_id" = ( SELECT "public"."workspace_account_owner_id"())))));
 
 
 
 CREATE POLICY "owner via patient chain adult nutrition" ON "public"."patient_adult_nutrition_assessments" USING (("patient_id" IN ( SELECT "p"."id"
-   FROM ("public"."patients" "p"
-     JOIN "public"."clients" "c" ON (("c"."id" = "p"."client_id")))
-  WHERE ("c"."owner_user_id" = "auth"."uid"()))));
+   FROM "public"."patients" "p"
+  WHERE ("p"."user_id" = ( SELECT "public"."workspace_account_owner_id"())))));
 
 
 
@@ -4873,16 +4871,14 @@ ALTER TABLE "public"."patient_geriatric_assessments" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "patient_naa_insert_own" ON "public"."patient_nutrition_assessments" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ("public"."patients" "p"
-     JOIN "public"."clients" "c" ON (("c"."id" = "p"."client_id")))
-  WHERE (("p"."id" = "patient_nutrition_assessments"."patient_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))));
+   FROM "public"."patients" "p"
+  WHERE (("p"."id" = "patient_nutrition_assessments"."patient_id") AND ("p"."user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))));
 
 
 
 CREATE POLICY "patient_naa_select_own" ON "public"."patient_nutrition_assessments" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("public"."patients" "p"
-     JOIN "public"."clients" "c" ON (("c"."id" = "p"."client_id")))
-  WHERE (("p"."id" = "patient_nutrition_assessments"."patient_id") AND ("c"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))));
+   FROM "public"."patients" "p"
+  WHERE (("p"."id" = "patient_nutrition_assessments"."patient_id") AND ("p"."user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))))));
 
 
 
@@ -4895,7 +4891,7 @@ ALTER TABLE "public"."patient_parental_consents" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."patients" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "patients_delete_own" ON "public"."patients" FOR DELETE TO "authenticated" USING ((("user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid")))));
+CREATE POLICY "patients_delete_own" ON "public"."patients" FOR DELETE TO "authenticated" USING ((("user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))));
 
 
 
@@ -4913,7 +4909,7 @@ CREATE POLICY "patients_select_own" ON "public"."patients" FOR SELECT TO "authen
 
 
 
-CREATE POLICY "patients_update_own" ON "public"."patients" FOR UPDATE TO "authenticated" USING ((("user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))))) WITH CHECK ((("user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid")))));
+CREATE POLICY "patients_update_own" ON "public"."patients" FOR UPDATE TO "authenticated" USING ((("user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")))) WITH CHECK ((("user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (NOT "public"."profile_lgpd_is_actively_blocked"(( SELECT "auth"."uid"() AS "uid"))) AND (( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id"))));
 
 
 
@@ -5082,8 +5078,6 @@ CREATE POLICY "team_members_delete_own" ON "public"."team_members" FOR DELETE TO
 
 
 CREATE POLICY "team_members_delete_workspace_managers" ON "public"."team_members" FOR DELETE TO "authenticated" USING ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND ((( SELECT "auth"."uid"() AS "uid") = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) OR (EXISTS ( SELECT 1
-   FROM "public"."team_members" "tm"
-  WHERE (("tm"."owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND ("tm"."member_user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("tm"."job_role" = 'gestao'::"text")))) OR (EXISTS ( SELECT 1
    FROM "public"."profiles" "pr"
   WHERE (("pr"."user_id" = ( SELECT "auth"."uid"() AS "uid")) AND ("pr"."role" = ANY (ARRAY['admin'::"text", 'super_admin'::"text"]))))))));
 
@@ -5105,7 +5099,6 @@ CREATE POLICY "team_members_update_self_profile_sync" ON "public"."team_members"
 
 
 
-CREATE POLICY "team_members_update_workspace_team" ON "public"."team_members" FOR UPDATE TO "authenticated" USING ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (( SELECT "auth"."uid"() AS "uid") IN ( SELECT "public"."workspace_member_user_ids"() AS "workspace_member_user_ids")))) WITH CHECK ((("owner_user_id" = ( SELECT "public"."workspace_account_owner_id"() AS "workspace_account_owner_id")) AND (( SELECT "auth"."uid"() AS "uid") IN ( SELECT "public"."workspace_member_user_ids"() AS "workspace_member_user_ids"))));
 
 
 

@@ -184,6 +184,12 @@ export async function ClientChecklistHistorySection({
     ? `/clientes/${clientId}/editar`
     : `/clientes/${clientId}/checklists`;
 
+  const singleEst = (estRows ?? []).length === 1 ? (estRows ?? [])[0] : null;
+  const applyEstId = estFilter ?? singleEst?.id ?? null;
+  const applyHref = applyEstId
+    ? `/checklists?est=${encodeURIComponent(applyEstId)}`
+    : "/checklists";
+
   function buildHref(params: Record<string, string | null>) {
     const base: Record<string, string> = {};
     if (embeddedInClientEdit) base.tab = "checklists";
@@ -342,14 +348,23 @@ export async function ClientChecklistHistorySection({
         </div>
       )}
 
-      <ChecklistHistoryFilters
-        establishments={estRows ?? []}
-        areas={areaRows ?? []}
-        currentEst={estFilter}
-        currentArea={areaFilter}
-        currentStatus={statusFilter}
-        baseHref={filtersBaseHref}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ChecklistHistoryFilters
+          establishments={estRows ?? []}
+          areas={areaRows ?? []}
+          currentEst={estFilter}
+          currentArea={areaFilter}
+          currentStatus={statusFilter}
+          baseHref={filtersBaseHref}
+        />
+        <Link
+          href={applyHref}
+          className={cn(buttonVariants({ size: "lg" }))}
+        >
+          <ClipboardList className="mr-1.5 h-4 w-4" />
+          Aplicar novo checklist
+        </Link>
+      </div>
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed p-10 text-center">
@@ -360,10 +375,11 @@ export async function ClientChecklistHistorySection({
               : "Nenhum checklist realizado ainda neste cliente."}
           </p>
           <Link
-            href="/checklists"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mt-4 inline-flex")}
+            href={applyHref}
+            className={cn(buttonVariants({ size: "sm" }), "mt-4 inline-flex")}
           >
-            Ir ao catálogo de checklists
+            <ClipboardList className="mr-1.5 h-4 w-4" />
+            Aplicar novo checklist
           </Link>
         </div>
       ) : (

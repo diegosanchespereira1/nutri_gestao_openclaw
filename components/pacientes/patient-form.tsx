@@ -34,6 +34,10 @@ export function PatientForm({
    *  Quando omitido, o formulário oferece seletor de cliente (opcional). */
   clientId,
   establishmentId,
+  /** Estabelecimentos do cliente PJ — quando fornecido exibe seletor visível (edit). */
+  establishments,
+  /** Mapa clientId → estabelecimentos (usado no selector de cliente em create). */
+  establishmentsByClient,
   /** Lista de clientes PJ disponíveis para o seletor (só relevante em create sem clientId fixo). */
   clients,
   teamMembers = [],
@@ -43,6 +47,8 @@ export function PatientForm({
   patientId?: string;
   clientId?: string | null;
   establishmentId?: string | null;
+  establishments?: { id: string; name: string }[];
+  establishmentsByClient?: Record<string, { id: string; name: string }[]>;
   clients?: Pick<ClientRow, "id" | "legal_name" | "trade_name">[];
   teamMembers?: TeamMemberSelectOption[];
   defaults: {
@@ -66,6 +72,21 @@ export function PatientForm({
   // Para o seletor de cliente no modo "independente"
   const showClientSelector = mode === "create" && clientId == null;
   const [selectedClientId, setSelectedClientId] = useState<string>("");
+  const [selectedClientEstId, setSelectedClientEstId] = useState<string>("");
+
+  // Estabelecimentos disponíveis para o cliente selecionado no selector
+  const clientEstablishments =
+    establishmentsByClient && selectedClientId
+      ? (establishmentsByClient[selectedClientId] ?? [])
+      : [];
+  const showClientEstSelector = clientEstablishments.length > 0;
+
+  // Seletor de estabelecimento — usado quando o cliente é PJ (edit mode)
+  const showEstablishmentSelector =
+    establishments != null && establishments.length > 0;
+  const [selectedEstId, setSelectedEstId] = useState<string>(
+    establishmentId ?? "",
+  );
 
   return (
     <form action={formAction} className="space-y-6">
@@ -76,7 +97,11 @@ export function PatientForm({
         // Seletor visível — o valor seleccionado vai como client_id
         <input type="hidden" name="client_id" value={selectedClientId} />
       ) : null}
-      {establishmentId ? (
+      {showEstablishmentSelector ? (
+        <input type="hidden" name="establishment_id" value={selectedEstId} />
+      ) : showClientEstSelector ? (
+        <input type="hidden" name="establishment_id" value={selectedClientEstId} />
+      ) : establishmentId ? (
         <input type="hidden" name="establishment_id" value={establishmentId} />
       ) : (
         <input type="hidden" name="establishment_id" value="" />
@@ -108,11 +133,12 @@ export function PatientForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="patient-birth">Data de nascimento</Label>
+            <Label htmlFor="patient-birth">Data de nascimento <span aria-hidden="true" className="text-destructive">*</span></Label>
             <Input
               id="patient-birth"
               name="birth_date"
               type="date"
+              required
               defaultValue={defaults.birth_date}
             />
           </div>
@@ -190,7 +216,10 @@ export function PatientForm({
               <select
                 id="patient-client"
                 value={selectedClientId}
-                onChange={(e) => setSelectedClientId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedClientId(e.target.value);
+                  setSelectedClientEstId("");
+                }}
                 className={cn(
                   selectClass,
                   selectedClientId === "" && "text-muted-foreground",
@@ -207,6 +236,64 @@ export function PatientForm({
               <p className="text-xs text-muted-foreground">
                 Pode associar ou alterar o cliente mais tarde.
               </p>
+            </div>
+
+            {showClientEstSelector ? (
+              <div className="space-y-2">
+                <Label htmlFor="patient-client-est">
+                  Estabelecimento <span aria-hidden="true" className="text-destructive">*</span>
+                </Label>
+                <select
+                  id="patient-client-est"
+                  value={selectedClientEstId}
+                  onChange={(e) => setSelectedClientEstId(e.target.value)}
+                  className={cn(
+                    selectClass,
+                    selectedClientEstId === "" && "text-muted-foreground",
+                  )}
+                  required
+                >
+                  <option value="">— Selecione o estabelecimento —</option>
+                  {clientEstablishments.map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+          </fieldset>
+          <div className="border-t border-border" />
+        </>
+      ) : null}
+
+      {/* ── Grupo 1c: Seletor de estabelecimento (cliente PJ) ─── */}
+      {showEstablishmentSelector ? (
+        <>
+          <fieldset className="space-y-4">
+            <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Estabelecimento
+            </legend>
+            <div className="space-y-2">
+              <Label htmlFor="patient-establishment">
+                Estabelecimento associado
+              </Label>
+              <select
+                id="patient-establishment"
+                value={selectedEstId}
+                onChange={(e) => setSelectedEstId(e.target.value)}
+                className={cn(
+                  selectClass,
+                  selectedEstId === "" && "text-muted-foreground",
+                )}
+              >
+                <option value="">— Selecione o estabelecimento —</option>
+                {establishments!.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </fieldset>
           <div className="border-t border-border" />

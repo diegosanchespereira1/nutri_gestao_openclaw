@@ -58,7 +58,7 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
 
   const { data: anchor, error: anchorErr } = await supabase
     .from("patients")
-    .select("id, full_name, document_id, client_id")
+    .select("id, full_name, document_id, client_id, user_id")
     .eq("id", patientId)
     .maybeSingle();
 
@@ -72,13 +72,9 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
     };
   }
 
-  const { data: clientRow } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", anchor.client_id)
-    .maybeSingle();
-
-  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
+  // Verifica propriedade directamente pelo user_id do paciente,
+  // funciona mesmo quando client_id é null (paciente independente).
+  if ((anchor as any).user_id !== workspaceOwnerId) {
     return {
       patientFullName: null,
       mergeByDocument: false,
@@ -94,21 +90,12 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
     .eq("owner_user_id", workspaceOwnerId);
 
   const clientIds = (myClients ?? []).map((c) => c.id);
-  if (clientIds.length === 0) {
-    return {
-      patientFullName: anchor.full_name,
-      mergeByDocument: false,
-      linkedPatientCount: 1,
-      documentOnFile: false,
-      events: [],
-    };
-  }
 
   const docDigits = onlyDigits(anchor.document_id ?? "");
   const documentOnFile = docDigits.length > 0;
   let patientIds: string[];
 
-  if (docDigits.length > 0) {
+  if (docDigits.length > 0 && clientIds.length > 0) {
     const { data: siblings } = await supabase
       .from("patients")
       .select("id")

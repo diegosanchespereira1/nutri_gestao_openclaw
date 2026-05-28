@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DeleteEstablishmentButton } from "@/components/clientes/delete-establishment-button";
@@ -5,6 +6,7 @@ import { EstablishmentChecklistHistorySection } from "@/components/clientes/esta
 import { EstablishmentComplianceDeadlinesSection } from "@/components/clientes/establishment-compliance-deadlines-section";
 import { EstablishmentForm } from "@/components/clientes/establishment-form";
 import { PatientsSection } from "@/components/pacientes/patients-section";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import {
@@ -19,6 +21,7 @@ import {
 } from "@/lib/actions/compliance-deadlines";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 
 export default async function EditarEstabelecimentoPage({
@@ -33,6 +36,9 @@ export default async function EditarEstabelecimentoPage({
   const blockedPatients =
     typeof sp.blocked === "string" ? sp.blocked === "patients" : false;
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
+  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
 
   const { data: client } = await supabase
     .from("clients")
@@ -137,10 +143,20 @@ export default async function EditarEstabelecimentoPage({
       {/* ── Seção 4: Pacientes ─────────────────────────────── */}
       <Card>
         <CardHeader className="border-b border-border pb-4">
-          <CardTitle className="text-base">Pacientes</CardTitle>
-          <CardDescription>
-            Pacientes vinculados a este estabelecimento.
-          </CardDescription>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Pacientes</CardTitle>
+              <CardDescription className="mt-1">
+                Pacientes vinculados a este estabelecimento.
+              </CardDescription>
+            </div>
+            <Link
+              href={`/clientes/${clientId}/estabelecimentos/${row.id}/pacientes`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Pacientes
+            </Link>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
           {blockedPatients ? (
@@ -159,21 +175,23 @@ export default async function EditarEstabelecimentoPage({
       </Card>
 
       {/* ── Seção 5: Zona de perigo ────────────────────────── */}
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
-        <h2 className="text-sm font-semibold text-destructive">
-          Zona de perigo
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Eliminar remove o estabelecimento permanentemente. Pacientes ou visitas
-          futuras deixarão de o referenciar.
-        </p>
-        <div className="mt-4">
-          <DeleteEstablishmentButton
-            establishmentId={row.id}
-            clientId={clientId}
-          />
+      {!isTeamMember ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
+          <h2 className="text-sm font-semibold text-destructive">
+            Zona de perigo
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Eliminar remove o estabelecimento permanentemente. Pacientes ou visitas
+            futuras deixarão de o referenciar.
+          </p>
+          <div className="mt-4">
+            <DeleteEstablishmentButton
+              establishmentId={row.id}
+              clientId={clientId}
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
     </PageLayout>
   );
 }

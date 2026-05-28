@@ -52,7 +52,7 @@ export function ChecklistHistoryFilters({
           // Limpar área ao trocar estabelecimento
           navigate(e.target.value || null, null, currentStatus);
         }}
-        className="h-9 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-9 max-w-[223px] rounded-lg border border-input bg-background px-2.5 text-sm text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Filtrar por estabelecimento"
       >
         <option value="">Todos os estabelecimentos</option>

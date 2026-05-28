@@ -17,3 +17,11 @@ export async function getWorkspaceAccountOwnerId(
   if (data?.owner_user_id) return data.owner_user_id as string;
   return authUserId;
 }
+
+/** Verdadeiro quando o utilizador autenticado é membro da equipa (não o titular). */
+export function isTeamMember(
+  authUserId: string,
+  workspaceOwnerId: string,
+): boolean {
+  return authUserId !== workspaceOwnerId;
+}

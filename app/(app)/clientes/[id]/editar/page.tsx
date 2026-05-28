@@ -35,6 +35,7 @@ import { todayKey } from "@/lib/datetime/calendar-tz";
 import { formatBRLFromCents } from "@/lib/dashboard/financial-pending";
 import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -134,6 +135,8 @@ export default async function EditarClientePage({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
+  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
   const tz = await fetchProfileTimeZone(supabase, user?.id ?? "");
   const tKey = todayKey(new Date(), tz);
   const { rows: chargesForClient } = await loadFinancialChargesForClient(
@@ -253,6 +256,7 @@ export default async function EditarClientePage({
               row.responsible_team_member_id ?? null
             }
             defaultEstName={estData?.name ?? ""}
+            defaultEstType={estData?.establishment_type ?? undefined}
             defaultEstAddressLine1={estData?.address_line1 ?? ""}
             defaultEstAddressLine2={estData?.address_line2 ?? ""}
             defaultEstCity={estData?.city ?? ""}
@@ -283,19 +287,23 @@ export default async function EditarClientePage({
             </>
           ) : null}
 
-          <Separator className="my-8" />
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
-            <h2 className="text-sm font-semibold text-destructive">
-              Zona de perigo
-            </h2>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Eliminar remove o cliente da sua carteira. Em versões futuras, dados
-              ligados (estabelecimentos, pacientes) podem restringir esta ação.
-            </p>
-            <div className="mt-3">
-              <DeleteClientButton clientId={row.id} />
-            </div>
-          </div>
+          {!isTeamMember ? (
+            <>
+              <Separator className="my-8" />
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <h2 className="text-sm font-semibold text-destructive">
+                  Zona de perigo
+                </h2>
+                <p className="text-muted-foreground mt-1 text-sm">
+                  Eliminar remove o cliente da sua carteira. Em versões futuras, dados
+                  ligados (estabelecimentos, pacientes) podem restringir esta ação.
+                </p>
+                <div className="mt-3">
+                  <DeleteClientButton clientId={row.id} />
+                </div>
+              </div>
+            </>
+          ) : null}
         </>
       ) : null}
 

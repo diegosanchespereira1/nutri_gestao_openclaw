@@ -10,9 +10,15 @@ import {
   type SkipOnboardingDetailsResult,
 } from "@/lib/actions/onboarding";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
-import { ESTABLISHMENT_TYPES, establishmentTypeLabel } from "@/lib/constants/establishment-types";
+import {
+  ESTABLISHMENT_CATEGORIES,
+  ESTABLISHMENT_TYPES_BY_CATEGORY,
+  categoryFromType,
+  establishmentCategoryLabel,
+  establishmentTypeLabel,
+} from "@/lib/constants/establishment-types";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
-import type { EstablishmentType } from "@/lib/types/establishments";
+import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -65,6 +71,8 @@ export function OnboardingWizard({ templates }: Props) {
   const [legalName, setLegalName] = useState("");
   const [documentId, setDocumentId] = useState("");
   const [establishmentName, setEstablishmentName] = useState("");
+  const [establishmentCategory, setEstablishmentCategory] =
+    useState<EstablishmentCategory>(categoryFromType("escola"));
   const [establishmentType, setEstablishmentType] =
     useState<EstablishmentType>("escola");
   const [addressLine1, setAddressLine1] = useState("");
@@ -239,6 +247,27 @@ export function OnboardingWizard({ templates }: Props) {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="onb-est-category">Categoria</Label>
+                <select
+                  id="onb-est-category"
+                  className={selectClassName}
+                  value={establishmentCategory}
+                  onChange={(e) => {
+                    const cat = e.target.value as EstablishmentCategory;
+                    setEstablishmentCategory(cat);
+                    setEstablishmentType(
+                      ESTABLISHMENT_TYPES_BY_CATEGORY[cat][0],
+                    );
+                  }}
+                >
+                  {ESTABLISHMENT_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {establishmentCategoryLabel[c]}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="onb-est-type">Tipo</Label>
                 <select
                   id="onb-est-type"
@@ -248,11 +277,13 @@ export function OnboardingWizard({ templates }: Props) {
                     setEstablishmentType(e.target.value as EstablishmentType)
                   }
                 >
-                  {ESTABLISHMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {establishmentTypeLabel[t]}
-                    </option>
-                  ))}
+                  {ESTABLISHMENT_TYPES_BY_CATEGORY[establishmentCategory].map(
+                    (t) => (
+                      <option key={t} value={t}>
+                        {establishmentTypeLabel[t]}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
               <div className="space-y-2">

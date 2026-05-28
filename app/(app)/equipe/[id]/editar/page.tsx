@@ -16,6 +16,8 @@ import {
   deleteTeamMemberAction,
   loadTeamMemberById,
 } from "@/lib/actions/team-members";
+import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
 
 const errMessages: Record<string, string> = {
   missing: "Preencha nome, área e cargo.",
@@ -34,6 +36,11 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
   const { err } = await searchParams;
   const { row } = await loadTeamMemberById(id);
   if (!row) notFound();
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
+  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
 
   const canRemoveMember = await canCurrentUserDeleteTeamMembers();
 
@@ -56,18 +63,26 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
         </div>
       ) : null}
 
+      {isTeamMember ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          Você não tem permissão para editar dados de membros da equipe. Apenas o administrador pode fazer isso.
+        </div>
+      ) : null}
+
       {/* ── Seção 1: Dados do membro ────────────────────────── */}
-      <Card>
-        <CardHeader className="border-b border-border pb-4">
-          <CardTitle className="text-base">Dados do membro</CardTitle>
-          <CardDescription>
-            Nome, contacto, área profissional e cargo na equipe.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="pt-6">
-          <TeamMemberForm mode="edit" initial={row} />
-        </CardContent>
-      </Card>
+      {!isTeamMember ? (
+        <Card>
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle className="text-base">Dados do membro</CardTitle>
+            <CardDescription>
+              Nome, contacto, área profissional e cargo na equipe.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <TeamMemberForm mode="edit" initial={row} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {canRemoveMember ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">

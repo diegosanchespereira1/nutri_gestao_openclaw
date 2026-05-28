@@ -5,7 +5,15 @@ export type EstablishmentType =
   | "hospital"
   | "clinica"
   | "lar_idosos"
+  | "restaurante"
+  | "frigorifico"
+  | "mercado"
+  | "cozinha_industrial"
   | "empresa";
+
+export type EstablishmentCategory =
+  | "atendimento_nutricional"
+  | "assessoria_alimentacao";
 
 export type EstablishmentRow = {
   id: string;

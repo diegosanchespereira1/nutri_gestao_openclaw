@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Saber Nutrir — Consultoria em Nutrição & Segurança Alimentar</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#5C7C14",
+        "primary-light": "#8EBF3F",
+        "primary-dark": "#3A5210",
+        "primary-glow": "#A8D45A",
+        accent: "#2E6B4E",
+        "accent-warm": "#D4920A",
+        surface: "#FAFCF8",
+        "surface-elevated": "#FFFFFF",
+        background: "#EEF5E6",
+        "on-surface": "#141A10",
+        "on-surface-muted": "#3D5035",
+        muted: "#5A6F52",
+        border: "#C8DEB8",
+        "border-subtle": "#E2F0D8",
+        inverse: "#0F1810",
+        "inverse-muted": "#B8D4A8",
+        success: "#2E7D52",
+        "chip-bg": "#E4F4D4",
+        "chip-text": "#3A5210"
+      },
+      borderRadius: { DEFAULT: "0.5rem", lg: "0.75rem", xl: "1rem", "2xl": "1.25rem", "3xl": "1.75rem", full: "9999px" },
+      spacing: { gutter: "24px", "section-gap": "96px", "stack-sm": "8px", "container-max": "1280px", "stack-lg": "32px", "stack-md": "16px" },
+      fontFamily: {
+        "body-lg": ["DM Sans"], "headline-md": ["Manrope"], "body-md": ["DM Sans"],
+        "headline-xl": ["Manrope"], "headline-lg": ["Manrope"], "label-sm": ["DM Sans"]
+      },
+      fontSize: {
+        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        "body-md": ["16px", { lineHeight: "26px", fontWeight: "400" }],
+        "headline-xl": ["52px", { lineHeight: "60px", letterSpacing: "-0.03em", fontWeight: "800" }],
+        "headline-lg": ["36px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "label-sm": ["13px", { lineHeight: "20px", letterSpacing: "0.06em", fontWeight: "600" }]
+      },
+      boxShadow: {
+        glow: "0 0 0 1px rgba(142,191,63,0.25), 0 8px 32px -8px rgba(92,124,20,0.3), 0 0 60px -16px rgba(168,212,90,0.4)",
+        "glow-lg": "0 0 0 1px rgba(142,191,63,0.35), 0 16px 48px -12px rgba(92,124,20,0.35), 0 0 80px -20px rgba(168,212,90,0.5)",
+        "glow-warm": "0 0 0 1px rgba(212,146,10,0.2), 0 8px 32px -8px rgba(212,146,10,0.25), 0 0 48px -12px rgba(232,168,56,0.3)"
+      }
+    }
+  }
+}
+</script>
+<style>
+:root {
+  --ds-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ds-duration-fast: 450ms;
+  --ds-duration-normal: 700ms;
+  --ds-duration-slow: 1000ms;
+  --ds-duration-cinematic: 1400ms;
+  --ds-translate-sm: 12px;
+  --ds-translate-md: 24px;
+  --ds-blur-subtle: 6px;
+  --ds-scale-from: 1.06;
+  --ds-stagger-step: 80ms;
+  --glow-green: rgba(142, 191, 63, 0.45);
+  --glow-green-soft: rgba(168, 212, 90, 0.25);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ds-animate, .ds-btn, .ds-text-link, .ds-nav-link, .ds-image-reveal img, .hero-orb { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; filter: none !important; }
+}
+/* Motion DS1 */
+.ds-animate { opacity: 0; will-change: opacity, transform, filter; }
+.ds-animate.is-visible { opacity: 1; }
+.ds-fade-in { transition: opacity var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-up { transform: translateY(var(--ds-translate-md)); filter: blur(var(--ds-blur-subtle)); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium), filter var(--ds-duration-slow) var(--ds-ease-out-soft); }
+.ds-fade-up.is-visible { transform: translateY(0); filter: blur(0); }
+.ds-fade-up-sm { transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium); }
+.ds-fade-up-sm.is-visible { transform: translateY(0); }
+.ds-fade-scale { transform: scale(0.96); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-scale.is-visible { transform: scale(1); }
+.ds-fade-left { transform: translateX(calc(var(--ds-translate-md) * -1)); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-left.is-visible { transform: translateX(0); }
+.ds-fade-right { transform: translateX(var(--ds-translate-md)); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-right.is-visible { transform: translateX(0); }
+.ds-delay-1 { transition-delay: calc(var(--ds-stagger-step) * 1); }
+.ds-delay-2 { transition-delay: calc(var(--ds-stagger-step) * 2); }
+.ds-delay-3 { transition-delay: calc(var(--ds-stagger-step) * 3); }
+.ds-delay-4 { transition-delay: calc(var(--ds-stagger-step) * 4); }
+.ds-delay-5 { transition-delay: calc(var(--ds-stagger-step) * 5); }
+.ds-nav-link { opacity: 0; transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium), color 200ms ease; }
+.ds-nav-link.is-visible { opacity: 1; transform: translateY(0); }
+.ds-image-reveal { overflow: hidden; position: relative; border-radius: 1.25rem; }
+.ds-image-reveal img { transform: scale(var(--ds-scale-from)); opacity: 0; transition: transform var(--ds-duration-cinematic) var(--ds-ease-premium), opacity var(--ds-duration-slow) var(--ds-ease-out-soft); }
+.ds-image-reveal.is-visible img { transform: scale(1); opacity: 1; }
+@keyframes ds-ken-burns { from { transform: scale(1.1); } to { transform: scale(1); } }
+.ds-hero-image img { animation: ds-ken-burns var(--ds-duration-cinematic) var(--ds-ease-out-soft) forwards; }
+.ds-btn { position: relative; overflow: hidden; isolation: isolate; opacity: 0; transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium), box-shadow 200ms ease, background-color 200ms ease; }
+.ds-btn.is-visible { opacity: 1; transform: translateY(0); }
+.ds-btn::before { content: ''; position: absolute; top: 0; left: -120%; width: 60%; height: 100%; background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%); transform: skewX(-20deg); transition: left 700ms var(--ds-ease-premium); z-index: 1; pointer-events: none; }
+.ds-btn:hover::before { left: 140%; }
+.ds-btn-primary { background: linear-gradient(135deg, #5C7C14 0%, #6B9418 50%, #8EBF3F 100%); box-shadow: 0 4px 24px -4px rgba(92,124,20,0.5), 0 0 40px -12px var(--glow-green-soft); }
+.ds-btn-primary:hover, .ds-btn-primary.is-visible:hover { transform: translateY(-3px); box-shadow: 0 8px 36px -6px rgba(92,124,20,0.55), 0 0 56px -8px var(--glow-green); }
+.ds-btn-ghost { background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.25); }
+.ds-btn-white { background: #fff; color: #3A5210; opacity: 0; box-shadow: 0 4px 24px -4px rgba(255,255,255,0.3); }
+.ds-btn-white.is-visible { opacity: 1; }
+.ds-btn-white:hover { transform: translateY(-3px); box-shadow: 0 8px 32px -6px rgba(255,255,255,0.4); }
+.ds-btn-outline { box-shadow: 0 2px 12px -4px rgba(92,124,20,0.15); }
+.ds-btn-outline:hover { box-shadow: 0 4px 20px -4px rgba(92,124,20,0.25); transform: translateY(-2px); }
+.ds-btn .ds-btn-icon { transition: transform 200ms var(--ds-ease-spring); }
+.ds-btn:hover .ds-btn-icon { transform: translateX(4px); }
+.ds-text-link { opacity: 0; transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium); }
+.ds-text-link.is-visible { opacity: 1; transform: translateY(0); }
+/* Glow cards */
+.glow-card { transition: transform 300ms var(--ds-ease-premium), box-shadow 300ms ease; }
+.glow-card:hover { transform: translateY(-6px); }
+.glow-card-green { box-shadow: 0 0 0 1px rgba(142,191,63,0.3), 0 8px 32px -8px rgba(92,124,20,0.28), 0 0 56px -16px rgba(168,212,90,0.35); }
+.glow-card-green:hover { box-shadow: 0 0 0 1px rgba(142,191,63,0.5), 0 16px 48px -12px rgba(92,124,20,0.38), 0 0 72px -12px rgba(168,212,90,0.5); }
+.glow-card-warm { box-shadow: 0 0 0 1px rgba(212,146,10,0.25), 0 8px 28px -8px rgba(212,146,10,0.22), 0 0 40px -14px rgba(232,168,56,0.28); }
+.glow-card-warm:hover { box-shadow: 0 0 0 1px rgba(212,146,10,0.4), 0 12px 40px -10px rgba(212,146,10,0.32), 0 0 60px -10px rgba(232,168,56,0.4); }
+.glow-card-static { box-shadow: 0 0 0 1px rgba(142,191,63,0.35), 0 12px 40px -10px rgba(92,124,20,0.32), 0 0 64px -16px rgba(168,212,90,0.42); }
+/* Hero */
+.hero-mesh { background: linear-gradient(145deg, #0F1810 0%, #1A2E14 35%, #2A4518 65%, #1E3312 100%); }
+.hero-orb { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(90px); }
+.hero-orb-1 { width: 480px; height: 480px; background: rgba(142,191,63,0.35); top: -10%; right: 5%; animation: orb-float 12s ease-in-out infinite; }
+.hero-orb-2 { width: 320px; height: 320px; background: rgba(46,107,78,0.4); bottom: 10%; left: 30%; animation: orb-float 10s ease-in-out infinite reverse; }
+.hero-orb-3 { width: 200px; height: 200px; background: rgba(212,146,10,0.2); top: 40%; right: 35%; animation: orb-float 8s ease-in-out infinite 2s; }
+@keyframes orb-float { 0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; } 50% { transform: translate(20px, -30px) scale(1.08); opacity: 1; } }
+.glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); }
+.glass-light { background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); border: 1px solid rgba(200,222,184,0.6); }
+.grid-pattern { background-image: linear-gradient(rgba(92,124,20,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(92,124,20,0.04) 1px, transparent 1px); background-size: 40px 40px; }
+.text-gradient { background: linear-gradient(135deg, #A8D45A 0%, #8EBF3F 40%, #D4E896 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.header-glass { background: rgba(250,252,248,0.85); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(200,222,184,0.5); }
+</style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased selection:bg-primary-light selection:text-primary-dark">
+
+<!-- Header -->
+<header class="header-glass sticky top-0 z-50">
+<div class="flex justify-between items-center w-full px-gutter max-w-container-max mx-auto h-[72px]">
+<a class="ds-animate ds-fade-up-sm flex items-center gap-3 group" data-ds-immediate href="#">
+<div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center text-white shadow-glow group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1">restaurant</span>
+</div>
+<div>
+<span class="font-headline-md text-[20px] text-primary-dark tracking-tight leading-none block">Saber Nutrir</span>
+<span class="text-[10px] text-muted uppercase tracking-[0.15em] leading-none mt-0.5 block">Segurança Alimentar & Consultoria</span>
+</div>
+</a>
+<nav class="hidden lg:flex items-center gap-7" data-ds-immediate data-ds-stagger="nav-link">
+<a class="text-primary font-label-sm text-label-sm border-b-2 border-primary pb-0.5" href="#">Início</a>
+<a class="text-on-surface-muted hover:text-primary transition-colors font-label-sm text-label-sm" href="#servicos">Serviços</a>
+<a class="text-on-surface-muted hover:text-primary transition-colors font-label-sm text-label-sm" href="#sobre">Sobre</a>
+<a class="text-on-surface-muted hover:text-primary transition-colors font-label-sm text-label-sm" href="#restaurantes">Restaurantes</a>
+<a class="text-on-surface-muted hover:text-primary transition-colors font-label-sm text-label-sm" href="#contato">Contato</a>
+</nav>
+<a class="ds-btn ds-btn-primary ds-animate ds-fade-up-sm ds-delay-5 hidden lg:inline-flex items-center justify-center px-6 py-2.5 rounded-full text-white font-label-sm text-label-sm" data-ds-immediate href="#contato">
+Diagnóstico gratuito
+</a>
+<button class="ds-animate ds-fade-in lg:hidden p-2 rounded-xl hover:bg-background transition-colors" data-ds-immediate aria-label="Menu">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</header>
+
+<main>
+<!-- Hero -->
+<section class="hero-mesh relative min-h-[92vh] flex items-center overflow-hidden">
+<div class="hero-orb hero-orb-1"></div>
+<div class="hero-orb hero-orb-2"></div>
+<div class="hero-orb hero-orb-3"></div>
+<div class="absolute inset-0 ds-hero-image opacity-30">
+<img alt="Cozinha profissional de restaurante com ingredientes frescos" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDT3reRSKw6HJJYXpPXd1xRRZ_iIjWwhMUBtgf6lOrNdrd0eSvQlMP0lBO5j2u1ELUtO6RPjcHq8rNrPX3Z-VLI5v9XBqPsLvXdoOd6w8tTksRzsAsPNgv6XEJ5FtSU33Mrj1WZmEpljsyCd-5teod8FdcIwH6YpizlU_BB2OdG5qpzkBcewzI4vUqzb79xx2kcX56v4RUBUJtFXzRkA1Unb2lcczyL43xfv3Uy369dVlhqZIOIKXpaMA95bddRlJdoVbNxR6VVDUvZ"/>
+</div>
+<div class="absolute inset-0 bg-gradient-to-r from-inverse via-inverse/80 to-transparent"></div>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse/60 via-transparent to-transparent"></div>
+
+<div class="relative z-10 w-full max-w-container-max mx-auto px-gutter py-24 lg:py-28">
+<div class="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+<!-- Left -->
+<div class="lg:col-span-7 flex flex-col gap-6">
+<div class="ds-animate ds-fade-up-sm ds-delay-1 inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass text-primary-glow font-label-sm text-label-sm uppercase tracking-wider w-fit" data-ds-immediate>
+<span class="w-2 h-2 rounded-full bg-primary-glow animate-pulse"></span>
+Consultoria para Restaurantes & Cozinhas
+</div>
+<h1 class="ds-animate ds-fade-up ds-delay-2 font-headline-xl text-[40px] lg:text-headline-xl text-white leading-[1.1]" data-ds-immediate>
+Seu restaurante em<br/>
+<span class="text-gradient">conformidade total</span><br/>
+com ANVISA e CRN-3
+</h1>
+<p class="ds-animate ds-fade-up ds-delay-3 font-body-lg text-body-lg text-inverse-muted max-w-xl" data-ds-immediate>
+Responsabilidade técnica, POPs, treinamento de equipe e auditorias sanitárias. Proteja sua operação, sua marca e seus clientes com quem entende de nutrição e segurança alimentar.
+</p>
+<div class="ds-animate ds-fade-up-sm ds-delay-4 flex flex-wrap gap-3 mt-2" data-ds-immediate data-ds-stagger="fade-up-sm">
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-medium border border-white/15"><span class="material-symbols-outlined text-[14px] text-primary-glow">verified</span> ANVISA</span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-medium border border-white/15"><span class="material-symbols-outlined text-[14px] text-primary-glow">badge</span> CRN-3</span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-white/90 text-xs font-medium border border-white/15"><span class="material-symbols-outlined text-[14px] text-primary-glow">restaurant</span> +200 Restaurantes</span>
+</div>
+<div class="flex flex-wrap gap-4 mt-4">
+<a class="ds-btn ds-btn-primary ds-animate ds-fade-up-sm ds-delay-5 inline-flex items-center justify-center px-8 py-4 rounded-full text-white font-label-sm text-label-sm" data-ds-immediate href="#contato">
+Solicitar diagnóstico
+<span class="material-symbols-outlined ml-2 ds-btn-icon text-[20px]">arrow_forward</span>
+</a>
+<a class="ds-btn ds-btn-ghost ds-animate ds-fade-up-sm ds-delay-6 inline-flex items-center justify-center px-8 py-4 rounded-full text-white font-label-sm text-label-sm" data-ds-immediate href="#servicos">
+Ver serviços
+</a>
+</div>
+</div>
+
+<!-- Right — floating cards -->
+<div class="lg:col-span-5 relative hidden lg:block">
+<div class="ds-animate ds-fade-right ds-delay-3 relative" data-ds-immediate>
+<div class="ds-image-reveal rounded-3xl aspect-[4/5] glow-card-static overflow-hidden mb-4" data-ds-immediate>
+<img alt="Nutricionista auditando cozinha de restaurante" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzt-zzxBmUUthcKN7UVyPPrd9beUUbI3WCEHlXnsvhUAEb6zCaH6CHMx_sAhSQ7uroorTtqA772Sa5cFiIbqMQRqmJD4TdKVPVgE7_NrlULkDFObswvSjmraR3sGBoM_y5wKxHHso_JVQpcRmMzCEBKnUt9Zlb8rUbFMVUvFiS57Dj7_U05q3PqEruzoWutE6PWujZ1vmC1wZRlKHTqCkT1DRTLpC492pE9NQb4SttWNd4VAEhGdh_cgJe2LAGcVeXECyqhzZ8hF4R"/>
+<div class="absolute inset-0 bg-gradient-to-t from-inverse/70 via-transparent to-transparent"></div>
+<div class="absolute bottom-5 left-5 right-5 glass rounded-2xl p-4">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-primary-light/20 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary-glow">fact_check</span>
+</div>
+<div>
+<p class="text-white text-sm font-semibold">Auditoria em campo</p>
+<p class="text-white/60 text-xs">Checklist completo ANVISA</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Floating stat cards -->
+<div class="absolute -left-8 top-8 glass-light rounded-2xl p-4 glow-card-green glow-card min-w-[160px]">
+<p class="text-primary-dark font-headline-lg text-[28px] leading-none font-bold">+10</p>
+<p class="text-muted text-xs uppercase tracking-wider mt-1">Anos de mercado</p>
+</div>
+<div class="absolute -right-6 bottom-24 glass-light rounded-2xl p-4 glow-card-warm glow-card min-w-[160px]">
+<p class="text-accent-warm font-headline-lg text-[28px] leading-none font-bold">100%</p>
+<p class="text-muted text-xs uppercase tracking-wider mt-1">Conformidade legal</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Hero stats bar -->
+<div class="relative z-10 border-t border-white/10 bg-white/5 backdrop-blur-md">
+<div class="max-w-container-max mx-auto px-gutter py-5 grid grid-cols-2 md:grid-cols-4 gap-6" data-ds-immediate data-ds-stagger="fade-up-sm">
+<div class="text-center md:text-left"><p class="text-primary-glow font-bold text-2xl">+3.500</p><p class="text-white/50 text-xs uppercase tracking-wider">Operações assessoradas</p></div>
+<div class="text-center md:text-left"><p class="text-primary-glow font-bold text-2xl">+15</p><p class="text-white/50 text-xs uppercase tracking-wider">Nutricionistas CRN</p></div>
+<div class="text-center md:text-left"><p class="text-primary-glow font-bold text-2xl">+200</p><p class="text-white/50 text-xs uppercase tracking-wider">Restaurantes ativos</p></div>
+<div class="text-center md:text-left"><p class="text-primary-glow font-bold text-2xl">24h</p><p class="text-white/50 text-xs uppercase tracking-wider">Suporte emergencial</p></div>
+</div>
+</div>
+</section>
+
+<!-- Trust strip -->
+<section class="py-8 bg-surface-elevated border-b border-border-subtle">
+<div class="max-w-container-max mx-auto px-gutter flex flex-wrap items-center justify-center gap-8 md:gap-16 opacity-80" data-ds-animate data-ds-stagger="fade-up-sm">
+<div class="flex items-center gap-2 text-on-surface-muted"><span class="material-symbols-outlined text-primary">shield</span><span class="text-sm font-medium">Vigilância Sanitária</span></div>
+<div class="flex items-center gap-2 text-on-surface-muted"><span class="material-symbols-outlined text-primary">restaurant</span><span class="text-sm font-medium">Restaurantes & Bares</span></div>
+<div class="flex items-center gap-2 text-on-surface-muted"><span class="material-symbols-outlined text-primary">factory</span><span class="text-sm font-medium">Cozinhas Industriais</span></div>
+<div class="flex items-center gap-2 text-on-surface-muted"><span class="material-symbols-outlined text-primary">school</span><span class="text-sm font-medium">Treinamentos POP</span></div>
+</div>
+</section>
+
+<!-- About -->
+<section class="py-section-gap bg-surface grid-pattern relative" id="sobre">
+<div class="max-w-container-max mx-auto px-gutter">
+<div class="grid lg:grid-cols-2 gap-16 items-center">
+<div class="flex flex-col gap-stack-md">
+<span class="ds-animate ds-fade-up-sm inline-block px-3 py-1 rounded-full bg-chip-bg text-chip-text font-label-sm text-label-sm uppercase tracking-wider w-fit" data-ds-animate>Quem Somos</span>
+<h2 class="ds-animate ds-fade-up ds-delay-1 font-headline-lg text-headline-lg text-on-surface" data-ds-animate>Especialistas em nutrição para quem alimenta o Brasil</h2>
+<p class="ds-animate ds-fade-up ds-delay-2 font-body-lg text-body-lg text-on-surface-muted leading-relaxed" data-ds-animate>
+Há mais de 10 anos, a Saber Nutrir assessora restaurantes, cozinhas industriais e instituições na adequação às normas da ANVISA e CRN-3. Do cardápio balanceado ao manual de boas práticas — cuidamos de cada detalhe da sua operação alimentar.
+</p>
+<div class="grid grid-cols-2 gap-4 mt-4">
+<div class="ds-animate ds-fade-scale ds-delay-3 bg-surface-elevated rounded-2xl p-5 border border-border-subtle glow-card glow-card-green" data-ds-animate>
+<span class="material-symbols-outlined text-primary text-2xl mb-2">gavel</span>
+<p class="font-semibold text-on-surface text-sm">Conformidade Legal</p>
+<p class="text-muted text-xs mt-1">RT perante CRN e Vigilância</p>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-4 bg-surface-elevated rounded-2xl p-5 border border-border-subtle glow-card glow-card-warm" data-ds-animate>
+<span class="material-symbols-outlined text-accent-warm text-2xl mb-2">skillet</span>
+<p class="font-semibold text-on-surface text-sm">Operação Segura</p>
+<p class="text-muted text-xs mt-1">POPs e treinamentos práticos</p>
+</div>
+</div>
+<a class="ds-text-link ds-animate ds-delay-5 inline-flex items-center gap-2 text-primary font-label-sm text-label-sm uppercase mt-4 group" data-ds-animate href="#">
+Nossa história <span class="material-symbols-outlined ds-btn-icon text-[18px]">east</span>
+</a>
+</div>
+<div class="relative grid grid-cols-2 gap-4">
+<div class="ds-image-reveal col-span-2 sm:col-span-1 rounded-3xl aspect-[4/5]" data-ds-animate>
+<img alt="Nutricionista em consultoria" class="w-full h-full object-cover rounded-3xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzt-zzxBmUUthcKN7UVyPPrd9beUUbI3WCEHlXnsvhUAEb6zCaH6CHMx_sAhSQ7uroorTtqA772Sa5cFiIbqMQRqmJD4TdKVPVgE7_NrlULkDFObswvSjmraR3sGBoM_y5wKxHHso_JVQpcRmMzCEBKnUt9Zlb8rUbFMVUvFiS57Dj7_U05q3PqEruzoWutE6PWujZ1vmC1wZRlKHTqCkT1DRTLpC492pE9NQb4SttWNd4VAEhGdh_cgJe2LAGcVeXECyqhzZ8hF4R"/>
+</div>
+<div class="col-span-2 sm:col-span-1 flex flex-col gap-4">
+<div class="ds-animate ds-fade-scale ds-delay-1 bg-gradient-to-br from-primary to-primary-light p-6 rounded-3xl text-white glow-card-static flex flex-col gap-2 h-full justify-center" data-ds-animate>
+<span class="material-symbols-outlined text-3xl opacity-80">groups</span>
+<p class="font-bold text-4xl">+3.500</p>
+<p class="text-white/80 text-xs uppercase tracking-wider">Clientes atendidos</p>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-2 bg-surface-elevated p-6 rounded-3xl border border-border glow-card glow-card-green flex flex-col gap-2 h-full justify-center" data-ds-animate>
+<span class="material-symbols-outlined text-primary text-3xl">medical_services</span>
+<p class="font-bold text-4xl text-primary">+15</p>
+<p class="text-muted text-xs uppercase tracking-wider">Nutricionistas CRN</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Services -->
+<section class="py-section-gap bg-background relative" id="servicos">
+<div class="max-w-container-max mx-auto px-gutter">
+<div class="text-center max-w-2xl mx-auto mb-16">
+<span class="ds-animate ds-fade-up-sm inline-block px-3 py-1 rounded-full bg-chip-bg text-chip-text font-label-sm text-label-sm uppercase tracking-wider mb-4" data-ds-animate>Serviços</span>
+<h2 class="ds-animate ds-fade-up ds-delay-1 font-headline-lg text-headline-lg text-on-surface" data-ds-animate>Soluções completas para restaurantes</h2>
+<p class="ds-animate ds-fade-up ds-delay-2 font-body-md text-body-md text-on-surface-muted mt-4" data-ds-animate>Do diagnóstico inicial à manutenção contínua — tudo que seu estabelecimento precisa para operar com segurança.</p>
+</div>
+<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+<!-- Featured glow card -->
+<div class="ds-animate ds-fade-scale lg:col-span-1 bg-gradient-to-br from-primary-dark via-primary to-primary-light p-stack-lg rounded-3xl text-white glow-card-static glow-card flex flex-col gap-4 relative overflow-hidden" data-ds-animate>
+<div class="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10 blur-2xl"></div>
+<div class="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center relative z-10">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings:'FILL' 1">verified_user</span>
+</div>
+<span class="text-primary-glow text-xs font-bold uppercase tracking-widest relative z-10">Mais solicitado</span>
+<h3 class="font-headline-md text-[22px] leading-tight relative z-10">Responsabilidade Técnica</h3>
+<p class="text-white/80 text-body-md flex-grow relative z-10">RT perante Vigilância Sanitária e CRN-3. Conformidade legal garantida para restaurantes e cozinhas.</p>
+<a class="inline-flex items-center gap-1 text-primary-glow text-sm font-semibold relative z-10 mt-2 group" href="#contato">Solicitar RT <span class="material-symbols-outlined text-[16px] group-hover:translate-x-1 transition-transform">arrow_forward</span></a>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-1 bg-surface-elevated p-stack-lg rounded-3xl border border-border glow-card glow-card-green flex flex-col gap-4" data-ds-animate>
+<div class="w-14 h-14 rounded-2xl bg-background flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[28px]" style="font-variation-settings:'FILL' 1">restaurant_menu</span></div>
+<h3 class="font-headline-md text-[20px] text-on-surface">Segurança Alimentar</h3>
+<p class="text-on-surface-muted text-body-md flex-grow">Manuais de BPF, POPs e controle de pontos críticos para cozinhas de restaurantes.</p>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-2 bg-surface-elevated p-stack-lg rounded-3xl border border-border glow-card glow-card-green flex flex-col gap-4" data-ds-animate>
+<div class="w-14 h-14 rounded-2xl bg-background flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[28px]" style="font-variation-settings:'FILL' 1">group_add</span></div>
+<h3 class="font-headline-md text-[20px] text-on-surface">Treinamento de Equipe</h3>
+<p class="text-on-surface-muted text-body-md flex-grow">Capacitação periódica para manipuladores — higiene, temperatura e fluxo de produção.</p>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-3 bg-surface-elevated p-stack-lg rounded-3xl border border-border glow-card flex flex-col gap-4" data-ds-animate>
+<div class="w-14 h-14 rounded-2xl bg-background flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[28px]" style="font-variation-settings:'FILL' 1">fact_check</span></div>
+<h3 class="font-headline-md text-[20px] text-on-surface">Auditoria Sanitária</h3>
+<p class="text-on-surface-muted text-body-md flex-grow">Diagnóstico completo com relatório de não-conformidades e plano de ação prioritário.</p>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-4 bg-surface-elevated p-stack-lg rounded-3xl border border-border glow-card glow-card-warm flex flex-col gap-4" data-ds-animate>
+<div class="w-14 h-14 rounded-2xl bg-background flex items-center justify-center text-accent-warm"><span class="material-symbols-outlined text-[28px]" style="font-variation-settings:'FILL' 1">skillet</span></div>
+<h3 class="font-headline-md text-[20px] text-on-surface">Oficina Culinária</h3>
+<p class="text-on-surface-muted text-body-md flex-grow">Receitas saudáveis, ficha técnica e padronização de preparo para cardápio equilibrado.</p>
+</div>
+<div class="ds-animate ds-fade-scale ds-delay-5 bg-surface-elevated p-stack-lg rounded-3xl border border-border glow-card flex flex-col gap-4" data-ds-animate>
+<div class="w-14 h-14 rounded-2xl bg-background flex items-center justify-center text-primary"><span class="material-symbols-outlined text-[28px]" style="font-variation-settings:'FILL' 1">school</span></div>
+<h3 class="font-headline-md text-[20px] text-on-surface">Educação Nutricional</h3>
+<p class="text-on-surface-muted text-body-md flex-grow">Programas de conscientização alimentar para colaboradores e clientes do estabelecimento.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- Process for restaurants -->
+<section class="py-section-gap bg-surface grid-pattern" id="restaurantes">
+<div class="max-w-container-max mx-auto px-gutter">
+<div class="text-center max-w-xl mx-auto mb-14">
+<h2 class="ds-animate ds-fade-up font-headline-lg text-headline-lg text-on-surface" data-ds-animate>Como funciona para o seu restaurante</h2>
+<p class="ds-animate ds-fade-up ds-delay-1 text-on-surface-muted mt-3" data-ds-animate>Processo claro, rápido e sem interromper sua operação.</p>
+</div>
+<div class="grid md:grid-cols-4 gap-6" data-ds-animate data-ds-stagger="fade-up">
+<div class="relative bg-surface-elevated rounded-3xl p-6 border border-border-subtle text-center glow-card glow-card-green">
+<div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary font-bold text-lg flex items-center justify-center mx-auto mb-4">1</div>
+<h3 class="font-semibold text-on-surface mb-2">Diagnóstico</h3>
+<p class="text-muted text-sm">Visita técnica e mapeamento de riscos na sua cozinha.</p>
+</div>
+<div class="relative bg-surface-elevated rounded-3xl p-6 border border-border-subtle text-center glow-card glow-card-green">
+<div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary font-bold text-lg flex items-center justify-center mx-auto mb-4">2</div>
+<h3 class="font-semibold text-on-surface mb-2">Plano de Ação</h3>
+<p class="text-muted text-sm">Relatório com prioridades e prazos de adequação.</p>
+</div>
+<div class="relative bg-surface-elevated rounded-3xl p-6 border border-border-subtle text-center glow-card glow-card-warm">
+<div class="w-12 h-12 rounded-2xl bg-accent-warm/10 text-accent-warm font-bold text-lg flex items-center justify-center mx-auto mb-4">3</div>
+<h3 class="font-semibold text-on-surface mb-2">Implementação</h3>
+<p class="text-muted text-sm">POPs, treinamentos e documentação completa.</p>
+</div>
+<div class="relative bg-gradient-to-br from-primary to-primary-light rounded-3xl p-6 text-center text-white glow-card-static">
+<div class="w-12 h-12 rounded-2xl bg-white/15 font-bold text-lg flex items-center justify-center mx-auto mb-4">4</div>
+<h3 class="font-semibold mb-2">Conformidade</h3>
+<p class="text-white/80 text-sm">RT ativa e acompanhamento contínuo da operação.</p>
+</div>
+</div>
+</div>
+</section>
+
+<!-- CTA -->
+<section class="py-section-gap bg-background relative overflow-hidden" id="saude">
+<div class="hero-orb hero-orb-1 opacity-30 !w-64 !h-64 !top-auto !bottom-0 !right-1/4"></div>
+<div class="max-w-container-max mx-auto px-gutter relative z-10">
+<div class="ds-animate ds-fade-scale bg-gradient-to-br from-primary-dark via-primary to-accent rounded-3xl p-10 md:p-16 glow-card-static relative overflow-hidden" data-ds-animate>
+<div class="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg width=\"60\" height=\"60\" viewBox=\"0 0 60 60\" xmlns=\"http://www.w3.org/2000/svg\"%3E%3Cg fill=\"none\" fill-rule=\"evenodd\"%3E%3Cg fill=\"%23ffffff\" fill-opacity=\"0.04\"%3E%3Cpath d=\"M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')] opacity-50"></div>
+<div class="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
+<div class="flex-1 space-y-4 text-center md:text-left">
+<h2 class="ds-animate ds-fade-up font-headline-lg text-headline-lg text-white" data-ds-animate>Seu restaurante pronto para a fiscalização?</h2>
+<p class="ds-animate ds-fade-up ds-delay-1 text-white/80 font-body-lg max-w-xl" data-ds-animate>
+Agende um diagnóstico gratuito. Nossa equipe avalia sua operação e apresenta um plano de adequação personalizado — sem compromisso.
+</p>
+</div>
+<a class="ds-btn ds-btn-white ds-animate ds-fade-up-sm ds-delay-2 inline-flex items-center justify-center px-8 py-4 rounded-full font-label-sm text-label-sm shrink-0" data-ds-animate href="https://wa.me/5511994946440" rel="noopener" target="_blank">
+<span class="material-symbols-outlined mr-2 ds-btn-icon">chat</span>
+Falar com Consultor
+</a>
+</div>
+</div>
+</div>
+</section>
+</main>
+
+<!-- Footer -->
+<footer class="bg-inverse text-inverse-muted py-stack-lg" id="contato">
+<div class="max-w-container-max mx-auto px-gutter grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-lg" data-ds-animate data-ds-stagger="fade-up">
+<div class="flex flex-col gap-4" data-ds-stagger="fade-up-sm">
+<a class="flex items-center gap-2" href="#">
+<div class="w-9 h-9 rounded-xl bg-primary-light flex items-center justify-center text-primary-dark">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings:'FILL' 1">restaurant</span>
+</div>
+<span class="font-headline-md text-white tracking-tight">Saber Nutrir</span>
+</a>
+<p class="text-sm text-inverse-muted/70 max-w-xs">Consultoria em nutrição e segurança alimentar para restaurantes, cozinhas industriais e instituições.</p>
+</div>
+<div class="flex flex-col gap-4" data-ds-stagger="fade-up-sm">
+<h4 class="font-label-sm text-label-sm text-white uppercase tracking-widest">Contato</h4>
+<ul class="flex flex-col gap-3 text-sm" data-ds-stagger="fade-up-sm">
+<li class="flex items-start gap-2"><span class="material-symbols-outlined text-primary-glow text-[18px] shrink-0">location_on</span>Rua Maria Abadia dos Santos, 107</li>
+<li class="flex items-center gap-2"><span class="material-symbols-outlined text-primary-glow text-[18px] shrink-0">mail</span><a class="hover:text-primary-glow transition-colors" href="mailto:sabernutrir@sabernutrir.com.br">sabernutrir@sabernutrir.com.br</a></li>
+<li><a class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/15 transition-colors border border-white/10" href="https://wa.me/5511994946440"><span class="material-symbols-outlined text-[16px]">calendar_month</span>Agendar visita</a></li>
+</ul>
+</div>
+<div class="flex flex-col gap-4" data-ds-stagger="fade-up-sm">
+<h4 class="font-label-sm text-label-sm text-white uppercase tracking-widest">Institucional</h4>
+<nav class="flex flex-col gap-2 text-sm" data-ds-stagger="fade-up-sm">
+<a class="hover:text-primary-glow transition-colors" href="#">Privacidade</a>
+<a class="hover:text-primary-glow transition-colors" href="#">Termos</a>
+<a class="hover:text-primary-glow transition-colors" href="#">Cookies</a>
+</nav>
+</div>
+<div class="flex flex-col gap-4 lg:items-end" data-ds-stagger="fade-up-sm">
+<div class="bg-white/8 border border-white/10 rounded-2xl p-4 inline-flex items-center gap-3 glow-card-green">
+<span class="material-symbols-outlined text-3xl text-primary-glow" style="font-variation-settings:'FILL' 1">assignment_turned_in</span>
+<div>
+<p class="text-white text-sm font-bold">CRN-3 Ativo</p>
+<p class="text-inverse-muted/60 text-xs">Adequação ANVISA</p>
+</div>
+</div>
+</div>
+</div>
+<div class="max-w-container-max mx-auto px-gutter mt-12 pt-8 border-t border-white/10">
+<p class="ds-animate ds-fade-in text-sm text-inverse-muted/50 text-center md:text-left" data-ds-animate>© 2024 Saber Nutrir. Consultoria Nutricional. Todos os direitos reservados.</p>
+</div>
+</footer>
+
+<script>
+(function DS1Motion() {
+  var STAGGER_MS = 80;
+  var motionTypes = { 'fade-in':'ds-fade-in','fade-up':'ds-fade-up','fade-up-sm':'ds-fade-up-sm','fade-scale':'ds-fade-scale','fade-left':'ds-fade-left','fade-right':'ds-fade-right','nav-link':'ds-nav-link' };
+  function revealElement(el, d) { setTimeout(function(){ el.classList.add('is-visible'); el.querySelectorAll('.ds-btn').forEach(function(b){ b.classList.add('is-visible'); }); }, d||0); }
+  function revealStaggerGroup(g, base) {
+    Array.from(g.children).filter(function(c){ return c.nodeType===1 && !c.hasAttribute('data-ds-stagger-skip'); }).forEach(function(c,i){
+      var cd = (base||0)+i*STAGGER_MS; revealElement(c,cd);
+      if (c.hasAttribute('data-ds-stagger')) revealStaggerGroup(c, cd+100);
+    });
+  }
+  function initStaggerGroup(g) {
+    var mc = motionTypes[g.dataset.dsStagger||'fade-up-sm']||'ds-fade-up-sm';
+    Array.from(g.children).forEach(function(c,i){ if(c.nodeType!==1||c.hasAttribute('data-ds-stagger-skip')) return; c.classList.add('ds-animate',mc); if(i>0&&i<=6) c.classList.add('ds-delay-'+i); });
+  }
+  document.querySelectorAll('[data-ds-stagger]').forEach(initStaggerGroup);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.ds-animate,.ds-btn,.ds-text-link,.ds-nav-link').forEach(function(el){ el.classList.add('is-visible'); }); return;
+  }
+  document.querySelectorAll('[data-ds-immediate]').forEach(function(el){
+    if(el.hasAttribute('data-ds-stagger')) revealStaggerGroup(el,STAGGER_MS);
+    else { var dm=Array.from(el.classList).find(function(c){return c.indexOf('ds-delay-')===0;}); revealElement(el,dm?parseInt(dm.replace('ds-delay-',''),10)*STAGGER_MS:0); }
+  });
+  document.querySelectorAll('[data-ds-immediate].ds-image-reveal').forEach(function(el){ revealElement(el, 500); });
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(!e.isIntersecting) return; var t=e.target;
+      if(t.hasAttribute('data-ds-stagger')) revealStaggerGroup(t,0);
+      else revealElement(t, parseInt(t.dataset.dsDelay||'0',10)*STAGGER_MS);
+      obs.unobserve(t);
+    });
+  },{threshold:0.08,rootMargin:'0px 0px -32px 0px'});
+  document.querySelectorAll('[data-ds-animate]').forEach(function(el){ obs.observe(el); });
+  document.querySelectorAll('a[href^="#"]').forEach(function(a){
+    a.addEventListener('click',function(e){ var id=a.getAttribute('href'); if(!id||id==='#') return; var s=document.querySelector(id); if(!s) return; e.preventDefault(); s.scrollIntoView({behavior:'smooth',block:'start'}); });
+  });
+})();
+</script>
+</body>
+</html>

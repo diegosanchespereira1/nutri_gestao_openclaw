@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 
 import { DeletePatientButton } from "@/components/pacientes/delete-patient-button";
 import { NutritionAssessmentsSection } from "@/components/pacientes/nutrition-assessments-section";
+import { PatientClientCard } from "@/components/pacientes/patient-client-card";
+import { PatientEstablishmentCard } from "@/components/pacientes/patient-establishment-card";
 import { PatientForm } from "@/components/pacientes/patient-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -16,6 +18,10 @@ import {
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadPatientById } from "@/lib/actions/patients";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
+import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
+import { loadClientsForOwner } from "@/lib/actions/clients";
+import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 
 export default async function EditarPacientePage({
@@ -32,11 +38,45 @@ export default async function EditarPacientePage({
   const avaliacaoAdultoOk =
     typeof sp.avaliacao_adulto === "string" && sp.avaliacao_adulto === "ok";
 
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
+  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
+
   const [{ row }, teamMembers] = await Promise.all([
     loadPatientById(id),
     loadTeamMembersForSelect(),
   ]);
   if (!row) notFound();
+
+  // Carrega kind do cliente e estabelecimentos (só relevante para PJ)
+  let clientKind: string | null = null;
+  let establishments: { id: string; name: string }[] = [];
+  let pjClients: { id: string; legal_name: string; trade_name: string | null }[] = [];
+
+  if (row.client_id) {
+    const [{ data: clientRow }, { rows: estRows }] = await Promise.all([
+      supabase
+        .from("clients")
+        .select("kind")
+        .eq("id", row.client_id)
+        .maybeSingle(),
+      loadEstablishmentsForClient(row.client_id),
+    ]);
+    clientKind = clientRow?.kind ?? null;
+    establishments = estRows.map((e) => ({ id: e.id, name: e.name }));
+  } else {
+    // Paciente independente — carrega clientes PJ para permitir associação
+    const { rows } = await loadClientsForOwner({ kind: "pj", lifecycle: "ativo" });
+    pjClients = rows.map((c) => ({
+      id: c.id,
+      legal_name: c.legal_name,
+      trade_name: c.trade_name ?? null,
+    }));
+  }
+
+  const showClientCard = !row.client_id;
+  const showEstablishmentCard = clientKind === "pj";
 
   const birthSlice = row.birth_date
     ? String(row.birth_date).slice(0, 10)
@@ -51,6 +91,8 @@ export default async function EditarPacientePage({
           (1000 * 60 * 60 * 24 * 365.25),
       )
     : undefined;
+
+  const isMinor = defaultAge !== undefined && defaultAge < 18;
 
   // Retroceder ao contexto correto — paciente pode ser independente (sem cliente)
   const backHref =
@@ -136,7 +178,43 @@ export default async function EditarPacientePage({
         </CardContent>
       </Card>
 
-      {/* ── Seção 2: Avaliações nutricionais ───────────────────── */}
+      {/* ── Seção 2: Cliente (apenas pacientes independentes) ───── */}
+      {showClientCard ? (
+        <Card>
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle className="text-base">Cliente</CardTitle>
+            <CardDescription>
+              Atribua este paciente a um cliente PJ para depois associar a um
+              estabelecimento.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <PatientClientCard patientId={row.id} clients={pjClients} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ── Seção 3: Estabelecimento (apenas clientes PJ) ──────── */}
+      {showEstablishmentCard ? (
+        <Card>
+          <CardHeader className="border-b border-border pb-4">
+            <CardTitle className="text-base">Estabelecimento</CardTitle>
+            <CardDescription>
+              Unidade à qual este paciente está associado.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <PatientEstablishmentCard
+              patientId={row.id}
+              currentEstablishmentId={row.establishment_id ?? null}
+              establishments={establishments}
+              clientId={row.client_id!}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {/* ── Seção 3: Avaliações nutricionais ───────────────────── */}
       <Card>
         <CardHeader className="border-b border-border pb-4">
           <CardTitle className="text-base">Avaliações nutricionais</CardTitle>
@@ -146,23 +224,25 @@ export default async function EditarPacientePage({
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <NutritionAssessmentsSection patientId={row.id} defaultAge={defaultAge} />
+          <NutritionAssessmentsSection patientId={row.id} defaultAge={defaultAge} isMinor={isMinor} />
         </CardContent>
       </Card>
 
       {/* ── Seção 3: Zona de perigo ─────────────────────────────── */}
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
-        <h2 className="text-sm font-semibold text-destructive">
-          Zona de perigo
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Eliminar remove o paciente do registo permanentemente. Dados sensíveis
-          devem ser tratados conforme a LGPD.
-        </p>
-        <div className="mt-4">
-          <DeletePatientButton patientId={row.id} />
+      {!isTeamMember ? (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
+          <h2 className="text-sm font-semibold text-destructive">
+            Zona de perigo
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Eliminar remove o paciente do registo permanentemente. Dados sensíveis
+            devem ser tratados conforme a LGPD.
+          </p>
+          <div className="mt-4">
+            <DeletePatientButton patientId={row.id} />
+          </div>
         </div>
-      </div>
+      ) : null}
     </PageLayout>
   );
 }

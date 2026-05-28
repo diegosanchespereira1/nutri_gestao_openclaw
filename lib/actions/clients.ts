@@ -10,7 +10,7 @@ import {
   resolveClientLogoPathFromForm,
 } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type {
   ClientBusinessSegment,
   ClientKind,
@@ -21,6 +21,7 @@ import type {
 import type { PatientSex } from "@/lib/types/patients";
 import {
   establishmentTypeFromSegment,
+  parseEstablishmentType,
 } from "@/lib/constants/establishment-types";
 import {
   isValidCnpj,
@@ -288,9 +289,11 @@ function parseEstablishmentInlineFields(
   const rawName = String(formData.get("est_name") ?? "").trim();
   const name = rawName.length > 0 ? rawName : fallbackName;
 
-  // Deriva o tipo de estabelecimento automaticamente da categoria do negócio.
+  // Usa o tipo enviado explicitamente pelo formulário; cai no segmento como fallback.
+  const estTypeRaw = String(formData.get("est_type") ?? "").trim();
   const segmentRaw = String(formData.get("business_segment") ?? "").trim();
-  const establishment_type = establishmentTypeFromSegment(segmentRaw);
+  const establishment_type =
+    parseEstablishmentType(estTypeRaw) ?? establishmentTypeFromSegment(segmentRaw);
 
   const address_line1 =
     String(formData.get("est_address_line1") ?? "").trim() || "";
@@ -528,6 +531,10 @@ export async function updateClientAction(
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
+  if (isTeamMember(user.id, workspaceOwnerId)) {
+    return { ok: false, error: "Sem permissão. Apenas o administrador pode editar clientes." };
+  }
+
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     return { ok: false, error: "Identificador em falta." };
@@ -682,6 +689,8 @@ export async function deleteClientAction(formData: FormData) {
   if (!user) redirect("/login");
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  if (isTeamMember(user.id, workspaceOwnerId)) redirect("/clientes");
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/clientes");

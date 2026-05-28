@@ -30,6 +30,11 @@ export async function PatientsSection(
       ? `/clientes/${props.clientId}/pacientes/novo`
       : `/clientes/${props.clientId}/estabelecimentos/${props.establishmentId}/pacientes/novo`;
 
+  const associarHref =
+    props.variant === "establishment"
+      ? `/clientes/${props.clientId}/estabelecimentos/${props.establishmentId}/pacientes/associar`
+      : null;
+
   const title =
     props.variant === "client_pf"
       ? "Pacientes (atendimento particular)"
@@ -49,9 +54,16 @@ export async function PatientsSection(
         >
           {title}
         </h2>
-        <Link href={novoHref} className={cn(buttonVariants())}>
-          Novo paciente
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {associarHref ? (
+            <Link href={associarHref} className={cn(buttonVariants({ variant: "outline" }))}>
+              Associar paciente existente
+            </Link>
+          ) : null}
+          <Link href={novoHref} className={cn(buttonVariants())}>
+            Novo paciente
+          </Link>
+        </div>
       </div>
       <p className="text-muted-foreground text-sm">{description}</p>
       {rows.length === 0 ? (
@@ -59,9 +71,16 @@ export async function PatientsSection(
           <p className="text-muted-foreground text-sm">
             Ainda não há pacientes neste contexto.
           </p>
-          <Link href={novoHref} className={cn(buttonVariants(), "mt-3 inline-flex")}>
-            Adicionar paciente
-          </Link>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {associarHref ? (
+              <Link href={associarHref} className={cn(buttonVariants({ variant: "outline" }))}>
+                Associar paciente existente
+              </Link>
+            ) : null}
+            <Link href={novoHref} className={cn(buttonVariants())}>
+              Novo paciente
+            </Link>
+          </div>
         </div>
       ) : (
         <ul

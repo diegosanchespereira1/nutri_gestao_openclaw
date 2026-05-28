@@ -65,20 +65,12 @@ export async function createGeriatricAssessmentAction(
 
   const { data: patient } = await supabase
     .from("patients")
-    .select("id, client_id")
+    .select("id, user_id")
     .eq("id", patientId)
     .maybeSingle();
 
-  if (!patient) return { ok: false, error: "Paciente não encontrado." };
-
-  const { data: clientRow } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", patient.client_id)
-    .maybeSingle();
-
-  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
-    return { ok: false, error: "Sem permissão para este paciente." };
+  if (!patient || patient.user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Paciente não encontrado." };
   }
 
   const patient_group = parsePatientGroup(formData.get("patient_group"));
@@ -168,14 +160,14 @@ async function assertGeriatricOwner(
 ): Promise<{ patientId: string } | { error: string }> {
   const { data: row } = await supabase
     .from("patient_geriatric_assessments")
-    .select("id, patient_id, patients!inner(client_id, clients!inner(owner_user_id))")
+    .select("id, patient_id, patients!inner(user_id)")
     .eq("id", assessmentId)
     .maybeSingle();
 
   if (!row) return { error: "Avaliação não encontrada." };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const owner = (row as any).patients?.clients?.owner_user_id;
+  const owner = (row as any).patients?.user_id;
   if (owner !== ownerUserId) return { error: "Sem permissão para esta avaliação." };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

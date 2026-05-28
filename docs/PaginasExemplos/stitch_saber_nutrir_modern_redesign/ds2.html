@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DS2 — Saber Nutrir Design System</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        primary: "#5C7C14", "primary-light": "#8EBF3F", "primary-dark": "#3A5210", "primary-glow": "#A8D45A",
+        accent: "#2E6B4E", "accent-warm": "#D4920A",
+        surface: "#FAFCF8", "surface-elevated": "#FFFFFF", background: "#EEF5E6",
+        "on-surface": "#141A10", "on-surface-muted": "#3D5035", muted: "#5A6F52",
+        border: "#C8DEB8", "border-subtle": "#E2F0D8",
+        inverse: "#0F1810", "inverse-muted": "#B8D4A8", success: "#2E7D52",
+        "chip-bg": "#E4F4D4", "chip-text": "#3A5210"
+      },
+      borderRadius: { DEFAULT: "0.5rem", lg: "0.75rem", xl: "1rem", "2xl": "1.25rem", "3xl": "1.75rem", full: "9999px" },
+      spacing: { gutter: "24px", "section-gap": "96px", "stack-sm": "8px", "container-max": "1280px", "stack-lg": "32px", "stack-md": "16px" },
+      fontFamily: {
+        "body-lg": ["DM Sans"], "headline-md": ["Manrope"], "body-md": ["DM Sans"],
+        "headline-xl": ["Manrope"], "headline-lg": ["Manrope"], "label-sm": ["DM Sans"]
+      },
+      fontSize: {
+        "body-lg": ["18px", { lineHeight: "28px", fontWeight: "400" }],
+        "headline-md": ["24px", { lineHeight: "32px", fontWeight: "600" }],
+        "body-md": ["16px", { lineHeight: "26px", fontWeight: "400" }],
+        "headline-xl": ["52px", { lineHeight: "60px", letterSpacing: "-0.03em", fontWeight: "800" }],
+        "headline-lg": ["36px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" }],
+        "label-sm": ["13px", { lineHeight: "20px", letterSpacing: "0.06em", fontWeight: "600" }]
+      },
+      boxShadow: {
+        glow: "0 0 0 1px rgba(142,191,63,0.25), 0 8px 32px -8px rgba(92,124,20,0.3), 0 0 60px -16px rgba(168,212,90,0.4)",
+        "glow-lg": "0 0 0 1px rgba(142,191,63,0.35), 0 16px 48px -12px rgba(92,124,20,0.35), 0 0 80px -20px rgba(168,212,90,0.5)",
+        "glow-warm": "0 0 0 1px rgba(212,146,10,0.2), 0 8px 32px -8px rgba(212,146,10,0.25), 0 0 48px -12px rgba(232,168,56,0.3)"
+      }
+    }
+  }
+}
+</script>
+<style>
+/* ═══════════════════════════════════════════════════════════════
+   DS2 — VITALITY GLOW DESIGN SYSTEM
+   Saber Nutrir · Restaurantes & Segurança Alimentar · v2.0
+   Baseado em DS1 (motion) + Template2 (visual)
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Color tokens ── */
+  --ds2-primary: #5C7C14;
+  --ds2-primary-light: #8EBF3F;
+  --ds2-primary-dark: #3A5210;
+  --ds2-primary-glow: #A8D45A;
+  --ds2-accent: #2E6B4E;
+  --ds2-accent-warm: #D4920A;
+  --ds2-surface: #FAFCF8;
+  --ds2-surface-elevated: #FFFFFF;
+  --ds2-background: #EEF5E6;
+  --ds2-on-surface: #141A10;
+  --ds2-on-surface-muted: #3D5035;
+  --ds2-muted: #5A6F52;
+  --ds2-border: #C8DEB8;
+  --ds2-border-subtle: #E2F0D8;
+  --ds2-inverse: #0F1810;
+  --ds2-inverse-muted: #B8D4A8;
+  --ds2-chip-bg: #E4F4D4;
+  --ds2-chip-text: #3A5210;
+
+  /* ── Glow tokens ── */
+  --ds2-glow-green: rgba(142, 191, 63, 0.45);
+  --ds2-glow-green-soft: rgba(168, 212, 90, 0.25);
+  --ds2-glow-warm: rgba(212, 146, 10, 0.35);
+
+  /* ── Motion (herdado DS1) ── */
+  --ds-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+  --ds-ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ds-duration-instant: 200ms;
+  --ds-duration-fast: 450ms;
+  --ds-duration-normal: 700ms;
+  --ds-duration-slow: 1000ms;
+  --ds-duration-cinematic: 1400ms;
+  --ds-translate-sm: 12px;
+  --ds-translate-md: 24px;
+  --ds-blur-subtle: 6px;
+  --ds-scale-from: 1.06;
+  --ds-stagger-step: 80ms;
+
+  /* ── Radius ── */
+  --ds2-radius-sm: 0.5rem;
+  --ds2-radius-md: 0.75rem;
+  --ds2-radius-lg: 1.25rem;
+  --ds2-radius-xl: 1.75rem;
+  --ds2-radius-full: 9999px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ds-animate, .ds-btn, .ds-text-link, .ds-nav-link, .ds-image-reveal img, .hero-orb {
+    animation: none !important; transition: none !important;
+    opacity: 1 !important; transform: none !important; filter: none !important;
+  }
+}
+
+/* ── Motion DS1 (compatível) ── */
+.ds-animate { opacity: 0; will-change: opacity, transform, filter; }
+.ds-animate.is-visible { opacity: 1; }
+.ds-fade-in { transition: opacity var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-up { transform: translateY(var(--ds-translate-md)); filter: blur(var(--ds-blur-subtle)); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium), filter var(--ds-duration-slow) var(--ds-ease-out-soft); }
+.ds-fade-up.is-visible { transform: translateY(0); filter: blur(0); }
+.ds-fade-up-sm { transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium); }
+.ds-fade-up-sm.is-visible { transform: translateY(0); }
+.ds-fade-scale { transform: scale(0.96); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-scale.is-visible { transform: scale(1); }
+.ds-fade-left { transform: translateX(calc(var(--ds-translate-md) * -1)); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-left.is-visible { transform: translateX(0); }
+.ds-fade-right { transform: translateX(var(--ds-translate-md)); transition: opacity var(--ds-duration-normal) var(--ds-ease-premium), transform var(--ds-duration-normal) var(--ds-ease-premium); }
+.ds-fade-right.is-visible { transform: translateX(0); }
+.ds-delay-1 { transition-delay: calc(var(--ds-stagger-step) * 1); }
+.ds-delay-2 { transition-delay: calc(var(--ds-stagger-step) * 2); }
+.ds-delay-3 { transition-delay: calc(var(--ds-stagger-step) * 3); }
+.ds-nav-link { opacity: 0; transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium); }
+.ds-nav-link.is-visible { opacity: 1; transform: translateY(0); }
+.ds-image-reveal { overflow: hidden; position: relative; border-radius: var(--ds2-radius-lg); }
+.ds-image-reveal img { transform: scale(var(--ds-scale-from)); opacity: 0; transition: transform var(--ds-duration-cinematic) var(--ds-ease-premium), opacity var(--ds-duration-slow) var(--ds-ease-out-soft); width: 100%; height: 100%; object-fit: cover; display: block; }
+.ds-image-reveal.is-visible img { transform: scale(1); opacity: 1; }
+@keyframes ds-ken-burns { from { transform: scale(1.1); } to { transform: scale(1); } }
+.ds-hero-image img { animation: ds-ken-burns var(--ds-duration-cinematic) var(--ds-ease-out-soft) forwards; }
+
+/* ── Buttons DS2 ── */
+.ds-btn { position: relative; overflow: hidden; isolation: isolate; opacity: 0; transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium), box-shadow var(--ds-duration-instant) ease; }
+.ds-btn.is-visible { opacity: 1; transform: translateY(0); }
+.ds-btn::before { content: ''; position: absolute; top: 0; left: -120%; width: 60%; height: 100%; background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.3) 50%, transparent 70%); transform: skewX(-20deg); transition: left 700ms var(--ds-ease-premium); z-index: 1; pointer-events: none; }
+.ds-btn:hover::before { left: 140%; }
+.ds-btn-primary { background: linear-gradient(135deg, var(--ds2-primary) 0%, #6B9418 50%, var(--ds2-primary-light) 100%); color: #fff; box-shadow: 0 4px 24px -4px rgba(92,124,20,0.5), 0 0 40px -12px var(--ds2-glow-green-soft); }
+.ds-btn-primary:hover, .ds-btn-primary.is-visible:hover { transform: translateY(-3px); box-shadow: 0 8px 36px -6px rgba(92,124,20,0.55), 0 0 56px -8px var(--ds2-glow-green); }
+.ds-btn-ghost { background: rgba(255,255,255,0.12); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+.ds-btn-ghost:hover { background: rgba(255,255,255,0.2); }
+.ds-btn-white { background: #fff; color: var(--ds2-primary-dark); box-shadow: 0 4px 24px -4px rgba(255,255,255,0.3); }
+.ds-btn-white:hover { transform: translateY(-3px); box-shadow: 0 8px 32px -6px rgba(255,255,255,0.4); }
+.ds-btn-outline { background: var(--ds2-surface-elevated); color: var(--ds2-primary); border: 1px solid var(--ds2-border); box-shadow: 0 2px 12px -4px rgba(92,124,20,0.15); }
+.ds-btn-outline:hover { transform: translateY(-2px); box-shadow: 0 4px 20px -4px rgba(92,124,20,0.25); }
+.ds-btn .ds-btn-icon { transition: transform var(--ds-duration-instant) var(--ds-ease-spring); }
+.ds-btn:hover .ds-btn-icon { transform: translateX(4px); }
+.ds-text-link { opacity: 0; transform: translateY(var(--ds-translate-sm)); transition: opacity var(--ds-duration-fast) var(--ds-ease-premium), transform var(--ds-duration-fast) var(--ds-ease-premium); color: var(--ds2-primary); }
+.ds-text-link.is-visible { opacity: 1; transform: translateY(0); }
+
+/* ── Glow Cards DS2 ── */
+.glow-card { transition: transform 300ms var(--ds-ease-premium), box-shadow 300ms ease; }
+.glow-card:hover { transform: translateY(-6px); }
+.glow-card-green { box-shadow: 0 0 0 1px rgba(142,191,63,0.3), 0 8px 32px -8px rgba(92,124,20,0.28), 0 0 56px -16px rgba(168,212,90,0.35); }
+.glow-card-green:hover { box-shadow: 0 0 0 1px rgba(142,191,63,0.5), 0 16px 48px -12px rgba(92,124,20,0.38), 0 0 72px -12px rgba(168,212,90,0.5); }
+.glow-card-warm { box-shadow: 0 0 0 1px rgba(212,146,10,0.25), 0 8px 28px -8px rgba(212,146,10,0.22), 0 0 40px -14px rgba(232,168,56,0.28); }
+.glow-card-warm:hover { box-shadow: 0 0 0 1px rgba(212,146,10,0.4), 0 12px 40px -10px rgba(212,146,10,0.32), 0 0 60px -10px rgba(232,168,56,0.4); }
+.glow-card-static { box-shadow: 0 0 0 1px rgba(142,191,63,0.35), 0 12px 40px -10px rgba(92,124,20,0.32), 0 0 64px -16px rgba(168,212,90,0.42); }
+
+/* ── Surfaces & Effects DS2 ── */
+.glass { background: rgba(255,255,255,0.08); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.15); }
+.glass-light { background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); border: 1px solid rgba(200,222,184,0.6); }
+.header-glass { background: rgba(250,252,248,0.85); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(200,222,184,0.5); }
+.grid-pattern { background-image: linear-gradient(rgba(92,124,20,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(92,124,20,0.04) 1px, transparent 1px); background-size: 40px 40px; }
+.text-gradient { background: linear-gradient(135deg, #A8D45A 0%, #8EBF3F 40%, #D4E896 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero-mesh { background: linear-gradient(145deg, #0F1810 0%, #1A2E14 35%, #2A4518 65%, #1E3312 100%); }
+.hero-orb { position: absolute; border-radius: 50%; pointer-events: none; filter: blur(90px); }
+@keyframes orb-float { 0%, 100% { transform: translate(0,0) scale(1); opacity: 0.7; } 50% { transform: translate(20px,-30px) scale(1.08); opacity: 1; } }
+
+/* ── DS page utilities ── */
+.ds-token-swatch { width: 56px; height: 56px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.06); }
+.ds-code { font-family: ui-monospace, monospace; font-size: 12px; background: var(--ds2-background); color: var(--ds2-primary-dark); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--ds2-border-subtle); }
+.ds-demo-dark { background: var(--ds2-inverse); border-radius: var(--ds2-radius-xl); position: relative; overflow: hidden; }
+</style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased selection:bg-primary-light selection:text-primary-dark">
+
+<!-- Header -->
+<header class="header-glass sticky top-0 z-50">
+  <div class="max-w-container-max mx-auto px-gutter h-16 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-primary-light flex items-center justify-center text-white shadow-glow">
+        <span class="material-symbols-outlined text-[20px]" style="font-variation-settings:'FILL' 1">restaurant</span>
+      </div>
+      <div>
+        <p class="font-headline-md text-[18px] text-primary-dark leading-none">DS2</p>
+        <p class="text-[10px] text-muted uppercase tracking-widest">Vitality Glow · v2.0</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="ds1.html" class="text-sm text-muted hover:text-primary font-label-sm hidden sm:inline">DS1</a>
+      <a href="Template2.html" class="text-sm text-primary hover:underline font-label-sm">← Template2</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-container-max mx-auto px-gutter py-12 space-y-24">
+
+<!-- Hero intro -->
+<section>
+  <span class="inline-block px-3 py-1 rounded-full bg-chip-bg text-chip-text font-label-sm text-label-sm uppercase tracking-wider mb-4">Design System v2.0</span>
+  <h1 class="font-headline-xl text-headline-xl text-on-surface mb-4">Vitality Glow</h1>
+  <p class="font-body-lg text-body-lg text-on-surface-muted max-w-2xl">
+    Sistema visual moderno para consultoria em nutrição e segurança alimentar — foco em restaurantes e cozinhas. Paleta vibrante, glow cards, glass morphism e motion herdado do DS1.
+  </p>
+  <div class="flex flex-wrap gap-3 mt-6">
+    <span class="ds-code">Template2.html</span>
+    <span class="ds-code">ds1.html → motion</span>
+    <span class="ds-code">Restaurantes & ANVISA</span>
+  </div>
+</section>
+
+<!-- Brand & Philosophy -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Filosofia Visual</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle glow-card glow-card-green">
+      <span class="material-symbols-outlined text-primary text-2xl mb-3">palette</span>
+      <h3 class="font-semibold mb-2">Cores Vivas</h3>
+      <p class="text-sm text-muted">Verdes saturados sem opacidade acinzentada. Fundos com tom botânico, nunca cinza neutro.</p>
+    </div>
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle glow-card glow-card-green">
+      <span class="material-symbols-outlined text-primary text-2xl mb-3">flare</span>
+      <h3 class="font-semibold mb-2">Glow & Depth</h3>
+      <p class="text-sm text-muted">Sombras com halo verde ou âmbar. Cards flutuantes com elevação premium.</p>
+    </div>
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle glow-card glow-card-warm">
+      <span class="material-symbols-outlined text-accent-warm text-2xl mb-3">restaurant</span>
+      <h3 class="font-semibold mb-2">Foco B2B</h3>
+      <p class="text-sm text-muted">Linguagem para restaurantes, cozinhas industriais e conformidade ANVISA/CRN-3.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Color Tokens -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Color Tokens</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+
+  <h3 class="font-headline-md text-headline-md mb-4 text-primary-dark">Primárias & Accent</h3>
+  <div class="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-10">
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2 shadow-glow" style="background:#5C7C14"></div><p class="text-[11px] font-medium">primary</p><p class="ds-code text-[10px] mt-1">#5C7C14</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#8EBF3F"></div><p class="text-[11px] font-medium">primary-light</p><p class="ds-code text-[10px] mt-1">#8EBF3F</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#3A5210"></div><p class="text-[11px] font-medium">primary-dark</p><p class="ds-code text-[10px] mt-1">#3A5210</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2 shadow-glow" style="background:#A8D45A"></div><p class="text-[11px] font-medium">primary-glow</p><p class="ds-code text-[10px] mt-1">#A8D45A</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#2E6B4E"></div><p class="text-[11px] font-medium">accent</p><p class="ds-code text-[10px] mt-1">#2E6B4E</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2 shadow-glow-warm" style="background:#D4920A"></div><p class="text-[11px] font-medium">accent-warm</p><p class="ds-code text-[10px] mt-1">#D4920A</p></div>
+  </div>
+
+  <h3 class="font-headline-md text-headline-md mb-4 text-primary-dark">Superfícies & Texto</h3>
+  <div class="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-10">
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#FAFCF8"></div><p class="text-[11px] font-medium">surface</p><p class="ds-code text-[10px] mt-1">#FAFCF8</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2 border" style="background:#FFFFFF"></div><p class="text-[11px] font-medium">surface-elevated</p><p class="ds-code text-[10px] mt-1">#FFFFFF</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#EEF5E6"></div><p class="text-[11px] font-medium">background</p><p class="ds-code text-[10px] mt-1">#EEF5E6</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#141A10"></div><p class="text-[11px] font-medium">on-surface</p><p class="ds-code text-[10px] mt-1">#141A10</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#3D5035"></div><p class="text-[11px] font-medium">on-surface-muted</p><p class="ds-code text-[10px] mt-1">#3D5035</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#0F1810"></div><p class="text-[11px] font-medium">inverse</p><p class="ds-code text-[10px] mt-1">#0F1810</p></div>
+  </div>
+
+  <h3 class="font-headline-md text-headline-md mb-4 text-primary-dark">Utilitários</h3>
+  <div class="grid grid-cols-3 sm:grid-cols-5 gap-4">
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#C8DEB8"></div><p class="text-[11px] font-medium">border</p><p class="ds-code text-[10px] mt-1">#C8DEB8</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#E2F0D8"></div><p class="text-[11px] font-medium">border-subtle</p><p class="ds-code text-[10px] mt-1">#E2F0D8</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#E4F4D4"></div><p class="text-[11px] font-medium">chip-bg</p><p class="ds-code text-[10px] mt-1">#E4F4D4</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#B8D4A8"></div><p class="text-[11px] font-medium">inverse-muted</p><p class="ds-code text-[10px] mt-1">#B8D4A8</p></div>
+    <div class="text-center"><div class="ds-token-swatch mx-auto mb-2" style="background:#5A6F52"></div><p class="text-[11px] font-medium">muted</p><p class="ds-code text-[10px] mt-1">#5A6F52</p></div>
+  </div>
+</section>
+
+<!-- Typography -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Tipografia</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="bg-surface-elevated rounded-3xl border border-border-subtle p-8 space-y-8">
+    <div class="border-b border-border-subtle pb-6">
+      <p class="ds-code mb-2">headline-xl · Manrope 800 · 52px</p>
+      <p class="font-headline-xl text-headline-xl text-on-surface">Conformidade total com ANVISA</p>
+    </div>
+    <div class="border-b border-border-subtle pb-6">
+      <p class="ds-code mb-2">headline-lg · Manrope 700 · 36px</p>
+      <p class="font-headline-lg text-headline-lg text-on-surface">Soluções para restaurantes</p>
+    </div>
+    <div class="border-b border-border-subtle pb-6">
+      <p class="ds-code mb-2">headline-md · Manrope 600 · 24px</p>
+      <p class="font-headline-md text-headline-md text-on-surface">Responsabilidade Técnica</p>
+    </div>
+    <div class="border-b border-border-subtle pb-6">
+      <p class="ds-code mb-2">body-lg · DM Sans 400 · 18px</p>
+      <p class="font-body-lg text-body-lg text-on-surface-muted">Assessoria nutricional especializada para garantir segurança alimentar em restaurantes e cozinhas industriais.</p>
+    </div>
+    <div class="border-b border-border-subtle pb-6">
+      <p class="ds-code mb-2">body-md · DM Sans 400 · 16px</p>
+      <p class="font-body-md text-body-md text-on-surface-muted">Implementação de manuais de BPF, POPs e controle de pontos críticos.</p>
+    </div>
+    <div>
+      <p class="ds-code mb-2">label-sm · DM Sans 600 · 13px · uppercase</p>
+      <p class="font-label-sm text-label-sm text-primary uppercase tracking-wider">Nossos Serviços</p>
+    </div>
+    <div class="pt-2">
+      <p class="ds-code mb-2">.text-gradient · hero highlights</p>
+      <p class="font-headline-lg text-headline-lg text-gradient">de dar saúde e vida</p>
+    </div>
+  </div>
+</section>
+
+<!-- Spacing & Radius -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Espaçamento & Formas</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="grid md:grid-cols-2 gap-8">
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle">
+      <h3 class="font-headline-md text-headline-md mb-4">Spacing</h3>
+      <ul class="space-y-2 text-sm text-on-surface-muted">
+        <li><span class="ds-code">gutter</span> · 24px — margem lateral</li>
+        <li><span class="ds-code">section-gap</span> · 96px — entre seções</li>
+        <li><span class="ds-code">stack-sm/md/lg</span> · 8 / 16 / 32px</li>
+        <li><span class="ds-code">container-max</span> · 1280px</li>
+      </ul>
+    </div>
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle">
+      <h3 class="font-headline-md text-headline-md mb-4">Border Radius</h3>
+      <div class="flex flex-wrap gap-4 items-end">
+        <div class="text-center"><div class="w-12 h-12 bg-primary/20 rounded" style="border-radius:0.5rem"></div><p class="text-[10px] mt-1 text-muted">sm 8px</p></div>
+        <div class="text-center"><div class="w-12 h-12 bg-primary/20 rounded-lg"></div><p class="text-[10px] mt-1 text-muted">lg 12px</p></div>
+        <div class="text-center"><div class="w-12 h-12 bg-primary/20 rounded-xl"></div><p class="text-[10px] mt-1 text-muted">xl 16px</p></div>
+        <div class="text-center"><div class="w-12 h-12 bg-primary/20 rounded-2xl"></div><p class="text-[10px] mt-1 text-muted">2xl 20px</p></div>
+        <div class="text-center"><div class="w-12 h-12 bg-primary/20 rounded-3xl"></div><p class="text-[10px] mt-1 text-muted">3xl 28px</p></div>
+        <div class="text-center"><div class="w-12 h-12 bg-primary/20 rounded-full"></div><p class="text-[10px] mt-1 text-muted">full</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Glow Tokens -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Glow Tokens</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="grid md:grid-cols-2 gap-8 mb-8">
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle">
+      <h3 class="font-headline-md text-headline-md mb-4">CSS Variables</h3>
+      <ul class="space-y-2 text-sm text-on-surface-muted">
+        <li><span class="ds-code">--ds2-glow-green</span> · rgba(142,191,63,0.45)</li>
+        <li><span class="ds-code">--ds2-glow-green-soft</span> · rgba(168,212,90,0.25)</li>
+        <li><span class="ds-code">--ds2-glow-warm</span> · rgba(212,146,10,0.35)</li>
+      </ul>
+    </div>
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border-subtle">
+      <h3 class="font-headline-md text-headline-md mb-4">Tailwind Shadows</h3>
+      <ul class="space-y-2 text-sm text-on-surface-muted">
+        <li><span class="ds-code">shadow-glow</span> — halo verde padrão</li>
+        <li><span class="ds-code">shadow-glow-lg</span> — cards destaque</li>
+        <li><span class="ds-code">shadow-glow-warm</span> — cozinha/culinária</li>
+      </ul>
+    </div>
+  </div>
+
+  <h3 class="font-headline-md text-headline-md mb-6">Classes de Glow Card</h3>
+  <div class="grid md:grid-cols-3 gap-6">
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border glow-card glow-card-green">
+      <p class="ds-code mb-3">.glow-card-green</p>
+      <p class="text-sm text-muted">Serviços, stats, cards interativos. Hover intensifica o halo.</p>
+    </div>
+    <div class="bg-surface-elevated p-6 rounded-3xl border border-border glow-card glow-card-warm">
+      <p class="ds-code mb-3">.glow-card-warm</p>
+      <p class="text-sm text-muted">Oficina culinária, implementação. Accent âmbar.</p>
+    </div>
+    <div class="bg-gradient-to-br from-primary-dark to-primary-light p-6 rounded-3xl text-white glow-card-static">
+      <p class="ds-code mb-3 text-white/80">.glow-card-static</p>
+      <p class="text-sm text-white/70">Cards fixos em destaque — RT, CTA hero.</p>
+    </div>
+  </div>
+  <p class="text-sm text-muted mt-4">Base: <span class="ds-code">.glow-card</span> adiciona lift no hover (translateY -6px).</p>
+</section>
+
+<!-- Surfaces & Glass -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Superfícies & Glass</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="ds-demo-dark p-10 min-h-[200px] flex flex-col justify-end relative">
+      <div class="hero-orb absolute w-48 h-48 bg-primary-glow/30 top-4 right-4" style="filter:blur(60px)"></div>
+      <div class="glass rounded-2xl p-5 relative z-10 max-w-xs">
+        <p class="ds-code text-white/60 mb-2">.glass</p>
+        <p class="text-white text-sm">Hero badges, overlays escuros. blur(20px) + border white/15.</p>
+      </div>
+    </div>
+    <div class="bg-background grid-pattern p-10 min-h-[200px] flex items-end">
+      <div class="glass-light rounded-2xl p-5 max-w-xs shadow-glow">
+        <p class="ds-code mb-2">.glass-light</p>
+        <p class="text-sm text-on-surface-muted">Cards flutuantes sobre fundo claro. blur(16px).</p>
+      </div>
+    </div>
+    <div class="bg-background grid-pattern p-8 rounded-3xl col-span-full">
+      <p class="ds-code mb-2">.grid-pattern</p>
+      <p class="text-sm text-muted">Grid 40×40px com linhas verdes a 4% — seções about e processo.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Buttons Live Demo -->
+<section id="demo-buttons">
+  <h2 class="font-headline-lg text-headline-lg mb-2">Botões — Live Demo</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="bg-background rounded-3xl p-8 space-y-8">
+    <div>
+      <p class="text-sm text-muted mb-4">Sobre fundo claro — role para ver fade-in</p>
+      <div class="flex flex-wrap gap-4 items-center">
+        <a href="#" class="ds-btn ds-btn-primary ds-animate ds-fade-up-sm ds-delay-1 inline-flex items-center justify-center px-8 py-4 rounded-full font-label-sm text-label-sm" data-ds-animate>
+          Solicitar diagnóstico
+          <span class="material-symbols-outlined ml-2 ds-btn-icon">arrow_forward</span>
+        </a>
+        <a href="#" class="ds-btn ds-btn-outline ds-animate ds-fade-up-sm ds-delay-2 inline-flex items-center justify-center px-6 py-2.5 rounded-full font-label-sm text-label-sm" data-ds-animate>
+          Ver serviços
+        </a>
+        <a href="#" class="ds-text-link ds-animate ds-delay-3 inline-flex items-center gap-1 font-label-sm text-label-sm uppercase" data-ds-animate>
+          Saiba mais <span class="material-symbols-outlined text-[16px]">east</span>
+        </a>
+      </div>
+    </div>
+    <div class="ds-demo-dark p-8 rounded-3xl">
+      <p class="text-sm text-inverse-muted mb-4">Sobre fundo escuro (hero)</p>
+      <div class="flex flex-wrap gap-4">
+        <a href="#" class="ds-btn ds-btn-primary is-visible inline-flex items-center justify-center px-8 py-4 rounded-full font-label-sm text-label-sm" style="opacity:1;transform:none">
+          Diagnóstico gratuito
+          <span class="material-symbols-outlined ml-2 ds-btn-icon">arrow_forward</span>
+        </a>
+        <a href="#" class="ds-btn ds-btn-ghost is-visible inline-flex items-center justify-center px-8 py-4 rounded-full font-label-sm text-label-sm" style="opacity:1;transform:none">
+          Ver serviços
+        </a>
+        <a href="#" class="ds-btn ds-btn-white is-visible inline-flex items-center justify-center px-8 py-4 rounded-full font-label-sm text-label-sm" style="opacity:1;transform:none">
+          <span class="material-symbols-outlined mr-2 ds-btn-icon">chat</span>
+          Falar com Consultor
+        </a>
+      </div>
+      <div class="mt-6 flex flex-wrap gap-2">
+        <p class="ds-code text-white/50 w-full mb-1">Modificadores:</p>
+        <span class="ds-code text-white/70">.ds-btn-primary</span>
+        <span class="ds-code text-white/70">.ds-btn-ghost</span>
+        <span class="ds-code text-white/70">.ds-btn-white</span>
+        <span class="ds-code text-white/70">.ds-btn-outline</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Chips & Badges -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Chips & Badges</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="flex flex-wrap gap-3">
+    <span class="px-3 py-1 rounded-full bg-chip-bg text-chip-text font-label-sm text-label-sm uppercase tracking-wider">Nossos Serviços</span>
+    <span class="px-3 py-1 rounded-full bg-chip-bg text-chip-text font-label-sm text-label-sm uppercase tracking-wider">Quem Somos</span>
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 text-primary-dark text-xs font-medium border border-primary/20">
+      <span class="material-symbols-outlined text-[14px]">verified</span> ANVISA
+    </span>
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent-warm/10 text-accent-warm text-xs font-medium border border-accent-warm/20">
+      <span class="material-symbols-outlined text-[14px]">restaurant</span> Restaurantes
+    </span>
+  </div>
+  <p class="text-sm text-muted mt-4">Seção: <span class="ds-code">bg-chip-bg text-chip-text</span> · Hero trust: <span class="ds-code">bg-white/10 border-white/15</span></p>
+</section>
+
+<!-- Hero Pattern -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Hero Pattern</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="hero-mesh rounded-3xl overflow-hidden relative min-h-[320px] flex items-center">
+    <div class="hero-orb w-64 h-64 bg-primary-glow/30 top-0 right-0 absolute" style="filter:blur(80px);animation:orb-float 12s ease-in-out infinite"></div>
+    <div class="hero-orb w-40 h-40 bg-accent/40 bottom-4 left-1/4 absolute" style="filter:blur(60px);animation:orb-float 10s ease-in-out infinite reverse"></div>
+    <div class="relative z-10 p-10 max-w-lg">
+      <p class="ds-code text-white/50 mb-3">.hero-mesh + .hero-orb + .text-gradient</p>
+      <h3 class="font-headline-lg text-white leading-tight mb-2">Seu restaurante em<br/><span class="text-gradient">conformidade total</span></h3>
+      <p class="text-inverse-muted text-sm">Gradiente escuro botânico · orbs animados · imagem 30% opacity · stats bar glass</p>
+    </div>
+  </div>
+  <ul class="mt-4 space-y-1 text-sm text-muted">
+    <li><span class="ds-code">.hero-mesh</span> — gradient 145deg #0F1810 → #2A4518</li>
+    <li><span class="ds-code">.hero-orb</span> — blur(90px) + animation orb-float</li>
+    <li><span class="ds-code">.ds-hero-image</span> — ken-burns na imagem de fundo</li>
+    <li><span class="ds-code">.header-glass</span> — nav sticky com backdrop-blur</li>
+  </ul>
+</section>
+
+<!-- Motion (DS1 compat) -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Motion — Compatível DS1</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="grid md:grid-cols-3 gap-4">
+    <div class="bg-surface-elevated p-5 rounded-2xl border border-border-subtle"><p class="ds-code mb-2">.ds-fade-up</p><p class="text-xs text-muted">Títulos — 24px + blur</p></div>
+    <div class="bg-surface-elevated p-5 rounded-2xl border border-border-subtle"><p class="ds-code mb-2">.ds-fade-scale</p><p class="text-xs text-muted">Cards — scale 0.96→1</p></div>
+    <div class="bg-surface-elevated p-5 rounded-2xl border border-border-subtle"><p class="ds-code mb-2">.ds-image-reveal</p><p class="text-xs text-muted">Imagens — scale 1.06→1</p></div>
+    <div class="bg-surface-elevated p-5 rounded-2xl border border-border-subtle"><p class="ds-code mb-2">data-ds-animate</p><p class="text-xs text-muted">Scroll trigger</p></div>
+    <div class="bg-surface-elevated p-5 rounded-2xl border border-border-subtle"><p class="ds-code mb-2">data-ds-immediate</p><p class="text-xs text-muted">Hero / header load</p></div>
+    <div class="bg-surface-elevated p-5 rounded-2xl border border-border-subtle"><p class="ds-code mb-2">data-ds-stagger</p><p class="text-xs text-muted">Stagger 80ms entre filhos</p></div>
+  </div>
+  <p class="text-sm text-muted mt-4">Documentação completa de motion: <a href="ds1.html" class="text-primary hover:underline">ds1.html</a></p>
+</section>
+
+<!-- Images demo -->
+<section>
+  <h2 class="font-headline-lg text-headline-lg mb-2">Imagens — Live Demo</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="grid md:grid-cols-2 gap-6">
+    <div class="ds-image-reveal aspect-[4/3] glow-card-static" data-ds-animate>
+      <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzt-zzxBmUUthcKN7UVyPPrd9beUUbI3WCEHlXnsvhUAEb6zCaH6CHMx_sAhSQ7uroorTtqA772Sa5cFiIbqMQRqmJD4TdKVPVgE7_NrlULkDFObswvSjmraR3sGBoM_y5wKxHHso_JVQpcRmMzCEBKnUt9Zlb8rUbFMVUvFiS57Dj7_U05q3PqEruzoWutE6PWujZ1vmC1wZRlKHTqCkT1DRTLpC492pE9NQb4SttWNd4VAEhGdh_cgJe2LAGcVeXECyqhzZ8hF" alt="Consultoria nutricional"/>
+    </div>
+    <div class="ds-image-reveal aspect-[4/3] glow-card-green ds-delay-2" data-ds-animate>
+      <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuDT3reRSKw6HJJYXpPXd1xRRZ_iIjWwhMUBtgf6lOrNdrd0eSvQlMP0lBO5j2u1ELUtO6RPjcHq8rNrPX3Z-VLI5v9XBqPsLvXdoOd6w8tTksRzsAsPNgv6XEJ5FtSU33Mrj1WZmEpljsyCd-5teod8FdcIwH6YpizlU_BB2OdG5qpzkBcewzI4vUqzb79xx2kcX56v4RUBUJtFXzRkA1Unb2lcczyL43xfv3Uy369dVlhqZIOIKXpaMA95bddRlJdoVbNxR6VVDUvZ" alt="Alimentos frescos"/>
+    </div>
+  </div>
+</section>
+
+<!-- Usage -->
+<section class="pb-20">
+  <h2 class="font-headline-lg text-headline-lg mb-2">Como usar</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <pre class="bg-inverse text-inverse-muted p-6 rounded-3xl text-sm overflow-x-auto leading-relaxed"><code>&lt;!-- Card com glow verde --&gt;
+&lt;div class="bg-surface-elevated p-6 rounded-3xl border border-border
+            glow-card glow-card-green" data-ds-animate&gt;
+  ...
+&lt;/div&gt;
+
+&lt;!-- Card destaque estático (RT, CTA) --&gt;
+&lt;div class="bg-gradient-to-br from-primary-dark to-primary-light
+            rounded-3xl p-8 text-white glow-card-static"&gt;
+  ...
+&lt;/div&gt;
+
+&lt;!-- Botão primário com gradiente --&gt;
+&lt;a class="ds-btn ds-btn-primary ds-animate ds-fade-up-sm"
+   data-ds-animate href="#"&gt;
+  Solicitar diagnóstico
+&lt;/a&gt;
+
+&lt;!-- Hero section --&gt;
+&lt;section class="hero-mesh relative min-h-[92vh]"&gt;
+  &lt;div class="hero-orb hero-orb-1"&gt;&lt;/div&gt;
+  &lt;div class="absolute inset-0 ds-hero-image opacity-30"&gt;
+    &lt;img src="..." /&gt;
+  &lt;/div&gt;
+  &lt;h1&gt;... &lt;span class="text-gradient"&gt;highlight&lt;/span&gt;&lt;/h1&gt;
+&lt;/section&gt;
+
+&lt;!-- Stagger group --&gt;
+&lt;div data-ds-animate data-ds-stagger="fade-up"&gt;
+  &lt;div&gt;Coluna 1&lt;/div&gt;
+  &lt;div&gt;Coluna 2&lt;/div&gt;
+&lt;/div&gt;
+
+&lt;!-- Referências --&gt;
+&lt;!-- Visual: ds2.html · Motion: ds1.html · Template: Template2.html --&gt;</code></pre>
+</section>
+
+<!-- DS comparison -->
+<section class="pb-24">
+  <h2 class="font-headline-lg text-headline-lg mb-2">DS1 vs DS2</h2>
+  <div class="w-16 h-1 bg-gradient-to-r from-primary to-primary-light rounded-full mb-8"></div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm border-collapse">
+      <thead>
+        <tr class="border-b border-border">
+          <th class="text-left py-3 pr-4 font-semibold">Aspecto</th>
+          <th class="text-left py-3 pr-4 font-semibold text-muted">DS1 · Template1</th>
+          <th class="text-left py-3 font-semibold text-primary">DS2 · Template2</th>
+        </tr>
+      </thead>
+      <tbody class="text-on-surface-muted">
+        <tr class="border-b border-border-subtle"><td class="py-3 pr-4">Paleta</td><td class="py-3 pr-4">Verdes M3, tons acinzentados</td><td class="py-3">Verdes vibrantes, fundo botânico</td></tr>
+        <tr class="border-b border-border-subtle"><td class="py-3 pr-4">Primary</td><td class="py-3 pr-4">#4b6709</td><td class="py-3">#5C7C14 + gradiente</td></tr>
+        <tr class="border-b border-border-subtle"><td class="py-3 pr-4">Elevação</td><td class="py-3 pr-4">soft-bloom-shadow</td><td class="py-3">glow-card-green / warm / static</td></tr>
+        <tr class="border-b border-border-subtle"><td class="py-3 pr-4">Hero</td><td class="py-3 pr-4">Overlay escuro + texto left</td><td class="py-3">Mesh + orbs + split layout</td></tr>
+        <tr class="border-b border-border-subtle"><td class="py-3 pr-4">Radius</td><td class="py-3 pr-4">8–16px</td><td class="py-3">20–28px (rounded-2xl/3xl)</td></tr>
+        <tr class="border-b border-border-subtle"><td class="py-3 pr-4">Público</td><td class="py-3 pr-4">Instituições gerais</td><td class="py-3">Restaurantes & cozinhas</td></tr>
+        <tr><td class="py-3 pr-4">Motion</td><td class="py-3 pr-4">DS1 completo</td><td class="py-3">Herdado DS1 (compatível)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function DS2Motion() {
+  var STAGGER_MS = 80;
+  var motionTypes = { 'fade-in':'ds-fade-in','fade-up':'ds-fade-up','fade-up-sm':'ds-fade-up-sm','fade-scale':'ds-fade-scale','fade-left':'ds-fade-left','fade-right':'ds-fade-right','nav-link':'ds-nav-link' };
+  function revealElement(el, d) { setTimeout(function(){ el.classList.add('is-visible'); el.querySelectorAll('.ds-btn').forEach(function(b){ b.classList.add('is-visible'); }); }, d||0); }
+  function revealStaggerGroup(g, base) {
+    Array.from(g.children).filter(function(c){ return c.nodeType===1; }).forEach(function(c,i){
+      var cd = (base||0)+i*STAGGER_MS; revealElement(c,cd);
+      if (c.hasAttribute('data-ds-stagger')) revealStaggerGroup(c, cd+100);
+    });
+  }
+  function initStaggerGroup(g) {
+    var mc = motionTypes[g.dataset.dsStagger||'fade-up-sm']||'ds-fade-up-sm';
+    Array.from(g.children).forEach(function(c,i){ if(c.nodeType!==1) return; c.classList.add('ds-animate',mc); if(i>0&&i<=6) c.classList.add('ds-delay-'+i); });
+  }
+  document.querySelectorAll('[data-ds-stagger]').forEach(initStaggerGroup);
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.querySelectorAll('.ds-animate,.ds-btn,.ds-text-link,.ds-nav-link').forEach(function(el){ el.classList.add('is-visible'); }); return;
+  }
+  document.querySelectorAll('[data-ds-immediate]').forEach(function(el){
+    if(el.hasAttribute('data-ds-stagger')) revealStaggerGroup(el,STAGGER_MS);
+    else revealElement(el,0);
+  });
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(!e.isIntersecting) return; var t=e.target;
+      if(t.hasAttribute('data-ds-stagger')) revealStaggerGroup(t,0);
+      else revealElement(t, parseInt(t.dataset.dsDelay||'0',10)*STAGGER_MS);
+      obs.unobserve(t);
+    });
+  },{threshold:0.08,rootMargin:'0px 0px -32px 0px'});
+  document.querySelectorAll('[data-ds-animate]').forEach(function(el){ obs.observe(el); });
+})();
+</script>
+</body>
+</html>

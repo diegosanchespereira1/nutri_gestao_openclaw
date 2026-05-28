@@ -134,7 +134,7 @@ export default async function PacientesPage({
             return (
               <li key={p.id}>
                 <Link
-                  href={`/pacientes/${p.id}/editar`}
+                  href={`/pacientes/${p.id}`}
                   className="hover:bg-muted/50 focus-visible:ring-ring flex items-start gap-3 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                 >
                   <div className="min-w-0 flex-1">

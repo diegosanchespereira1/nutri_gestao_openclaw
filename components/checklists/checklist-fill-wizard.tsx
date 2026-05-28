@@ -595,6 +595,7 @@ export function ChecklistFillWizard({
   const leavePromptOpenRef = useRef(false);
   const [leaveActionBusy, setLeaveActionBusy] = useState(false);
   const [leaveActionError, setLeaveActionError] = useState<string | null>(null);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   /* ── Task B: guarda de navegação (Voltar do browser + links internos) ── */
   const { guardTriggered, cancelLeave } = useNavigationGuard({
@@ -722,6 +723,14 @@ export function ChecklistFillWizard({
       setLeaveActionBusy(false);
     }
   }, [persistDraftForLeave, backHref, clearLeaveLinkTarget, cancelLeave, router]);
+
+  const handleDiscardAndLeave = useCallback(() => {
+    const dest = leaveLinkTargetRef.current ?? backHref;
+    setDiscardConfirmOpen(false);
+    clearLeaveLinkTarget();
+    cancelLeave();
+    router.push(dest);
+  }, [backHref, clearLeaveLinkTarget, cancelLeave, router]);
 
   /** Bloqueia navegação interna (sidebar, etc.) até confirmar gravação do rascunho. */
   useEffect(() => {
@@ -1602,7 +1611,17 @@ export function ChecklistFillWizard({
               {leaveActionError}
             </p>
           ) : null}
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 mr-auto"
+              disabled={leaveActionBusy}
+              onClick={() => setDiscardConfirmOpen(true)}
+            >
+              Descartar alterações
+            </Button>
             <Button
               type="button"
               variant="outline"
@@ -1617,6 +1636,35 @@ export function ChecklistFillWizard({
               onClick={() => void handleConfirmLeaveDialog()}
             >
               {leaveActionBusy ? "A gravar…" : "Sim, gravar e sair"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de confirmação de descarte — irreversível */}
+      <Dialog open={discardConfirmOpen} onOpenChange={(open) => { if (!open) setDiscardConfirmOpen(false); }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Descartar alterações?</DialogTitle>
+            <DialogDescription>
+              Todas as respostas e textos ainda não sincronizados serão perdidos permanentemente.
+              Esta ação é irreversível e não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDiscardConfirmOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDiscardAndLeave}
+            >
+              Sim, descartar e sair
             </Button>
           </div>
         </DialogContent>

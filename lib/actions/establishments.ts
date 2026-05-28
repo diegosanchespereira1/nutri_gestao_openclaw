@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type {
   EstablishmentPickerOption,
   EstablishmentRow,
@@ -259,6 +259,30 @@ export async function loadRecentChecklistEstablishmentsAction(
   return { rows };
 }
 
+/** Carrega um único estabelecimento como opção de picker (para pré-seleção via URL). */
+export async function loadEstablishmentPickerOptionById(
+  establishmentId: string,
+): Promise<EstablishmentPickerOption | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: row, error } = await supabase
+    .from("establishments")
+    .select("id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)")
+    .eq("id", establishmentId)
+    .eq("clients.owner_user_id", workspaceOwnerId)
+    .eq("clients.kind", "pj")
+    .maybeSingle();
+
+  if (error || !row) return null;
+  return mapRowToPickerOption(row as unknown as EstablishmentPickerDbRow);
+}
+
 export async function registerChecklistEstablishmentOpenAction(
   establishmentId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -451,6 +475,11 @@ export async function updateEstablishmentAction(
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (isTeamMember(user.id, workspaceOwnerId)) {
+    return { ok: false, error: "Sem permissão. Apenas o administrador pode editar estabelecimentos." };
+  }
+
   const id = String(formData.get("id") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();
   if (!id || !clientId) {
@@ -520,6 +549,9 @@ export async function deleteEstablishmentAction(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (isTeamMember(user.id, workspaceOwnerId)) redirect("/clientes");
 
   const id = String(formData.get("id") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();

@@ -180,6 +180,20 @@ export async function reopenChecklistFillDossierAction(
     };
   }
 
+  // Bloquear reabertura se houver itens com validade ainda vigente
+  const todayIso = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
+  const hasValidFutureItems = Object.values(bundle.responses).some(
+    (r) => r.validUntil !== null && r.validUntil >= todayIso,
+  );
+  if (hasValidFutureItems) {
+    return {
+      ok: false,
+      error:
+        "Este checklist não pode ser reaberto pois possui itens com validade futura ainda em vigor. " +
+        "Inicie um novo preenchimento — os itens vigentes serão carregados automaticamente.",
+    };
+  }
+
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
   const estOk = await assertEstablishmentOwned(
     supabase,

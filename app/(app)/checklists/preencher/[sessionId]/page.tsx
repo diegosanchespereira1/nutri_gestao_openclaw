@@ -140,6 +140,19 @@ export default async function ChecklistPreencherPage({
         </div>
       )}
 
+      {bundle.inheritedCount > 0 && (
+        <div className="bg-muted/60 border-border flex items-start gap-3 rounded-lg border px-4 py-3 text-sm">
+          <Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <p className="text-muted-foreground">
+            <span className="text-foreground font-medium">{bundle.inheritedCount}</span>{" "}
+            {bundle.inheritedCount === 1
+              ? "item com validade vigente foi carregado automaticamente"
+              : "itens com validade vigente foram carregados automaticamente"}{" "}
+            da sessão anterior.
+          </p>
+        </div>
+      )}
+
       <ChecklistFillWizard
         sessionId={bundle.session.id}
         template={bundle.template}

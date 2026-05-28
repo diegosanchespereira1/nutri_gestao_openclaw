@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+
+<html class="light" lang="pt-BR"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Saber Nutrir - Assessoria Nutricional</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "surface-variant": "#e0e3e8",
+                    "border": "#E2E8F0",
+                    "inverse-surface": "#2d3135",
+                    "on-primary-fixed": "#141f00",
+                    "outline-variant": "#c5c8b5",
+                    "on-primary-fixed-variant": "#364e00",
+                    "on-surface": "#181c20",
+                    "on-background": "#181c20",
+                    "on-surface-variant": "#44483a",
+                    "error": "#ba1a1a",
+                    "surface-container-high": "#e5e8ee",
+                    "surface-container-lowest": "#ffffff",
+                    "on-primary": "#ffffff",
+                    "tertiary": "#566342",
+                    "on-secondary": "#ffffff",
+                    "background": "#f7f9ff",
+                    "surface-container": "#ebeef3",
+                    "on-tertiary-fixed": "#141f05",
+                    "on-tertiary": "#ffffff",
+                    "secondary-container": "#c4e9c7",
+                    "tertiary-fixed": "#dae8be",
+                    "outline": "#757968",
+                    "primary": "#4b6709",
+                    "on-secondary-fixed-variant": "#2e4e35",
+                    "on-tertiary-fixed-variant": "#3f4b2c",
+                    "secondary-fixed-dim": "#abd0af",
+                    "on-error-container": "#93000a",
+                    "accent-red": "#840D0E",
+                    "surface-container-highest": "#e0e3e8",
+                    "surface": "#F7F9F2",
+                    "error-container": "#ffdad6",
+                    "primary-fixed-dim": "#b0d36d",
+                    "inverse-primary": "#b0d36d",
+                    "on-error": "#ffffff",
+                    "primary-container": "#8cad4c",
+                    "inverse-on-surface": "#eef1f6",
+                    "on-tertiary-container": "#313c1f",
+                    "surface-bright": "#f7f9ff",
+                    "tertiary-container": "#99a781",
+                    "on-primary-container": "#2b3e00",
+                    "surface-dim": "#d7dadf",
+                    "on-secondary-container": "#4a6a4f",
+                    "secondary-fixed": "#c7ecca",
+                    "on-secondary-fixed": "#02210c",
+                    "secondary": "#45664b",
+                    "surface-tint": "#4b6709",
+                    "muted": "#64748B",
+                    "surface-container-low": "#f1f4f9",
+                    "primary-fixed": "#cbef86",
+                    "tertiary-fixed-dim": "#becca3"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {
+                    "gutter": "24px",
+                    "section-gap": "80px",
+                    "stack-sm": "8px",
+                    "container-max": "1280px",
+                    "margin-mobile": "16px",
+                    "stack-lg": "32px",
+                    "stack-md": "16px"
+            },
+            "fontFamily": {
+                    "body-lg": [
+                            "DM Sans"
+                    ],
+                    "headline-md": [
+                            "Manrope"
+                    ],
+                    "body-md": [
+                            "DM Sans"
+                    ],
+                    "headline-lg-mobile": [
+                            "Manrope"
+                    ],
+                    "headline-xl": [
+                            "Manrope"
+                    ],
+                    "headline-lg": [
+                            "Manrope"
+                    ],
+                    "label-sm": [
+                            "DM Sans"
+                    ]
+            },
+            "fontSize": {
+                    "body-lg": [
+                            "18px",
+                            {
+                                    "lineHeight": "28px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-md": [
+                            "24px",
+                            {
+                                    "lineHeight": "32px",
+                                    "fontWeight": "600"
+                            }
+                    ],
+                    "body-md": [
+                            "16px",
+                            {
+                                    "lineHeight": "24px",
+                                    "fontWeight": "400"
+                            }
+                    ],
+                    "headline-lg-mobile": [
+                            "28px",
+                            {
+                                    "lineHeight": "36px",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "headline-xl": [
+                            "48px",
+                            {
+                                    "lineHeight": "56px",
+                                    "letterSpacing": "-0.02em",
+                                    "fontWeight": "800"
+                            }
+                    ],
+                    "headline-lg": [
+                            "32px",
+                            {
+                                    "lineHeight": "40px",
+                                    "letterSpacing": "-0.01em",
+                                    "fontWeight": "700"
+                            }
+                    ],
+                    "label-sm": [
+                            "14px",
+                            {
+                                    "lineHeight": "20px",
+                                    "letterSpacing": "0.05em",
+                                    "fontWeight": "600"
+                            }
+                    ]
+            }
+    },
+        },
+      }
+    </script>
+<style>
+        /* DS1 — Motion Design System (ver ds1.html) */
+        :root {
+            --ds-ease-premium: cubic-bezier(0.16, 1, 0.3, 1);
+            --ds-ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+            --ds-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+            --ds-duration-instant: 200ms;
+            --ds-duration-fast: 450ms;
+            --ds-duration-normal: 700ms;
+            --ds-duration-slow: 1000ms;
+            --ds-duration-cinematic: 1400ms;
+            --ds-translate-sm: 12px;
+            --ds-translate-md: 24px;
+            --ds-blur-subtle: 6px;
+            --ds-scale-from: 1.06;
+            --ds-stagger-step: 80ms;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .ds-animate, .ds-btn, .ds-text-link, .ds-nav-link, .ds-image-reveal img {
+                transition: none !important;
+                animation: none !important;
+                opacity: 1 !important;
+                transform: none !important;
+                filter: none !important;
+            }
+        }
+        .soft-bloom-shadow {
+            box-shadow: 0 10px 30px -10px rgba(75, 103, 9, 0.08);
+        }
+        .ds-animate { opacity: 0; will-change: opacity, transform, filter; }
+        .ds-animate.is-visible { opacity: 1; }
+        .ds-fade-in { transition: opacity var(--ds-duration-normal) var(--ds-ease-premium); }
+        .ds-fade-up {
+            transform: translateY(var(--ds-translate-md));
+            filter: blur(var(--ds-blur-subtle));
+            transition: opacity var(--ds-duration-normal) var(--ds-ease-premium),
+                        transform var(--ds-duration-normal) var(--ds-ease-premium),
+                        filter var(--ds-duration-slow) var(--ds-ease-out-soft);
+        }
+        .ds-fade-up.is-visible { transform: translateY(0); filter: blur(0); }
+        .ds-fade-up-sm {
+            transform: translateY(var(--ds-translate-sm));
+            transition: opacity var(--ds-duration-fast) var(--ds-ease-premium),
+                        transform var(--ds-duration-fast) var(--ds-ease-premium);
+        }
+        .ds-fade-up-sm.is-visible { transform: translateY(0); }
+        .ds-fade-scale {
+            transform: scale(0.96);
+            transition: opacity var(--ds-duration-normal) var(--ds-ease-premium),
+                        transform var(--ds-duration-normal) var(--ds-ease-premium);
+        }
+        .ds-fade-scale.is-visible { transform: scale(1); }
+        .ds-delay-1 { transition-delay: calc(var(--ds-stagger-step) * 1); }
+        .ds-delay-2 { transition-delay: calc(var(--ds-stagger-step) * 2); }
+        .ds-delay-3 { transition-delay: calc(var(--ds-stagger-step) * 3); }
+        .ds-delay-4 { transition-delay: calc(var(--ds-stagger-step) * 4); }
+        .ds-delay-5 { transition-delay: calc(var(--ds-stagger-step) * 5); }
+        .ds-delay-6 { transition-delay: calc(var(--ds-stagger-step) * 6); }
+        .ds-image-reveal { overflow: hidden; position: relative; }
+        .ds-image-reveal::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(135deg, rgba(75,103,9,0.08) 0%, transparent 60%);
+            opacity: 1; transition: opacity var(--ds-duration-slow) var(--ds-ease-out-soft);
+            pointer-events: none; z-index: 1;
+        }
+        .ds-image-reveal.is-visible::after { opacity: 0; }
+        .ds-image-reveal img {
+            transform: scale(var(--ds-scale-from)); opacity: 0;
+            transition: transform var(--ds-duration-cinematic) var(--ds-ease-premium),
+                        opacity var(--ds-duration-slow) var(--ds-ease-out-soft);
+        }
+        .ds-image-reveal.is-visible img { transform: scale(1); opacity: 1; }
+        @keyframes ds-ken-burns { from { transform: scale(1.08); } to { transform: scale(1); } }
+        .ds-hero-image img {
+            animation: ds-ken-burns var(--ds-duration-cinematic) var(--ds-ease-out-soft) forwards;
+        }
+        .ds-btn {
+            position: relative; overflow: hidden; isolation: isolate;
+            opacity: 0; transform: translateY(var(--ds-translate-sm));
+            transition: opacity var(--ds-duration-fast) var(--ds-ease-premium),
+                        transform var(--ds-duration-fast) var(--ds-ease-premium),
+                        box-shadow var(--ds-duration-instant) ease,
+                        background-color var(--ds-duration-instant) ease,
+                        color var(--ds-duration-instant) ease;
+        }
+        .ds-btn.is-visible { opacity: 1; transform: translateY(0); }
+        .ds-btn::before {
+            content: ''; position: absolute; top: 0; left: -120%; width: 60%; height: 100%;
+            background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.28) 50%, transparent 70%);
+            transform: skewX(-20deg); transition: left 700ms var(--ds-ease-premium);
+            z-index: 1; pointer-events: none;
+        }
+        .ds-btn:hover::before { left: 140%; }
+        .ds-btn-primary { box-shadow: 0 4px 20px -4px rgba(75,103,9,0.35); }
+        .ds-btn-primary:hover, .ds-btn-primary.is-visible:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px -6px rgba(75,103,9,0.45);
+        }
+        .ds-btn-secondary:hover, .ds-btn-secondary.is-visible:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px -4px rgba(75,103,9,0.15);
+        }
+        .ds-btn:active { transform: translateY(0) scale(0.98) !important; transition-duration: 100ms; }
+        .ds-btn .ds-btn-icon { transition: transform var(--ds-duration-instant) var(--ds-ease-spring); }
+        .ds-btn:hover .ds-btn-icon { transform: translateX(4px); }
+        .ds-text-link {
+            opacity: 0;
+            transform: translateY(var(--ds-translate-sm));
+            transition: opacity var(--ds-duration-fast) var(--ds-ease-premium),
+                        transform var(--ds-duration-fast) var(--ds-ease-premium),
+                        color var(--ds-duration-instant) ease;
+        }
+        .ds-text-link.is-visible { opacity: 1; transform: translateY(0); }
+        .ds-text-link:hover .ds-btn-icon { transform: translateX(4px); }
+        .ds-nav-link {
+            opacity: 0;
+            transform: translateY(var(--ds-translate-sm));
+            transition: opacity var(--ds-duration-fast) var(--ds-ease-premium),
+                        transform var(--ds-duration-fast) var(--ds-ease-premium),
+                        color var(--ds-duration-instant) ease,
+                        border-color var(--ds-duration-instant) ease;
+        }
+        .ds-nav-link.is-visible { opacity: 1; transform: translateY(0); }
+        .ds-fade-left {
+            transform: translateX(calc(var(--ds-translate-md) * -1));
+            transition: opacity var(--ds-duration-normal) var(--ds-ease-premium),
+                        transform var(--ds-duration-normal) var(--ds-ease-premium);
+        }
+        .ds-fade-left.is-visible { transform: translateX(0); }
+        .ds-fade-right {
+            transform: translateX(var(--ds-translate-md));
+            transition: opacity var(--ds-duration-normal) var(--ds-ease-premium),
+                        transform var(--ds-duration-normal) var(--ds-ease-premium);
+        }
+        .ds-fade-right.is-visible { transform: translateX(0); }
+        .ds-card-lift {
+            transition: transform var(--ds-duration-instant) var(--ds-ease-premium),
+                        box-shadow var(--ds-duration-instant) ease,
+                        border-color var(--ds-duration-instant) ease;
+        }
+        .ds-card-lift:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 16px 40px -12px rgba(75,103,9,0.12);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md antialiased selection:bg-primary-container selection:text-on-primary-container">
+<!-- Navigation -->
+<header class="bg-surface/95 dark:bg-surface-dim/95 backdrop-blur-sm docked full-width top-0 sticky z-50 border-b border-border dark:border-outline-variant flat no shadows">
+<div class="flex justify-between items-center w-full px-gutter max-w-container-max mx-auto h-20">
+<a class="ds-animate ds-fade-up-sm flex items-center gap-2 group" data-ds-immediate href="#">
+<!-- Simple Logo Representation based on Brand Anchor -->
+<div class="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-on-primary font-headline-md shadow-sm group-hover:scale-105 transition-transform">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">eco</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline-lg text-headline-lg text-primary dark:text-primary-fixed-dim tracking-tight leading-none">Saber Nutrir</span>
+<span class="font-label-sm text-[10px] text-muted uppercase tracking-widest leading-none mt-1">Assessoria Nutricional</span>
+</div>
+</a>
+<nav class="hidden md:flex items-center gap-8" data-ds-immediate data-ds-stagger="nav-link">
+<a class="text-primary dark:text-primary-fixed-dim border-b-2 border-primary dark:border-primary-fixed-dim pb-1 font-label-sm text-label-sm" href="#">Home</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors font-label-sm text-label-sm" href="#servicos">Nossos Serviços</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors font-label-sm text-label-sm" href="#sobre">Quem Somos</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors font-label-sm text-label-sm" href="#saude">Nutrição e Saúde</a>
+<a class="text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors font-label-sm text-label-sm" href="#contato">Contato</a>
+</nav>
+<a class="ds-btn ds-btn-secondary ds-animate ds-fade-up-sm ds-delay-5 hidden md:inline-flex items-center justify-center px-6 py-2.5 rounded-full bg-surface text-primary border border-primary font-label-sm text-label-sm hover:bg-primary hover:text-on-primary" data-ds-immediate href="#">
+                Agende uma visita
+            </a>
+<button class="ds-animate ds-fade-in ds-delay-2 md:hidden text-on-surface p-2 rounded-lg hover:bg-surface-container-low transition-colors" data-ds-immediate>
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</header>
+<main>
+<!-- Hero Section -->
+<section class="relative min-h-[819px] flex items-center justify-center overflow-hidden bg-surface-container-low">
+<!-- Background Image -->
+<div class="absolute inset-0 z-0 ds-hero-image">
+<div class="absolute inset-0 bg-gradient-to-r from-inverse-surface/90 via-inverse-surface/70 to-transparent z-10 mix-blend-multiply"></div>
+<img alt="Uma grande variedade de alimentos frescos e saudáveis, incluindo vegetais verdes escuros, grãos integrais, leguminosas em tigelas e frutas coloridas espalhadas sobre uma mesa de madeira rústica. A iluminação é natural e dramática, criando um clima acolhedor e focado na vitalidade e saúde." class="w-full h-full object-cover object-center" data-alt="A beautiful, high-resolution top-down flatlay of fresh, vibrant health foods on a dark wooden table. The composition includes rich dark leafy greens, colorful fresh fruits (apples, berries), and rustic bowls filled with various grains and legumes (lentils, chickpeas). The lighting is moody yet natural, highlighting the textures and vibrant natural colors of the ingredients. The overarching UI style is modern, clinical yet organic, matching a premium nutrition consultancy brand aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDT3reRSKw6HJJYXpPXd1xRRZ_iIjWwhMUBtgf6lOrNdrd0eSvQlMP0lBO5j2u1ELUtO6RPjcHq8rNrPX3Z-VLI5v9XBqPsLvXdoOd6w8tTksRzsAsPNgv6XEJ5FtSU33Mrj1WZmEpljsyCd-5teod8FdcIwH6YpizlU_BB2OdG5qpzkBcewzI4vUqzb79xx2kcX56v4RUBUJtFXzRkA1Unb2lcczyL43xfv3Uy369dVlhqZIOIKXpaMA95bddRlJdoVbNxR6VVDUvZ"/>
+</div>
+<div class="relative z-20 w-full max-w-container-max mx-auto px-gutter grid md:grid-cols-2 gap-stack-lg items-center pt-20 pb-section-gap">
+<div class="flex flex-col items-start gap-stack-lg text-on-primary">
+<div class="ds-animate ds-fade-up-sm ds-delay-1 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/20 border border-primary/30 backdrop-blur-sm text-primary-fixed-dim font-label-sm text-label-sm uppercase tracking-wider" data-ds-immediate>
+<span class="material-symbols-outlined text-[16px]">health_and_safety</span>
+                        Bem vindo ao Saber Nutrir
+                    </div>
+<h1 class="ds-animate ds-fade-up ds-delay-2 font-headline-xl text-headline-xl text-surface-container-lowest leading-tight" data-ds-immediate>
+                        Nutrição é a arte <br/>
+<span class="text-primary-fixed-dim">de dar saúde e vida</span> <br/>
+                        ao que você não vê.
+                    </h1>
+<p class="ds-animate ds-fade-up ds-delay-3 font-body-lg text-body-lg text-surface-variant max-w-lg" data-ds-immediate>
+                        Assessoria nutricional especializada para garantir segurança alimentar e qualidade de vida em instituições e empresas.
+                    </p>
+<a class="ds-btn ds-btn-primary ds-animate ds-fade-up-sm ds-delay-4 inline-flex items-center justify-center px-8 py-4 rounded-full bg-primary text-on-primary font-label-sm text-label-sm mt-4" data-ds-immediate href="#">
+                        Agende uma visita
+                        <span class="material-symbols-outlined ml-2 ds-btn-icon">arrow_forward</span>
+</a>
+</div>
+</div>
+</section>
+<!-- Intro & Stats Section -->
+<section class="py-section-gap bg-surface relative" id="sobre">
+<div class="max-w-container-max mx-auto px-gutter">
+<div class="grid lg:grid-cols-2 gap-16 items-center">
+<!-- Text Content -->
+<div class="flex flex-col gap-stack-md">
+<h2 class="ds-animate ds-fade-up font-headline-lg text-headline-lg text-on-surface" data-ds-animate>Assessoria nutricional.</h2>
+<div class="ds-animate ds-fade-in w-16 h-1 bg-primary rounded-full mb-4" data-ds-animate data-ds-delay="1"></div>
+<p class="ds-animate ds-fade-up ds-delay-2 font-body-lg text-body-lg text-on-surface-variant leading-relaxed" data-ds-animate>
+                            A Saber Nutrir atua há mais de 10 anos em assessoria e consultoria em segurança alimentar e nutricional, adequando os estabelecimentos segundo as normas vigentes da Vigilância Sanitária (ANVISA) e cumprindo as atribuições impostas pelo Conselho Regional de Nutricionistas (CRN-3).
+                        </p>
+<div class="mt-8">
+<a class="ds-text-link ds-animate ds-delay-3 inline-flex items-center gap-2 text-primary font-label-sm text-label-sm uppercase hover:text-primary-container group" data-ds-animate href="#">
+                                Conheça nossa história
+                                <span class="material-symbols-outlined ds-btn-icon">east</span>
+</a>
+</div>
+</div>
+<!-- Image / Stats Bento -->
+<div class="relative grid grid-cols-2 gap-4">
+<div class="ds-image-reveal col-span-2 sm:col-span-1 rounded-xl aspect-[4/5] relative" data-ds-animate>
+<img alt="Nutricionista em jaleco branco preenchendo um prontuário médico em uma mesa limpa. Há uma maçã verde brilhante com uma fita métrica verde ao redor, além de alguns vegetais frescos e um estetoscópio sobre a mesa. O ambiente é claro, clínico e profissional." class="w-full h-full object-cover" data-alt="A professional, well-lit clinical setting showing a nutritionist in a white lab coat writing on a medical chart. In the foreground, a bright green apple is wrapped with a measuring tape, symbolizing health and diet. The background features a clean desk with fresh vegetables and a stethoscope. The overall aesthetic is clean, modern, medical yet natural, using bright whites and vibrant greens to match the corporate clinical style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzt-zzxBmUUthcKN7UVyPPrd9beUUbI3WCEHlXnsvhUAEb6zCaH6CHMx_sAhSQ7uroorTtqA772Sa5cFiIbqMQRqmJD4TdKVPVgE7_NrlULkDFObswvSjmraR3sGBoM_y5wKxHHso_JVQpcRmMzCEBKnUt9Zlb8rUbFMVUvFiS57Dj7_U05q3PqEruzoWutE6PWujZ1vmC1wZRlKHTqCkT1DRTLpC492pE9NQb4SttWNd4VAEhGdh_cgJe2LAGcVeXECyqhzZ8hF4R"/>
+</div>
+<div class="col-span-2 sm:col-span-1 flex flex-col gap-4">
+<!-- Stat Card 1 -->
+<div class="ds-animate ds-fade-scale ds-delay-1 bg-surface-container-lowest p-6 rounded-xl border border-border soft-bloom-shadow ds-card-lift flex flex-col items-start gap-2 h-full justify-center group hover:border-primary/30" data-ds-animate>
+<span class="ds-animate ds-fade-up-sm material-symbols-outlined text-primary text-3xl mb-2" data-ds-animate>groups</span>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-xl text-headline-lg text-primary group-hover:scale-105 transition-transform origin-left" data-ds-animate>+3.500</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-label-sm text-label-sm text-muted uppercase" data-ds-animate>Pacientes atendidos</p>
+</div>
+<!-- Stat Card 2 -->
+<div class="ds-animate ds-fade-scale ds-delay-2 bg-primary p-6 rounded-xl text-on-primary shadow-lg shadow-primary/20 ds-card-lift flex flex-col items-start gap-2 h-full justify-center relative overflow-hidden" data-ds-animate>
+<div class="absolute -right-6 -bottom-6 opacity-10">
+<span class="material-symbols-outlined text-[100px]" style="font-variation-settings: 'FILL' 1;">medical_services</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-xl text-headline-lg text-surface-container-lowest relative z-10" data-ds-animate>+15</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-label-sm text-label-sm text-primary-fixed-dim uppercase relative z-10" data-ds-animate>Nutricionistas</p>
+</div>
+</div>
+<!-- Stat Card 3 (Full Width Bottom) -->
+<div class="ds-animate ds-fade-up ds-delay-3 col-span-2 bg-surface-container-low p-6 rounded-xl border border-border ds-card-lift flex items-center justify-between group hover:bg-surface-container" data-ds-animate>
+<div class="flex items-center gap-4">
+<div class="ds-animate ds-fade-scale w-12 h-12 rounded-full bg-surface-container-highest flex items-center justify-center text-primary" data-ds-animate>
+<span class="material-symbols-outlined">workspace_premium</span>
+</div>
+<div>
+<p class="ds-animate ds-fade-up-sm ds-delay-1 font-label-sm text-label-sm text-muted uppercase" data-ds-animate>Experiência comprovada</p>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-2 font-headline-md text-headline-md text-on-surface" data-ds-animate>+10 Anos de atuação</h3>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Services Section -->
+<section class="py-section-gap bg-background border-t border-border/50" id="servicos">
+<div class="max-w-container-max mx-auto px-gutter">
+<div class="text-center max-w-2xl mx-auto mb-16 flex flex-col items-center gap-stack-sm">
+<span class="ds-animate ds-fade-up-sm px-3 py-1 rounded-full bg-secondary-container text-on-secondary-container font-label-sm text-label-sm uppercase tracking-wider mb-2" data-ds-animate>Nossos Serviços</span>
+<h2 class="ds-animate ds-fade-up ds-delay-1 font-headline-lg text-headline-lg text-on-surface" data-ds-animate>Como podemos ajudá-lo a se sentir melhor?</h2>
+<p class="ds-animate ds-fade-up ds-delay-2 font-body-md text-body-md text-on-surface-variant mt-4" data-ds-animate>Soluções completas em nutrição para adequação sanitária e promoção de saúde no seu estabelecimento.</p>
+</div>
+<div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+<!-- Service 1 -->
+<div class="ds-animate ds-fade-scale ds-card-lift bg-surface-container-lowest p-stack-lg rounded-2xl border border-border soft-bloom-shadow hover:border-primary/40 flex flex-col gap-4 group" data-ds-animate>
+<div class="ds-animate ds-fade-up-sm w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors" data-ds-animate>
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-md text-[20px] leading-tight text-on-surface mt-2" data-ds-animate>Responsabilidade técnica</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-body-md text-body-md text-on-surface-variant flex-grow" data-ds-animate>Atuação perante a vigilância sanitária e CRN, garantindo total conformidade legal.</p>
+</div>
+<!-- Service 2 -->
+<div class="ds-animate ds-fade-scale ds-delay-1 ds-card-lift bg-surface-container-lowest p-stack-lg rounded-2xl border border-border soft-bloom-shadow hover:border-primary/40 flex flex-col gap-4 group" data-ds-animate>
+<div class="ds-animate ds-fade-up-sm w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors" data-ds-animate>
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">school</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-md text-[20px] leading-tight text-on-surface mt-2" data-ds-animate>Educação nutricional</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-body-md text-body-md text-on-surface-variant flex-grow" data-ds-animate>Programas de conscientização e reeducação alimentar para grupos e instituições.</p>
+</div>
+<!-- Service 3 -->
+<div class="ds-animate ds-fade-scale ds-delay-2 ds-card-lift bg-surface-container-lowest p-stack-lg rounded-2xl border border-border soft-bloom-shadow hover:border-primary/40 flex flex-col gap-4 group" data-ds-animate>
+<div class="ds-animate ds-fade-up-sm w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors" data-ds-animate>
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">monitor_weight</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-md text-[20px] leading-tight text-on-surface mt-2" data-ds-animate>Avaliação antropométrica</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-body-md text-body-md text-on-surface-variant flex-grow" data-ds-animate>Avaliação nutricional detalhada dos residentes ou colaboradores conforme necessidade.</p>
+</div>
+<!-- Service 4 -->
+<div class="ds-animate ds-fade-scale ds-delay-3 ds-card-lift bg-surface-container-lowest p-stack-lg rounded-2xl border border-border soft-bloom-shadow hover:border-primary/40 flex flex-col gap-4 group" data-ds-animate>
+<div class="ds-animate ds-fade-up-sm w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors" data-ds-animate>
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">restaurant_menu</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-md text-[20px] leading-tight text-on-surface mt-2" data-ds-animate>Segurança alimentar</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-body-md text-body-md text-on-surface-variant flex-grow" data-ds-animate>Implementação de manuais de boas práticas e POPs para cozinhas industriais e restaurantes.</p>
+</div>
+<!-- Service 5 -->
+<div class="ds-animate ds-fade-scale ds-delay-4 ds-card-lift bg-surface-container-lowest p-stack-lg rounded-2xl border border-border soft-bloom-shadow hover:border-primary/40 flex flex-col gap-4 group" data-ds-animate>
+<div class="ds-animate ds-fade-up-sm w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors" data-ds-animate>
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">skillet</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-md text-[20px] leading-tight text-on-surface mt-2" data-ds-animate>Oficina culinária</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-body-md text-body-md text-on-surface-variant flex-grow" data-ds-animate>Aulas práticas para o desenvolvimento de receitas saudáveis e aproveitamento integral.</p>
+</div>
+<!-- Service 6 -->
+<div class="ds-animate ds-fade-scale ds-delay-5 ds-card-lift bg-surface-container-lowest p-stack-lg rounded-2xl border border-border soft-bloom-shadow hover:border-primary/40 flex flex-col gap-4 group" data-ds-animate>
+<div class="ds-animate ds-fade-up-sm w-14 h-14 rounded-xl bg-surface-container flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-on-primary transition-colors" data-ds-animate>
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">group_add</span>
+</div>
+<h3 class="ds-animate ds-fade-up-sm ds-delay-1 font-headline-md text-[20px] leading-tight text-on-surface mt-2" data-ds-animate>Treinamento</h3>
+<p class="ds-animate ds-fade-up-sm ds-delay-2 font-body-md text-body-md text-on-surface-variant flex-grow" data-ds-animate>Capacitação periódica para manipuladores de alimentos focada em higiene e processos.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-section-gap bg-surface relative overflow-hidden" id="saude">
+<!-- Decorative background elements -->
+<div class="ds-animate ds-fade-right absolute top-0 right-0 w-1/2 h-full bg-surface-container-low rounded-l-[100px] -z-10 hidden lg:block" data-ds-animate></div>
+<div class="max-w-container-max mx-auto px-gutter relative z-10">
+<div class="ds-animate ds-fade-scale bg-surface-container-lowest rounded-3xl border border-border soft-bloom-shadow p-8 md:p-16 flex flex-col md:flex-row items-center justify-between gap-8" data-ds-animate>
+<div class="flex-1 space-y-4">
+<h2 class="ds-animate ds-fade-up font-headline-lg text-headline-lg text-on-surface" data-ds-animate>Pronto para elevar o padrão do seu estabelecimento?</h2>
+<p class="ds-animate ds-fade-up ds-delay-1 font-body-lg text-body-lg text-on-surface-variant max-w-xl" data-ds-animate>
+                            Nossa equipe de especialistas está pronta para realizar um diagnóstico completo e propor as melhores soluções em nutrição e segurança alimentar.
+                        </p>
+</div>
+<div class="flex-shrink-0 w-full md:w-auto">
+<a class="ds-btn ds-btn-primary ds-animate ds-fade-up-sm ds-delay-2 w-full md:w-auto inline-flex items-center justify-center px-8 py-4 rounded-full bg-primary text-on-primary font-label-sm text-label-sm hover:bg-primary-container hover:text-on-primary-container shadow-md" data-ds-animate href="https://wa.me/5511994946440" rel="noopener" target="_blank">
+<span class="material-symbols-outlined mr-2 ds-btn-icon">chat</span>
+                            Falar com Consultor
+                        </a>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-surface-container-low dark:bg-inverse-surface border-t border-border dark:border-outline-variant full-width py-stack-lg mt-section-gap" id="contato">
+<div class="max-w-container-max mx-auto px-gutter grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-stack-lg items-start" data-ds-animate data-ds-stagger="fade-up">
+<!-- Brand Column -->
+<div class="flex flex-col gap-4" data-ds-stagger="fade-up-sm">
+<a class="flex items-center gap-2" href="#">
+<div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-on-primary">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">eco</span>
+</div>
+<span class="font-headline-md text-headline-md text-primary dark:text-primary-fixed-dim tracking-tight">Saber Nutrir</span>
+</a>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2 max-w-xs">
+                    Consultoria e assessoria nutricional especializada para instituições e empresas.
+                </p>
+</div>
+<!-- Contact -->
+<div class="flex flex-col gap-4" data-ds-stagger="fade-up-sm">
+<h4 class="font-label-sm text-label-sm text-on-surface uppercase tracking-widest font-bold">Contato</h4>
+<ul class="flex flex-col gap-3" data-ds-stagger="fade-up-sm">
+<li class="flex items-start gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px] text-primary shrink-0 mt-0.5">location_on</span>
+<span class="font-body-md text-body-md">Rua Maria Abadia dos Santos, 107</span>
+</li>
+<li class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[20px] text-primary shrink-0">mail</span>
+<a class="font-body-md text-body-md hover:text-primary transition-colors" href="mailto:sabernutrir@sabernutrir.com.br">sabernutrir@sabernutrir.com.br</a>
+</li>
+<li class="flex items-center gap-2 text-on-surface-variant mt-2">
+<a class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-surface border border-border text-primary font-label-sm text-label-sm hover:bg-primary/5 hover:-translate-y-0.5 transition-all w-fit" href="https://wa.me/5511994946440">
+<span class="material-symbols-outlined text-[18px]">calendar_month</span>
+                            Agende uma visita
+                        </a>
+</li>
+</ul>
+</div>
+<!-- Legal Links -->
+<div class="flex flex-col gap-4" data-ds-stagger="fade-up-sm">
+<h4 class="font-label-sm text-label-sm text-on-surface uppercase tracking-widest font-bold">Institucional</h4>
+<nav class="flex flex-col gap-2" data-ds-stagger="fade-up-sm">
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">Privacidade</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">Termos</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">Cookies</a>
+<a class="font-body-md text-body-md text-on-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors" href="#">FAQ</a>
+</nav>
+</div>
+<!-- Certification / Trust -->
+<div class="flex flex-col gap-4 lg:items-end" data-ds-stagger="fade-up-sm">
+<div class="bg-surface-container-lowest p-4 rounded-xl border border-border inline-flex items-center gap-3 w-fit ds-card-lift">
+<span class="material-symbols-outlined text-3xl text-primary" style="font-variation-settings: 'FILL' 1;">assignment_turned_in</span>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface font-bold">Registro CRN-3 Ativo</p>
+<p class="text-[12px] text-muted">Adequação ANVISA</p>
+</div>
+</div>
+</div>
+</div>
+<div class="max-w-container-max mx-auto px-gutter mt-12 pt-8 border-t border-border/50 text-center md:text-left">
+<p class="ds-animate ds-fade-in font-body-md text-body-md text-muted text-sm" data-ds-animate>
+                © 2024 Saber Nutrir. Consultoria Nutricional. Todos os direitos reservados.
+            </p>
+</div>
+</footer>
+<script>
+(function DS1Motion() {
+    var STAGGER_MS = 80;
+    var motionTypes = {
+        'fade-in': 'ds-fade-in',
+        'fade-up': 'ds-fade-up',
+        'fade-up-sm': 'ds-fade-up-sm',
+        'fade-scale': 'ds-fade-scale',
+        'fade-left': 'ds-fade-left',
+        'fade-right': 'ds-fade-right',
+        'nav-link': 'ds-nav-link'
+    };
+
+    function revealElement(el, delayMs) {
+        setTimeout(function() {
+            el.classList.add('is-visible');
+            el.querySelectorAll('.ds-btn').forEach(function(btn) { btn.classList.add('is-visible'); });
+        }, delayMs || 0);
+    }
+
+    function revealStaggerGroup(group, baseDelay) {
+        var children = Array.from(group.children).filter(function(c) {
+            return c.nodeType === 1 && !c.hasAttribute('data-ds-stagger-skip');
+        });
+        children.forEach(function(child, i) {
+            var childDelay = (baseDelay || 0) + i * STAGGER_MS;
+            revealElement(child, childDelay);
+            if (child.hasAttribute('data-ds-stagger')) {
+                revealStaggerGroup(child, childDelay + 100);
+            }
+        });
+    }
+
+    function initStaggerGroup(group) {
+        var type = group.dataset.dsStagger || 'fade-up-sm';
+        var motionClass = motionTypes[type] || 'ds-fade-up-sm';
+        Array.from(group.children).forEach(function(child, i) {
+            if (child.nodeType !== 1 || child.hasAttribute('data-ds-stagger-skip')) return;
+            child.classList.add('ds-animate', motionClass);
+            if (i > 0 && i <= 6) child.classList.add('ds-delay-' + i);
+        });
+    }
+
+    document.querySelectorAll('[data-ds-stagger]').forEach(initStaggerGroup);
+
+    var prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+        document.querySelectorAll('.ds-animate, .ds-btn, .ds-text-link, .ds-nav-link').forEach(function(el) {
+            el.classList.add('is-visible');
+        });
+        return;
+    }
+
+    document.querySelectorAll('[data-ds-immediate]').forEach(function(el) {
+        if (el.hasAttribute('data-ds-stagger')) {
+            revealStaggerGroup(el, STAGGER_MS);
+        } else {
+            var delayMatch = Array.from(el.classList).find(function(c) { return c.indexOf('ds-delay-') === 0; });
+            var extra = delayMatch ? parseInt(delayMatch.replace('ds-delay-', ''), 10) * STAGGER_MS : 0;
+            revealElement(el, extra);
+        }
+    });
+
+    var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+            if (!entry.isIntersecting) return;
+            var target = entry.target;
+            if (target.hasAttribute('data-ds-stagger')) {
+                revealStaggerGroup(target, 0);
+            } else {
+                var delay = parseInt(target.dataset.dsDelay || '0', 10);
+                revealElement(target, delay * STAGGER_MS);
+            }
+            observer.unobserve(target);
+        });
+    }, { threshold: 0.08, rootMargin: '0px 0px -32px 0px' });
+
+    document.querySelectorAll('[data-ds-animate]').forEach(function(el) {
+        observer.observe(el);
+    });
+
+    document.querySelectorAll('a[href^="#"]').forEach(function(anchor) {
+        anchor.addEventListener('click', function(e) {
+            var id = anchor.getAttribute('href');
+            if (!id || id === '#') return;
+            var section = document.querySelector(id);
+            if (!section) return;
+            e.preventDefault();
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+})();
+</script>
+</body></html>

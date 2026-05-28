@@ -62,22 +62,12 @@ export async function createNutritionAssessmentAction(
 
   const { data: patient } = await supabase
     .from("patients")
-    .select("id, client_id")
+    .select("id, user_id")
     .eq("id", patientId)
     .maybeSingle();
 
-  if (!patient) {
+  if (!patient || patient.user_id !== workspaceOwnerId) {
     return { ok: false, error: "Paciente não encontrado." };
-  }
-
-  const { data: clientRow } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", patient.client_id)
-    .maybeSingle();
-
-  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
-    return { ok: false, error: "Sem permissão para este paciente." };
   }
 
   const height_cm = parseOptDecimal(String(formData.get("height_cm") ?? ""));
@@ -132,14 +122,14 @@ async function assertAssessmentOwner(
 ): Promise<{ patientId: string } | { error: string }> {
   const { data: row } = await supabase
     .from("patient_nutrition_assessments")
-    .select("id, patient_id, patients!inner(client_id, clients!inner(owner_user_id))")
+    .select("id, patient_id, patients!inner(user_id)")
     .eq("id", assessmentId)
     .maybeSingle();
 
   if (!row) return { error: "Avaliação não encontrada." };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const owner = (row as any).patients?.clients?.owner_user_id;
+  const owner = (row as any).patients?.user_id;
   if (owner !== ownerUserId) return { error: "Sem permissão para esta avaliação." };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

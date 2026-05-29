@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export type ClientCustomSegment = {
   id: string;
@@ -41,9 +42,12 @@ export async function createCustomSegmentAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
 
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
   const { data: existing } = await supabase
     .from("client_custom_segments")
     .select("id, label")
+    .eq("owner_user_id", workspaceOwnerId)
     .eq("label", trimmed)
     .maybeSingle();
 
@@ -53,7 +57,7 @@ export async function createCustomSegmentAction(
 
   const { data, error } = await supabase
     .from("client_custom_segments")
-    .insert({ label: trimmed, owner_user_id: user.id })
+    .insert({ label: trimmed, owner_user_id: workspaceOwnerId })
     .select("id, label")
     .single();
 

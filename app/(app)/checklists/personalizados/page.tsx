@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Pencil, Play } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { startChecklistCustomFill } from "@/lib/actions/checklist-fill";
@@ -32,23 +33,19 @@ export default async function ChecklistsPersonalizadosPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Modelos personalizados
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Cópias do catálogo oficial com itens extra por estabelecimento. Aplique
-            estes modelos em rascunhos de preenchimento e, no futuro, em visitas.
-          </p>
-        </div>
-        <Link
-          href="/checklists"
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-        >
-          Catálogo oficial
-        </Link>
-      </div>
+      <PageHeader
+        title="Modelos personalizados"
+        description="Cópias do catálogo oficial com itens extra por estabelecimento. Aplique estes modelos em rascunhos de preenchimento e, no futuro, em visitas."
+        back={{ href: "/checklists", label: "Checklists" }}
+        actions={
+          <Link
+            href="/checklists"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            Catálogo oficial
+          </Link>
+        }
+      />
 
       {err === "missing" || err === "forbidden" || err === "session" ? (
         <p className="text-destructive text-sm" role="alert">

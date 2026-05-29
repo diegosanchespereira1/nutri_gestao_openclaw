@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { WorkspaceChecklistBuilder } from "@/components/checklists/workspace-checklist-builder";
 import { loadWorkspaceTemplateForEdit } from "@/lib/actions/checklist-workspace";
 import type { WorkspaceEditSection } from "@/lib/actions/checklist-workspace";
-import { createClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { cn } from "@/lib/utils";
 
 export default async function EditWorkspaceChecklistPage({
   params,
@@ -19,17 +21,6 @@ export default async function EditWorkspaceChecklistPage({
   }
   if (template.archived_at) {
     notFound();
-  }
-
-  // Bloqueia edição de templates já utilizados em ao menos 1 sessão.
-  const supabase = await createClient();
-  const { count: sessionCount } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_template_id", id);
-
-  if ((sessionCount ?? 0) > 0) {
-    redirect("/checklists/equipe");
   }
 
   const initialSections: WorkspaceEditSection[] = template.sections.map((sec) => ({
@@ -56,11 +47,31 @@ export default async function EditWorkspaceChecklistPage({
         </div>
         <Link
           href="/checklists/equipe"
-          className="text-muted-foreground hover:text-foreground text-sm font-medium underline-offset-2 hover:underline"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
           Voltar para modelos da equipe
         </Link>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="font-mono">
+          v{template.version}
+        </Badge>
+        {template.fill_session_count > 0 && (
+          <Badge variant="secondary">
+            {template.fill_session_count} sessão(ões) aplicada(s)
+          </Badge>
+        )}
+      </div>
+
+      {template.fill_session_count > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="text-sm text-amber-800">
+            Este modelo já foi aplicado em {template.fill_session_count} sessão(ões).
+            Qualquer edição criará automaticamente uma nova versão.
+          </p>
+        </div>
+      )}
 
       <WorkspaceChecklistBuilder
         mode="edit"

@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { Loader2, Pencil, Archive, Play } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -92,9 +93,14 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
               )}
             >
               <div className="min-w-0">
-                <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                  Equipe
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    Equipe
+                  </span>
+                  <Badge variant="outline" className="font-mono text-[10px]">
+                    v{tpl.version}
+                  </Badge>
+                </div>
                 <p className="mt-2 truncate text-sm font-semibold text-foreground">
                   {tpl.name}
                 </p>
@@ -126,7 +132,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
 
               {tpl.has_been_used && (
                 <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                  Modelo em uso — não pode ser editado. Use-o como base para criar um novo.
+                  Modelo em uso — edições geram nova versão e preservam o histórico.
                 </p>
               )}
 
@@ -138,15 +144,13 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                   <Play className="size-3.5" />
                   Preencher
                 </Link>
-                {!tpl.has_been_used && (
-                  <Link
-                    href={`/checklists/equipe/${tpl.id}/editar`}
-                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full sm:w-auto")}
-                  >
-                    <Pencil className="size-3.5" />
-                    Editar
-                  </Link>
-                )}
+                <Link
+                  href={`/checklists/equipe/${tpl.id}/editar`}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full sm:w-auto")}
+                >
+                  <Pencil className="size-3.5" />
+                  Editar
+                </Link>
                 <Button
                   type="button"
                   variant="ghost"

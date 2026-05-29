@@ -45,6 +45,7 @@ export default async function ClientesPage({
 }) {
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q : "";
+  const createdOk = sp.ok === "created";
   const situacaoRaw =
     typeof sp.situacao === "string" ? sp.situacao : undefined;
   const situacao = parseSituacao(situacaoRaw);
@@ -89,6 +90,16 @@ export default async function ClientesPage({
           </Link>
         }
       />
+
+      {createdOk ? (
+        <p
+          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+          role="status"
+        >
+          Cliente criado com sucesso. Apenas o administrador da conta pode editar
+          os dados depois do cadastro.
+        </p>
+      ) : null}
 
       <ClientesFilters
         defaultQ={q}

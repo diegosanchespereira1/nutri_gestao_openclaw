@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import {
   useActionState,
+  useEffect,
   useRef,
   useState,
   useTransition,
@@ -44,6 +45,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -231,7 +233,7 @@ export function ClientForm({
 }) {
   const action =
     mode === "create" ? createClientAction : updateClientAction;
-  const [state, formAction] = useActionState(action, initial);
+  const [state, formAction, isPending] = useActionState(action, initial);
   const [kind, setKind] = useState<ClientKind>(defaultKind);
   const [tab, setTab] = useState<ClientFormTab>(() => {
     if (
@@ -249,6 +251,7 @@ export function ClientForm({
   const [estCategory, setEstCategory] = useState<EstablishmentCategory | "">(initialEstCategory);
   const [estType, setEstType] = useState<EstablishmentType | "">(defaultEstType ?? "");
   const [estValidationError, setEstValidationError] = useState(false);
+  const [estValidationDialogOpen, setEstValidationDialogOpen] = useState(false);
 
   function handleEstCategoryChange(cat: EstablishmentCategory | "") {
     setEstCategory(cat);
@@ -264,6 +267,18 @@ export function ClientForm({
   const [newSegmentError, setNewSegmentError] = useState<string | null>(null);
   const [segmentPending, startSegmentTransition] = useTransition();
   const newSegmentInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (state?.ok !== false || !state.error) return;
+    const needsEstablishment =
+      state.error.includes("estabelecimento") ||
+      state.error.includes("Estabelecimento");
+    if (needsEstablishment) {
+      setEstValidationError(true);
+      setEstValidationDialogOpen(true);
+      setTab("pj-estabelecimento");
+    }
+  }, [state]);
 
   function handleCreateSegment() {
     setNewSegmentError(null);
@@ -320,6 +335,7 @@ export function ClientForm({
           if (kind === "pj" && !estType) {
             e.preventDefault();
             setEstValidationError(true);
+            setEstValidationDialogOpen(true);
             setTab("pj-estabelecimento");
           }
         }}
@@ -1333,13 +1349,76 @@ export function ClientForm({
             </p>
           ) : null}
           <div className="flex flex-wrap justify-end gap-2 sm:ms-auto">
-            <Button type="submit" className="min-w-[9rem]">
-              {mode === "create" ? "Criar cliente" : "Salvar alterações"}
+            <Button type="submit" className="min-w-[9rem]" disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  {mode === "create" ? "Cadastrando…" : "Salvando…"}
+                </>
+              ) : mode === "create" ? (
+                "Criar cliente"
+              ) : (
+                "Salvar alterações"
+              )}
             </Button>
           </div>
         </CardFooter>
       </form>
     </Card>
+
+    <Dialog open={isPending}>
+      <DialogContent
+        showCloseButton={false}
+        className="sm:max-w-md"
+        aria-describedby="client-form-pending-desc"
+      >
+        <DialogHeader className="items-center pr-0 text-center">
+          <Loader2
+            className="mx-auto mb-3 size-10 animate-spin text-primary"
+            aria-hidden
+          />
+          <DialogTitle>
+            {mode === "create" ? "Cadastrando cliente…" : "Salvando alterações…"}
+          </DialogTitle>
+          <DialogDescription id="client-form-pending-desc">
+            {mode === "create" && kind === "pj"
+              ? "Estamos a registar o cliente e o estabelecimento associado. Aguarde — não feche esta página."
+              : mode === "create"
+                ? "Estamos a registar o cliente. Aguarde — não feche esta página."
+                : "Aguarde enquanto guardamos os dados do cliente."}
+          </DialogDescription>
+        </DialogHeader>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog
+      open={estValidationDialogOpen}
+      onOpenChange={setEstValidationDialogOpen}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Complete o cadastro do estabelecimento</DialogTitle>
+          <DialogDescription>
+            Para clientes pessoa jurídica, é obrigatório informar a{" "}
+            <strong className="text-foreground">categoria</strong> e o{" "}
+            <strong className="text-foreground">tipo de estabelecimento</strong>{" "}
+            antes de concluir o cadastro. Acesse a aba Estabelecimento e preencha
+            esses campos.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button
+            type="button"
+            onClick={() => {
+              setEstValidationDialogOpen(false);
+              setTab("pj-estabelecimento");
+            }}
+          >
+            Ir para estabelecimento
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <Dialog
       open={segmentDialogOpen}

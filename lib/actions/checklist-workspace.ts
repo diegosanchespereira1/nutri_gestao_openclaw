@@ -23,6 +23,7 @@ export type WorkspaceTemplateListRow = {
   created_by_name: string | null;
   total_item_count: number;
   required_item_count: number;
+  version: number;
   updated_at: string;
   /** true quando já existe ao menos 1 sessão de preenchimento usando este modelo. */
   has_been_used: boolean;
@@ -48,6 +49,8 @@ export type WorkspaceTemplateInput = {
 export type WorkspaceTemplateLoadResult = {
   id: string;
   name: string;
+  version: number;
+  fill_session_count: number;
   archived_at: string | null;
   sections: Array<{
     id: string;
@@ -82,7 +85,7 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
 
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, name, created_by_user_id, updated_at")
+    .select("id, name, created_by_user_id, version, updated_at")
     .eq("owner_user_id", workspaceOwnerId)
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
@@ -154,6 +157,7 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
       created_by_name: profileNames.get(String(t.created_by_user_id)) ?? null,
       total_item_count: counts.get(String(t.id))?.total ?? 0,
       required_item_count: counts.get(String(t.id))?.required ?? 0,
+      version: Number(t.version ?? 1),
       updated_at: String(t.updated_at),
       has_been_used: usedTemplateIds.has(String(t.id)),
     })),
@@ -172,11 +176,17 @@ export async function loadWorkspaceTemplateForEdit(
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  const { data: template } = await supabase
-    .from("checklist_workspace_templates")
-    .select("id, name, archived_at, owner_user_id")
-    .eq("id", id)
-    .maybeSingle();
+  const [{ data: template }, { count: fillSessionCount }] = await Promise.all([
+    supabase
+      .from("checklist_workspace_templates")
+      .select("id, name, version, archived_at, owner_user_id")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("checklist_fill_sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_template_id", id),
+  ]);
 
   if (!template || template.owner_user_id !== workspaceOwnerId) return null;
 
@@ -215,6 +225,8 @@ export async function loadWorkspaceTemplateForEdit(
   return {
     id: String(template.id),
     name: String(template.name),
+    version: Number(template.version ?? 1),
+    fill_session_count: fillSessionCount ?? 0,
     archived_at: template.archived_at as string | null,
     sections: (sections ?? []).map((sec) => ({
       id: String(sec.id),
@@ -307,7 +319,7 @@ export async function loadWorkspaceTemplateBundle(
     uf: "*",
     applies_to: [],
     description: "Modelo da equipe (workspace).",
-    version: 1,
+    version: Number(template.version ?? 1),
     is_active: template.archived_at === null,
     created_at: String(template.created_at),
     updated_at: String(template.updated_at),
@@ -318,6 +330,29 @@ export async function loadWorkspaceTemplateBundle(
 }
 
 /* ─── Mutations ────────────────────────────────────────────────────────── */
+
+async function bumpWorkspaceVersionIfApplied(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  templateId: string,
+): Promise<void> {
+  const { count } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_template_id", templateId);
+
+  if (!count || count <= 0) return;
+
+  const { data: template } = await supabase
+    .from("checklist_workspace_templates")
+    .select("version")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  await supabase
+    .from("checklist_workspace_templates")
+    .update({ version: Number(template?.version ?? 1) + 1 })
+    .eq("id", templateId);
+}
 
 function sanitizeInput(input: WorkspaceTemplateInput): {
   ok: true;
@@ -472,13 +507,6 @@ export async function updateWorkspaceTemplateAction(
     .eq("id", templateId);
   if (nameErr) return { ok: false, error: "Não foi possível salvar o nome." };
 
-  // Estratégia: apaga seções/itens existentes e recria. Como sessões antigas
-  // continuam referenciando os IDs (cascade no delete só impacta itens não
-  // preservados), preservamos só itens com o mesmo `id` (caso o front envie).
-  // Para simplicidade e segurança, removemos tudo e criamos do zero — sessões
-  // existentes ainda funcionam porque elas referenciam respostas com FK ON
-  // DELETE CASCADE e o template antigo é preservado por ON DELETE RESTRICT.
-  // Para evitar invalidar sessões em curso, validamos primeiro.
   const { count: openSessionsCount } = await supabase
     .from("checklist_fill_sessions")
     .select("id", { count: "exact", head: true })
@@ -493,130 +521,132 @@ export async function updateWorkspaceTemplateAction(
     };
   }
 
-  // Bloquear edição se houver sessões aprovadas com itens de validade futura em uso
-  const todayIso = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Sao_Paulo" });
-  const { data: approvedSessions } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id")
-    .eq("workspace_template_id", templateId)
-    .not("dossier_approved_at", "is", null);
-
-  if (approvedSessions && approvedSessions.length > 0) {
-    const approvedIds = approvedSessions.map((s) => (s as { id: string }).id);
-    const { count: futureValidCount } = await supabase
-      .from("checklist_fill_item_responses")
-      .select("id", { count: "exact", head: true })
-      .in("session_id", approvedIds)
-      .not("valid_until", "is", null)
-      .gte("valid_until", todayIso);
-
-    if ((futureValidCount ?? 0) > 0) {
-      return {
-        ok: false,
-        error:
-          "Este modelo não pode ser editado pois possui itens com validade futura em uso em checklists aprovados. " +
-          "Crie uma nova versão do modelo para fazer alterações.",
-      };
-    }
-  }
-
-  // Apaga seções existentes (cascade nos itens). Itens em respostas aprovadas
-  // serão preservados pelo ON DELETE CASCADE → impede a exclusão se houver
-  // resposta. Para garantir que o histórico não quebre, criamos um snapshot:
-  // apagamos só as seções/itens ainda não usados em respostas.
   const { data: oldSections } = await supabase
     .from("checklist_workspace_sections")
     .select("id")
     .eq("workspace_template_id", templateId);
 
   const oldSectionIds = (oldSections ?? []).map((s) => String(s.id));
-  if (oldSectionIds.length > 0) {
-    const { data: oldItems } = await supabase
-      .from("checklist_workspace_items")
-      .select("id")
-      .in("workspace_section_id", oldSectionIds);
-    const oldItemIds = (oldItems ?? []).map((i) => String(i.id));
+  const { data: oldItems } =
+    oldSectionIds.length > 0
+      ? await supabase
+          .from("checklist_workspace_items")
+          .select("id")
+          .in("workspace_section_id", oldSectionIds)
+      : { data: [] as { id: string }[] };
 
-    if (oldItemIds.length > 0) {
-      const { data: usedRefs } = await supabase
-        .from("checklist_fill_item_responses")
-        .select("workspace_item_id")
-        .in("workspace_item_id", oldItemIds);
-      const usedItemIds = new Set(
-        (usedRefs ?? [])
-          .map((r) => r.workspace_item_id as string | null)
-          .filter((id): id is string => Boolean(id)),
-      );
-
-      if (usedItemIds.size > 0) {
-        return {
-          ok: false,
-          error:
-            "Não é possível salvar com o mesmo nome. Este modelo já foi usado em checklists finalizados e não pode ser alterado. Crie um novo checklist com um nome diferente.",
-        };
-      }
-
-      await supabase
-        .from("checklist_workspace_items")
-        .delete()
-        .in("id", oldItemIds);
-    }
-
-    // Remove seções vazias após a limpeza
-    const { data: emptySections } = await supabase
-      .from("checklist_workspace_sections")
-      .select("id")
-      .eq("workspace_template_id", templateId);
-    for (const sec of emptySections ?? []) {
-      const { count: itemCount } = await supabase
-        .from("checklist_workspace_items")
-        .select("id", { count: "exact", head: true })
-        .eq("workspace_section_id", sec.id as string);
-      if ((itemCount ?? 0) === 0) {
-        await supabase
-          .from("checklist_workspace_sections")
-          .delete()
-          .eq("id", sec.id as string);
-      }
+  const oldItemIds = (oldItems ?? []).map((i) => String(i.id));
+  const usedItemIds = new Set<string>();
+  if (oldItemIds.length > 0) {
+    const { data: usedRefs } = await supabase
+      .from("checklist_fill_item_responses")
+      .select("workspace_item_id")
+      .in("workspace_item_id", oldItemIds);
+    for (const ref of usedRefs ?? []) {
+      const itemId = ref.workspace_item_id as string | null;
+      if (itemId) usedItemIds.add(itemId);
     }
   }
 
-  // Cria as novas seções/itens. Posições começam após as preservadas.
-  const { count: existingSecCount } = await supabase
-    .from("checklist_workspace_sections")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_template_id", templateId);
+  const payloadSectionIds = new Set(
+    sanitized.sections.map((sec) => sec.id).filter((id): id is string => Boolean(id)),
+  );
+  const payloadItemIds = new Set(
+    sanitized.sections
+      .flatMap((sec) => sec.items.map((it) => it.id))
+      .filter((id): id is string => Boolean(id)),
+  );
 
-  let nextSectionPos = existingSecCount ?? 0;
+  let sectionPos = 0;
   for (const sec of sanitized.sections) {
-    const { data: secRow, error: sErr } = await supabase
-      .from("checklist_workspace_sections")
-      .insert({
-        workspace_template_id: templateId,
-        title: sec.title,
-        position: nextSectionPos++,
-      })
-      .select("id")
-      .single();
+    let sectionId: string;
 
-    if (sErr || !secRow) {
-      return { ok: false, error: "Não foi possível salvar as seções." };
+    if (sec.id && payloadSectionIds.has(sec.id)) {
+      const { error: secErr } = await supabase
+        .from("checklist_workspace_sections")
+        .update({ title: sec.title, position: sectionPos })
+        .eq("id", sec.id)
+        .eq("workspace_template_id", templateId);
+      if (secErr) {
+        return { ok: false, error: "Não foi possível salvar as seções." };
+      }
+      sectionId = sec.id;
+    } else {
+      const { data: secRow, error: secErr } = await supabase
+        .from("checklist_workspace_sections")
+        .insert({
+          workspace_template_id: templateId,
+          title: sec.title,
+          position: sectionPos,
+        })
+        .select("id")
+        .single();
+      if (secErr || !secRow) {
+        return { ok: false, error: "Não foi possível salvar as seções." };
+      }
+      sectionId = String(secRow.id);
     }
 
-    const itemRows = sec.items.map((it, idx) => ({
-      workspace_section_id: secRow.id as string,
-      description: it.description,
-      is_required: it.is_required,
-      position: idx,
-    }));
+    let itemPos = 0;
+    for (const it of sec.items) {
+      if (it.id && payloadItemIds.has(it.id)) {
+        const { error: itemErr } = await supabase
+          .from("checklist_workspace_items")
+          .update({
+            workspace_section_id: sectionId,
+            description: it.description,
+            is_required: it.is_required,
+            position: itemPos,
+          })
+          .eq("id", it.id);
+        if (itemErr) {
+          return { ok: false, error: "Não foi possível salvar os itens." };
+        }
+      } else {
+        const { error: itemErr } = await supabase
+          .from("checklist_workspace_items")
+          .insert({
+            workspace_section_id: sectionId,
+            description: it.description,
+            is_required: it.is_required,
+            position: itemPos,
+          });
+        if (itemErr) {
+          return { ok: false, error: "Não foi possível salvar os itens." };
+        }
+      }
+      itemPos += 1;
+    }
 
-    if (itemRows.length > 0) {
-      const { error: iErr } = await supabase
-        .from("checklist_workspace_items")
-        .insert(itemRows);
-      if (iErr) return { ok: false, error: "Não foi possível salvar os itens." };
+    sectionPos += 1;
+  }
+
+  const removableItemIds = oldItemIds.filter(
+    (id) => !payloadItemIds.has(id) && !usedItemIds.has(id),
+  );
+  if (removableItemIds.length > 0) {
+    await supabase
+      .from("checklist_workspace_items")
+      .delete()
+      .in("id", removableItemIds);
+  }
+
+  for (const sectionId of oldSectionIds) {
+    if (payloadSectionIds.has(sectionId)) continue;
+    const { count: itemCount } = await supabase
+      .from("checklist_workspace_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_section_id", sectionId);
+    if ((itemCount ?? 0) === 0) {
+      await supabase
+        .from("checklist_workspace_sections")
+        .delete()
+        .eq("id", sectionId)
+        .eq("workspace_template_id", templateId);
     }
   }
+
+  await bumpWorkspaceVersionIfApplied(supabase, templateId);
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");

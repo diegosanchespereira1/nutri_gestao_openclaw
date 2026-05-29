@@ -10,6 +10,7 @@ import {
   resolveClientLogoPathFromForm,
 } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type {
   ClientBusinessSegment,
@@ -327,6 +328,33 @@ export type ClientFormResult =
   | { ok: true }
   | { ok: false; error: string };
 
+async function rollbackCreatedClient(args: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  clientId: string;
+  workspaceOwnerId: string;
+  logoPath: string | null;
+  useServiceRole: boolean;
+}): Promise<void> {
+  const { supabase, clientId, workspaceOwnerId, logoPath, useServiceRole } = args;
+  await deleteLogoAtPathIfAny(supabase, logoPath);
+
+  if (useServiceRole) {
+    const admin = createServiceRoleClient();
+    await admin
+      .from("clients")
+      .delete()
+      .eq("id", clientId)
+      .eq("owner_user_id", workspaceOwnerId);
+    return;
+  }
+
+  await supabase
+    .from("clients")
+    .delete()
+    .eq("id", clientId)
+    .eq("owner_user_id", workspaceOwnerId);
+}
+
 async function resolveResponsibleTeamMemberId(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceOwnerId: string,
@@ -386,6 +414,8 @@ export async function createClientAction(
   if (!user) redirect("/login");
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const teamMember = isTeamMember(user.id, workspaceOwnerId);
+  const newId = crypto.randomUUID();
 
   const kind = parseKind(formData.get("kind"));
   if (!kind) {
@@ -448,9 +478,25 @@ export async function createClientAction(
     return { ok: false, error: responsibleRes.error };
   }
 
+  let logoPath: string | null = null;
+  if (kind === "pj") {
+    const logoRes = await resolveClientLogoPathFromForm({
+      supabase,
+      userId: workspaceOwnerId,
+      clientId: newId,
+      formData,
+      previousPath: null,
+    });
+    if (!logoRes.ok) {
+      return { ok: false, error: logoRes.error };
+    }
+    logoPath = logoRes.path;
+  }
+
   const { data, error } = await supabase
     .from("clients")
     .insert({
+      id: newId,
       owner_user_id: workspaceOwnerId,
       kind,
       legal_name,
@@ -462,39 +508,17 @@ export async function createClientAction(
       responsible_team_member_id: responsibleRes.value,
       ...pf,
       ...pjPayload,
+      ...(kind === "pj" ? { logo_storage_path: logoPath } : {}),
     })
     .select("id")
     .single();
 
   if (error || !data) {
+    if (logoPath) {
+      await deleteLogoAtPathIfAny(supabase, logoPath);
+    }
+    console.error("[createClientAction] insert failed:", error?.message);
     return { ok: false, error: "Não foi possível criar o cliente." };
-  }
-
-  const newId = data.id as string;
-
-  if (kind === "pj") {
-    const logoRes = await resolveClientLogoPathFromForm({
-      supabase,
-      userId: workspaceOwnerId,
-      clientId: newId,
-      formData,
-      previousPath: null,
-    });
-    if (!logoRes.ok) {
-      await supabase
-        .from("clients")
-        .delete()
-        .eq("id", newId)
-        .eq("owner_user_id", workspaceOwnerId);
-      return { ok: false, error: logoRes.error };
-    }
-    if (logoRes.path !== null) {
-      await supabase
-        .from("clients")
-        .update({ logo_storage_path: logoRes.path })
-        .eq("id", newId)
-        .eq("owner_user_id", workspaceOwnerId);
-    }
   }
 
   if (kind === "pj") {
@@ -505,6 +529,17 @@ export async function createClientAction(
     });
     if (estErr) {
       console.error("[createClientAction] establishment insert failed:", estErr.message);
+      await rollbackCreatedClient({
+        supabase,
+        clientId: newId,
+        workspaceOwnerId,
+        logoPath,
+        useServiceRole: teamMember,
+      });
+      return {
+        ok: false,
+        error: "Não foi possível criar o estabelecimento do cliente.",
+      };
     }
   }
 
@@ -513,6 +548,9 @@ export async function createClientAction(
   }
 
   revalidatePathsAfterClientMutation(newId);
+  if (teamMember) {
+    redirect("/clientes?ok=created");
+  }
   redirect(`/clientes/${newId}/editar`);
 }
 

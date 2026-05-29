@@ -46,7 +46,7 @@ export function RegiaoFusoForm({ defaultTimeZone }: { defaultTimeZone: string })
   }, [defaultTimeZone]);
 
   return (
-    <form action={formAction} className="max-w-lg space-y-4">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="max-w-lg space-y-4">
       <div className="space-y-2">
         <Label htmlFor="regiao-timezone">Fuso horário</Label>
         <select

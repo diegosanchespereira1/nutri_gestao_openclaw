@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils";
 
 const initial: NutritionAssessmentFormResult | undefined = undefined;
 
-// Dentro do Card (bg-card = branco), select e textarea usam bg-card para consistência
 const selectClass =
   "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
 
@@ -28,11 +27,19 @@ const legendClass =
   "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
 export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
-  const [state, formAction] = useActionState(
+  const [state, formAction, pending] = useActionState(
     createNutritionAssessmentAction,
     initial,
   );
+
+  // Controlled state preserves values if the action returns an error
+  const [heightCm, setHeightCm] = useState("");
+  const [weightKg, setWeightKg] = useState("");
+  const [waistCm, setWaistCm] = useState("");
   const [activityLevel, setActivityLevel] = useState("");
+  const [dietNotes, setDietNotes] = useState("");
+  const [clinicalNotes, setClinicalNotes] = useState("");
+  const [goals, setGoals] = useState("");
 
   return (
     <form action={formAction} className="space-y-6">
@@ -54,6 +61,8 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
               inputMode="decimal"
               placeholder="Ex.: 165"
               className="tabular-nums"
+              value={heightCm}
+              onChange={(e) => setHeightCm(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -68,6 +77,8 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
               inputMode="decimal"
               placeholder="Ex.: 70"
               className="tabular-nums"
+              value={weightKg}
+              onChange={(e) => setWeightKg(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -82,6 +93,8 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
               inputMode="decimal"
               placeholder="Opcional"
               className="tabular-nums"
+              value={waistCm}
+              onChange={(e) => setWaistCm(e.target.value)}
             />
           </div>
         </div>
@@ -120,6 +133,8 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
             className={textareaClass}
             style={{ minHeight: "72px" }}
             placeholder="Padrão alimentar, refeições típicas, preferências… (opcional)"
+            value={dietNotes}
+            onChange={(e) => setDietNotes(e.target.value)}
           />
         </div>
       </fieldset>
@@ -139,6 +154,8 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
             className={textareaClass}
             style={{ minHeight: "72px" }}
             placeholder="Condicionantes, medicação com impacto nutricional… (opcional)"
+            value={clinicalNotes}
+            onChange={(e) => setClinicalNotes(e.target.value)}
           />
         </div>
 
@@ -151,6 +168,8 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
             className={textareaClass}
             style={{ minHeight: "56px" }}
             placeholder="Ex.: ganho de massa muscular, controlo glicémico… (opcional)"
+            value={goals}
+            onChange={(e) => setGoals(e.target.value)}
           />
         </div>
       </fieldset>
@@ -166,7 +185,9 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
       ) : null}
 
       <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:gap-4">
-        <Button type="submit">Registar avaliação</Button>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Registando…" : "Registar avaliação"}
+        </Button>
         <p className="text-xs text-muted-foreground">
           Cada envio cria um novo registo datado — o histórico anterior não é alterado.
         </p>

@@ -109,7 +109,7 @@ export function EstablishmentComplianceDeadlinesSection({
         </ul>
       )}
 
-      <form action={createAction} className="border-border space-y-3 rounded-lg border p-4 bg-white">
+      <form action={createAction} onReset={(e) => e.preventDefault()} className="border-border space-y-3 rounded-lg border p-4 bg-white">
         <input type="hidden" name="establishment_id" value={establishmentId} />
         <input type="hidden" name="client_id" value={clientId} />
         <p className="text-foreground text-sm font-medium">Novo prazo</p>

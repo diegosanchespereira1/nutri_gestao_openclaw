@@ -242,7 +242,7 @@ export function ChecklistPdfSettingsForm({
 
   return (
     <div className="max-w-xl space-y-6">
-      <form action={formAction} className="space-y-6">
+      <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
         <input type="hidden" name="header_bg_color" value={headerBg} />
         <input type="hidden" name="header_text_color" value={headerText} />
         <input type="hidden" name="accent_color" value={accent} />

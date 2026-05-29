@@ -68,7 +68,7 @@ export function EstablishmentForm({
     category !== "" ? ESTABLISHMENT_TYPES_BY_CATEGORY[category] : [];
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
       <input type="hidden" name="client_id" value={clientId} />
       {mode === "edit" && establishmentId ? (
         <input type="hidden" name="id" value={establishmentId} />

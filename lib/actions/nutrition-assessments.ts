@@ -106,7 +106,11 @@ export async function createNutritionAssessmentAction(
   });
 
   if (error) {
-    return { ok: false, error: "Não foi possível salvar a avaliação." };
+    console.error("[createNutritionAssessment]", { code: error.code });
+    const detail = process.env.NODE_ENV !== "production"
+      ? ` [${error.code}: ${error.message}]`
+      : "";
+    return { ok: false, error: `Não foi possível salvar a avaliação.${detail}` };
   }
 
   revalidatePath(`/pacientes/${patientId}`);

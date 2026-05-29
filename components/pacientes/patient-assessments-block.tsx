@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, TrendingUp } from "lucide-react";
+import { ClipboardList, TrendingUp, ChevronDown } from "lucide-react";
 
 import {
   GeneralEvolutionCharts,
@@ -18,6 +18,13 @@ import {
   NUTRITIONAL_RISK_LABELS,
 } from "@/lib/types/geriatric-assessments";
 import type { AdultNutritionAssessmentRow } from "@/lib/types/adult-nutrition-assessments";
+import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
+import {
+  ACTIVITY_LEVELS,
+  activityLevelLabel,
+} from "@/lib/constants/activity-levels";
+import type { ActivityLevel } from "@/lib/constants/activity-levels";
+import { computeBmi } from "@/lib/utils/bmi";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
@@ -87,9 +94,7 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
     ? NUTRITIONAL_RISK_LABELS[row.nutritional_risk]
     : null;
   const summary = [
-    row.estimated_weight_kg
-      ? `PE ${fmt(row.estimated_weight_kg)} kg`
-      : null,
+    row.estimated_weight_kg ? `PE ${fmt(row.estimated_weight_kg)} kg` : null,
     row.bmi ? `IMC ${fmt(row.bmi)}` : null,
     riskLabel ? riskLabel.split("—")[0].trim() : null,
   ]
@@ -99,8 +104,9 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
   return (
     <li className="overflow-hidden rounded-lg border border-border bg-muted/30">
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50 marker:content-none [&::-webkit-details-marker]:hidden">
-          <div className="flex flex-1 flex-col gap-0.5 sm:flex-row sm:items-baseline sm:gap-3">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/50 marker:content-none [&::-webkit-details-marker]:hidden">
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
             <span className="text-sm font-medium text-foreground">
               {fmtDateFull(row.recorded_at)}
             </span>
@@ -110,12 +116,6 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
               {summary ? ` · ${summary}` : ""}
             </span>
           </div>
-          <span className="ml-2 shrink-0 text-xs text-muted-foreground transition-transform group-open:hidden">
-            Ver detalhes ▾
-          </span>
-          <span className="ml-2 shrink-0 text-xs text-muted-foreground hidden group-open:inline">
-            Fechar ▴
-          </span>
         </summary>
 
         <div className="space-y-4 border-t border-border bg-card px-4 py-4 text-sm">
@@ -140,53 +140,140 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
             </dl>
           </div>
 
-          {row.kcal_per_kg != null || row.ptn_per_kg != null ? (
-            <div>
-              <p className={legendClass}>Prescrição energético-proteica</p>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
-                <DataItem
-                  label="Nec. Energética"
-                  value={
-                    row.energy_needs_kcal != null
-                      ? `${Math.round(row.energy_needs_kcal).toLocaleString("pt-BR")} kcal/dia`
-                      : "–"
-                  }
-                  highlight
-                />
-                <DataItem
-                  label="Nec. Proteica"
-                  value={row.protein_needs_g != null ? `${fmt(row.protein_needs_g, 1)} g/dia` : "–"}
-                  highlight
-                />
-              </dl>
-            </div>
-          ) : null}
+          <div>
+            <p className={legendClass}>Prescrição energético-proteica</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+              <DataItem
+                label="Nec. Energética"
+                value={row.energy_needs_kcal != null ? `${Math.round(row.energy_needs_kcal).toLocaleString("pt-BR")} kcal/dia` : "–"}
+                highlight
+              />
+              <DataItem
+                label="Nec. Proteica"
+                value={row.protein_needs_g != null ? `${fmt(row.protein_needs_g, 1)} g/dia` : "–"}
+                highlight
+              />
+            </dl>
+          </div>
 
-          {riskLabel || row.nutritional_diagnosis || row.clinical_notes ? (
-            <div className="space-y-1.5">
-              <p className={legendClass}>Avaliação clínica</p>
-              {riskLabel ? (
-                <p>
-                  <span className="font-medium">Risco: </span>
-                  {riskLabel}
-                </p>
-              ) : null}
-              {row.nutritional_diagnosis ? (
-                <p>
-                  <span className="font-medium">Diagnóstico: </span>
-                  {row.nutritional_diagnosis}
-                </p>
-              ) : null}
-              {row.clinical_notes ? (
-                <p className="whitespace-pre-wrap text-muted-foreground">
-                  {row.clinical_notes}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+          <div className="space-y-1.5">
+            <p className={legendClass}>Avaliação clínica</p>
+            {riskLabel ? (
+              <p><span className="font-medium">Risco: </span>{riskLabel}</p>
+            ) : <p className="text-muted-foreground">Risco: –</p>}
+            {row.nutritional_diagnosis ? (
+              <p><span className="font-medium">Diagnóstico: </span>{row.nutritional_diagnosis}</p>
+            ) : null}
+            {row.clinical_notes ? (
+              <p className="whitespace-pre-wrap text-muted-foreground">{row.clinical_notes}</p>
+            ) : null}
+          </div>
         </div>
       </details>
     </li>
+  );
+}
+
+// ── Indicadores ──────────────────────────────────────────────────────────────
+
+function IndicatorCard({
+  label,
+  value,
+  unit,
+  date,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  date?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "rounded-lg border px-3 py-2.5",
+      accent ? "border-primary/20 bg-primary/5" : "border-border bg-card",
+    )}>
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-foreground/70">
+        {label}
+      </p>
+      <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-foreground leading-none">
+        {value}
+        {unit && (
+          <span className="ml-1 text-xs font-normal text-muted-foreground">{unit}</span>
+        )}
+      </p>
+      {date && (
+        <p className="mt-1 text-[10px] text-muted-foreground">{date}</p>
+      )}
+    </div>
+  );
+}
+
+function AssessmentIndicatorStrip({
+  generalRows,
+  adultRows,
+  geriatricRows,
+}: {
+  generalRows: NutritionAssessmentRow[];
+  adultRows: AdultNutritionAssessmentRow[];
+  geriatricRows: Awaited<ReturnType<typeof loadGeriatricAssessmentsForPatient>>["rows"];
+}) {
+  const cards: React.ReactNode[] = [];
+
+  const latestGeneral = generalRows[0];
+  if (latestGeneral) {
+    const date = fmtDate(latestGeneral.recorded_at);
+    const h = latestGeneral.height_cm != null ? Number(latestGeneral.height_cm) : null;
+    const w = latestGeneral.weight_kg != null ? Number(latestGeneral.weight_kg) : null;
+    const waist = latestGeneral.waist_cm != null ? Number(latestGeneral.waist_cm) : null;
+    const bmi = h && w ? computeBmi(h, w) : null;
+    const activity =
+      latestGeneral.activity_level &&
+      ACTIVITY_LEVELS.includes(latestGeneral.activity_level as ActivityLevel)
+        ? activityLevelLabel[latestGeneral.activity_level as ActivityLevel]
+        : null;
+
+    if (w != null)
+      cards.push(<IndicatorCard key="peso" label="Peso" value={fmt(w, 1)} unit="kg" date={date} />);
+    if (h != null)
+      cards.push(<IndicatorCard key="altura" label="Altura" value={String(h)} unit="cm" date={date} />);
+    if (bmi != null)
+      cards.push(<IndicatorCard key="imc-g" label="IMC" value={fmt(bmi, 1)} unit="kg/m²" date={date} accent />);
+    if (waist != null)
+      cards.push(<IndicatorCard key="cintura" label="Cintura" value={fmt(waist, 1)} unit="cm" date={date} />);
+    if (activity)
+      cards.push(<IndicatorCard key="atividade" label="Atividade" value={activity} date={date} />);
+  }
+
+  const latestAdult = adultRows[0] ?? null;
+  const latestGeriatric = geriatricRows[0] ?? null;
+  const latestAnthro = latestAdult ?? latestGeriatric;
+
+  if (latestAnthro) {
+    const date = fmtDate(latestAnthro.recorded_at);
+    const riskLabel = latestAnthro.nutritional_risk
+      ? NUTRITIONAL_RISK_LABELS[latestAnthro.nutritional_risk]?.split("—")[0].trim()
+      : null;
+
+    if (latestAnthro.estimated_weight_kg != null && !latestGeneral)
+      cards.push(<IndicatorCard key="pe" label="Peso Estimado" value={fmt(latestAnthro.estimated_weight_kg)} unit="kg" date={date} />);
+    if (latestAnthro.bmi != null && !latestGeneral)
+      cards.push(<IndicatorCard key="imc-a" label="IMC" value={fmt(latestAnthro.bmi)} unit="kg/m²" date={date} accent />);
+    if (latestAnthro.energy_needs_kcal != null)
+      cards.push(<IndicatorCard key="ne" label="Nec. Energética" value={Math.round(latestAnthro.energy_needs_kcal).toLocaleString("pt-BR")} unit="kcal/dia" date={date} />);
+    if (latestAnthro.protein_needs_g != null)
+      cards.push(<IndicatorCard key="np" label="Nec. Proteica" value={fmt(latestAnthro.protein_needs_g, 1)} unit="g/dia" date={date} />);
+    if (riskLabel)
+      cards.push(<IndicatorCard key="risco" label="Risco Nutricional" value={riskLabel} date={date} accent />);
+  }
+
+  if (cards.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      {cards}
+    </div>
   );
 }
 
@@ -225,7 +312,7 @@ function GeneralTabContent({
     <div className="space-y-6 pt-2">
       {chartData.length >= 2 && (
         <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
             <TrendingUp className="size-3.5" aria-hidden />
             Evolução
           </p>
@@ -260,7 +347,7 @@ function AdultTabContent({
     <div className="space-y-6 pt-2">
       {chartData.length >= 2 && (
         <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
             <TrendingUp className="size-3.5" aria-hidden />
             Evolução
           </p>
@@ -295,7 +382,7 @@ function GeriatricTabContent({
     <div className="space-y-6 pt-2">
       {chartData.length >= 2 && (
         <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
             <TrendingUp className="size-3.5" aria-hidden />
             Evolução
           </p>
@@ -369,6 +456,13 @@ export async function PatientAssessmentsBlock({
           Realizar avaliação
         </Link>
       </div>
+
+      {/* Indicadores da avaliação mais recente */}
+      <AssessmentIndicatorStrip
+        generalRows={generalRows}
+        adultRows={adultRows}
+        geriatricRows={geriatricRows}
+      />
 
       {/* Tabs com gráficos + histórico */}
       <NutritionAssessmentsTabs

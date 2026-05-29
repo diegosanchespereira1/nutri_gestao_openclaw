@@ -57,6 +57,16 @@ export function getClientIp(request: NextRequest): string {
   );
 }
 
+/** Fail-closed quando Redis/Upstash está indisponível. */
+function rateLimitUnavailable(retryAfterSeconds: number) {
+  return {
+    success: false,
+    remaining: 0,
+    reset: Date.now() + retryAfterSeconds * 1000,
+    retryAfter: retryAfterSeconds,
+  };
+}
+
 /**
  * Check auth rate limit (for login/signup)
  * Returns { success, remaining, reset, retryAfter }
@@ -74,13 +84,7 @@ export async function checkAuthRateLimit(request: NextRequest) {
     };
   } catch (error) {
     console.error('[Rate Limit Error]', error);
-    // Graceful degradation: allow request if Redis is down
-    return {
-      success: true,
-      remaining: 4,
-      reset: Date.now() + 60000,
-      retryAfter: null,
-    };
+    return rateLimitUnavailable(60);
   }
 }
 
@@ -100,12 +104,7 @@ export async function checkPasswordResetRateLimit(email: string) {
     };
   } catch (error) {
     console.error('[Rate Limit Error]', error);
-    return {
-      success: true,
-      remaining: 2,
-      reset: Date.now() + 3600000,
-      retryAfter: null,
-    };
+    return rateLimitUnavailable(3600);
   }
 }
 
@@ -125,11 +124,6 @@ export async function checkApiRateLimit(userId: string) {
     };
   } catch (error) {
     console.error('[Rate Limit Error]', error);
-    return {
-      success: true,
-      remaining: 99,
-      reset: Date.now() + 60000,
-      retryAfter: null,
-    };
+    return rateLimitUnavailable(60);
   }
 }

@@ -153,7 +153,7 @@ export async function createAdultNutritionAssessmentAction(
   });
 
   if (error) {
-    console.error("[adult-nutrition-assessments] Supabase insert error:", error);
+    console.error("[adult-nutrition-assessments]", { code: error.code });
     const detail =
       process.env.NODE_ENV === "development"
         ? ` [${error.code ?? "?"}: ${error.message}]`

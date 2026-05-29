@@ -144,7 +144,7 @@ export function PerfilForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form action={formAction} className="space-y-4">
+          <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4">
             {pendingEmail ? (
               <div className="border-border bg-muted/40 rounded-md border p-3">
                 <p className="text-sm font-medium">

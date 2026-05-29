@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
+import { Pencil, Trash2, X, Check, Loader2, ChevronDown } from "lucide-react";
 
 import {
   deleteNutritionAssessmentAction,
@@ -11,15 +11,43 @@ import {
   ACTIVITY_LEVELS,
   activityLevelLabel,
 } from "@/lib/constants/activity-levels";
+import type { ActivityLevel } from "@/lib/constants/activity-levels";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
 import {
   buildAssessmentSummaryLine,
   formatAssessmentRecordedAt,
+  toAssessmentNum,
 } from "@/lib/utils/nutrition-assessment-display";
+import { computeBmi } from "@/lib/utils/bmi";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+
+const legendClass =
+  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
+
+function DataItem({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={highlight ? "font-mono font-semibold tabular-nums text-foreground" : "tabular-nums text-foreground"}>{value}</dd>
+    </div>
+  );
+}
+
+function TextField({ label, value }: { label: string; value: string | null }) {
+  return (
+    <div>
+      <p className={legendClass}>{label}</p>
+      {value ? (
+        <p className="mt-1 whitespace-pre-wrap text-foreground">{value}</p>
+      ) : (
+        <p className="mt-1 text-muted-foreground">–</p>
+      )}
+    </div>
+  );
+}
 
 const selectClass =
   "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
@@ -45,7 +73,7 @@ function EditForm({
   const [activityLevel, setActivityLevel] = useState(row.activity_level ?? "");
 
   return (
-    <form action={formAction} className="space-y-4 border-t border-border bg-card px-4 py-4">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4 border-t border-border bg-card px-4 py-4">
       <input type="hidden" name="assessment_id" value={row.id} />
 
       {/* Antropometria */}
@@ -174,7 +202,7 @@ function DeleteConfirm({
   );
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2 border-t border-border bg-destructive/5 px-4 py-3">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="flex flex-wrap items-center gap-2 border-t border-border bg-destructive/5 px-4 py-3">
       <input type="hidden" name="assessment_id" value={row.id} />
       <p className="flex-1 text-sm text-destructive">
         Eliminar este registo permanentemente?
@@ -200,7 +228,17 @@ export function NutritionAssessmentHistoryItem({
   row: NutritionAssessmentRow;
 }) {
   const [mode, setMode] = useState<Mode>("view");
+  const [isOpen, setIsOpen] = useState(false);
   const summary = buildAssessmentSummaryLine(row);
+
+  const h = toAssessmentNum(row.height_cm);
+  const w = toAssessmentNum(row.weight_kg);
+  const waist = toAssessmentNum(row.waist_cm);
+  const bmi = h && w ? computeBmi(h, w) : null;
+  const activity =
+    row.activity_level && ACTIVITY_LEVELS.includes(row.activity_level as ActivityLevel)
+      ? activityLevelLabel[row.activity_level as ActivityLevel]
+      : null;
 
   return (
     <li className="overflow-hidden rounded-lg border border-border bg-muted/30">
@@ -208,14 +246,23 @@ export function NutritionAssessmentHistoryItem({
       <div className="flex items-center gap-2 px-4 py-3">
         <button
           type="button"
-          className="flex flex-1 flex-col gap-1 text-left sm:flex-row sm:items-baseline sm:justify-between"
-          onClick={() => mode === "view" && setMode("view")}
+          className="flex flex-1 items-center gap-2 text-left"
+          onClick={() => { if (mode === "view") setIsOpen((v) => !v); }}
+          aria-expanded={isOpen}
           aria-label={`Avaliação de ${formatAssessmentRecordedAt(row.recorded_at)}`}
         >
-          <span className="text-sm font-medium text-foreground">
-            {formatAssessmentRecordedAt(row.recorded_at)}
-          </span>
-          <span className="text-xs text-muted-foreground">{summary}</span>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+              isOpen && "rotate-180",
+            )}
+          />
+          <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <span className="text-sm font-medium text-foreground">
+              {formatAssessmentRecordedAt(row.recorded_at)}
+            </span>
+            <span className="text-xs text-muted-foreground">{summary}</span>
+          </div>
         </button>
 
         {/* Ações */}
@@ -223,7 +270,7 @@ export function NutritionAssessmentHistoryItem({
           <button
             type="button"
             aria-label="Editar avaliação"
-            onClick={() => setMode(mode === "edit" ? "view" : "edit")}
+            onClick={() => { setMode(mode === "edit" ? "view" : "edit"); setIsOpen(false); }}
             className={cn(
               "rounded-md p-1.5 transition-colors",
               mode === "edit"
@@ -236,7 +283,7 @@ export function NutritionAssessmentHistoryItem({
           <button
             type="button"
             aria-label="Eliminar avaliação"
-            onClick={() => setMode(mode === "confirm-delete" ? "view" : "confirm-delete")}
+            onClick={() => { setMode(mode === "confirm-delete" ? "view" : "confirm-delete"); setIsOpen(false); }}
             className={cn(
               "rounded-md p-1.5 transition-colors",
               mode === "confirm-delete"
@@ -250,35 +297,25 @@ export function NutritionAssessmentHistoryItem({
       </div>
 
       {/* View: detalhe colapsável */}
-      {mode === "view" && (
-        <details>
-          <summary className="cursor-pointer list-none border-t border-border/40 px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 marker:content-none [&::-webkit-details-marker]:hidden">
-            Ver detalhes ▾
-          </summary>
-          <div className="space-y-3 border-t border-border bg-card px-4 py-4 text-sm">
-            {row.diet_notes ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Alimentação / hábitos</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">{row.diet_notes}</p>
-              </div>
-            ) : null}
-            {row.clinical_notes ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Notas clínicas</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">{row.clinical_notes}</p>
-              </div>
-            ) : null}
-            {row.goals ? (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Objetivos</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">{row.goals}</p>
-              </div>
-            ) : null}
-            {!row.diet_notes && !row.clinical_notes && !row.goals ? (
-              <p className="text-muted-foreground">Apenas dados antropométricos / atividade neste registo.</p>
-            ) : null}
+      {mode === "view" && isOpen && (
+        <div className="space-y-4 border-t border-border bg-card px-4 py-4 text-sm">
+          {/* Antropometria */}
+          <div>
+            <p className={legendClass}>Antropometria & atividade</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+              <DataItem label="Altura" value={h != null ? `${h} cm` : "–"} />
+              <DataItem label="Peso" value={w != null ? `${w} kg` : "–"} />
+              <DataItem label="IMC" value={bmi != null ? `${bmi} kg/m²` : "–"} highlight />
+              <DataItem label="Cintura" value={waist != null ? `${waist} cm` : "–"} />
+              <DataItem label="Atividade" value={activity ?? "–"} />
+            </dl>
           </div>
-        </details>
+
+          {/* Texto */}
+          <TextField label="Alimentação / hábitos" value={row.diet_notes} />
+          <TextField label="Notas clínicas" value={row.clinical_notes} />
+          <TextField label="Objetivos" value={row.goals} />
+        </div>
       )}
 
       {/* Edit: formulário inline */}

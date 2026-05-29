@@ -180,7 +180,7 @@ export default async function ProntuarioPacientePage({
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
               <User className="size-3.5" aria-hidden />
               Identificação
             </CardTitle>
@@ -209,7 +209,7 @@ export default async function ProntuarioPacientePage({
 
         <Card>
           <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
               <Phone className="size-3.5" aria-hidden />
               Contacto
             </CardTitle>
@@ -232,7 +232,7 @@ export default async function ProntuarioPacientePage({
       {/* ── Associação ──────────────────────────────────────── */}
       <Card>
         <CardHeader className="border-b border-border pb-3">
-          <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
             <Building2 className="size-3.5" aria-hidden />
             Associação
           </CardTitle>
@@ -258,7 +258,7 @@ export default async function ProntuarioPacientePage({
       {row.notes ? (
         <Card>
           <CardHeader className="border-b border-border pb-3">
-            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
               <Lock className="size-3.5" aria-hidden />
               Notas clínicas
             </CardTitle>
@@ -278,7 +278,7 @@ export default async function ProntuarioPacientePage({
       {/* ── Avaliações nutricionais ──────────────────────────── */}
       <Card>
         <CardHeader className="border-b border-border pb-3">
-          <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
             <ClipboardList className="size-3.5" aria-hidden />
             Avaliações nutricionais
           </CardTitle>

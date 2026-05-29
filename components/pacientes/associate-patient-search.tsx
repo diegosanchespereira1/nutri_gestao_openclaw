@@ -107,6 +107,7 @@ export function AssociatePatientSearch({
               </div>
               <form
                 action={formAction}
+                onReset={(e) => e.preventDefault()}
                 onSubmit={() => setPendingId(c.id)}
                 className="shrink-0"
               >

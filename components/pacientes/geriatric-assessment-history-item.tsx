@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
-import { Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
+import { Pencil, Trash2, X, Check, Loader2, ChevronDown } from "lucide-react";
 
 import {
   deleteGeriatricAssessmentAction,
@@ -188,7 +188,7 @@ function EditForm({
   }, [pe, numPtn]);
 
   return (
-    <form action={formAction} className="space-y-5 border-t border-border bg-card px-4 py-4">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-5 border-t border-border bg-card px-4 py-4">
       <input type="hidden" name="assessment_id" value={row.id} />
       <input type="hidden" name="has_amputation" value={String(hasAmputation)} />
       <input type="hidden" name="cmb_cm" value={cmb !== null ? String(cmb) : ""} />
@@ -401,7 +401,7 @@ function DeleteConfirm({
   );
 
   return (
-    <form action={formAction} className="flex flex-wrap items-center gap-2 border-t border-border bg-destructive/5 px-4 py-3">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="flex flex-wrap items-center gap-2 border-t border-border bg-destructive/5 px-4 py-3">
       <input type="hidden" name="assessment_id" value={row.id} />
       <p className="flex-1 text-sm text-destructive">
         Eliminar este registo permanentemente?
@@ -429,6 +429,7 @@ export function GeriatricAssessmentHistoryItem({
   row: GeriatricAssessmentRow;
 }) {
   const [mode, setMode] = useState<Mode>("view");
+  const [isOpen, setIsOpen] = useState(false);
 
   const riskLabel = row.nutritional_risk ? NUTRITIONAL_RISK_LABELS[row.nutritional_risk] : null;
   const summary = [
@@ -444,23 +445,36 @@ export function GeriatricAssessmentHistoryItem({
     <li className="overflow-hidden rounded-lg border border-border bg-muted/30">
       {/* Cabeçalho — sempre visível */}
       <div className="flex items-center gap-2 px-4 py-3">
-        <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-          <span className="text-sm font-medium text-foreground">
-            {formatRecordedAt(row.recorded_at)}
-          </span>
-          <span className="text-xs text-muted-foreground">
-            {PATIENT_GROUP_LABELS[row.patient_group]}
-            {row.has_amputation ? " · Amputado" : ""}
-            {summary ? ` · ${summary}` : ""}
-          </span>
-        </div>
+        <button
+          type="button"
+          className="flex flex-1 items-center gap-2 text-left"
+          onClick={() => { if (mode === "view") setIsOpen((v) => !v); }}
+          aria-expanded={isOpen}
+        >
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform",
+              isOpen && "rotate-180",
+            )}
+          />
+          <div className="flex flex-1 flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
+            <span className="text-sm font-medium text-foreground">
+              {formatRecordedAt(row.recorded_at)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {PATIENT_GROUP_LABELS[row.patient_group]}
+              {row.has_amputation ? " · Amputado" : ""}
+              {summary ? ` · ${summary}` : ""}
+            </span>
+          </div>
+        </button>
 
         {/* Ações */}
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
             aria-label="Editar avaliação"
-            onClick={() => setMode(mode === "edit" ? "view" : "edit")}
+            onClick={() => { setMode(mode === "edit" ? "view" : "edit"); setIsOpen(false); }}
             className={cn(
               "rounded-md p-1.5 transition-colors",
               mode === "edit"
@@ -473,7 +487,7 @@ export function GeriatricAssessmentHistoryItem({
           <button
             type="button"
             aria-label="Eliminar avaliação"
-            onClick={() => setMode(mode === "confirm-delete" ? "view" : "confirm-delete")}
+            onClick={() => { setMode(mode === "confirm-delete" ? "view" : "confirm-delete"); setIsOpen(false); }}
             className={cn(
               "rounded-md p-1.5 transition-colors",
               mode === "confirm-delete"
@@ -487,63 +501,54 @@ export function GeriatricAssessmentHistoryItem({
       </div>
 
       {/* View: detalhe colapsável */}
-      {mode === "view" && (
-        <details>
-          <summary className="cursor-pointer list-none border-t border-border/40 px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 marker:content-none [&::-webkit-details-marker]:hidden">
-            Ver detalhes ▾
-          </summary>
-          <div className="space-y-4 border-t border-border bg-card px-4 py-4 text-sm">
-            {/* Medidas */}
-            <div>
-              <p className={legendClass}>Medidas antropométricas</p>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-                <DataItem label="CB" value={row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–"} />
-                <DataItem label="DCT" value={row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–"} />
-                <DataItem label="CMB" value={row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–"} />
-                <DataItem label="CP" value={row.cp_cm != null ? `${fmt(row.cp_cm)} cm` : "–"} />
-                <DataItem label="AJ" value={row.aj_cm != null ? `${fmt(row.aj_cm)} cm` : "–"} />
-                <DataItem label="Peso Real" value={row.weight_real_kg != null ? `${fmt(row.weight_real_kg)} kg` : "–"} />
-              </dl>
-            </div>
+      {mode === "view" && isOpen && (
+        <div className="space-y-4 border-t border-border bg-card px-4 py-4 text-sm">
+          {/* Medidas */}
+          <div>
+            <p className={legendClass}>Medidas antropométricas</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+              <DataItem label="CB" value={row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–"} />
+              <DataItem label="DCT" value={row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–"} />
+              <DataItem label="CMB" value={row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–"} />
+              <DataItem label="CP" value={row.cp_cm != null ? `${fmt(row.cp_cm)} cm` : "–"} />
+              <DataItem label="AJ" value={row.aj_cm != null ? `${fmt(row.aj_cm)} cm` : "–"} />
+              <DataItem label="Peso Real" value={row.weight_real_kg != null ? `${fmt(row.weight_real_kg)} kg` : "–"} />
+            </dl>
+          </div>
 
-            {/* Valores calculados */}
-            <div>
-              <p className={legendClass}>Valores calculados</p>
-              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-                <DataItem label="Peso Estimado" value={row.estimated_weight_kg != null ? `${fmt(row.estimated_weight_kg)} kg` : "–"} highlight />
-                <DataItem label="Altura Estimada" value={row.estimated_height_m != null ? `${fmt(row.estimated_height_m, 3)} m` : "–"} />
-                <DataItem label="IMC" value={row.bmi != null ? `${fmt(row.bmi)} kg/m²` : "–"} highlight />
-              </dl>
-            </div>
+          {/* Valores calculados */}
+          <div>
+            <p className={legendClass}>Valores calculados</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+              <DataItem label="Peso Estimado" value={row.estimated_weight_kg != null ? `${fmt(row.estimated_weight_kg)} kg` : "–"} highlight />
+              <DataItem label="Altura Estimada" value={row.estimated_height_m != null ? `${fmt(row.estimated_height_m, 3)} m` : "–"} />
+              <DataItem label="IMC" value={row.bmi != null ? `${fmt(row.bmi)} kg/m²` : "–"} highlight />
+            </dl>
+          </div>
 
-            {/* Prescrição */}
-            {(row.kcal_per_kg != null || row.ptn_per_kg != null) ? (
-              <div>
-                <p className={legendClass}>Prescrição energético-proteica</p>
-                <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
-                  <DataItem label="Nec. Energética" value={row.energy_needs_kcal != null ? `${Math.round(row.energy_needs_kcal).toLocaleString("pt-BR")} kcal/dia` : "–"} highlight />
-                  <DataItem label="Nec. Proteica" value={row.protein_needs_g != null ? `${fmt(row.protein_needs_g, 1)} g/dia` : "–"} highlight />
-                </dl>
-              </div>
+          {/* Prescrição */}
+          <div>
+            <p className={legendClass}>Prescrição energético-proteica</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+              <DataItem label="Nec. Energética" value={row.energy_needs_kcal != null ? `${Math.round(row.energy_needs_kcal).toLocaleString("pt-BR")} kcal/dia` : "–"} highlight />
+              <DataItem label="Nec. Proteica" value={row.protein_needs_g != null ? `${fmt(row.protein_needs_g, 1)} g/dia` : "–"} highlight />
+            </dl>
+          </div>
+
+          {/* Avaliação clínica */}
+          <div className="space-y-1.5">
+            <p className={legendClass}>Avaliação clínica</p>
+            {riskLabel ? (
+              <p><span className="font-medium">Risco: </span>{riskLabel}</p>
+            ) : <p className="text-muted-foreground">Risco: –</p>}
+            {row.nutritional_diagnosis ? (
+              <p><span className="font-medium">Diagnóstico: </span>{row.nutritional_diagnosis}</p>
             ) : null}
-
-            {/* Avaliação clínica */}
-            {(riskLabel || row.nutritional_diagnosis || row.clinical_notes) ? (
-              <div className="space-y-1.5">
-                <p className={legendClass}>Avaliação clínica</p>
-                {riskLabel ? (
-                  <p><span className="font-medium">Risco: </span>{riskLabel}</p>
-                ) : null}
-                {row.nutritional_diagnosis ? (
-                  <p><span className="font-medium">Diagnóstico: </span>{row.nutritional_diagnosis}</p>
-                ) : null}
-                {row.clinical_notes ? (
-                  <p className="whitespace-pre-wrap text-muted-foreground">{row.clinical_notes}</p>
-                ) : null}
-              </div>
+            {row.clinical_notes ? (
+              <p className="whitespace-pre-wrap text-muted-foreground">{row.clinical_notes}</p>
             ) : null}
           </div>
-        </details>
+        </div>
       )}
 
       {/* Edit: formulário inline */}

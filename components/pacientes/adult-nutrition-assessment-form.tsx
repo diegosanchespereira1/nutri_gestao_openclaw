@@ -180,7 +180,7 @@ export function AdultNutritionAssessmentForm({
       : "PE ÷ Altura²";
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
       {/* ── Campos ocultos: identificação + valores calculados ───────────── */}
       <input type="hidden" name="patient_id"          value={patientId} />
       <input type="hidden" name="has_amputation"      value={String(hasAmputation)} />

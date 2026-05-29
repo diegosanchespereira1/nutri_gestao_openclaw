@@ -336,7 +336,7 @@ export function OnboardingWizard({ templates }: Props) {
             </div>
           ) : null}
 
-          <form action={skipFormAction} className="flex flex-col gap-2">
+          <form action={skipFormAction} onReset={(e) => e.preventDefault()} className="flex flex-col gap-2">
             <input type="hidden" name="work_context" value={workContext ?? ""} />
             <Button
               type="submit"
@@ -434,7 +434,7 @@ export function OnboardingWizard({ templates }: Props) {
       ) : null}
 
       {step === 4 && workContext ? (
-        <form action={formAction} className="space-y-6">
+        <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
           <input type="hidden" name="work_context" value={workContext} />
           <input type="hidden" name="legal_name" value={legalName} />
           <input type="hidden" name="document_id" value={documentId} />

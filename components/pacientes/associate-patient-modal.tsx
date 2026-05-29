@@ -179,7 +179,7 @@ export function AssociatePatientModal({
                 >
                   Cancelar
                 </Button>
-                <form action={formAction}>
+                <form action={formAction} onReset={(e) => e.preventDefault()}>
                   <input type="hidden" name="establishment_id" value={establishmentId} />
                   <input type="hidden" name="patient_id" value={selected ?? ""} />
                   <Button type="submit" disabled={!selected || isPending}>

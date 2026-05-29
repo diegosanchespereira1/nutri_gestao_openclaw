@@ -109,7 +109,7 @@ export function VisitDossierEmailPanel({
         </p>
       ) : null}
 
-      <form action={formAction} className="space-y-3">
+      <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-3">
         <input type="hidden" name="visit_id" value={visitId} />
         <div className="space-y-2">
           <Label htmlFor={`dossier-emails-${visitId}`}>

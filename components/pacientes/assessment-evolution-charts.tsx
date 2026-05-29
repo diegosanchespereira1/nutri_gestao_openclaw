@@ -54,7 +54,7 @@ function ChartTooltip({
   if (!entry || entry.value == null) return null;
   return (
     <div className="rounded-lg border border-border bg-popover px-3 py-1.5 shadow-lg text-xs">
-      <p className="text-muted-foreground mb-0.5">{label}</p>
+      <p className="text-foreground/70 mb-0.5">{label}</p>
       <p style={{ color: String(entry.color) }} className="font-semibold tabular-nums">
         {fmtNum(Number(entry.value))} {unit}
       </p>
@@ -148,7 +148,7 @@ function ChartTile({
 }) {
   return (
     <div className="rounded-xl border border-border bg-card p-3 shadow-xs">
-      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+      <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-foreground/70">
         {title}
       </p>
       {children}

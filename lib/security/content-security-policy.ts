@@ -47,7 +47,7 @@ function connectSrcParts(): string[] {
   return [...parts];
 }
 
-function buildContentSecurityPolicyValue(): string {
+export function buildContentSecurityPolicyValue(): string {
   const isProd = process.env.NODE_ENV === "production";
   const scriptSrc = isProd
     ? "'self' 'unsafe-inline'"

@@ -89,7 +89,7 @@ export function PatientForm({
   );
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
       {/* Campos ocultos de contexto */}
       {clientId ? (
         <input type="hidden" name="client_id" value={clientId} />

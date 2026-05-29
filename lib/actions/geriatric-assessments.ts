@@ -140,7 +140,7 @@ export async function createGeriatricAssessmentAction(
 
   if (error) {
     // Log server-side para diagnóstico (visível nos logs Next.js / Vercel)
-    console.error("[geriatric-assessments] Supabase insert error:", error);
+    console.error("[geriatric-assessments]", { code: error.code });
     const detail =
       process.env.NODE_ENV === "development"
         ? ` [${error.code ?? "?"}: ${error.message}]`
@@ -250,7 +250,7 @@ export async function updateGeriatricAssessmentAction(
     .eq("id", assessmentId);
 
   if (error) {
-    console.error("[geriatric-assessments] update error:", error);
+    console.error("[geriatric-assessments]", { code: error.code });
     return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 

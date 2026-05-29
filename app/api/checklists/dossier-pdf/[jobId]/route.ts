@@ -6,6 +6,7 @@ import {
 } from "@/lib/checklist-dossier-pdf-filename";
 import { CHECKLIST_DOSSIER_PDFS_BUCKET } from "@/lib/constants/checklist-dossier-pdf";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 /**
  * Entrega o PDF do dossiê pela origem da app (sem expor URL assinada do Supabase
@@ -38,6 +39,35 @@ export async function GET(
 
   if (row.superseded_at) {
     return NextResponse.json({ error: "PDF obsoleto." }, { status: 410 });
+  }
+
+  const { data: session } = await supabase
+    .from("checklist_fill_sessions")
+    .select("establishment_id")
+    .eq("id", row.session_id)
+    .maybeSingle();
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  if (!session?.establishment_id) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
+  }
+
+  const { data: establishment } = await supabase
+    .from("establishments")
+    .select("client_id")
+    .eq("id", session.establishment_id)
+    .maybeSingle();
+
+  const { data: client } = establishment
+    ? await supabase
+        .from("clients")
+        .select("owner_user_id")
+        .eq("id", establishment.client_id)
+        .maybeSingle()
+    : { data: null };
+
+  if (!client || client.owner_user_id !== workspaceOwnerId) {
+    return NextResponse.json({ error: "Sem permissão." }, { status: 403 });
   }
 
   const { data: blob, error: dlErr } = await supabase.storage

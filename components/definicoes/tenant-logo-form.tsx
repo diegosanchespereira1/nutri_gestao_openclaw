@@ -80,7 +80,7 @@ export function TenantLogoForm({
           </p>
         </div>
 
-        <form action={formAction} className="space-y-4">
+        <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="tenant-logo-file">
               {hasLogo ? "Substituir logotipo" : "Enviar logotipo"}

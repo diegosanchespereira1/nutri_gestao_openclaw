@@ -156,6 +156,7 @@ export function TeamMemberForm({ mode, initial }: Props) {
   return (
     <form
       action={isCreate ? createFormAction : action}
+      onReset={(e) => e.preventDefault()}
       className="max-w-lg space-y-6"
       onSubmit={isCreate ? handleCreateSubmit : undefined}
     >

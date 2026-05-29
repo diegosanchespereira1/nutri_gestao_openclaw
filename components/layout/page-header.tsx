@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -37,11 +37,11 @@ export function PageHeader({
         <Link
           href={back.href}
           className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground hover:text-foreground -ml-2 mb-1 h-auto gap-1 px-2 py-1",
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "mb-2 gap-1.5 self-start",
           )}
         >
-          <ChevronLeft className="size-3.5" aria-hidden />
+          <ArrowLeft className="size-3.5" aria-hidden />
           {back.label}
         </Link>
       )}

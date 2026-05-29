@@ -37,7 +37,7 @@ export function PatientClientCard({
   }
 
   return (
-    <form action={formAction} className="space-y-4">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4">
       <input type="hidden" name="patient_id" value={patientId} />
 
       <p className="text-sm text-muted-foreground">

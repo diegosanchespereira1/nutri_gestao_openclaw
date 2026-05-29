@@ -26,6 +26,46 @@ async function requireSuperAdmin() {
   return { supabase, user };
 }
 
+type AdminSubscriptionEventType =
+  | "plan_changed"
+  | "suspended"
+  | "unsuspended"
+  | "tenant_unblocked_lgpd";
+
+async function recordAdminTenantEvent(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: {
+    tenantUserId: string;
+    eventType: AdminSubscriptionEventType;
+    oldValue?: string | null;
+    newValue?: string | null;
+    metadata?: Record<string, unknown>;
+    createdBy: string;
+  },
+): Promise<void> {
+  await supabase.from("subscription_events").insert({
+    tenant_user_id: params.tenantUserId,
+    event_type: params.eventType,
+    old_value: params.oldValue ?? null,
+    new_value: params.newValue ?? null,
+    metadata: { admin_action: true, ...params.metadata },
+    created_by: params.createdBy,
+  });
+}
+
+async function resolveTenantUserId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  profileId: string,
+): Promise<string | null> {
+  const { data } = await supabase
+    .from("profiles")
+    .select("user_id")
+    .eq("id", profileId)
+    .not("role", "in", '("admin","super_admin")')
+    .maybeSingle();
+  return data?.user_id ?? null;
+}
+
 // ── 10.1 — Gestão de tenants ──────────────────────────────────────────────────
 
 export type TenantRow = {
@@ -100,13 +140,22 @@ export async function reactivateTenantAction(formData: FormData): Promise<void> 
 }
 
 export async function changeTenantPlanAction(formData: FormData): Promise<void> {
-  const { supabase } = await requireSuperAdmin();
+  const { supabase, user } = await requireSuperAdmin();
 
   const tenantId = String(formData.get("tenant_id") ?? "").trim();
   const planSlug = String(formData.get("plan_slug") ?? "").trim();
   const expiresAt = String(formData.get("plan_expires_at") ?? "").trim() || null;
 
   if (!tenantId || !planSlug) redirect("/admin/tenants?err=invalid");
+
+  const tenantUserId = await resolveTenantUserId(supabase, tenantId);
+  if (!tenantUserId) redirect("/admin/tenants?err=invalid");
+
+  const { data: before } = await supabase
+    .from("profiles")
+    .select("plan_slug, plan_expires_at")
+    .eq("id", tenantId)
+    .maybeSingle();
 
   const { error } = await supabase
     .from("profiles")
@@ -118,21 +167,50 @@ export async function changeTenantPlanAction(formData: FormData): Promise<void> 
 
   if (error) redirect("/admin/tenants?err=save");
 
+  const planSlugChanged = before?.plan_slug !== planSlug;
+  const expiresChanged =
+    (before?.plan_expires_at ?? null) !== (expiresAt ?? null);
+
+  if (expiresChanged && !planSlugChanged) {
+    await recordAdminTenantEvent(supabase, {
+      tenantUserId,
+      eventType: "plan_changed",
+      oldValue: before?.plan_slug ?? null,
+      newValue: planSlug,
+      metadata: {
+        old_plan_expires_at: before?.plan_expires_at ?? null,
+        new_plan_expires_at: expiresAt,
+        plan_expires_only: true,
+      },
+      createdBy: user.id,
+    });
+  }
+
   revalidatePath("/admin/tenants");
   redirect("/admin/tenants?ok=plan_updated");
 }
 
 export async function unblockLgpdTenantAction(formData: FormData): Promise<void> {
-  const { supabase } = await requireSuperAdmin();
+  const { supabase, user } = await requireSuperAdmin();
 
   const tenantId = String(formData.get("tenant_id") ?? "").trim();
   if (!tenantId) redirect("/admin/tenants?err=invalid");
+
+  const tenantUserId = await resolveTenantUserId(supabase, tenantId);
+  if (!tenantUserId) redirect("/admin/tenants?err=invalid");
 
   const { data, error } = await supabase.rpc("lgpd_admin_unblock_profile", {
     p_profile_id: tenantId,
   });
 
   if (error) redirect("/admin/tenants?err=save");
+
+  await recordAdminTenantEvent(supabase, {
+    tenantUserId,
+    eventType: "tenant_unblocked_lgpd",
+    metadata: { profile_id: tenantId },
+    createdBy: user.id,
+  });
 
   const userId =
     data &&
@@ -206,10 +284,9 @@ export type PlatformMetrics = {
 export async function loadPlatformMetrics(): Promise<{
   metrics: PlatformMetrics | null;
 }> {
-  await requireSuperAdmin();
-  const adminSupabase = createServiceRoleClient();
+  const { supabase } = await requireSuperAdmin();
 
-  const { data, error } = await adminSupabase
+  const { data, error } = await supabase
     .from("admin_platform_metrics")
     .select("*")
     .maybeSingle();

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+import { buildContentSecurityPolicyValue } from "@/lib/security/content-security-policy";
+
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
@@ -25,9 +27,10 @@ const nextConfig: NextConfig = {
       });
     }
 
-    // Content-Security-Policy (connect-src): definida em proxy.ts com o mesmo URL
-    // runtime que `/runtime-env.js` (SUPABASE_URL → NEXT_PUBLIC_SUPABASE_URL), para
-    // não bloquear Supabase em domínio próprio quando o build não embute NEXT_PUBLIC_*.
+    base.push({
+      key: "Content-Security-Policy",
+      value: buildContentSecurityPolicyValue(),
+    });
 
     return [{ source: "/:path*", headers: base }];
   },

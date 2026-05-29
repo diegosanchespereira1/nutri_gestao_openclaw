@@ -315,6 +315,7 @@ export function ClientForm({
       </CardHeader>
       <form
         action={formAction}
+        onReset={(e) => e.preventDefault()}
         onSubmit={(e) => {
           if (kind === "pj" && !estType) {
             e.preventDefault();

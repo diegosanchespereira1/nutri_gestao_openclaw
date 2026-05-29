@@ -427,6 +427,16 @@ export async function createClientAction(
     const pj = parsePjFields(formData);
     if (!pj.ok) return { ok: false, error: pj.error };
     pjPayload = { ...pj.fields, logo_storage_path: null };
+
+    // Valida estabelecimento antes de criar o cliente para não deixar registos órfãos
+    const estCheck = parseEstablishmentInlineFields(formData, legal_name);
+    if (!estCheck.establishment_type) {
+      return {
+        ok: false,
+        error:
+          "Selecione a categoria e o tipo do estabelecimento antes de guardar. Acesse a aba Estabelecimento e preencha esses campos.",
+      };
+    }
   }
 
   const responsibleRes = await resolveResponsibleTeamMemberId(
@@ -494,8 +504,6 @@ export async function createClientAction(
       ...estPayload,
     });
     if (estErr) {
-      // Estabelecimento não criado: cliente existe mas sem estabelecimento.
-      // Redireciona para edição onde o utilizador pode corrigir.
       console.error("[createClientAction] establishment insert failed:", estErr.message);
     }
   }

@@ -6,6 +6,11 @@ import {
   DEFAULT_PROFILE_TIME_ZONE,
   normalizeAppTimeZone,
 } from "@/lib/timezones";
+import {
+  DEFAULT_ENABLED_MODULES,
+  parseEnabledModules,
+  type EnabledModules,
+} from "@/lib/types/modules";
 
 export async function fetchProfileRole(
   supabase: SupabaseClient,
@@ -165,6 +170,7 @@ export type ProfileGuardContext = {
   fullName: string | null;
   lgpdBlocked: boolean;
   onboardingCompletedAt: string | null;
+  enabledModules: EnabledModules;
 };
 
 export async function fetchProfileGuardContext(
@@ -174,18 +180,21 @@ export async function fetchProfileGuardContext(
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "role, timezone, full_name, lgpd_blocked_at, lgpd_unblocked_at, onboarding_completed_at",
+      "role, timezone, full_name, lgpd_blocked_at, lgpd_unblocked_at, onboarding_completed_at, enabled_modules",
     )
     .eq("user_id", userId)
     .maybeSingle();
 
   if (error || !data) {
+    if (error) console.error("[fetchProfileGuardContext] erro:", error.message, error.code, "userId:", userId);
+    else console.warn("[fetchProfileGuardContext] sem dados para userId:", userId);
     return {
       role: null,
       timeZone: DEFAULT_PROFILE_TIME_ZONE,
       fullName: null,
       lgpdBlocked: false,
       onboardingCompletedAt: null,
+      enabledModules: { ...DEFAULT_ENABLED_MODULES },
     };
   }
 
@@ -197,6 +206,11 @@ export async function fetchProfileGuardContext(
     ? data.full_name
     : null;
   const lgpdBlocked = data.lgpd_blocked_at != null && data.lgpd_unblocked_at == null;
+  // Seguro antes da SQL ser aplicada: coluna inexistente → data.enabled_modules = undefined
+  // → parseEnabledModules retorna DEFAULT_ENABLED_MODULES (ambos habilitados)
+  const enabledModules = parseEnabledModules(
+    (data as Record<string, unknown>)["enabled_modules"],
+  );
 
   return {
     role,
@@ -204,5 +218,6 @@ export async function fetchProfileGuardContext(
     fullName,
     lgpdBlocked,
     onboardingCompletedAt: data.onboarding_completed_at ?? null,
+    enabledModules,
   };
 }

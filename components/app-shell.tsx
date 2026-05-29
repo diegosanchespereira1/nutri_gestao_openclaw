@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Leaf, Menu } from "lucide-react";
 
-import { adminNavItem, appNavItems } from "@/lib/app-nav";
+import { adminNavItem, appNavGroups, type AppNavGroup } from "@/lib/app-nav";
+import type { EnabledModules } from "@/lib/types/modules";
+import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -13,54 +15,107 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
 
-function NavLinks({
+/** Filtra os grupos de acordo com os módulos habilitados e role de admin. */
+function buildVisibleGroups(
+  enabledModules: EnabledModules,
+  showAdminNav: boolean,
+): AppNavGroup[] {
+  const filtered = appNavGroups
+    .filter(
+      (group) =>
+        !group.moduleGate || enabledModules[group.moduleGate] === true,
+    )
+    .filter((group) => group.items.length > 0);
+
+  if (showAdminNav) {
+    const sistemaIdx = filtered.findIndex((g) => g.label === "Sistema");
+    const adminGroup: AppNavGroup = {
+      label: "Sistema",
+      items: [adminNavItem],
+    };
+    if (sistemaIdx >= 0) {
+      // Adiciona item de admin dentro do grupo Sistema
+      return filtered.map((g, i) =>
+        i === sistemaIdx
+          ? { ...g, items: [...g.items, adminNavItem] }
+          : g,
+      );
+    }
+    return [...filtered, adminGroup];
+  }
+
+  return filtered;
+}
+
+function NavGroups({
   onNavigate,
   className,
   showAdminNav,
+  enabledModules,
 }: {
   onNavigate?: () => void;
   className?: string;
   showAdminNav?: boolean;
+  enabledModules: EnabledModules;
 }) {
   const pathname = usePathname();
-  const items = showAdminNav ? [...appNavItems, adminNavItem] : appNavItems;
+  const groups = buildVisibleGroups(enabledModules, showAdminNav ?? false);
 
   return (
     <nav
-      className={cn("flex flex-col gap-0.5 px-2 py-2", className)}
+      className={cn("flex flex-col py-2", className)}
       aria-label="Navegação principal"
     >
-      {items.map((item) => {
-        const Icon = item.icon;
-        const active =
-          pathname === item.href ||
-          (item.href !== "/inicio" && pathname.startsWith(`${item.href}/`));
+      {groups.map((group, groupIdx) => (
+        <div key={group.label}>
+          {/* Separador entre grupos (não antes do primeiro) */}
+          {groupIdx > 0 && (
+            <Separator className="bg-sidebar-border/40 mx-3 my-1 w-auto" />
+          )}
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150",
-              "max-lg:min-h-11 max-lg:py-3 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-3",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-              active
-                ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-            )}
-          >
-            <Icon
-              className={cn(
-                "size-4 shrink-0 transition-opacity",
-                active ? "opacity-100" : "opacity-70",
-              )}
-              aria-hidden
-            />
-            {item.label}
-          </Link>
-        );
-      })}
+          {/* Label do grupo */}
+          <p className="text-sidebar-foreground/40 mt-2 mb-0.5 px-5 text-[10px] font-semibold uppercase tracking-widest">
+            {group.label}
+          </p>
+
+          {/* Itens do grupo */}
+          <div className="px-2">
+            {group.items.map((item) => {
+              const Icon = item.icon;
+              const active =
+                pathname === item.href ||
+                (item.href !== "/inicio" &&
+                  pathname.startsWith(`${item.href}/`));
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex min-h-9 items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150",
+                    "max-lg:min-h-10 max-lg:py-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:py-2",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                  aria-current={active ? "page" : undefined}
+                >
+                  <Icon
+                    className={cn(
+                      "size-4 shrink-0 transition-opacity",
+                      active ? "opacity-100" : "opacity-70",
+                    )}
+                    aria-hidden
+                  />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 }
@@ -69,10 +124,12 @@ export function AppShell({
   children,
   showAdminNav = false,
   userFirstName = null,
+  enabledModules = DEFAULT_ENABLED_MODULES,
 }: {
   children: React.ReactNode;
   showAdminNav?: boolean;
   userFirstName?: string | null;
+  enabledModules?: EnabledModules;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -85,7 +142,7 @@ export function AppShell({
         Saltar para conteúdo
       </a>
 
-      {/* Sidebar dark fixa — ≥ lg (1024px) */}
+      {/* Sidebar fixa — ≥ lg (1024px) */}
       <aside
         className="bg-sidebar border-sidebar-border fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r shadow-lg lg:flex"
         aria-label="Barra lateral"
@@ -107,9 +164,10 @@ export function AppShell({
 
         <Separator className="bg-sidebar-border opacity-40" />
 
-        <NavLinks
+        <NavGroups
           className="min-h-0 flex-1 overflow-y-auto"
           showAdminNav={showAdminNav}
+          enabledModules={enabledModules}
         />
 
         <Separator className="bg-sidebar-border opacity-40" />
@@ -168,9 +226,10 @@ export function AppShell({
 
             <Separator className="bg-sidebar-border opacity-40" />
 
-            <NavLinks
+            <NavGroups
               className="min-h-0 flex-1 overflow-y-auto"
               showAdminNav={showAdminNav}
+              enabledModules={enabledModules}
               onNavigate={() => setMenuOpen(false)}
             />
 

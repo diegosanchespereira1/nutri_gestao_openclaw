@@ -24,6 +24,11 @@ import {
 } from "@/lib/supabase/profile";
 import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
+import {
+  DEFAULT_ENABLED_MODULES,
+  parseEnabledModules,
+  type EnabledModules,
+} from "@/lib/types/modules";
 
 const AUTH_MIDDLEWARE_TIMEOUT_MS = 4_500;
 
@@ -104,6 +109,7 @@ type MiddlewareProfileContext = {
   lgpdBlocked: boolean;
   needsOnboarding: boolean;
   cachedAt: number;
+  enabledModules: EnabledModules;
 };
 
 /**
@@ -154,6 +160,8 @@ function parseProfileContextCookie(raw: string | undefined): MiddlewareProfileCo
       lgpdBlocked: parsed.lgpdBlocked,
       needsOnboarding: parsed.needsOnboarding,
       cachedAt: parsed.cachedAt,
+      // Retrocompatibilidade: cookies antigos sem enabledModules → ambos habilitados
+      enabledModules: parseEnabledModules(parsed.enabledModules ?? null),
     };
   } catch {
     return null;
@@ -346,6 +354,7 @@ export async function updateSession(request: NextRequest) {
           lgpdBlocked: guard.lgpdBlocked,
           needsOnboarding,
           cachedAt: nowSec,
+          enabledModules: guard.enabledModules,
         };
       } catch (error) {
         logAuthMiddleware("warn", requestId, "profile_guard_context_failed", {
@@ -361,6 +370,7 @@ export async function updateSession(request: NextRequest) {
           lgpdBlocked: false,
           needsOnboarding: false,
           cachedAt: nowSec,
+          enabledModules: { ...DEFAULT_ENABLED_MODULES },
         };
       }
     }

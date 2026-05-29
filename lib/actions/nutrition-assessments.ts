@@ -109,9 +109,9 @@ export async function createNutritionAssessmentAction(
     return { ok: false, error: "Não foi possível salvar a avaliação." };
   }
 
+  revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  revalidatePath(`/pacientes/${patientId}/historico`);
-  redirect(`/pacientes/${patientId}/editar?avaliacao=ok`);
+  redirect(`/pacientes/${patientId}?avaliacao=ok`);
 }
 
 // ── Helpers de permissão ──────────────────────────────────────────────────────
@@ -158,8 +158,8 @@ export async function deleteNutritionAssessmentAction(
 
   if (error) return { ok: false, error: "Não foi possível eliminar." };
 
+  revalidatePath(`/pacientes/${check.patientId}`);
   revalidatePath(`/pacientes/${check.patientId}/editar`);
-  revalidatePath(`/pacientes/${check.patientId}/historico`);
   return { ok: true };
 }
 
@@ -193,7 +193,7 @@ export async function updateNutritionAssessmentAction(
 
   if (error) return { ok: false, error: "Não foi possível salvar as alterações." };
 
+  revalidatePath(`/pacientes/${check.patientId}`);
   revalidatePath(`/pacientes/${check.patientId}/editar`);
-  revalidatePath(`/pacientes/${check.patientId}/historico`);
   return { ok: true };
 }

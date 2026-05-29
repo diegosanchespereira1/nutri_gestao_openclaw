@@ -248,10 +248,12 @@ export function ClientForm({
     : "";
   const [estCategory, setEstCategory] = useState<EstablishmentCategory | "">(initialEstCategory);
   const [estType, setEstType] = useState<EstablishmentType | "">(defaultEstType ?? "");
+  const [estValidationError, setEstValidationError] = useState(false);
 
   function handleEstCategoryChange(cat: EstablishmentCategory | "") {
     setEstCategory(cat);
     setEstType("");
+    setEstValidationError(false);
   }
 
   const [segmentValue, setSegmentValue] = useState(defaultBusinessSegment);
@@ -311,7 +313,16 @@ export function ClientForm({
           tudo.
         </CardDescription>
       </CardHeader>
-      <form action={formAction}>
+      <form
+        action={formAction}
+        onSubmit={(e) => {
+          if (kind === "pj" && !estType) {
+            e.preventDefault();
+            setEstValidationError(true);
+            setTab("pj-estabelecimento");
+          }
+        }}
+      >
         {mode === "edit" && clientId ? (
           <input type="hidden" name="id" value={clientId} />
         ) : null}
@@ -345,9 +356,15 @@ export function ClientForm({
               ) : null}
               {kind === "pj" ? (
                 <>
-                  <TabsTrigger value="pj-estabelecimento" className="shrink-0">
+                  <TabsTrigger value="pj-estabelecimento" className="shrink-0 relative">
                     <MapPin className="size-4 opacity-70" aria-hidden />
                     Estabelecimento
+                    {!estType && (
+                      <span
+                        className="absolute -top-1 -right-1 flex size-2.5 items-center justify-center rounded-full bg-destructive"
+                        aria-label="Campo obrigatório não preenchido"
+                      />
+                    )}
                   </TabsTrigger>
                   <TabsTrigger value="pj-fiscal" className="shrink-0">
                     <IdCard className="size-4 opacity-70" aria-hidden />
@@ -588,6 +605,24 @@ export function ClientForm({
                   <input type="hidden" name="responsible_team_member_id" value="" />
                 )}
 
+                {kind === "pj" && !estType ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/40">
+                    <span className="mt-px shrink-0 text-amber-600 dark:text-amber-400" aria-hidden>ℹ️</span>
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      Clientes PJ precisam de um <strong>estabelecimento</strong> cadastrado.
+                      Acesse a aba{" "}
+                      <button
+                        type="button"
+                        className="font-semibold underline underline-offset-2"
+                        onClick={() => setTab("pj-estabelecimento")}
+                      >
+                        Estabelecimento
+                      </button>{" "}
+                      e selecione a categoria e tipo antes de salvar.
+                    </p>
+                  </div>
+                ) : null}
+
                 {kind === "pj" ? (
                   <>
                     <Separator />
@@ -637,6 +672,22 @@ export function ClientForm({
 
             {kind === "pj" ? (
               <TabsContent value="pj-estabelecimento" className="space-y-6">
+                {estValidationError && (
+                  <div
+                    role="alert"
+                    className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/8 px-4 py-3"
+                  >
+                    <span className="mt-0.5 shrink-0 text-destructive" aria-hidden>⚠️</span>
+                    <div>
+                      <p className="text-sm font-semibold text-destructive">
+                        Estabelecimento obrigatório para clientes PJ
+                      </p>
+                      <p className="mt-0.5 text-xs text-destructive/80">
+                        Selecione a <strong>Categoria</strong> e o <strong>Tipo de estabelecimento</strong> abaixo antes de guardar.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <p className="text-foreground flex items-center gap-1.5 text-sm font-semibold">
                     <MapPin className="size-4 text-muted-foreground" aria-hidden />
@@ -694,9 +745,10 @@ export function ClientForm({
                       name="est_type"
                       required
                       value={estType}
-                      onChange={(e) =>
-                        setEstType(e.target.value as EstablishmentType)
-                      }
+                      onChange={(e) => {
+                        setEstType(e.target.value as EstablishmentType);
+                        if (e.target.value) setEstValidationError(false);
+                      }}
                       className={selectClassName}
                     >
                       <option value="" disabled>

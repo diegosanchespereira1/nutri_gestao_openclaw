@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil, Clock, User, Phone, Building2, Lock, ClipboardList } from "lucide-react";
+import { Pencil, User, Phone, Building2, Lock, ClipboardList } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -11,8 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { PatientAssessmentsBlock } from "@/components/pacientes/patient-assessments-block";
 import { loadPatientById } from "@/lib/actions/patients";
-import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-assessments";
 import { createClient } from "@/lib/supabase/server";
 import { formatCpfDisplay } from "@/lib/format/br-document";
 import { cn } from "@/lib/utils";
@@ -71,10 +71,12 @@ function InfoRow({
 
 export default async function ProntuarioPacientePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { row } = await loadPatientById(id);
   if (!row) notFound();
 
@@ -82,31 +84,40 @@ export default async function ProntuarioPacientePage({
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
   const age = birthSlice ? calcAge(birthSlice) : null;
 
-  const [clientResult, estResult, teamMemberResult, { rows: assessments }] =
-    await Promise.all([
-      row.client_id
-        ? supabase
-            .from("clients")
-            .select("legal_name, trade_name, kind")
-            .eq("id", row.client_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      row.establishment_id
-        ? supabase
-            .from("establishments")
-            .select("name")
-            .eq("id", row.establishment_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      row.responsible_team_member_id
-        ? supabase
-            .from("team_members")
-            .select("full_name")
-            .eq("id", row.responsible_team_member_id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      loadNutritionAssessmentsForPatient(id),
-    ]);
+  const serverNowMs = Date.now();
+  const defaultAge = birthSlice
+    ? Math.floor(
+        (serverNowMs - new Date(birthSlice).getTime()) /
+          (1000 * 60 * 60 * 24 * 365.25),
+      )
+    : undefined;
+  const isMinor = defaultAge !== undefined && defaultAge < 18;
+
+  const avaliacaoOk = sp.avaliacao === "ok";
+
+  const [clientResult, estResult, teamMemberResult] = await Promise.all([
+    row.client_id
+      ? supabase
+          .from("clients")
+          .select("legal_name, trade_name, kind")
+          .eq("id", row.client_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    row.establishment_id
+      ? supabase
+          .from("establishments")
+          .select("name")
+          .eq("id", row.establishment_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    row.responsible_team_member_id
+      ? supabase
+          .from("team_members")
+          .select("full_name")
+          .eq("id", row.responsible_team_member_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   const client = clientResult.data as {
     legal_name: string;
@@ -143,24 +154,27 @@ export default async function ProntuarioPacientePage({
         description={descriptionParts.join(" · ")}
         back={{ href: backHref, label: backLabel }}
         actions={
-          <>
-            <Link
-              href={`/pacientes/${row.id}/historico`}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              <Clock className="mr-1.5 size-3.5" aria-hidden />
-              Histórico
-            </Link>
-            <Link
-              href={`/pacientes/${row.id}/editar`}
-              className={cn(buttonVariants({ size: "sm" }))}
-            >
-              <Pencil className="mr-1.5 size-3.5" aria-hidden />
-              Editar dados
-            </Link>
-          </>
+          <Link
+            href={`/pacientes/${row.id}/editar`}
+            className={cn(buttonVariants({ size: "sm" }))}
+          >
+            <Pencil className="mr-1.5 size-3.5" aria-hidden />
+            Editar dados
+          </Link>
         }
       />
+
+      {/* ── Banner de sucesso ────────────────────────────────── */}
+      {avaliacaoOk ? (
+        <div
+          className="rounded-lg border border-green-200 bg-green-50 px-4 py-3"
+          role="status"
+        >
+          <p className="text-sm font-medium text-green-800">
+            Avaliação nutricional registada com sucesso.
+          </p>
+        </div>
+      ) : null}
 
       {/* ── Identificação + Contacto ─────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -263,96 +277,14 @@ export default async function ProntuarioPacientePage({
 
       {/* ── Avaliações nutricionais ──────────────────────────── */}
       <Card>
-        <CardHeader className="border-b border-border pb-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <ClipboardList className="size-4" aria-hidden />
-              Avaliações nutricionais
-            </CardTitle>
-            <Link
-              href={`/pacientes/${row.id}/historico`}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              Ver histórico completo
-            </Link>
-          </div>
+        <CardHeader className="border-b border-border pb-3">
+          <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            <ClipboardList className="size-3.5" aria-hidden />
+            Avaliações nutricionais
+          </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          {assessments.length === 0 ? (
-            <div className="rounded-md border border-dashed border-border bg-muted/30 p-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma avaliação registada ainda.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                As avaliações são lançadas na{" "}
-                <Link
-                  href={`/pacientes/${row.id}/editar`}
-                  className="text-primary hover:underline"
-                >
-                  página de edição do paciente
-                </Link>
-                .
-              </p>
-            </div>
-          ) : (
-            <>
-              <ul className="divide-y divide-border" aria-label="Últimas avaliações">
-                {assessments.slice(0, 5).map((a) => {
-                  const bmi =
-                    a.weight_kg && a.height_cm
-                      ? (
-                          Number(a.weight_kg) /
-                          (Number(a.height_cm) / 100) ** 2
-                        ).toFixed(1)
-                      : null;
-
-                  const metrics = [
-                    a.weight_kg ? `${Number(a.weight_kg).toFixed(1)} kg` : null,
-                    a.height_cm ? `${Number(a.height_cm).toFixed(0)} cm` : null,
-                    a.waist_cm ? `Cintura ${Number(a.waist_cm).toFixed(0)} cm` : null,
-                    bmi ? `IMC ${bmi}` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ");
-
-                  return (
-                    <li key={a.id} className="py-3">
-                      <div className="flex flex-wrap items-baseline justify-between gap-2">
-                        <span className="text-sm font-medium text-foreground">
-                          {new Date(a.recorded_at).toLocaleDateString("pt-BR", {
-                            day: "2-digit",
-                            month: "long",
-                            year: "numeric",
-                          })}
-                        </span>
-                        {metrics && (
-                          <span className="text-xs text-muted-foreground">
-                            {metrics}
-                          </span>
-                        )}
-                      </div>
-                      {(a.clinical_notes || a.goals || a.diet_notes) && (
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                          {a.clinical_notes ?? a.goals ?? a.diet_notes}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              {assessments.length > 5 && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  +{assessments.length - 5} avaliações anteriores —{" "}
-                  <Link
-                    href={`/pacientes/${row.id}/historico`}
-                    className="text-primary hover:underline"
-                  >
-                    ver histórico completo
-                  </Link>
-                </p>
-              )}
-            </>
-          )}
+          <PatientAssessmentsBlock patientId={row.id} isMinor={isMinor} />
         </CardContent>
       </Card>
     </PageLayout>

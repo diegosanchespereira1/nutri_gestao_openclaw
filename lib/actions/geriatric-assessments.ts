@@ -148,8 +148,9 @@ export async function createGeriatricAssessmentAction(
     return { ok: false, error: `Não foi possível salvar a avaliação.${detail}` };
   }
 
+  revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}/editar?avaliacao=ok`);
+  redirect(`/pacientes/${patientId}?avaliacao=ok`);
 }
 
 // ── Helpers de permissão ──────────────────────────────────────────────────────
@@ -196,6 +197,7 @@ export async function deleteGeriatricAssessmentAction(
 
   if (error) return { ok: false, error: "Não foi possível eliminar." };
 
+  revalidatePath(`/pacientes/${check.patientId}`);
   revalidatePath(`/pacientes/${check.patientId}/editar`);
   return { ok: true };
 }
@@ -252,6 +254,7 @@ export async function updateGeriatricAssessmentAction(
     return { ok: false, error: "Não foi possível salvar as alterações." };
   }
 
+  revalidatePath(`/pacientes/${check.patientId}`);
   revalidatePath(`/pacientes/${check.patientId}/editar`);
   return { ok: true };
 }

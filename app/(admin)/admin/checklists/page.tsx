@@ -22,8 +22,7 @@ async function loadGlobalChecklistTemplates() {
   const supabase = await createClient();
   const { data } = await supabase
     .from("checklist_templates")
-    .select("id, name, kind, version, is_active, created_at, updated_at")
-    .is("owner_user_id", null)   // global templates only
+    .select("id, name, portaria_ref, uf, version, is_active, created_at, updated_at")
     .order("name", { ascending: true });
   return data ?? [];
 }
@@ -74,7 +73,9 @@ export default async function AdminChecklistsPage({
       )}
       {err && (
         <p className="text-destructive rounded border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm">
-          Erro ao processar. Verifique os dados e tente novamente.
+          {err === "sem_permissao"
+            ? "Sem permissão para editar checklists. É necessário ter perfil admin ou super_admin."
+            : "Erro ao processar. Verifique os dados e tente novamente."}
         </p>
       )}
 
@@ -93,17 +94,27 @@ export default async function AdminChecklistsPage({
                       {t.name}
                     </CardTitle>
                     <Badge variant="outline">v{t.version}</Badge>
-                    <Badge variant="secondary">{t.kind}</Badge>
+                    {t.uf && t.uf !== "*" && (
+                      <Badge variant="secondary">{t.uf}</Badge>
+                    )}
                     {!t.is_active && (
                       <Badge variant="destructive">Inativo</Badge>
                     )}
                   </div>
                   <CardDescription className="text-xs">
+                    {t.portaria_ref && <span>{t.portaria_ref} · </span>}
                     Criado: {formatDate(t.created_at)} · Atualizado:{" "}
                     {formatDate(t.updated_at)}
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-3">
+                  <Link
+                    href={`/admin/checklists/${t.id}/editar`}
+                    className={cn(buttonVariants({ variant: "outline", size: "sm" }), "text-xs h-8")}
+                  >
+                    Editar checklist
+                  </Link>
+
                   {/* Story 10.6 — Notificar profissionais */}
                   <form
                     action={notifyTenantsAboutPortariaUpdateAction}

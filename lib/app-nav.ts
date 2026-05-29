@@ -15,31 +15,70 @@ import {
   Wallet,
 } from "lucide-react";
 
+import type { ModuleContext } from "@/lib/types/modules";
+
 export type AppNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
 };
 
-/** Navegação principal da área logada (MVP — rotas placeholder até módulos existirem). */
-export const appNavItems: AppNavItem[] = [
-  { href: "/inicio", label: "Início", icon: LayoutDashboard },
-  { href: "/clientes", label: "Clientes", icon: UserCircle2 },
-  { href: "/pacientes", label: "Pacientes", icon: HeartPulse },
-  { href: "/visitas", label: "Visitas", icon: ClipboardList },
-  { href: "/equipe", label: "Equipe", icon: Users },
-  { href: "/checklists", label: "Checklists", icon: ClipboardCheck },
-  { href: "/ficha-tecnica", label: "Ficha técnica", icon: UtensilsCrossed },
-  { href: "/financeiro", label: "Financeiro", icon: Wallet },
-  { href: "/pops", label: "POPs", icon: Soup },
-  { href: "/importar", label: "Importar", icon: Upload },
-  { href: "/perfil", label: "Perfil", icon: CircleUserRound },
-  { href: "/definicoes", label: "Definições", icon: Settings },
+export type AppNavGroup = {
+  /** Label do grupo exibido na sidebar como separador. */
+  label: string;
+  /** Se definido, o grupo só aparece quando o módulo estiver habilitado. */
+  moduleGate?: ModuleContext;
+  items: AppNavItem[];
+};
+
+/** Grupos de navegação principais (área logada). */
+export const appNavGroups: AppNavGroup[] = [
+  {
+    label: "Geral",
+    items: [
+      { href: "/inicio",     label: "Início",      icon: LayoutDashboard },
+      { href: "/clientes",   label: "Clientes",    icon: UserCircle2 },
+      { href: "/equipe",     label: "Equipe",       icon: Users },
+      { href: "/visitas",    label: "Visitas",      icon: ClipboardList },
+      { href: "/financeiro", label: "Financeiro",   icon: Wallet },
+    ],
+  },
+  {
+    label: "Atendimento Nutricional",
+    moduleGate: "atendimento_nutricional",
+    items: [
+      { href: "/pacientes", label: "Pacientes", icon: HeartPulse },
+    ],
+  },
+  {
+    label: "Assessoria Alimentar",
+    moduleGate: "assessoria_alimentacao",
+    items: [
+      { href: "/checklists",    label: "Checklists",    icon: ClipboardCheck },
+      { href: "/pops",          label: "POPs",           icon: Soup },
+      { href: "/ficha-tecnica", label: "Ficha técnica", icon: UtensilsCrossed },
+    ],
+  },
+  {
+    label: "Sistema",
+    items: [
+      { href: "/perfil",     label: "Perfil",      icon: CircleUserRound },
+      { href: "/definicoes", label: "Definições",  icon: Settings },
+      { href: "/importar",   label: "Importar",    icon: Upload },
+    ],
+  },
 ];
 
-/** Só para utilizadores com papel admin ou super_admin. */
+/** Item de admin — adicionado no final quando o utilizador tem papel admin/super_admin. */
 export const adminNavItem: AppNavItem = {
   href: "/admin",
   label: "Administração",
   icon: Shield,
 };
+
+/**
+ * Lista plana de todos os itens (sem admin) — mantida para retrocompatibilidade
+ * com código que importa appNavItems diretamente.
+ * @deprecated Prefira appNavGroups para renderização agrupada.
+ */
+export const appNavItems: AppNavItem[] = appNavGroups.flatMap((g) => g.items);

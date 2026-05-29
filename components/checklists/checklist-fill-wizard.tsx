@@ -1167,9 +1167,14 @@ export function ChecklistFillWizard({
               📍 {areaName}
             </span>
           ) : null}
-          <p className="text-muted-foreground mt-1 text-sm">
-            Seção {sectionIndex + 1} de {sections.length}: {section.title}
-          </p>
+          <div className="mt-2 border-l-2 border-primary pl-3">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Seção {sectionIndex + 1} de {sections.length}
+            </p>
+            <p className="text-[15px] font-bold text-foreground leading-snug uppercase">
+              {section.title}
+            </p>
+          </div>
           {sectionNavLoading ? (
             <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
               <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>

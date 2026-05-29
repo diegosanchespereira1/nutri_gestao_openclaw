@@ -161,6 +161,7 @@ export async function createAdultNutritionAssessmentAction(
     return { ok: false, error: `Não foi possível salvar a avaliação.${detail}` };
   }
 
+  revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}/editar?avaliacao_adulto=ok`);
+  redirect(`/pacientes/${patientId}?avaliacao=ok`);
 }

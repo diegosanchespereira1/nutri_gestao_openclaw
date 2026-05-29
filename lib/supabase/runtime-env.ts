@@ -1,9 +1,11 @@
 import "server-only";
-import { env as nodeEnv } from "node:process";
 
+// Usa process.env diretamente (compatível com Node.js e Edge Runtime).
+// Reflect.get(import("node:process").env, key) falha silenciosamente no Edge
+// porque o polyfill de node:process não inclui vars não-públicas.
 function readRuntimeEnv(keys: string[]): string | undefined {
   for (const key of keys) {
-    const raw = Reflect.get(nodeEnv, key);
+    const raw = process.env[key];
     if (typeof raw === "string" && raw.trim().length > 0) {
       return raw.trim();
     }

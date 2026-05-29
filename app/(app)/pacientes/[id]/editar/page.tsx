@@ -94,20 +94,8 @@ export default async function EditarPacientePage({
 
   const isMinor = defaultAge !== undefined && defaultAge < 18;
 
-  // Retroceder ao contexto correto — paciente pode ser independente (sem cliente)
-  const backHref =
-    row.establishment_id && row.client_id
-      ? `/clientes/${row.client_id}/estabelecimentos/${row.establishment_id}/editar`
-      : row.client_id
-        ? `/clientes/${row.client_id}/editar`
-        : "/pacientes";
-
-  const backLabel =
-    row.establishment_id && row.client_id
-      ? "Estabelecimento"
-      : row.client_id
-        ? "Cliente"
-        : "Pacientes";
+  const backHref = `/pacientes/${row.id}`;
+  const backLabel = "Prontuário";
 
   return (
     <PageLayout variant="form">

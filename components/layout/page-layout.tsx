@@ -32,7 +32,7 @@ export function PageLayout({
 }: PageLayoutProps) {
   return (
     <div
-      className={cn("w-full space-y-6", variantClass[variant], className)}
+      className={cn("min-w-0 w-full max-w-full space-y-6", variantClass[variant], className)}
     >
       {children}
     </div>

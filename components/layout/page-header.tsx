@@ -45,8 +45,8 @@ export function PageHeader({
           {back.label}
         </Link>
       )}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
+        <h1 className="min-w-0 text-2xl font-bold tracking-tight text-foreground">
           {title}
         </h1>
         {actions && (

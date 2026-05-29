@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { clearAppSessionCookies } from "@/lib/auth/clear-app-session-cookies";
 import { getServerAppOrigin } from "@/lib/app-origin";

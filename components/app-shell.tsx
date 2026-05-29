@@ -11,6 +11,7 @@ import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
@@ -174,6 +175,7 @@ export function AppShell({
 
         <div className="p-2">
           <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
+          <AppBuildLabel className="text-sidebar-foreground/45" />
         </div>
       </aside>
 
@@ -237,6 +239,7 @@ export function AppShell({
 
             <div className="p-2">
               <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
+              <AppBuildLabel className="text-sidebar-foreground/45" />
             </div>
           </SheetContent>
         </Sheet>

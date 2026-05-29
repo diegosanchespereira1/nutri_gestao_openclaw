@@ -32,7 +32,19 @@ const nextConfig: NextConfig = {
       value: buildContentSecurityPolicyValue(),
     });
 
-    return [{ source: "/:path*", headers: base }];
+    const noStoreHtml = {
+      key: "Cache-Control",
+      value: "no-store, must-revalidate",
+    };
+
+    return [
+      { source: "/:path*", headers: base },
+      {
+        source:
+          "/((?!_next/static|_next/image|favicon.ico|runtime-env.js|.*\\.(?:ico|png|jpg|jpeg|gif|webp|svg|woff2?)$).*)",
+        headers: [noStoreHtml],
+      },
+    ];
   },
 };
 

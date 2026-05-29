@@ -4,7 +4,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
+import { AppBuildLabel } from "@/components/app-version-guard";
 import { PasswordField } from "@/components/auth/password-field";
+import { navigateAfterAuth } from "@/lib/app-build-navigate";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { mapSupabaseLoginError } from "@/lib/map-supabase-auth-error";
 import { createClient } from "@/lib/supabase/client";
@@ -282,7 +284,7 @@ export function LoginForm() {
         return;
       }
 
-      window.location.assign(next);
+      navigateAfterAuth(next);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro inesperado";
       const isTimeout = message.startsWith("AUTH_TIMEOUT:");
@@ -365,7 +367,7 @@ export function LoginForm() {
         return;
       }
 
-      window.location.assign(next);
+      navigateAfterAuth(next);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro inesperado";
       const isTimeout = message.startsWith("AUTH_TIMEOUT:");
@@ -552,15 +554,7 @@ export function LoginForm() {
         </Link>
       </p>
 
-      <p className="text-muted-foreground text-center text-sm">
-        Ainda sem conta?{" "}
-        <Link
-          href="/register"
-          className="text-primary font-medium underline-offset-4 hover:underline focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-        >
-          Criar cadastro
-        </Link>
-      </p>
+      <AppBuildLabel className="mt-4" />
     </div>
   );
 }

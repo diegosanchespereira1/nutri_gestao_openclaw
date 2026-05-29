@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { AppTimeZoneProvider } from "@/components/app-timezone-provider";
+import { AppVersionGuard } from "@/components/app-version-guard";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
 import { canAccessAdminArea, type ProfileRole } from "@/lib/roles";
@@ -69,6 +70,7 @@ export default async function AppAreaLayout({
 
   return (
     <AppTimeZoneProvider timeZone={timeZone}>
+      <AppVersionGuard />
       <Toaster />
       {onboardingOnly ? (
         <div className="bg-background min-h-screen">{children}</div>

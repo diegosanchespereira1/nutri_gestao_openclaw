@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseCookieOptions } from "@/lib/supabase/cookie-options";
+import { clearAppSessionCookies } from "@/lib/auth/clear-app-session-cookies";
 import {
   APP_PROFILE_CTX_COOKIE,
   APP_SESSION_LAST_COOKIE,
@@ -246,9 +247,7 @@ export async function updateSession(request: NextRequest) {
   const baseCookie = getSupabaseCookieOptions();
 
   if (!user) {
-    supabaseResponse.cookies.delete(APP_SESSION_START_COOKIE);
-    supabaseResponse.cookies.delete(APP_SESSION_LAST_COOKIE);
-    supabaseResponse.cookies.delete(APP_PROFILE_CTX_COOKIE);
+    clearAppSessionCookies(supabaseResponse.cookies);
   } else {
     const now = Math.floor(Date.now() / 1000);
     const absSec = getAppSessionAbsoluteMaxSec();
@@ -275,8 +274,7 @@ export async function updateSession(request: NextRequest) {
       loginUrl.searchParams.set("reason", "session_expired");
       const redirectRes = NextResponse.redirect(loginUrl);
       copyCookies(supabaseResponse, redirectRes);
-      redirectRes.cookies.delete(APP_SESSION_START_COOKIE);
-      redirectRes.cookies.delete(APP_SESSION_LAST_COOKIE);
+      clearAppSessionCookies(redirectRes.cookies);
       logAuthMiddleware("warn", requestId, "session_expired_redirect", {
         pathname,
         elapsedMs: Date.now() - startedAt,
@@ -328,7 +326,12 @@ export async function updateSession(request: NextRequest) {
     const cachedProfileCtx = parseProfileContextCookie(
       request.cookies.get(APP_PROFILE_CTX_COOKIE)?.value,
     );
+    const sessStartRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
+    const isNewAppSession = !Number.isFinite(
+      Number.parseInt(sessStartRaw ?? "", 10),
+    );
     const canReuseCache =
+      !isNewAppSession &&
       cachedProfileCtx?.userId === user.id &&
       nowSec - cachedProfileCtx.cachedAt <= profileCtxTtlSec;
 

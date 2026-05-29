@@ -51,6 +51,10 @@ jobs:
             type=raw,value=latest
             type=sha,prefix=,format=short
 
+      - name: Resolve build id
+        id: buildid
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -64,6 +68,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
             NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL }}
             NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
+            NEXT_PUBLIC_APP_BUILD_ID=${{ steps.buildid.outputs.short }}
           cache-from: type=gha,scope=docker-latest
           cache-to: type=gha,mode=max,scope=docker-latest
 
@@ -98,6 +103,10 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || secrets.DOCKER_HUB_USERNAME || vars.DOCKER_HUB_USERNAME || secrets.DOCKER_USERNAME || vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_HUB_TOKEN || secrets.DOCKER_HUB_PASSWORD || secrets.DOCKERHUB_PASSWORD }}
 
+      - name: Resolve build id
+        id: buildid
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
       - name: Build and push dev
         uses: docker/build-push-action@v7
         with:
@@ -110,5 +119,6 @@ jobs:
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY_DEV }}
             NEXT_PUBLIC_SITE_URL=${{ secrets.NEXT_PUBLIC_SITE_URL_DEV }}
             NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY_DEV }}
+            NEXT_PUBLIC_APP_BUILD_ID=${{ steps.buildid.outputs.short }}
           cache-from: type=gha,scope=docker-dev
           cache-to: type=gha,mode=max,scope=docker-dev

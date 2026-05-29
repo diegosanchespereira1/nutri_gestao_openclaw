@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { SupabaseHashAuthRedirect } from "@/components/auth/supabase-hash-auth-redirect";
+import { getAppBuildId } from "@/lib/app-build";
 
 import "./globals.css";
 
@@ -34,6 +35,9 @@ export default function RootLayout({
       data-theme="nutri-teal-v2"
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
+      <head>
+        <meta name="app-build-id" content={getAppBuildId()} />
+      </head>
       <body className="min-h-full flex flex-col">
         <Script src="/runtime-env.js" strategy="beforeInteractive" />
         <SupabaseHashAuthRedirect />

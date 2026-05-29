@@ -1,17 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
+import { clearAppSessionCookies } from "@/lib/auth/clear-app-session-cookies";
 import { getServerAppOrigin } from "@/lib/app-origin";
 import { resolveProfilePhotoPathFromForm } from "@/lib/profile/photo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeBrazilPhone } from "@/lib/validators/br-phone";
 
-export async function signOutAction() {
+export async function signOutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  const cookieStore = await cookies();
+  clearAppSessionCookies(cookieStore);
 }
 
 export type UpdateProfileResult =

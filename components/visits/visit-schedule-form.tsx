@@ -18,7 +18,9 @@ import { establishmentClientLabel } from "@/lib/utils/establishment-client-label
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { createScheduledVisitAction } from "@/lib/actions/visits";
+import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
 
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
@@ -57,6 +59,7 @@ export function VisitScheduleForm({
   patients,
   teamMembers,
 }: Props) {
+  const profileTimeZone = useAppTimeZone();
   const [targetType, setTargetType] = useState<VisitTargetType>(() => {
     if (hasSchedulableEstablishment(establishments)) return "establishment";
     return "patient";
@@ -74,7 +77,12 @@ export function VisitScheduleForm({
       e.preventDefault();
       return;
     }
-    hidden.value = new Date(local.value).toISOString();
+    const iso = localDateTimeInTimeZoneToUtcIso(local.value, profileTimeZone);
+    if (!iso) {
+      e.preventDefault();
+      return;
+    }
+    hidden.value = iso;
   }
 
   const disableSubmit =
@@ -250,6 +258,9 @@ export function VisitScheduleForm({
           required
           className="w-full max-w-xs"
         />
+        <p className="text-muted-foreground text-xs">
+          Horário no fuso configurado em Definições → Região.
+        </p>
       </div>
 
       <div className="space-y-2">

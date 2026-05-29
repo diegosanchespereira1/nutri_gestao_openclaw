@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 import { parseVisitPriority } from "@/lib/constants/visit-priorities";
 import { parseVisitKind } from "@/lib/constants/visit-kinds";
+import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ScheduledVisitWithTargets, VisitTargetType } from "@/lib/types/visits";
@@ -115,9 +117,13 @@ export async function createScheduledVisitAction(
     formData.get("establishment_id") ?? "",
   ).trim();
   const patientId = String(formData.get("patient_id") ?? "").trim();
-  const scheduledIso = String(
-    formData.get("scheduled_start_iso") ?? "",
-  ).trim();
+  const localRaw = String(formData.get("scheduled_start_local") ?? "").trim();
+  let scheduledIso = String(formData.get("scheduled_start_iso") ?? "").trim();
+  if (localRaw) {
+    const tz = await fetchProfileTimeZone(supabase, user.id);
+    const fromProfileTz = localDateTimeInTimeZoneToUtcIso(localRaw, tz);
+    if (fromProfileTz) scheduledIso = fromProfileTz;
+  }
   const priority = parseVisitPriority(formData.get("priority")) ?? "normal";
   const notesRaw = String(formData.get("notes") ?? "").trim();
   const notes = notesRaw.length > 0 ? notesRaw : null;

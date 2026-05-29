@@ -3,7 +3,7 @@ import Script from "next/script";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { SupabaseHashAuthRedirect } from "@/components/auth/supabase-hash-auth-redirect";
-import { getAppBuildId } from "@/lib/app-build";
+import { getAppVersion } from "@/lib/app-version";
 
 import "./globals.css";
 
@@ -36,7 +36,7 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
-        <meta name="app-build-id" content={getAppBuildId()} />
+        <meta name="app-version" content={getAppVersion()} />
       </head>
       <body className="min-h-full flex flex-col">
         <Script src="/runtime-env.js" strategy="beforeInteractive" />

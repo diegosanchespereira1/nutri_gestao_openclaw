@@ -32,4 +32,4 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.test
-          NEXT_PUBLIC_APP_BUILD_ID: ${{ github.sha }}
+          NEXT_PUBLIC_APP_VERSION: "0.0.0-ci"

@@ -1,10 +1,10 @@
-import { getAppBuildId } from "@/lib/app-build";
+import { getAppVersion } from "@/lib/app-version";
 
 export type PublicRuntimeEnv = {
   supabaseUrl: string;
   supabaseAnonKey: string;
   siteUrl: string;
-  buildId: string;
+  version: string;
 };
 
 declare global {
@@ -40,15 +40,15 @@ export function getPublicRuntimeEnv(): PublicRuntimeEnv {
   const siteUrl =
     fromWindow?.siteUrl || readServerEnv(["SITE_URL", "NEXT_PUBLIC_SITE_URL"]);
 
-  const buildId =
-    fromWindow?.buildId ||
-    (typeof window === "undefined" ? getAppBuildId() : "");
+  const version =
+    fromWindow?.version ||
+    (typeof window === "undefined" ? getAppVersion() : "");
 
   return {
     supabaseUrl,
     supabaseAnonKey,
     siteUrl,
-    buildId: buildId || getAppBuildId(),
+    version: version || getAppVersion(),
   };
 }
 

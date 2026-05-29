@@ -4,23 +4,28 @@ import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import {
-  APP_BUILD_SESSION_STORAGE_KEY,
-  formatAppBuildLabel,
-} from "@/lib/app-build";
-import { getClientAppBuildId } from "@/lib/app-build-client";
+  APP_VERSION_SESSION_STORAGE_KEY,
+  formatAppVersionLabel,
+  formatAppVersionTitle,
+} from "@/lib/app-version";
+import { getClientAppVersion } from "@/lib/app-version-client";
 import { cn } from "@/lib/utils";
 
 const POLL_MS = 5 * 60 * 1000;
 
-async function fetchServerBuildId(): Promise<string | null> {
+async function fetchServerAppVersion(): Promise<string | null> {
   try {
     const res = await fetch("/api/app-version", {
       cache: "no-store",
       credentials: "same-origin",
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { buildId?: string };
-    return typeof data.buildId === "string" ? data.buildId : null;
+    const data = (await res.json()) as { version?: string; buildId?: string };
+    return typeof data.version === "string"
+      ? data.version
+      : typeof data.buildId === "string"
+        ? data.buildId
+        : null;
   } catch {
     return null;
   }
@@ -30,27 +35,26 @@ export function AppVersionGuard() {
   const toastShownRef = useRef(false);
 
   const checkVersion = useCallback(async () => {
-    const embedded = getClientAppBuildId();
-    const serverId = (await fetchServerBuildId()) ?? embedded;
-    const stored = sessionStorage.getItem(APP_BUILD_SESSION_STORAGE_KEY);
+    const embedded = getClientAppVersion();
+    const serverVersion = (await fetchServerAppVersion()) ?? embedded;
+    const stored = sessionStorage.getItem(APP_VERSION_SESSION_STORAGE_KEY);
 
     if (!stored) {
-      sessionStorage.setItem(APP_BUILD_SESSION_STORAGE_KEY, serverId);
+      sessionStorage.setItem(APP_VERSION_SESSION_STORAGE_KEY, serverVersion);
       return;
     }
 
-    if (stored === serverId) return;
+    if (stored === serverVersion) return;
     if (toastShownRef.current) return;
 
     toastShownRef.current = true;
     toast("Atualização disponível", {
-      description:
-        "Uma nova versão da aplicação foi publicada. Recarregue para ver as alterações.",
+      description: `Nova versão ${formatAppVersionTitle(serverVersion)}. Recarregue para continuar.`,
       duration: Infinity,
       action: {
         label: "Recarregar",
         onClick: () => {
-          sessionStorage.setItem(APP_BUILD_SESSION_STORAGE_KEY, serverId);
+          sessionStorage.setItem(APP_VERSION_SESSION_STORAGE_KEY, serverVersion);
           window.location.reload();
         },
       },
@@ -64,10 +68,10 @@ export function AppVersionGuard() {
   }, []);
 
   useEffect(() => {
-    const embedded = getClientAppBuildId();
-    const stored = sessionStorage.getItem(APP_BUILD_SESSION_STORAGE_KEY);
+    const embedded = getClientAppVersion();
+    const stored = sessionStorage.getItem(APP_VERSION_SESSION_STORAGE_KEY);
     if (!stored) {
-      sessionStorage.setItem(APP_BUILD_SESSION_STORAGE_KEY, embedded);
+      sessionStorage.setItem(APP_VERSION_SESSION_STORAGE_KEY, embedded);
     }
 
     void checkVersion();
@@ -91,8 +95,8 @@ export function AppVersionGuard() {
 }
 
 export function AppBuildLabel({ className }: { className?: string }) {
-  const buildId = getClientAppBuildId();
-  const label = formatAppBuildLabel(buildId);
+  const version = getClientAppVersion();
+  const label = formatAppVersionLabel(version);
 
   return (
     <p
@@ -100,9 +104,9 @@ export function AppBuildLabel({ className }: { className?: string }) {
         "text-muted-foreground mt-1 px-3 text-center font-mono text-[10px] tracking-wide",
         className,
       )}
-      title={`Versão: ${buildId}`}
+      title={formatAppVersionTitle(version)}
     >
-      v{label}
+      {label}
     </p>
   );
 }

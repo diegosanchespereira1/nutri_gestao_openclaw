@@ -1,8 +1,27 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import type { NextConfig } from "next";
 
 import { buildContentSecurityPolicyValue } from "@/lib/security/content-security-policy";
 
+function readPackageVersion(): string {
+  try {
+    const raw = readFileSync(join(process.cwd(), "package.json"), "utf8");
+    const pkg = JSON.parse(raw) as { version?: string };
+    return typeof pkg.version === "string" ? pkg.version : "0.0.0";
+  } catch {
+    return "0.0.0";
+  }
+}
+
+const appVersion =
+  process.env.NEXT_PUBLIC_APP_VERSION?.trim() || readPackageVersion();
+
 const nextConfig: NextConfig = {
+  env: {
+    NEXT_PUBLIC_APP_VERSION: appVersion,
+  },
   output: "standalone",
   experimental: {
     serverActions: {

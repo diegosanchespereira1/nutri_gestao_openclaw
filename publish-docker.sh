@@ -149,13 +149,13 @@ if [[ "$DEV_MODE" == true ]]; then
         echo -e "${YELLOW}⚠ NEXT_PUBLIC_SITE_URL ausente; usando fallback: $NEXT_PUBLIC_SITE_URL_VALUE${NC}"
     fi
 
-    BUILD_ID="$(git rev-parse --short HEAD 2>/dev/null || echo dev)"
+    APP_VERSION="$(node -p "require('./package.json').version" 2>/dev/null || echo 0.0.0)"
     DEV_BUILD_ARGS=(
       --platform linux/amd64
       --build-arg "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL_VALUE"
       --build-arg "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY_VALUE"
       --build-arg "NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL_VALUE"
-      --build-arg "NEXT_PUBLIC_APP_BUILD_ID=$BUILD_ID"
+      --build-arg "NEXT_PUBLIC_APP_VERSION=$APP_VERSION"
     )
     SA_KEY_DEV="$(read_server_actions_encryption_key)"
     if [[ -n "$SA_KEY_DEV" ]]; then
@@ -180,8 +180,8 @@ if [[ "$DEV_MODE" == true ]]; then
 fi
 
 # Step 1: Build (modo clássico)
-BUILD_ID="$(git rev-parse --short HEAD 2>/dev/null || echo "$VERSION")"
-CLASSIC_BUILD_ARGS=(-t "$REPO:$VERSION" --build-arg "NEXT_PUBLIC_APP_BUILD_ID=$BUILD_ID")
+APP_VERSION="$(node -p "require('./package.json').version" 2>/dev/null || echo "$VERSION")"
+CLASSIC_BUILD_ARGS=(-t "$REPO:$VERSION" --build-arg "NEXT_PUBLIC_APP_VERSION=$APP_VERSION")
 SA_KEY_CLASSIC="$(read_server_actions_encryption_key)"
 if [[ -n "$SA_KEY_CLASSIC" ]]; then
   CLASSIC_BUILD_ARGS+=(--build-arg "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$SA_KEY_CLASSIC")

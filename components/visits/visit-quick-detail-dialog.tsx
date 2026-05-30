@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import {
   Dialog,
@@ -16,10 +18,27 @@ import { visitPriorityLabel } from "@/lib/constants/visit-priorities";
 import { visitStatusLabel } from "@/lib/constants/visit-status";
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { formatDateTimeShort } from "@/lib/datetime/calendar-tz";
+import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import { rescheduleVisitAction } from "@/lib/actions/visits";
 import type { TeamJobRole } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
 import { visitDisplayTitle, visitTargetName } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
+
+function toDatetimeLocalValue(isoUtc: string, tz: string): string {
+  const date = new Date(isoUtc);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
 
 type Props = {
   visit: ScheduledVisitWithTargets | null;
@@ -42,6 +61,40 @@ export function VisitQuickDetailDialog({
   canStartVisit,
 }: Props) {
   const tz = useAppTimeZone();
+  const router = useRouter();
+
+  const [editedLocal, setEditedLocal] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Sync input when the visit or timezone changes
+  useEffect(() => {
+    if (visit) setEditedLocal(toDatetimeLocalValue(visit.scheduled_start, tz));
+  }, [visit?.id, visit?.scheduled_start, tz]);
+
+  // Clear error when dialog closes
+  useEffect(() => {
+    if (!open) setSaveError(null);
+  }, [open]);
+
+  const originalLocal = visit ? toDatetimeLocalValue(visit.scheduled_start, tz) : "";
+  const hasChanged = !!visit && editedLocal !== originalLocal;
+
+  async function handleSaveTime() {
+    if (!visit) return;
+    const iso = localDateTimeInTimeZoneToUtcIso(editedLocal, tz);
+    if (!iso) return;
+    setIsSaving(true);
+    setSaveError(null);
+    const result = await rescheduleVisitAction(visit.id, iso);
+    setIsSaving(false);
+    if (result.ok) {
+      router.refresh();
+      onOpenChange(false);
+    } else {
+      setSaveError(result.error);
+    }
+  }
 
   if (!open) return null;
 
@@ -67,12 +120,59 @@ export function VisitQuickDetailDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {formatDateTimeShort(visit.scheduled_start, tz)} ·{" "}
             {visitPriorityLabel[visit.priority]} · {visitStatusLabel[visit.status]}
           </DialogDescription>
         </DialogHeader>
 
-        <dl className="text-muted-foreground space-y-2 text-sm">
+        <dl className="text-muted-foreground space-y-3 text-sm">
+          {/* Data e hora — editável */}
+          <div className="flex gap-2">
+            <dt className="text-foreground/80 w-28 shrink-0 font-medium">
+              Data e hora
+            </dt>
+            <dd className="min-w-0 flex-1">
+              <input
+                type="datetime-local"
+                value={editedLocal}
+                onChange={(e) => setEditedLocal(e.target.value)}
+                disabled={isSaving}
+                className={cn(
+                  "border-input bg-background text-foreground focus-visible:ring-ring h-8 w-full rounded-md border px-2 text-xs shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                  isSaving && "opacity-50",
+                )}
+              />
+              {hasChanged && (
+                <div className="mt-1.5 flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleSaveTime}
+                    disabled={isSaving}
+                    className={cn(
+                      buttonVariants({ size: "sm" }),
+                      "h-7 px-2.5 text-xs",
+                    )}
+                  >
+                    {isSaving ? "A guardar…" : "Guardar"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditedLocal(originalLocal)}
+                    disabled={isSaving}
+                    className={cn(
+                      buttonVariants({ variant: "ghost", size: "sm" }),
+                      "h-7 px-2.5 text-xs",
+                    )}
+                  >
+                    Reverter
+                  </button>
+                </div>
+              )}
+              {saveError && (
+                <p className="text-destructive mt-1 text-xs">{saveError}</p>
+              )}
+            </dd>
+          </div>
+
           <div className="flex gap-2">
             <dt className="text-foreground/80 w-28 shrink-0 font-medium">
               Tipo de visita
@@ -93,7 +193,7 @@ export function VisitQuickDetailDialog({
               <dt className="text-foreground/80 w-28 shrink-0 font-medium">
                 Profissional
               </dt>
-              <dd>Titular da conta (não atribuído à equipe)</dd>
+              <dd>Titular da conta</dd>
             </div>
           )}
         </dl>

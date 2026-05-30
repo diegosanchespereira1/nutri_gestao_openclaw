@@ -220,11 +220,11 @@ export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEn
     setRescheduleError(null);
   }, [visits]);
 
-  const handleRescheduleConfirm = useCallback(async () => {
+  const handleRescheduleConfirm = useCallback(async (newStartIso: string) => {
     if (!pendingReschedule) return;
     setIsRescheduling(true);
     setRescheduleError(null);
-    const result = await rescheduleVisitAction(pendingReschedule.visitId, pendingReschedule.newStart);
+    const result = await rescheduleVisitAction(pendingReschedule.visitId, newStartIso);
     setIsRescheduling(false);
     if (result.ok) {
       setPendingReschedule(null);

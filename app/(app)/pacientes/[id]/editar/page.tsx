@@ -40,13 +40,13 @@ export default async function EditarPacientePage({
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
-  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
 
-  const [{ row }, teamMembers] = await Promise.all([
+  const [workspaceOwnerId, { row }, teamMembers] = await Promise.all([
+    getWorkspaceAccountOwnerId(supabase, user?.id ?? ""),
     loadPatientById(id),
     loadTeamMembersForSelect(),
   ]);
+  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
   if (!row) notFound();
 
   // Carrega kind do cliente e estabelecimentos (só relevante para PJ)

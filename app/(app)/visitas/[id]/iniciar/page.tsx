@@ -206,15 +206,13 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
 
     const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
 
-    const supabaseWizard = await createClient();
-    const {
-      data: { user: wizardUser },
-    } = await supabaseWizard.auth.getUser();
-    const { canReopen: canReopenDossier } =
-      model.fill.itemResponseSource === "workspace" || !wizardUser
-        ? { canReopen: false }
-        : await getChecklistReopenEligibility(supabaseWizard, wizardUser.id);
-    const initialReopenEvents = await loadReopenEventsForSession(sessionParam);
+    const [{ canReopen: canReopenDossier }, initialReopenEvents] =
+      await Promise.all([
+        model.fill.itemResponseSource === "workspace" || !user
+          ? Promise.resolve({ canReopen: false })
+          : getChecklistReopenEligibility(supabase, user.id),
+        loadReopenEventsForSession(sessionParam),
+      ]);
 
     return (
       <div className="space-y-6">

@@ -64,6 +64,28 @@ export const establishmentTypeLabel: Record<EstablishmentType, string> = {
   empresa: "Empresa",
 };
 
+/** Classes de badge alinhadas à coluna «Tipo de Negócio» em Clientes. */
+export const establishmentTypeBadgeClass: Record<EstablishmentType, string> = {
+  clinica:
+    "border border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-950 dark:text-fuchsia-100",
+  escola:
+    "border border-sky-500/30 bg-sky-500/10 text-sky-950 dark:text-sky-100",
+  hospital:
+    "border border-rose-500/30 bg-rose-500/10 text-rose-950 dark:text-rose-100",
+  lar_idosos:
+    "border border-cyan-500/30 bg-cyan-500/10 text-cyan-950 dark:text-cyan-100",
+  restaurante:
+    "border border-orange-500/30 bg-orange-500/10 text-orange-950 dark:text-orange-100",
+  mercado:
+    "border border-lime-500/30 bg-lime-500/10 text-lime-950 dark:text-lime-100",
+  frigorifico:
+    "border border-teal-500/30 bg-teal-500/10 text-teal-950 dark:text-teal-100",
+  cozinha_industrial:
+    "border border-teal-500/30 bg-teal-500/10 text-teal-950 dark:text-teal-100",
+  empresa:
+    "border border-violet-500/25 bg-violet-500/10 text-violet-900 dark:text-violet-100",
+};
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 export function categoryFromType(

@@ -43,7 +43,7 @@ export function ClientesFilters({
             placeholder="Pesquisar por nome, CNPJ…"
             defaultValue={defaultQ}
             autoComplete="off"
-            className="pl-8"
+            className="h-9 rounded-md pl-8"
           />
         </div>
 
@@ -71,12 +71,12 @@ export function ClientesFilters({
         </div>
 
         <div className="flex gap-2">
-          <Button type="submit" size="sm">
+          <Button type="submit" size="lg" className="rounded-md">
             Filtrar
           </Button>
           <Link
             href="/clientes"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-md")}
           >
             Limpar
           </Link>

@@ -14,14 +14,6 @@ import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { PaginationNav } from "@/components/ui/pagination-nav";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { clientLifecycleBadgeLabel } from "@/lib/constants/client-lifecycle";
@@ -260,28 +252,28 @@ export default async function ClientesPage({
           </div>
 
           {/* ── Desktop: tabela ── */}
-          <div className="hidden overflow-hidden rounded-xl border border-border bg-card shadow-sm md:block">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="pl-4 text-xs font-semibold uppercase tracking-wider">
+          <div className="border-border hidden overflow-x-auto rounded-xl border bg-white md:block">
+            <table className="w-full min-w-[720px] text-left text-sm">
+              <thead className="border-border border-b bg-primary/10 dark:bg-primary/15">
+                <tr>
+                  <th className="text-foreground px-4 py-3 text-left font-bold">
                     Nome do Cliente
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider">
+                  </th>
+                  <th className="text-foreground px-4 py-3 text-left font-bold">
                     Tipo de Negócio
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider">
+                  </th>
+                  <th className="text-foreground px-4 py-3 text-left font-bold">
                     Status
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wider">
+                  </th>
+                  <th className="text-foreground px-4 py-3 text-left font-bold">
                     Nota
-                  </TableHead>
-                  <TableHead className="w-24 text-xs font-semibold uppercase tracking-wider">
+                  </th>
+                  <th className="text-foreground w-24 px-4 py-3 text-left font-bold">
                     Ações
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
                 {rowsWithLogos.map(({ row, logoUrl }) => {
                   const cat = categoryBadgeContent(row.kind, row.business_segment);
                   const life = lifecycleMeta[row.lifecycle_status];
@@ -291,8 +283,9 @@ export default async function ClientesPage({
                     <ClickableTableRow
                       key={row.id}
                       href={`/clientes/${row.id}/editar`}
+                      className="border-b border-foreground/5 last:border-0"
                     >
-                      <TableCell className="pl-4">
+                      <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <ClientAvatar
                             name={row.legal_name}
@@ -311,33 +304,33 @@ export default async function ClientesPage({
                             ) : null}
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="px-4 py-3">
                         <span title={cat.title} className={cn(badgeBase(), "px-1.5 py-0 text-[11px]", cat.className)}>
                           {cat.label}
                         </span>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="px-4 py-3">
                         <span className={cn(badgeBase(), "px-1.5 py-0 text-[11px]", life.className)}>
                           <span className="mr-1" aria-hidden>●</span>
                           {statusLabel}
                         </span>
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="px-4 py-3">
                         {score != null ? (
                           <NotaBadge pct={score} />
                         ) : (
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
-                      </TableCell>
-                      <TableCell>
+                      </td>
+                      <td className="px-4 py-3">
                         <ClientRowActions clientId={row.id} />
-                      </TableCell>
+                      </td>
                     </ClickableTableRow>
                   );
                 })}
-              </TableBody>
-            </Table>
+              </tbody>
+            </table>
 
             <div className="flex flex-col items-center justify-between gap-3 border-t border-border px-4 py-3 sm:flex-row">
               <p className="text-sm text-muted-foreground">

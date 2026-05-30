@@ -24,7 +24,7 @@ import {
   visitsByMonthHasData,
 } from "@/lib/dashboard/visits-by-month";
 import { buildWeeklyBriefing } from "@/lib/dashboard/weekly-briefing";
-import { loadScheduledVisitsForOwner } from "@/lib/actions/visits";
+import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { FirstClientReminderToast } from "@/components/dashboard/first-client-reminder-toast";
@@ -73,23 +73,40 @@ export default async function InicioPage({
     }
   }
 
-  // Resolve workspace owner in parallel with the heavy dashboard queries
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const now = new Date();
+  const visitsFrom = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, now.getUTCDate()),
+  ).toISOString();
+  const visitsTo = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90),
+  ).toISOString();
+
   const [
-    workspaceOwnerId,
-    { rows },
+    visitsResult,
     complianceAlerts,
     validityAlerts,
     financialSummary,
     { rows: expiringContracts },
+    clientCount,
   ] = await Promise.all([
-    getWorkspaceAccountOwnerId(supabase, user.id),
-    loadScheduledVisitsForOwner(),
+    supabase
+      .from("scheduled_visits")
+      .select(
+        `*, establishments(id, name, client_id), patients(id, full_name), team_members(id, full_name, job_role)`,
+      )
+      .eq("user_id", workspaceOwnerId)
+      .gte("scheduled_start", visitsFrom)
+      .lte("scheduled_start", visitsTo)
+      .order("scheduled_start", { ascending: true }),
     loadComplianceDashboardAlerts(tz),
     loadChecklistValidityAlerts(tz),
     loadFinancialDashboardSummary(tz),
     loadExpiringContracts(60),
+    countClientsForOwner(supabase, workspaceOwnerId),
   ]);
-  const clientCount = await countClientsForOwner(supabase, workspaceOwnerId);
+  const rows = (visitsResult.data ?? []) as unknown as ScheduledVisitWithTargets[];
   const hasClients = clientCount > 0;
   const today = sortScheduledVisitsForDashboard(
     rows.filter(

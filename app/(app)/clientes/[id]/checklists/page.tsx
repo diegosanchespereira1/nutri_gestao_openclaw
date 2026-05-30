@@ -24,30 +24,25 @@ export default async function ClientChecklistHistoryPage({
   const sp = await searchParams;
 
   const supabase = await createClient();
-  const { data: client } = await supabase
-    .from("clients")
-    .select("id, legal_name, kind, owner_user_id")
-    .eq("id", clientId)
-    .maybeSingle();
 
-  if (!client || client.kind !== "pj") {
-    notFound();
-  }
+  const [{ data: client }, { data: { user } }] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, legal_name, kind, owner_user_id")
+      .eq("id", clientId)
+      .maybeSingle(),
+    supabase.auth.getUser(),
+  ]);
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (!client || client.kind !== "pj") notFound();
+  if (!user) notFound();
 
-  if (!user) {
-    notFound();
-  }
+  const [workspaceOwnerId, scoreHistory] = await Promise.all([
+    getWorkspaceAccountOwnerId(supabase, user.id),
+    loadChecklistScoreHistory(clientId),
+  ]);
 
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (client.owner_user_id !== workspaceOwnerId) {
-    notFound();
-  }
-
-  const scoreHistory = await loadChecklistScoreHistory(clientId);
+  if (client.owner_user_id !== workspaceOwnerId) notFound();
 
   return (
     <PageLayout variant="form">

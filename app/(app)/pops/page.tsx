@@ -1,13 +1,43 @@
 import Link from "next/link";
 
+import { ClientAvatar } from "@/components/clientes/client-avatar";
+import { badgeBase } from "@/components/clientes/clientes-list-badges";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
+import { getClientLogoSignedUrls } from "@/lib/clients/logo-sync";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
+import {
+  establishmentTypeBadgeClass,
+  establishmentTypeLabel,
+} from "@/lib/constants/establishment-types";
+import { createClient } from "@/lib/supabase/server";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { cn } from "@/lib/utils";
 
 export default async function PopsPage() {
   const { rows: establishments } = await loadEstablishmentsForOwner();
+
+  const supabase = await createClient();
+  const clientIds = [...new Set(establishments.map((e) => e.client_id))];
+  const logoPathByClientId = new Map<string, string | null>();
+
+  if (clientIds.length > 0) {
+    const { data: clientRows } = await supabase
+      .from("clients")
+      .select("id, logo_storage_path")
+      .in("id", clientIds);
+
+    for (const row of clientRows ?? []) {
+      logoPathByClientId.set(
+        row.id as string,
+        (row.logo_storage_path as string | null) ?? null,
+      );
+    }
+  }
+
+  const logoPaths = [...logoPathByClientId.values()].filter(
+    (path): path is string => !!path,
+  );
+  const logoUrlMap = await getClientLogoSignedUrls(supabase, logoPaths);
 
   return (
     <div className="space-y-8">
@@ -52,38 +82,66 @@ export default async function PopsPage() {
               </tr>
             </thead>
             <tbody>
-              {establishments.map((e) => (
-                <tr
-                  key={e.id}
-                  className="border-b border-foreground/5 last:border-0"
-                >
-                  <td className="px-4 py-3">
-                    <p className="text-foreground font-medium">{e.name}</p>
-                    <p className="text-muted-foreground text-xs">
-                      {establishmentClientLabel(e)}
-                    </p>
-                  </td>
-                  <td className="text-muted-foreground px-4 py-3">
-                    {establishmentTypeLabel[e.establishment_type]}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Link
-                        href={`/pops/estabelecimento/${e.id}`}
-                        className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              {establishments.map((e) => {
+                const clientLabel = establishmentClientLabel(e);
+                const logoPath = logoPathByClientId.get(e.client_id) ?? null;
+                const logoUrl = logoPath
+                  ? (logoUrlMap.get(logoPath) ?? null)
+                  : null;
+
+                return (
+                  <tr
+                    key={e.id}
+                    className="border-b border-foreground/5 last:border-0"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <ClientAvatar
+                          name={e.clients.legal_name}
+                          imageUrl={logoUrl}
+                          size="sm"
+                          className="shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <p className="truncate font-medium text-foreground">
+                            {e.name}
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {clientLabel}
+                          </p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={cn(
+                          badgeBase(),
+                          "px-1.5 py-0 text-[11px]",
+                          establishmentTypeBadgeClass[e.establishment_type],
+                        )}
                       >
-                        POPs
-                      </Link>
-                      <Link
-                        href={`/pops/estabelecimento/${e.id}/novo`}
-                        className={cn(buttonVariants({ size: "sm" }))}
-                      >
-                        Novo POP
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {establishmentTypeLabel[e.establishment_type]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        <Link
+                          href={`/pops/estabelecimento/${e.id}`}
+                          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                        >
+                          POPs
+                        </Link>
+                        <Link
+                          href={`/pops/estabelecimento/${e.id}/novo`}
+                          className={cn(buttonVariants({ size: "sm" }))}
+                        >
+                          Novo POP
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

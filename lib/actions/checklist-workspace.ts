@@ -138,16 +138,20 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   }
 
   // Verifica quais templates já foram usados em ao menos 1 sessão de preenchimento.
-  // Single query with .in() instead of N separate count queries.
+  // head:true retorna só o count, sem transferir linhas. Promise.all paraleliza as N queries.
   const usedTemplateIds = new Set<string>();
   if (templateIds.length > 0) {
-    const { data: usedRows } = await supabase
-      .from("checklist_fill_sessions")
-      .select("workspace_template_id")
-      .in("workspace_template_id", templateIds)
-      .not("workspace_template_id", "is", null);
-    for (const row of usedRows ?? []) {
-      if (row.workspace_template_id) usedTemplateIds.add(String(row.workspace_template_id));
+    const checks = await Promise.all(
+      templateIds.map((tid) =>
+        supabase
+          .from("checklist_fill_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_template_id", tid)
+          .then((r) => ({ tid, used: (r.count ?? 0) > 0 })),
+      ),
+    );
+    for (const { tid, used } of checks) {
+      if (used) usedTemplateIds.add(tid);
     }
   }
 

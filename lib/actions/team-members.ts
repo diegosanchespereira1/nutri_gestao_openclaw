@@ -348,6 +348,7 @@ export async function createTeamMemberAction(
       user_metadata: {
         full_name: fullName,
         source: "team_menu",
+        acquisition_source: "team_member",
         invited_by_owner_user_id: user.id,
       },
     });

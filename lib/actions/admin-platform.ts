@@ -91,6 +91,7 @@ export async function loadTenants(search?: string): Promise<{
       "id, full_name, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at, lgpd_blocked_at, lgpd_unblocked_at",
     )
     .not("role", "in", '("admin","super_admin")')
+    .or("acquisition_source.is.null,acquisition_source.neq.team_member")
     .order("created_at", { ascending: false });
 
   if (search) {

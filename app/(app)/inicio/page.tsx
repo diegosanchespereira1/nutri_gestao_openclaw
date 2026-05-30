@@ -28,10 +28,10 @@ import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { FirstClientReminderToast } from "@/components/dashboard/first-client-reminder-toast";
-import { createClient } from "@/lib/supabase/server";
-import { countClientsForOwner } from "@/lib/supabase/profile";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
+import { parseProfileContextCookie } from "@/lib/auth/profile-context-cookie";
+import { getServerContext } from "@/lib/supabase/get-server-user";
+import { countClientsForOwner } from "@/lib/supabase/profile";
 import { DEFAULT_PROFILE_TIME_ZONE, normalizeAppTimeZone } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
@@ -47,33 +47,20 @@ export default async function InicioPage({
   const bemvindo = sp.bemvindo === "1";
   const onboardingMinimal = sp.onboarding === "minimal";
 
-  const [supabase, cookieStore] = await Promise.all([
-    createClient(),
+  const [cookieStore, { supabase, user, workspaceOwnerId }] = await Promise.all([
     cookies(),
+    getServerContext(),
   ]);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  if (!user || !workspaceOwnerId) {
     redirect("/login");
   }
 
-  // Lê o timezone do cookie de sessão (já populado pelo middleware)
-  // evitando uma query extra à tabela profiles.
-  const profileCtxRaw = cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value;
-  let tz = DEFAULT_PROFILE_TIME_ZONE;
-  if (profileCtxRaw) {
-    try {
-      const parsed = JSON.parse(profileCtxRaw) as { timeZone?: string };
-      if (typeof parsed.timeZone === "string" && parsed.timeZone.trim().length > 0) {
-        tz = normalizeAppTimeZone(parsed.timeZone);
-      }
-    } catch {
-      // cookie inválido — usa default
-    }
-  }
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const profileCtx = parseProfileContextCookie(
+    cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
+  );
+  const tz = profileCtx?.timeZone
+    ? normalizeAppTimeZone(profileCtx.timeZone)
+    : DEFAULT_PROFILE_TIME_ZONE;
 
   const now = new Date();
   const visitsFrom = new Date(

@@ -6,16 +6,12 @@ import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadAllPatientsForOwner } from "@/lib/actions/patients";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
 import { fetchAgendaSettings } from "@/lib/supabase/profile";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 
 export default async function VisitasPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) redirect("/login");
 
   const now = new Date();
   const from = new Date(
@@ -25,13 +21,9 @@ export default async function VisitasPage() {
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90),
   ).toISOString();
 
-  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, workspaceOwnerId] = await Promise.all([
-    fetchAgendaSettings(supabase, user.id),
-    getWorkspaceAccountOwnerId(supabase, user.id),
-  ]);
-
-  const [visitsResult, { rows: establishments }, { rows: patients }, { rows: teamMembers }] =
+  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, visitsResult, { rows: establishments }, { rows: patients }, { rows: teamMembers }] =
     await Promise.all([
+      fetchAgendaSettings(supabase, user.id),
       supabase
         .from("scheduled_visits")
         .select(

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { AppBuildLabel } from "@/components/app-version-guard";
@@ -33,6 +33,7 @@ async function withAuthTimeout<T>(promise: Promise<T>, step: string): Promise<T>
 }
 
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
   const [requestId] = useState(() => crypto.randomUUID());
@@ -284,7 +285,7 @@ export function LoginForm() {
         return;
       }
 
-      navigateAfterAuth(next);
+      navigateAfterAuth(next, router);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro inesperado";
       const isTimeout = message.startsWith("AUTH_TIMEOUT:");
@@ -367,7 +368,7 @@ export function LoginForm() {
         return;
       }
 
-      navigateAfterAuth(next);
+      navigateAfterAuth(next, router);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro inesperado";
       const isTimeout = message.startsWith("AUTH_TIMEOUT:");

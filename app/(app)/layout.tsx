@@ -6,44 +6,10 @@ import { AppTimeZoneProvider } from "@/components/app-timezone-provider";
 import { AppVersionGuard } from "@/components/app-version-guard";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
-import { canAccessAdminArea, type ProfileRole } from "@/lib/roles";
+import { parseProfileShellContextCookie } from "@/lib/auth/profile-context-cookie";
+import { canAccessAdminArea } from "@/lib/roles";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
-import {
-  DEFAULT_ENABLED_MODULES,
-  parseEnabledModules,
-  type EnabledModules,
-} from "@/lib/types/modules";
-
-type ProfileCtxCookie = {
-  userId: string;
-  role: ProfileRole | null;
-  timeZone: string;
-  fullName: string | null;
-  enabledModules: EnabledModules;
-};
-
-function parseProfileCtxCookie(raw: string | undefined): ProfileCtxCookie | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<ProfileCtxCookie> & Record<string, unknown>;
-    if (
-      typeof parsed.userId !== "string" ||
-      typeof parsed.timeZone !== "string"
-    ) {
-      return null;
-    }
-    return {
-      userId: parsed.userId,
-      role: typeof parsed.role === "string" ? (parsed.role as ProfileRole) : null,
-      timeZone: parsed.timeZone,
-      fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
-      // Retrocompatibilidade: cookies antigos não têm enabledModules → ambos habilitados
-      enabledModules: parseEnabledModules(parsed.enabledModules ?? null),
-    };
-  } catch {
-    return null;
-  }
-}
+import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 
 export default async function AppAreaLayout({
   children,
@@ -51,7 +17,7 @@ export default async function AppAreaLayout({
   children: React.ReactNode;
 }) {
   const [cookieStore, headersList] = await Promise.all([cookies(), headers()]);
-  const profileCtx = parseProfileCtxCookie(
+  const profileCtx = parseProfileShellContextCookie(
     cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
   );
   if (!profileCtx?.userId) {

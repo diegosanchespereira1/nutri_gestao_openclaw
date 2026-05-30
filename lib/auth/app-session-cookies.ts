@@ -9,7 +9,7 @@ export const APP_PROFILE_CTX_COOKIE = "ng_profile_ctx";
 
 const ABS_FALLBACK_SEC = 8 * 60 * 60; // 8 h
 const IDLE_FALLBACK_SEC = 45 * 60; // 45 min
-const PROFILE_CTX_TTL_FALLBACK_SEC = 30; // 30 s
+const PROFILE_CTX_TTL_FALLBACK_SEC = 5 * 60; // 5 min
 
 function parsePositiveInt(raw: string | undefined, fallback: number, min: number): number {
   if (raw == null || raw === "") return fallback;

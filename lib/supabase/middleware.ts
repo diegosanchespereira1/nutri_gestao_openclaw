@@ -13,22 +13,25 @@ import {
   getProfileCtxTtlSec,
 } from "@/lib/auth/app-session-cookies";
 import {
+  parseProfileContextCookie,
+  type ProfileContextCookie,
+} from "@/lib/auth/profile-context-cookie";
+import {
   isAuthPublicPath,
   isAdminPath,
   isPathAllowedWhenLgpdBlocked,
   isProtectedPath,
 } from "@/lib/auth-paths";
-import { canAccessAdminArea, type ProfileRole } from "@/lib/roles";
+import { canAccessAdminArea } from "@/lib/roles";
 import {
   countClientsForOwner,
   fetchProfileGuardContext,
 } from "@/lib/supabase/profile";
 import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import {
   DEFAULT_ENABLED_MODULES,
-  parseEnabledModules,
-  type EnabledModules,
 } from "@/lib/types/modules";
 
 const AUTH_MIDDLEWARE_TIMEOUT_MS = 4_500;
@@ -102,16 +105,7 @@ function isServerActionRequest(request: NextRequest): boolean {
   return request.headers.has("next-action");
 }
 
-type MiddlewareProfileContext = {
-  userId: string;
-  role: ProfileRole | null;
-  timeZone: string;
-  fullName: string | null;
-  lgpdBlocked: boolean;
-  needsOnboarding: boolean;
-  cachedAt: number;
-  enabledModules: EnabledModules;
-};
+type MiddlewareProfileContext = ProfileContextCookie;
 
 /**
  * Server Actions não passam por getUser() (evita /auth/v1/user a cada autosave).
@@ -140,33 +134,10 @@ function bumpAppSessionLastForServerActionIfEligible(
   return res;
 }
 
-function parseProfileContextCookie(raw: string | undefined): MiddlewareProfileContext | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(raw) as Partial<MiddlewareProfileContext>;
-    if (
-      typeof parsed.userId !== "string" ||
-      typeof parsed.timeZone !== "string" ||
-      typeof parsed.lgpdBlocked !== "boolean" ||
-      typeof parsed.needsOnboarding !== "boolean" ||
-      typeof parsed.cachedAt !== "number"
-    ) {
-      return null;
-    }
-    return {
-      userId: parsed.userId,
-      role: typeof parsed.role === "string" ? (parsed.role as ProfileRole) : null,
-      timeZone: parsed.timeZone,
-      fullName: typeof parsed.fullName === "string" ? parsed.fullName : null,
-      lgpdBlocked: parsed.lgpdBlocked,
-      needsOnboarding: parsed.needsOnboarding,
-      cachedAt: parsed.cachedAt,
-      // Retrocompatibilidade: cookies antigos sem enabledModules → ambos habilitados
-      enabledModules: parseEnabledModules(parsed.enabledModules ?? null),
-    };
-  } catch {
-    return null;
-  }
+function parseProfileContextCookieFromRequest(
+  raw: string | undefined,
+): MiddlewareProfileContext | null {
+  return parseProfileContextCookie(raw);
 }
 
 export async function updateSession(request: NextRequest) {
@@ -323,7 +294,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isProtectedPath(pathname)) {
     const nowSec = Math.floor(Date.now() / 1000);
     const profileCtxTtlSec = getProfileCtxTtlSec();
-    const cachedProfileCtx = parseProfileContextCookie(
+    const cachedProfileCtx = parseProfileContextCookieFromRequest(
       request.cookies.get(APP_PROFILE_CTX_COOKIE)?.value,
     );
     const sessStartRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
@@ -349,8 +320,13 @@ export async function updateSession(request: NextRequest) {
             countClientsForOwner(supabase, user.id),
             "count_clients_for_owner",
           )) === 0;
+        const workspaceOwnerId = await withTimeout(
+          getWorkspaceAccountOwnerId(supabase, user.id),
+          "workspace_account_owner_id",
+        );
         profileCtx = {
           userId: user.id,
+          workspaceOwnerId,
           role: guard.role,
           timeZone: guard.timeZone,
           fullName: guard.fullName,
@@ -367,6 +343,7 @@ export async function updateSession(request: NextRequest) {
         });
         profileCtx = {
           userId: user.id,
+          workspaceOwnerId: user.id,
           role: null,
           timeZone: "America/Sao_Paulo",
           fullName: null,

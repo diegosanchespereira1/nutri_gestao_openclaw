@@ -93,18 +93,52 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   if (error || !templates || templates.length === 0) return { rows: [] };
 
   const templateIds = templates.map((t) => String(t.id));
+  const userIds = [...new Set(templates.map((t) => String(t.created_by_user_id)))];
 
-  const { data: sectionRows } = await supabase
-    .from("checklist_workspace_sections")
-    .select("id, workspace_template_id")
-    .in("workspace_template_id", templateIds);
+  // Fase 1: sections + profiles + "used" checks correm em paralelo
+  // (todas dependem apenas de templateIds/userIds, já disponíveis)
+  const [sectionRows, profileRows, usedChecks] = await Promise.all([
+    supabase
+      .from("checklist_workspace_sections")
+      .select("id, workspace_template_id")
+      .in("workspace_template_id", templateIds)
+      .then((r) => r.data ?? []),
+    userIds.length > 0
+      ? supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", userIds)
+          .then((r) => r.data ?? [])
+      : Promise.resolve([]),
+    Promise.all(
+      templateIds.map((tid) =>
+        supabase
+          .from("checklist_fill_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_template_id", tid)
+          .then((r) => ({ tid, used: (r.count ?? 0) > 0 })),
+      ),
+    ),
+  ]);
 
-  const sectionIds = (sectionRows ?? []).map((s) => String(s.id));
+  const sectionIds = sectionRows.map((s) => String(s.id));
   const sectionToTemplate = new Map<string, string>();
-  for (const s of sectionRows ?? []) {
+  for (const s of sectionRows) {
     sectionToTemplate.set(String(s.id), String(s.workspace_template_id));
   }
 
+  const profileNames = new Map<string, string>();
+  for (const p of profileRows) {
+    const name = String(p.full_name ?? "").trim();
+    if (name.length > 0) profileNames.set(String(p.user_id), name);
+  }
+
+  const usedTemplateIds = new Set<string>();
+  for (const { tid, used } of usedChecks) {
+    if (used) usedTemplateIds.add(tid);
+  }
+
+  // Fase 2: items dependem dos sectionIds da fase anterior
   const counts = new Map<string, { total: number; required: number }>();
   for (const id of templateIds) counts.set(id, { total: 0, required: 0 });
 
@@ -121,37 +155,6 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
       cur.total += 1;
       if (item.is_required) cur.required += 1;
       counts.set(tid, cur);
-    }
-  }
-
-  const userIds = [...new Set(templates.map((t) => String(t.created_by_user_id)))];
-  const profileNames = new Map<string, string>();
-  if (userIds.length > 0) {
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("user_id, full_name")
-      .in("user_id", userIds);
-    for (const p of profiles ?? []) {
-      const name = String(p.full_name ?? "").trim();
-      if (name.length > 0) profileNames.set(String(p.user_id), name);
-    }
-  }
-
-  // Verifica quais templates já foram usados em ao menos 1 sessão de preenchimento.
-  // head:true retorna só o count, sem transferir linhas. Promise.all paraleliza as N queries.
-  const usedTemplateIds = new Set<string>();
-  if (templateIds.length > 0) {
-    const checks = await Promise.all(
-      templateIds.map((tid) =>
-        supabase
-          .from("checklist_fill_sessions")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_template_id", tid)
-          .then((r) => ({ tid, used: (r.count ?? 0) > 0 })),
-      ),
-    );
-    for (const { tid, used } of checks) {
-      if (used) usedTemplateIds.add(tid);
     }
   }
 

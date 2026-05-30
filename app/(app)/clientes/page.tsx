@@ -7,6 +7,7 @@ import { ClientesListBadges } from "@/components/clientes/clientes-list-badges";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { PaginationNav } from "@/components/ui/pagination-nav";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { getClientLogoSignedUrls } from "@/lib/clients/logo-sync";
@@ -51,13 +52,16 @@ export default async function ClientesPage({
   const situacao = parseSituacao(situacaoRaw);
   const segmentosRaw = sp.segmentos;
   const segmentos = parseSegmentos(segmentosRaw);
+  const page = typeof sp.page === "string" ? Math.max(1, parseInt(sp.page, 10) || 1) : 1;
+
   // Story 2.1a — Clientes = apenas Pessoa Jurídica (empresas, hospitais, clínicas).
   // Pacientes PF têm módulo próprio em /pacientes/.
-  const { rows } = await loadClientsForOwner({
+  const { rows, total, pageSize } = await loadClientsForOwner({
     q,
     kind: "pj",
     lifecycle: situacao,
     businessSegments: segmentos.length > 0 ? segmentos : undefined,
+    page,
   });
 
   const supabase = await createClient();
@@ -83,7 +87,7 @@ export default async function ClientesPage({
     <PageLayout>
       <PageHeader
         title="Clientes"
-        description={`${rows.length > 0 ? `${rows.length} cliente${rows.length !== 1 ? "s" : ""}` : "Carteira de clientes"} — empresas, hospitais e clínicas.`}
+        description={`${total > 0 ? `${total} cliente${total !== 1 ? "s" : ""}` : "Carteira de clientes"} — empresas, hospitais e clínicas.`}
         actions={
           <Link href="/clientes/novo" className={cn(buttonVariants())}>
             Novo cliente
@@ -127,49 +131,58 @@ export default async function ClientesPage({
           />
         )
       ) : (
-        <ul
-          className="border-border divide-border divide-y overflow-hidden rounded-lg border bg-card shadow-sm"
-          aria-label="Lista de clientes"
-        >
-          {rowsWithLogos.map(({ row, logoUrl }) => (
-            <li key={row.id}>
-              <Link
-                href={`/clientes/${row.id}/editar`}
-                className="hover:bg-muted/50 focus-visible:ring-ring flex gap-3 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-              >
-                <ClientAvatar
-                  name={row.legal_name}
-                  imageUrl={logoUrl}
-                  className="mt-0.5 shrink-0"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                    <div className="min-w-0">
-                      <span className="text-foreground font-medium leading-snug">
-                        {row.legal_name}
-                      </span>
-                      {row.kind === "pj" && row.trade_name ? (
-                        <span className="text-muted-foreground mt-0.5 block text-sm">
-                          {row.trade_name}
+        <>
+          <ul
+            className="border-border divide-border divide-y overflow-hidden rounded-lg border bg-card shadow-sm"
+            aria-label="Lista de clientes"
+          >
+            {rowsWithLogos.map(({ row, logoUrl }) => (
+              <li key={row.id}>
+                <Link
+                  href={`/clientes/${row.id}/editar`}
+                  className="hover:bg-muted/50 focus-visible:ring-ring flex gap-3 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                >
+                  <ClientAvatar
+                    name={row.legal_name}
+                    imageUrl={logoUrl}
+                    className="mt-0.5 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                      <div className="min-w-0">
+                        <span className="text-foreground font-medium leading-snug">
+                          {row.legal_name}
                         </span>
-                      ) : null}
+                        {row.kind === "pj" && row.trade_name ? (
+                          <span className="text-muted-foreground mt-0.5 block text-sm">
+                            {row.trade_name}
+                          </span>
+                        ) : null}
+                      </div>
+                      <ClientesListBadges
+                        kind={row.kind}
+                        businessSegment={row.business_segment}
+                        lifecycleStatus={row.lifecycle_status}
+                      />
                     </div>
-                    <ClientesListBadges
-                      kind={row.kind}
-                      businessSegment={row.business_segment}
-                      lifecycleStatus={row.lifecycle_status}
-                    />
+                    {row.email ? (
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        {row.email}
+                      </p>
+                    ) : null}
                   </div>
-                  {row.email ? (
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {row.email}
-                    </p>
-                  ) : null}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <PaginationNav
+            page={page}
+            total={total}
+            pageSize={pageSize}
+            searchParams={sp}
+            className="mt-4"
+          />
+        </>
       )}
     </PageLayout>
   );

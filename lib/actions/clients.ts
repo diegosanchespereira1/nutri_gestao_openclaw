@@ -761,25 +761,33 @@ export async function deleteClientAction(formData: FormData) {
 }
 
 /** Para a lista com filtros (RSC). */
+const CLIENTS_PAGE_SIZE = 20;
+
 export async function loadClientsForOwner(options: {
   q?: string;
   kind?: ClientKind | "all";
   lifecycle?: ClientLifecycleStatus | "all";
   businessSegments?: ClientBusinessSegment[];
-}): Promise<{ rows: ClientRow[] }> {
+  page?: number;
+}): Promise<{ rows: ClientRow[]; total: number; pageSize: number }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
+  if (!user) return { rows: [], total: 0, pageSize: CLIENTS_PAGE_SIZE };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
+  const page = Math.max(1, options.page ?? 1);
+  const from = (page - 1) * CLIENTS_PAGE_SIZE;
+  const to = from + CLIENTS_PAGE_SIZE - 1;
+
   let q = supabase
     .from("clients")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("owner_user_id", workspaceOwnerId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
   const kindFilter = options.kind;
   if (kindFilter === "pf" || kindFilter === "pj") {
@@ -809,13 +817,13 @@ export async function loadClientsForOwner(options: {
     );
   }
 
-  const { data, error } = await q;
+  const { data, error, count } = await q;
   if (error || !data) {
-    return { rows: [] };
+    return { rows: [], total: 0, pageSize: CLIENTS_PAGE_SIZE };
   }
 
   const rows = (data as Record<string, unknown>[]).map((r) =>
     normalizeClientRow(r),
   );
-  return { rows };
+  return { rows, total: count ?? 0, pageSize: CLIENTS_PAGE_SIZE };
 }

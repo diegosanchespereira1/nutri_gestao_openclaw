@@ -37,20 +37,15 @@ async function assertEstablishmentOwned(
   workspaceOwnerId: string,
   establishmentId: string,
 ): Promise<boolean> {
-  const { data: est } = await supabase
+  const { data } = await supabase
     .from("establishments")
-    .select("client_id")
+    .select("clients!inner(owner_user_id)")
     .eq("id", establishmentId)
     .maybeSingle();
-  if (!est) return false;
-
-  const { data: cl } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", est.client_id)
-    .maybeSingle();
-
-  return Boolean(cl && cl.owner_user_id === workspaceOwnerId);
+  if (!data) return false;
+  // Supabase types the join as array; at runtime PostgREST returns a single object for many-to-one FK
+  const ownerRow = data.clients as unknown as { owner_user_id: string } | null;
+  return ownerRow?.owner_user_id === workspaceOwnerId;
 }
 
 export async function startChecklistFill(formData: FormData): Promise<void> {
@@ -948,6 +943,11 @@ export async function saveFillResponsesBatch(input: {
     });
   }
 
+  // Classify entries into batches to avoid N+1 round-trips
+  const deleteIds: string[] = [];
+  const updateOps: Array<{ id: string; payload: Record<string, unknown> }> = [];
+  const insertRows: Array<Record<string, unknown>> = [];
+
   for (const entry of entries) {
     const itemId = entry.itemId;
     const existing = existingByItemId.get(itemId);
@@ -959,14 +959,7 @@ export async function saveFillResponsesBatch(input: {
     }
 
     if (entry.outcome === null) {
-      if (existing) {
-        const { error } = await supabase
-          .from("checklist_fill_item_responses")
-          .delete()
-          .eq("id", existing.id);
-        if (error) return { ok: false, error: "Não foi possível salvar." };
-        existingByItemId.delete(itemId);
-      }
+      if (existing) deleteIds.push(existing.id);
       continue;
     }
 
@@ -981,11 +974,7 @@ export async function saveFillResponsesBatch(input: {
         existingValidUntil: existing.valid_until,
         persistMode,
       });
-      const { error } = await supabase
-        .from("checklist_fill_item_responses")
-        .update(payload)
-        .eq("id", existing.id);
-      if (error) return { ok: false, error: "Não foi possível salvar." };
+      updateOps.push({ id: existing.id, payload });
       continue;
     }
 
@@ -1000,10 +989,23 @@ export async function saveFillResponsesBatch(input: {
       valid_until: normalizedValidUntil,
     };
     insertPayload[itemColumn] = itemId;
-    const { error } = await supabase
-      .from("checklist_fill_item_responses")
-      .insert(insertPayload);
-    if (error) return { ok: false, error: "Não foi possível salvar." };
+    insertRows.push(insertPayload);
+  }
+
+  // Execute all DB mutations in parallel (3 operations max instead of N)
+  const results = await Promise.all([
+    ...(deleteIds.length > 0
+      ? [supabase.from("checklist_fill_item_responses").delete().in("id", deleteIds)]
+      : []),
+    ...(insertRows.length > 0
+      ? [supabase.from("checklist_fill_item_responses").insert(insertRows)]
+      : []),
+    ...updateOps.map(({ id, payload }) =>
+      supabase.from("checklist_fill_item_responses").update(payload).eq("id", id),
+    ),
+  ]);
+  if (results.some((r) => r.error)) {
+    return { ok: false, error: "Não foi possível salvar." };
   }
 
   if (withRevalidate) {

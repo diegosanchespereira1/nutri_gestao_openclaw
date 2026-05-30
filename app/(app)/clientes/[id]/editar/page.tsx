@@ -97,11 +97,19 @@ export default async function EditarClientePage({
   const { contractErr } = sp;
 
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("clients")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
+
+  // Phase 1: fetch client + auth + static lists in parallel
+  const [
+    { data, error },
+    { data: { user } },
+    customSegments,
+    teamMembersForSelect,
+  ] = await Promise.all([
+    supabase.from("clients").select("*").eq("id", id).maybeSingle(),
+    supabase.auth.getUser(),
+    loadCustomSegmentsAction(),
+    loadTeamMembersForSelect(),
+  ]);
 
   if (error || !data) {
     notFound();
@@ -117,39 +125,31 @@ export default async function EditarClientePage({
     redirect(`/clientes/${id}/editar?${q.toString()}`);
   }
 
-  const { data: estData } = row.kind === "pj"
-    ? await supabase
-        .from("establishments")
-        .select("*")
-        .eq("client_id", id)
-        .maybeSingle()
-    : { data: null };
-
-  const logoPreviewUrl = await getClientLogoSignedUrl(
-    supabase,
-    row.logo_storage_path,
-  );
-
-  const social = row.social_links ?? {};
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
-  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
-  const tz = await fetchProfileTimeZone(supabase, user?.id ?? "");
-  const tKey = todayKey(new Date(), tz);
-  const { rows: chargesForClient } = await loadFinancialChargesForClient(
-    row.id,
-  );
-  const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
-  const { rows: contracts } = await loadContractsByClient(row.id);
-  const [customSegments, teamMembersForSelect] = await Promise.all([
-    loadCustomSegmentsAction(),
-    loadTeamMembersForSelect(),
+  // Phase 2: fetch all client-dependent and user-dependent data in parallel
+  const [
+    { data: estData },
+    logoPreviewUrl,
+    workspaceOwnerId,
+    tz,
+    { rows: chargesForClient },
+    { rows: contracts },
+  ] = await Promise.all([
+    row.kind === "pj"
+      ? supabase.from("establishments").select("*").eq("client_id", id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    getClientLogoSignedUrl(supabase, row.logo_storage_path),
+    getWorkspaceAccountOwnerId(supabase, user?.id ?? ""),
+    fetchProfileTimeZone(supabase, user?.id ?? ""),
+    loadFinancialChargesForClient(row.id),
+    loadContractsByClient(row.id),
   ]);
 
-  // Áreas do estabelecimento (apenas PJ com estabelecimento já criado)
+  const social = row.social_links ?? {};
+  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
+  const tKey = todayKey(new Date(), tz);
+  const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
+
+  // Phase 3: establishment areas depend on estData
   const establishmentAreas =
     row.kind === "pj" && estData?.id
       ? await loadAreasForEstablishment(estData.id)

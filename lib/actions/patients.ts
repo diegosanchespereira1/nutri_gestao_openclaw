@@ -363,7 +363,7 @@ export async function updatePatientClientAction(
 /** Lista todos os pacientes do profissional autenticado, com joins de contexto.
  *  Suporta filtro por nome/CPF (q) e por cliente (clientId). */
 export async function loadAllPatientsForOwner(
-  filters?: { q?: string; clientId?: string },
+  filters?: { q?: string; clientId?: string; independente?: boolean },
 ): Promise<{ rows: PatientWithContext[] }> {
   const supabase = await createClient();
   const {
@@ -389,6 +389,9 @@ export async function loadAllPatientsForOwner(
   }
   if (filters?.clientId) {
     q = q.eq("client_id", filters.clientId);
+  }
+  if (filters?.independente) {
+    q = q.is("client_id", null);
   }
 
   const { data, error } = await q;

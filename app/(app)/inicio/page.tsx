@@ -73,16 +73,24 @@ export default async function InicioPage({
     }
   }
 
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  const clientCount = await countClientsForOwner(supabase, workspaceOwnerId);
-  const hasClients = clientCount > 0;
-  const [{ rows }, complianceAlerts, validityAlerts, financialSummary, { rows: expiringContracts }] = await Promise.all([
+  // Resolve workspace owner in parallel with the heavy dashboard queries
+  const [
+    workspaceOwnerId,
+    { rows },
+    complianceAlerts,
+    validityAlerts,
+    financialSummary,
+    { rows: expiringContracts },
+  ] = await Promise.all([
+    getWorkspaceAccountOwnerId(supabase, user.id),
     loadScheduledVisitsForOwner(),
     loadComplianceDashboardAlerts(tz),
     loadChecklistValidityAlerts(tz),
     loadFinancialDashboardSummary(tz),
     loadExpiringContracts(60),
   ]);
+  const clientCount = await countClientsForOwner(supabase, workspaceOwnerId);
+  const hasClients = clientCount > 0;
   const today = sortScheduledVisitsForDashboard(
     rows.filter(
       (v) =>

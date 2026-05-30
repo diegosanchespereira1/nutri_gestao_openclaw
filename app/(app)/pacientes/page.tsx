@@ -27,13 +27,10 @@ export default async function PacientesPage({
     typeof sp.situacao === "string" ? sp.situacao : undefined,
   );
 
-  const { rows: allRows } = await loadAllPatientsForOwner({ q });
-
-  // Filtro "independente" (sem cliente) feito em memória após query
-  const rows =
-    situacao === "independente"
-      ? allRows.filter((p) => !p.client_id)
-      : allRows;
+  const { rows } = await loadAllPatientsForOwner({
+    q,
+    independente: situacao === "independente",
+  });
 
   const hasFilters = !!(q || situacao !== "all");
 

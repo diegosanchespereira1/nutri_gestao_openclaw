@@ -37,47 +37,56 @@ export default async function ChecklistPreencherPage({
   const { sessionId } = await params;
   const sp = await searchParams;
   const viewOnlyDossier = sp.view === "dossie";
-  const bundle = await loadFillSessionPageData(sessionId);
+
+  const supabase = await createClient();
+
+  // Phase 1: session bundle + auth + static config in parallel
+  const [bundle, { data: { user } }, initialReopenEvents, clientSignatureRequired] =
+    await Promise.all([
+      loadFillSessionPageData(sessionId),
+      supabase.auth.getUser(),
+      loadReopenEventsForSession(sessionId),
+      getClientSignatureRequiredAction(),
+    ]);
+
   if (!bundle) {
     notFound();
   }
 
   const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const { canReopen: canReopenDossier } =
+  // Phase 2: user-dependent fetches in parallel
+  const [
+    { canReopen: canReopenDossier },
+    professionalProfile,
+  ] = await Promise.all([
     bundle.itemResponseSource === "workspace" || !user
-      ? { canReopen: false }
-      : await getChecklistReopenEligibility(supabase, user.id);
-  const initialReopenEvents = await loadReopenEventsForSession(sessionId);
-  const clientSignatureRequired = await getClientSignatureRequiredAction();
+      ? Promise.resolve({ canReopen: false })
+      : getChecklistReopenEligibility(supabase, user.id),
+    user
+      ? supabase
+          .from("profiles")
+          .select("full_name, crn")
+          .eq("user_id", user.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   // Carrega nome e CRN do profissional para exibição no dialog de assinatura
-  let professionalName: string | undefined;
-  let professionalCrn: string | undefined;
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
+  let professionalName: string | undefined = (professionalProfile?.data?.full_name as string | null) ?? undefined;
+  let professionalCrn: string | undefined = (professionalProfile?.data?.crn as string | null) ?? undefined;
+
+  // Fallback: team_members (only when profile fields are missing)
+  if (user && (!professionalName || !professionalCrn)) {
+    const { data: member } = await supabase
+      .from("team_members")
       .select("full_name, crn")
-      .eq("user_id", user.id)
+      .eq("member_user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
-    professionalName = (profile?.full_name as string | null) ?? undefined;
-    professionalCrn = (profile?.crn as string | null) ?? undefined;
-    // Fallback: team_members
-    if (!professionalName || !professionalCrn) {
-      const { data: member } = await supabase
-        .from("team_members")
-        .select("full_name, crn")
-        .eq("member_user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!professionalName) professionalName = (member?.full_name as string | null) ?? undefined;
-      if (!professionalCrn) professionalCrn = (member?.crn as string | null) ?? undefined;
-    }
+    if (!professionalName) professionalName = (member?.full_name as string | null) ?? undefined;
+    if (!professionalCrn) professionalCrn = (member?.crn as string | null) ?? undefined;
   }
 
   // Assinaturas já salvas (para re-exibição se o dossiê já foi aprovado)

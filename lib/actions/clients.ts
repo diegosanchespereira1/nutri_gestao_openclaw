@@ -469,29 +469,26 @@ export async function createClientAction(
     }
   }
 
-  const responsibleRes = await resolveResponsibleTeamMemberId(
-    supabase,
-    workspaceOwnerId,
-    formData,
-  );
+  // Run team-member lookup and logo upload in parallel (both need only workspaceOwnerId)
+  const [responsibleRes, logoRes] = await Promise.all([
+    resolveResponsibleTeamMemberId(supabase, workspaceOwnerId, formData),
+    kind === "pj"
+      ? resolveClientLogoPathFromForm({
+          supabase,
+          userId: workspaceOwnerId,
+          clientId: newId,
+          formData,
+          previousPath: null,
+        })
+      : Promise.resolve({ ok: true as const, path: null }),
+  ]);
   if (!responsibleRes.ok) {
     return { ok: false, error: responsibleRes.error };
   }
-
-  let logoPath: string | null = null;
-  if (kind === "pj") {
-    const logoRes = await resolveClientLogoPathFromForm({
-      supabase,
-      userId: workspaceOwnerId,
-      clientId: newId,
-      formData,
-      previousPath: null,
-    });
-    if (!logoRes.ok) {
-      return { ok: false, error: logoRes.error };
-    }
-    logoPath = logoRes.path;
+  if (!logoRes.ok) {
+    return { ok: false, error: logoRes.error };
   }
+  const logoPath = logoRes.path;
 
   const { data, error } = await supabase
     .from("clients")
@@ -633,23 +630,29 @@ export async function updateClientAction(
 
   const pf = parsePfProfile(formData, kind);
 
-  let logoPath = previousLogo;
-  if (kind === "pj") {
-    const logoRes = await resolveClientLogoPathFromForm({
-      supabase,
-      userId: workspaceOwnerId,
-      clientId: id,
-      formData,
-      previousPath: previousLogo,
-    });
-    if (!logoRes.ok) {
-      return { ok: false, error: logoRes.error };
-    }
-    logoPath = logoRes.path;
-  } else {
-    await deleteLogoAtPathIfAny(supabase, previousLogo);
-    logoPath = null;
+  // Run logo handling and team-member lookup in parallel (both independent)
+  const [logoRes, responsibleRes] = await Promise.all([
+    kind === "pj"
+      ? resolveClientLogoPathFromForm({
+          supabase,
+          userId: workspaceOwnerId,
+          clientId: id,
+          formData,
+          previousPath: previousLogo,
+        })
+      : deleteLogoAtPathIfAny(supabase, previousLogo).then(() => ({
+          ok: true as const,
+          path: null,
+        })),
+    resolveResponsibleTeamMemberId(supabase, workspaceOwnerId, formData),
+  ]);
+  if (!logoRes.ok) {
+    return { ok: false, error: logoRes.error };
   }
+  if (!responsibleRes.ok) {
+    return { ok: false, error: responsibleRes.error };
+  }
+  const logoPath = logoRes.path;
 
   const baseUpdate: Record<string, unknown> = {
     kind,
@@ -659,6 +662,7 @@ export async function updateClientAction(
     email,
     phone,
     notes,
+    responsible_team_member_id: responsibleRes.value,
     ...pf,
   };
 
@@ -669,18 +673,6 @@ export async function updateClientAction(
   } else {
     Object.assign(baseUpdate, pfOnlyClearPayload(), { logo_storage_path: logoPath });
   }
-
-  const responsibleRes = await resolveResponsibleTeamMemberId(
-    supabase,
-    workspaceOwnerId,
-    formData,
-  );
-  if (!responsibleRes.ok) {
-    return { ok: false, error: responsibleRes.error };
-  }
-  Object.assign(baseUpdate, {
-    responsible_team_member_id: responsibleRes.value,
-  });
 
   const { error } = await supabase
     .from("clients")

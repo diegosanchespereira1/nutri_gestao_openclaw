@@ -10,13 +10,13 @@ import type {
   ClientLifecycleStatus,
 } from "@/lib/types/clients";
 
-const patientBadgeClass =
+export const patientBadgeClass =
   "border border-primary/35 bg-primary/10 text-primary";
 
-const empresaFallbackClass =
+export const empresaFallbackClass =
   "border border-violet-500/25 bg-violet-500/10 text-violet-900 dark:text-violet-100";
 
-const segmentBadgeClass: Record<ClientBusinessSegment, string> = {
+export const segmentBadgeClass: Record<ClientBusinessSegment, string> = {
   padaria:
     "border border-amber-500/30 bg-amber-500/10 text-amber-950 dark:text-amber-100",
   mercado:
@@ -40,7 +40,7 @@ const segmentBadgeClass: Record<ClientBusinessSegment, string> = {
     "border border-muted-foreground/25 bg-muted text-muted-foreground",
 };
 
-const lifecycleMeta: Record<ClientLifecycleStatus, { className: string }> = {
+export const lifecycleMeta: Record<ClientLifecycleStatus, { className: string }> = {
   ativo: {
     className:
       "border border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100",
@@ -55,11 +55,11 @@ const lifecycleMeta: Record<ClientLifecycleStatus, { className: string }> = {
   },
 };
 
-function badgeBase() {
+export function badgeBase() {
   return "inline-flex max-w-full shrink-0 items-center rounded-md px-2 py-0.5 text-xs font-semibold tracking-wide";
 }
 
-function categoryBadgeContent(
+export function categoryBadgeContent(
   kind: ClientKind,
   businessSegment: string | null,
 ): { label: string; title: string; className: string } {

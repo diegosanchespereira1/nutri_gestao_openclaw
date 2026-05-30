@@ -315,19 +315,6 @@ export function ClientForm({
   return (
     <>
     <Card className="max-w-3xl">
-      <CardHeader className="border-b border-foreground/10 pb-4">
-        <CardTitle className="text-base">
-          {mode === "create" ? "Novo registo na carteira" : "Dados do cliente"}
-        </CardTitle>
-        <CardDescription>
-          Aqui regista o <strong className="text-foreground font-medium">contrato</strong>{" "}
-          (PF ou PJ). Em PF, o separador{" "}
-          <strong className="text-foreground font-medium">Pessoa atendida e saúde</strong>{" "}
-          concentra dados clínicos iniciais. Em PJ, use os separadores para unidade,
-          estado do contrato, fiscal, web, marca e responsáveis. Um clique em salvar grava
-          tudo.
-        </CardDescription>
-      </CardHeader>
       <form
         action={formAction}
         onReset={(e) => e.preventDefault()}

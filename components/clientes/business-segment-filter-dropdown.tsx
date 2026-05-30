@@ -15,10 +15,12 @@ import { cn } from "@/lib/utils";
 
 interface BusinessSegmentFilterDropdownProps {
   defaultSegmentos?: ClientBusinessSegment[];
+  showLabel?: boolean;
 }
 
 export function BusinessSegmentFilterDropdown({
   defaultSegmentos = [],
+  showLabel = true,
 }: BusinessSegmentFilterDropdownProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [selected, setSelected] = React.useState<Set<ClientBusinessSegment>>(
@@ -75,14 +77,14 @@ export function BusinessSegmentFilterDropdown({
         : `${selectedCount} tipos selecionados`;
 
   return (
-    <div className="w-full space-y-2">
-      <Label>Tipo de Negócio</Label>
+    <div className={cn("w-full", showLabel && "space-y-2")}>
+      {showLabel && <Label>Tipo de Negócio</Label>}
       <div ref={dropdownRef} className="relative">
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
           className={cn(
-            "border-input bg-white ring-offset-background focus-visible:ring-ring flex h-9 w-full items-center justify-between rounded-md border px-3 py-1 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 dark:bg-card",
+            "border-input bg-background text-foreground flex h-9 w-full touch-manipulation items-center justify-between rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             isOpen && "ring-2 ring-ring ring-offset-1"
           )}
         >

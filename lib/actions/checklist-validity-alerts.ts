@@ -17,6 +17,17 @@ type CandidateAlert = ChecklistValidityAlert & {
   scopeKey: string;
 };
 
+const IN_CHUNK_SIZE = 150;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  if (items.length === 0) return [];
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
+
 export async function loadChecklistValidityAlerts(
   timeZone: string,
   options?: { withinDays?: number; limit?: number; clientId?: string | null },
@@ -36,49 +47,14 @@ export async function loadChecklistValidityAlerts(
   const horizon = addCalendarDays(tKey, withinDays, timeZone);
   const pastCap = addCalendarDays(tKey, -365, timeZone);
 
-  const { data: responseRows, error: responseError } = await supabase
-    .from("checklist_fill_item_responses")
-    .select("id, session_id, valid_until")
-    .not("valid_until", "is", null)
-    .gte("valid_until", pastCap);
-
-  if (responseError || !responseRows || responseRows.length === 0) return [];
-
-  const uniqueSessionIds = [...new Set(responseRows.map((r) => String(r.session_id)))];
-  const { data: sessions, error: sessionError } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id, establishment_id, template_id, custom_template_id")
-    .in("id", uniqueSessionIds);
-  if (sessionError || !sessions || sessions.length === 0) return [];
-
-  const sessionMap = new Map<string, SessionMeta>();
-  for (const s of sessions) {
-    sessionMap.set(String(s.id), {
-      id: String(s.id),
-      establishment_id: String(s.establishment_id),
-      template_id: (s.template_id as string | null) ?? null,
-      custom_template_id: (s.custom_template_id as string | null) ?? null,
-    });
-  }
-
-  const establishmentIds = [...new Set(sessions.map((s) => String(s.establishment_id)))];
-  const { data: establishments, error: establishmentError } = await supabase
-    .from("establishments")
-    .select("id, client_id")
-    .in("id", establishmentIds);
-  if (establishmentError || !establishments || establishments.length === 0) return [];
-
-  const establishmentToClient = new Map<string, string>();
-  for (const est of establishments) {
-    establishmentToClient.set(String(est.id), String(est.client_id));
-  }
-
-  const clientIds = [...new Set(establishments.map((e) => String(e.client_id)))];
-  const { data: clients, error: clientsError } = await supabase
+  let clientsQuery = supabase
     .from("clients")
-    .select("id, owner_user_id, legal_name, trade_name")
-    .in("id", clientIds)
+    .select("id, legal_name, trade_name")
     .eq("owner_user_id", workspaceOwnerId);
+  if (clientFilter) {
+    clientsQuery = clientsQuery.eq("id", clientFilter);
+  }
+  const { data: clients, error: clientsError } = await clientsQuery;
   if (clientsError || !clients || clients.length === 0) return [];
 
   const clientNameMap = new Map<string, string>();
@@ -88,10 +64,75 @@ export async function loadChecklistValidityAlerts(
     clientNameMap.set(String(c.id), trade.length > 0 ? trade : legal);
   }
 
-  if (clientFilter && !clientNameMap.has(clientFilter)) return [];
+  const clientIds = [...clientNameMap.keys()];
+  const { data: establishments, error: establishmentError } = await supabase
+    .from("establishments")
+    .select("id, client_id")
+    .in("client_id", clientIds);
+  if (establishmentError || !establishments || establishments.length === 0) {
+    return [];
+  }
 
-  const templateIds = [...new Set(sessions.map((s) => s.template_id).filter(Boolean))] as string[];
-  const customTemplateIds = [...new Set(sessions.map((s) => s.custom_template_id).filter(Boolean))] as string[];
+  const establishmentToClient = new Map<string, string>();
+  for (const est of establishments) {
+    establishmentToClient.set(String(est.id), String(est.client_id));
+  }
+
+  const establishmentIds = establishments.map((e) => String(e.id));
+  const sessionMap = new Map<string, SessionMeta>();
+  for (const ids of chunk(establishmentIds, IN_CHUNK_SIZE)) {
+    const { data: sessions, error: sessionError } = await supabase
+      .from("checklist_fill_sessions")
+      .select("id, establishment_id, template_id, custom_template_id")
+      .in("establishment_id", ids);
+    if (sessionError || !sessions) continue;
+    for (const s of sessions) {
+      sessionMap.set(String(s.id), {
+        id: String(s.id),
+        establishment_id: String(s.establishment_id),
+        template_id: (s.template_id as string | null) ?? null,
+        custom_template_id: (s.custom_template_id as string | null) ?? null,
+      });
+    }
+  }
+  if (sessionMap.size === 0) return [];
+
+  const sessionIds = [...sessionMap.keys()];
+  const responseRows: Array<{ id: string; session_id: string; valid_until: string }> =
+    [];
+  for (const ids of chunk(sessionIds, IN_CHUNK_SIZE)) {
+    const { data: rows, error: responseError } = await supabase
+      .from("checklist_fill_item_responses")
+      .select("id, session_id, valid_until")
+      .in("session_id", ids)
+      .not("valid_until", "is", null)
+      .gte("valid_until", pastCap)
+      .lte("valid_until", horizon);
+    if (responseError || !rows) continue;
+    for (const row of rows) {
+      responseRows.push({
+        id: String(row.id),
+        session_id: String(row.session_id),
+        valid_until: String(row.valid_until),
+      });
+    }
+  }
+  if (responseRows.length === 0) return [];
+
+  const templateIds = [
+    ...new Set(
+      [...sessionMap.values()]
+        .map((s) => s.template_id)
+        .filter(Boolean),
+    ),
+  ] as string[];
+  const customTemplateIds = [
+    ...new Set(
+      [...sessionMap.values()]
+        .map((s) => s.custom_template_id)
+        .filter(Boolean),
+    ),
+  ] as string[];
 
   const templateNameMap = new Map<string, string>();
   if (templateIds.length > 0) {
@@ -117,10 +158,10 @@ export async function loadChecklistValidityAlerts(
 
   const candidates: CandidateAlert[] = [];
   for (const row of responseRows) {
-    const validUntil = String(row.valid_until ?? "").slice(0, 10);
+    const validUntil = row.valid_until.slice(0, 10);
     if (!validUntil) continue;
 
-    const session = sessionMap.get(String(row.session_id));
+    const session = sessionMap.get(row.session_id);
     if (!session) continue;
 
     const clientId = establishmentToClient.get(session.establishment_id);
@@ -128,7 +169,6 @@ export async function loadChecklistValidityAlerts(
 
     const clientName = clientNameMap.get(clientId);
     if (!clientName) continue;
-    if (clientFilter && clientId !== clientFilter) continue;
 
     const checklistName =
       (session.template_id ? templateNameMap.get(session.template_id) : null) ??
@@ -147,8 +187,8 @@ export async function loadChecklistValidityAlerts(
     const scopeKey = `${clientId}|${session.establishment_id}|${templateScope}`;
 
     candidates.push({
-      responseId: String(row.id),
-      sessionId: String(row.session_id),
+      responseId: row.id,
+      sessionId: row.session_id,
       clientId,
       clientName,
       checklistName,
@@ -159,8 +199,6 @@ export async function loadChecklistValidityAlerts(
     });
   }
 
-  // Regra de vigência: para cada checklist (cliente + estabelecimento + template),
-  // mantemos apenas a validade mais recente entre todas as execuções.
   const latestByScope = new Map<string, CandidateAlert>();
   for (const candidate of candidates) {
     const prev = latestByScope.get(candidate.scopeKey);

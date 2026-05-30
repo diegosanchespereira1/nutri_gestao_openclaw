@@ -22,12 +22,6 @@ type Props = {
 
 type StatusFilter = "todos" | "proximo" | "vencido";
 
-type AlertsByClientGroup = {
-  clientId: string;
-  clientName: string;
-  alerts: ChecklistValidityAlert[];
-};
-
 export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
@@ -41,22 +35,6 @@ export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
       return alert.clientName.toLocaleLowerCase("pt-BR").includes(search);
     });
   }, [alerts, searchTerm, statusFilter]);
-
-  const groupedAlerts = useMemo<AlertsByClientGroup[]>(() => {
-    return filteredAlerts.reduce<AlertsByClientGroup[]>((groups, alert) => {
-      const existing = groups.find((group) => group.clientId === alert.clientId);
-      if (existing) {
-        existing.alerts.push(alert);
-        return groups;
-      }
-      groups.push({
-        clientId: alert.clientId,
-        clientName: alert.clientName,
-        alerts: [alert],
-      });
-      return groups;
-    }, []);
-  }, [filteredAlerts]);
 
   return (
     <div className="space-y-4">
@@ -96,37 +74,25 @@ export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
         </div>
       </div>
 
-      {groupedAlerts.length === 0 ? (
+      {filteredAlerts.length === 0 ? (
         <p className="text-muted-foreground text-sm">
           Nenhum item encontrado para os filtros aplicados.
         </p>
       ) : (
-        <div className="space-y-4" aria-label="Validades de itens de checklist">
-          {groupedAlerts.map((group) => (
-            <section
-              key={group.clientId}
-              className="bg-muted/20 space-y-3 rounded-lg border border-border p-3 sm:p-4"
-              aria-label={`Alertas de validade do cliente ${group.clientName}`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-                <p className="text-foreground text-lg font-semibold tracking-tight sm:text-xl">
-                  {group.clientName}
-                </p>
-                <span className="text-muted-foreground text-xs">
-                  {group.alerts.length} {group.alerts.length === 1 ? "item" : "itens"}{" "}
-                  {group.alerts.length === 1 ? "a vencer/vencido" : "a vencer/vencidos"}
-                </span>
-              </div>
-              <ul className="space-y-3" aria-label={`Itens de validade de ${group.clientName}`}>
-                {group.alerts.map((alert) => (
-                  <li key={alert.responseId}>
-                    <ChecklistValidityAlertCard alert={alert} timeZone={timeZone} />
-                  </li>
-                ))}
-              </ul>
-            </section>
+        <ul
+          className="grid grid-cols-1 gap-3 md:grid-cols-2"
+          aria-label="Validades de itens de checklist"
+        >
+          {filteredAlerts.map((alert) => (
+            <li key={alert.responseId} className="min-h-0">
+              <ChecklistValidityAlertCard
+                alert={alert}
+                timeZone={timeZone}
+                stacked
+              />
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

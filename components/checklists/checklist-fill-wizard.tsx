@@ -598,8 +598,9 @@ export function ChecklistFillWizard({
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
 
   /* ── Task B: guarda de navegação (Voltar do browser + links internos) ── */
-  const { guardTriggered, cancelLeave } = useNavigationGuard({
+  const { guardTriggered, cancelLeave, completeBrowserBack } = useNavigationGuard({
     active: !formLocked,
+    fallbackHref: backHref,
   });
 
   const leaveDialogOpen = guardTriggered || leaveLinkTarget !== null;
@@ -715,22 +716,30 @@ export function ChecklistFillWizard({
         setLeaveActionError(result.error);
         return;
       }
-      const dest = leaveLinkTargetRef.current ?? backHref;
+      const dest = leaveLinkTargetRef.current;
       clearLeaveLinkTarget();
       cancelLeave();
-      router.push(dest);
+      if (dest) {
+        router.push(dest);
+      } else {
+        completeBrowserBack();
+      }
     } finally {
       setLeaveActionBusy(false);
     }
-  }, [persistDraftForLeave, backHref, clearLeaveLinkTarget, cancelLeave, router]);
+  }, [persistDraftForLeave, clearLeaveLinkTarget, cancelLeave, completeBrowserBack, router]);
 
   const handleDiscardAndLeave = useCallback(() => {
-    const dest = leaveLinkTargetRef.current ?? backHref;
+    const dest = leaveLinkTargetRef.current;
     setDiscardConfirmOpen(false);
     clearLeaveLinkTarget();
     cancelLeave();
-    router.push(dest);
-  }, [backHref, clearLeaveLinkTarget, cancelLeave, router]);
+    if (dest) {
+      router.push(dest);
+    } else {
+      completeBrowserBack();
+    }
+  }, [clearLeaveLinkTarget, cancelLeave, completeBrowserBack, router]);
 
   /** Bloqueia navegação interna (sidebar, etc.) até confirmar gravação do rascunho. */
   useEffect(() => {

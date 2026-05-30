@@ -10,6 +10,7 @@ import {
   resolveClientLogoPathFromForm,
 } from "@/lib/clients/logo-sync";
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type {
@@ -770,13 +771,8 @@ export async function loadClientsForOwner(options: {
   businessSegments?: ClientBusinessSegment[];
   page?: number;
 }): Promise<{ rows: ClientRow[]; total: number; pageSize: number }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [], total: 0, pageSize: CLIENTS_PAGE_SIZE };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [], total: 0, pageSize: CLIENTS_PAGE_SIZE };
 
   const page = Math.max(1, options.page ?? 1);
   const from = (page - 1) * CLIENTS_PAGE_SIZE;

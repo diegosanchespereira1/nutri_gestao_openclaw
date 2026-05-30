@@ -26,17 +26,19 @@ import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { createClient } from "@/lib/supabase/server";
+import { safeNextPath } from "@/lib/auth/safe-next-path";
 
 export default async function ChecklistPreencherPage({
   params,
   searchParams,
 }: {
   params: Promise<{ sessionId: string }>;
-  searchParams: Promise<{ view?: string }>;
+  searchParams: Promise<{ view?: string; returnTo?: string }>;
 }) {
   const { sessionId } = await params;
   const sp = await searchParams;
   const viewOnlyDossier = sp.view === "dossie";
+  const backHref = sp.returnTo ? safeNextPath(sp.returnTo) : undefined;
 
   const supabase = await createClient();
 
@@ -164,6 +166,7 @@ export default async function ChecklistPreencherPage({
 
       <ChecklistFillWizard
         sessionId={bundle.session.id}
+        {...(backHref ? { backHref } : {})}
         template={bundle.template}
         initialResponses={bundle.responses}
         establishmentLabel={bundle.establishmentLabel}

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type {
   EstablishmentPickerOption,
@@ -66,13 +67,8 @@ function revalidateClientEstablishmentPaths(clientId: string, estId?: string) {
 export async function loadEstablishmentsForOwner(): Promise<{
   rows: EstablishmentWithClientNames[];
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [] };
 
   const { data: clientRows, error: cErr } = await supabase
     .from("clients")
@@ -206,11 +202,8 @@ export async function loadOwnerChecklistEstablishmentsDropdownAction(params?: {
 export async function loadRecentChecklistEstablishmentsAction(
   limit = 3,
 ): Promise<{ rows: EstablishmentPickerOption[] }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [] };
 
   const safeLimit = Math.min(10, Math.max(1, limit));
 
@@ -231,8 +224,6 @@ export async function loadRecentChecklistEstablishmentsAction(
     establishmentIds.push(eid);
     if (establishmentIds.length >= safeLimit) break;
   }
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data: establishments, error: estErr } = await supabase
     .from("establishments")
@@ -263,13 +254,8 @@ export async function loadRecentChecklistEstablishmentsAction(
 export async function loadEstablishmentPickerOptionById(
   establishmentId: string,
 ): Promise<EstablishmentPickerOption | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return null;
 
   const { data: row, error } = await supabase
     .from("establishments")

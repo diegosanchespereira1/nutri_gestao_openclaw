@@ -18,7 +18,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { clientLifecycleBadgeLabel } from "@/lib/constants/client-lifecycle";
 import { getClientLogoSignedUrls } from "@/lib/clients/logo-sync";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
 import type {
   ClientBusinessSegment,
@@ -77,15 +77,17 @@ export default async function ClientesPage({
   const page =
     typeof sp.page === "string" ? Math.max(1, parseInt(sp.page, 10) || 1) : 1;
 
-  const { rows, total, pageSize } = await loadClientsForOwner({
-    q,
-    kind: "pj",
-    lifecycle: situacao,
-    businessSegments: segmentos.length > 0 ? segmentos : undefined,
-    page,
-  });
+  const [{ rows, total, pageSize }, { supabase }] = await Promise.all([
+    loadClientsForOwner({
+      q,
+      kind: "pj",
+      lifecycle: situacao,
+      businessSegments: segmentos.length > 0 ? segmentos : undefined,
+      page,
+    }),
+    getServerContext(),
+  ]);
 
-  const supabase = await createClient();
   const clientIds = rows.map((r) => r.id);
   const logoPaths = rows
     .filter((r) => r.kind === "pj" && r.logo_storage_path)

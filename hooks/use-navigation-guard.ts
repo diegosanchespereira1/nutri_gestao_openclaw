@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 type UseNavigationGuardOptions = {
   /** Ativar o guard. Passar false quando o dossiê estiver aprovado. */
   active: boolean;
+  /** Destino se o histórico do browser for insuficiente (ex.: abriu numa aba nova). */
+  fallbackHref?: string;
 };
 
 type UseNavigationGuardReturn = {
@@ -12,6 +14,8 @@ type UseNavigationGuardReturn = {
   guardTriggered: boolean;
   /** Fecha o aviso de saída (Voltar do browser) sem navegar. */
   cancelLeave: () => void;
+  /** Desactiva o guard e navega para a página anterior no histórico. */
+  completeBrowserBack: () => void;
 };
 
 /**
@@ -19,42 +23,50 @@ type UseNavigationGuardReturn = {
  * durante o preenchimento de um checklist.
  *
  * - `beforeunload` → aviso nativo do browser ao fechar aba / recarregar.
- * - `popstate` → ao pressionar Voltar, repõe a URL e exibe o modal customizado.
- *
- * A confirmação de saída e a gravação no servidor ficam a cargo do componente pai
- * (ex.: botão «Gravar e sair» no diálogo).
+ * - `popstate` → ao pressionar Voltar, repõe a entrada sentinel e exibe o modal.
  */
 export function useNavigationGuard(
   options: UseNavigationGuardOptions,
 ): UseNavigationGuardReturn {
-  const { active } = options;
+  const { active, fallbackHref = "/checklists" } = options;
   const [guardTriggered, setGuardTriggered] = useState(false);
   const activeRef = useRef(active);
+  const guardPushedRef = useRef(false);
+  const completingRef = useRef(false);
+  const fallbackHrefRef = useRef(fallbackHref);
 
   useEffect(() => {
     activeRef.current = active;
   }, [active]);
 
   useEffect(() => {
+    fallbackHrefRef.current = fallbackHref;
+  }, [fallbackHref]);
+
+  useEffect(() => {
+    if (!active) {
+      guardPushedRef.current = false;
+      return;
+    }
+
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (!activeRef.current) return;
-      // Retornar uma string não-vazia ativa o aviso nativo do browser.
+      if (!activeRef.current || completingRef.current) return;
       e.preventDefault();
-      // Chrome requer returnValue (obsoleto, mas necessário para compatibilidade).
       e.returnValue = "";
       return "";
     }
 
     function handlePopState() {
+      if (completingRef.current) return;
       if (!activeRef.current) return;
-      // Repõe a URL atual para que o browser não navegue de facto.
-      history.pushState(null, "", window.location.href);
-      // Exibe o modal customizado.
       setGuardTriggered(true);
+      history.pushState({ navGuard: 1 }, "", window.location.href);
     }
 
-    // Empurra um estado extra para que o popstate possa ser interceptado.
-    history.pushState(null, "", window.location.href);
+    if (!guardPushedRef.current) {
+      history.pushState({ navGuard: 1 }, "", window.location.href);
+      guardPushedRef.current = true;
+    }
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("popstate", handlePopState);
@@ -63,11 +75,25 @@ export function useNavigationGuard(
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState);
     };
-  }, []); // Apenas no mount/unmount — usa refs para aceder ao estado corrente.
+  }, [active]);
 
   const cancelLeave = useCallback(() => {
     setGuardTriggered(false);
   }, []);
 
-  return { guardTriggered, cancelLeave };
+  const completeBrowserBack = useCallback(() => {
+    completingRef.current = true;
+    activeRef.current = false;
+    setGuardTriggered(false);
+
+    // Entrada sentinel + página actual: recuar 2 níveis volta à origem (ex.: /inicio).
+    if (window.history.length > 2) {
+      history.go(-2);
+      return;
+    }
+
+    window.location.assign(fallbackHrefRef.current);
+  }, []);
+
+  return { guardTriggered, cancelLeave, completeBrowserBack };
 }

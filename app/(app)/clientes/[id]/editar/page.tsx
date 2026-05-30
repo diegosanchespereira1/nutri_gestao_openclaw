@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ClientExamDocumentList } from "@/components/clientes/client-exam-document-list";
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { ClientContractsSection } from "@/components/clientes/client-contracts-section";
-import { ClientForm } from "@/components/clientes/client-form";
+import { ClientFormLazy } from "@/components/clientes/client-form-lazy";
 import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
 import { ClientChecklistHistorySection } from "@/components/clientes/client-checklist-history-section";
 import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
@@ -37,6 +37,8 @@ import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
+import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
+import type { EstablishmentRow } from "@/lib/types/establishments";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 
@@ -98,17 +100,10 @@ export default async function EditarClientePage({
 
   const supabase = await createClient();
 
-  // Phase 1: fetch client + auth + static lists in parallel
-  const [
-    { data, error },
-    { data: { user } },
-    customSegments,
-    teamMembersForSelect,
-  ] = await Promise.all([
+  // Phase 1: cliente + sessão
+  const [{ data, error }, { data: { user } }] = await Promise.all([
     supabase.from("clients").select("*").eq("id", id).maybeSingle(),
     supabase.auth.getUser(),
-    loadCustomSegmentsAction(),
-    loadTeamMembersForSelect(),
   ]);
 
   if (error || !data) {
@@ -125,7 +120,12 @@ export default async function EditarClientePage({
     redirect(`/clientes/${id}/editar?${q.toString()}`);
   }
 
-  // Phase 2: fetch all client-dependent and user-dependent data in parallel
+  const activeTab = resolveClientEditTab(sp.tab, row.kind);
+  const needDadosExtras = activeTab === "dados";
+  const needFinancial = activeTab === "financeiro";
+  const needEstablishment = row.kind === "pj" && (needDadosExtras || activeTab === "checklists");
+
+  // Phase 2: carrega só o necessário para o separador activo
   const [
     { data: estData },
     logoPreviewUrl,
@@ -133,29 +133,48 @@ export default async function EditarClientePage({
     tz,
     { rows: chargesForClient },
     { rows: contracts },
+    customSegments,
+    teamMembersForSelect,
   ] = await Promise.all([
-    row.kind === "pj"
+    needEstablishment
       ? supabase.from("establishments").select("*").eq("client_id", id).maybeSingle()
       : Promise.resolve({ data: null }),
-    getClientLogoSignedUrl(supabase, row.logo_storage_path),
+    row.logo_storage_path
+      ? getClientLogoSignedUrl(supabase, row.logo_storage_path)
+      : Promise.resolve(null),
     getWorkspaceAccountOwnerId(supabase, user?.id ?? ""),
-    fetchProfileTimeZone(supabase, user?.id ?? ""),
-    loadFinancialChargesForClient(row.id),
-    loadContractsByClient(row.id),
+    needFinancial
+      ? fetchProfileTimeZone(supabase, user?.id ?? "")
+      : Promise.resolve(DEFAULT_PROFILE_TIME_ZONE),
+    needFinancial
+      ? loadFinancialChargesForClient(row.id)
+      : Promise.resolve({ rows: [] }),
+    needFinancial
+      ? loadContractsByClient(row.id)
+      : Promise.resolve({ rows: [] }),
+    needDadosExtras
+      ? loadCustomSegmentsAction()
+      : Promise.resolve([]),
+    needDadosExtras
+      ? loadTeamMembersForSelect()
+      : Promise.resolve([]),
   ]);
 
   const social = row.social_links ?? {};
   const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
-  const tKey = todayKey(new Date(), tz);
-  const payMetrics = metricsFromClientCharges(chargesForClient, tKey);
+  const tKey = needFinancial ? todayKey(new Date(), tz) : "";
+  const payMetrics = needFinancial
+    ? metricsFromClientCharges(chargesForClient, tKey)
+    : metricsFromClientCharges([], tKey);
 
-  // Phase 3: establishment areas depend on estData
   const establishmentAreas =
-    row.kind === "pj" && estData?.id
+    needDadosExtras && row.kind === "pj" && estData?.id
       ? await loadAreasForEstablishment(estData.id)
       : [];
 
-  const activeTab = resolveClientEditTab(sp.tab, row.kind);
+  const estRow: EstablishmentRow | null = estData
+    ? (estData as EstablishmentRow)
+    : null;
 
   const statusLabel =
     row.lifecycle_status === "ativo"
@@ -197,7 +216,7 @@ export default async function EditarClientePage({
 
       {activeTab === "dados" ? (
         <>
-          <ClientForm
+          <ClientFormLazy
             mode="edit"
             clientId={row.id}
             defaultKind={row.kind}
@@ -264,9 +283,9 @@ export default async function EditarClientePage({
             defaultEstPostalCode={estData?.postal_code ?? ""}
           >
             {row.kind === "pj" ? (
-              <EstablishmentsSection clientId={row.id} />
+              <EstablishmentsSection clientId={row.id} establishment={estRow} />
             ) : null}
-          </ClientForm>
+          </ClientFormLazy>
 
           {row.kind === "pj" && estData?.id ? (
             <>

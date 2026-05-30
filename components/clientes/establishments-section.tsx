@@ -1,15 +1,21 @@
 import Link from "next/link";
 
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
+import type { EstablishmentRow } from "@/lib/types/establishments";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
 
 export async function EstablishmentsSection({
   clientId,
+  establishment: preloadedEstablishment,
 }: {
   clientId: string;
+  /** Evita round-trip extra quando a página já carregou o estabelecimento. */
+  establishment?: EstablishmentRow | null;
 }) {
-  const { rows } = await loadEstablishmentsForClient(clientId);
-  const establishment = rows[0] ?? null;
+  const establishment =
+    preloadedEstablishment !== undefined
+      ? preloadedEstablishment
+      : (await loadEstablishmentsForClient(clientId)).rows[0] ?? null;
 
   return (
     <section

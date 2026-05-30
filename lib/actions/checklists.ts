@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/supabase/get-server-user";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import type {
   ChecklistTemplateItemRow,
@@ -98,10 +99,7 @@ function assembleTemplates(
 export async function loadChecklistCatalog(): Promise<{
   templates: ChecklistTemplateWithSections[];
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getServerUser();
   if (!user) return { templates: [] };
 
   const { data: templatesRaw, error: tErr } = await supabase

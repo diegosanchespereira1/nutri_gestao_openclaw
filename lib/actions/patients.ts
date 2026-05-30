@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerUser } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type { ClientKind } from "@/lib/types/clients";
 import type {
@@ -365,10 +366,7 @@ export async function updatePatientClientAction(
 export async function loadAllPatientsForOwner(
   filters?: { q?: string; clientId?: string; independente?: boolean },
 ): Promise<{ rows: PatientWithContext[] }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getServerUser();
   if (!user) return { rows: [] };
 
   let q = supabase

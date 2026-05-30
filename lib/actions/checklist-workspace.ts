@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
@@ -75,13 +76,8 @@ export type WorkspaceActionResult =
 export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   rows: WorkspaceTemplateListRow[];
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [] };
 
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")

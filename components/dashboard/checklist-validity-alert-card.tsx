@@ -1,13 +1,16 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
-import { buttonVariants } from "@/components/ui/button-variants";
 import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
 import { cn } from "@/lib/utils";
 
 type Props = {
   alert: ChecklistValidityAlert;
   timeZone: string;
+  /** Oculta o nome do cliente quando já aparece no cabeçalho do grupo. */
+  hideClientName?: boolean;
+  /** Layout compacto para grelha de 2 colunas no dashboard. */
+  stacked?: boolean;
 };
 
 function formatDueDatePt(dueDateKey: string, timeZone: string): string {
@@ -28,71 +31,76 @@ function buildStatusLabel(alert: ChecklistValidityAlert): string {
   return `Vence em ${alert.daysToExpire} dia${alert.daysToExpire > 1 ? "s" : ""}`;
 }
 
-export function ChecklistValidityAlertCard({ alert, timeZone }: Props) {
+export function ChecklistValidityAlertCard({
+  alert,
+  timeZone,
+  hideClientName = false,
+  stacked = false,
+}: Props) {
   const dueLabel = formatDueDatePt(alert.validUntil, timeZone);
   const statusLabel = buildStatusLabel(alert);
   const urgencyClasses =
     alert.status === "vencido"
-      ? "border-l-4 border-l-destructive bg-red-50/60"
-      : "border-l-4 border-l-warning bg-amber-50/60";
+      ? "border-l-[3px] border-l-destructive bg-red-50/50 dark:bg-red-950/20"
+      : "border-l-[3px] border-l-warning bg-amber-50/50 dark:bg-amber-950/20";
+
+  const titleId = `validity-alert-title-${alert.responseId}`;
+  const href = `/checklists/preencher/${alert.sessionId}?returnTo=${encodeURIComponent("/inicio")}`;
+  const ariaLabel = `Abrir checklist ${alert.checklistName} de ${alert.clientName}, ${statusLabel}`;
 
   return (
-    <article
+    <Link
+      href={href}
+      prefetch={false}
+      aria-labelledby={titleId}
+      aria-label={ariaLabel}
       className={cn(
-        "flex flex-col gap-3 rounded-lg border border-border p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between",
+        "group block rounded-lg border border-border transition-colors",
+        "hover:border-primary/35 hover:bg-background/80 hover:shadow-xs",
+        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+        stacked ? "p-2.5" : "p-3",
         urgencyClasses,
       )}
-      aria-labelledby={`validity-alert-title-${alert.responseId}`}
     >
-      <div className="min-w-0 flex gap-3">
+      <div className={cn("flex gap-2", !stacked && "gap-2.5")}>
         <AlertTriangle
           className={cn(
-            "mt-0.5 size-5 shrink-0",
+            "mt-0.5 shrink-0",
+            stacked ? "size-3.5" : "size-4",
             alert.status === "vencido"
               ? "text-destructive"
               : "text-amber-600 dark:text-amber-400",
           )}
           aria-hidden
         />
-        <div className="min-w-0 space-y-1">
-          <p
-            id={`validity-alert-title-${alert.responseId}`}
-            className="text-foreground font-medium leading-snug"
-          >
-            {alert.clientName}
-          </p>
-          <p className="text-muted-foreground text-sm">
-            Checklist: <span className="text-foreground">{alert.checklistName}</span>
-          </p>
-          <p className="text-foreground flex flex-wrap items-center gap-1 text-sm">
-            <CalendarClock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-            <span className="font-medium">Validade:</span>
-            <span>{dueLabel}</span>
-            <span aria-hidden>·</span>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          {hideClientName ? (
+            <p
+              id={titleId}
+              className="text-foreground truncate text-sm font-semibold leading-tight group-hover:text-primary"
+            >
+              {alert.checklistName}
+            </p>
+          ) : (
+            <>
+              <p
+                id={titleId}
+                className="text-foreground truncate text-sm font-semibold leading-tight"
+              >
+                {alert.clientName}
+              </p>
+              <p className="text-foreground truncate text-xs font-medium leading-snug group-hover:text-primary">
+                {alert.checklistName}
+              </p>
+            </>
+          )}
+          <p className="text-muted-foreground text-xs leading-snug">
+            <span className="text-foreground/90 tabular-nums">{dueLabel}</span>
+            <span aria-hidden> · </span>
             <span>{statusLabel}</span>
           </p>
         </div>
       </div>
-      <div className="flex shrink-0 flex-col gap-2 sm:items-end">
-        <Link
-          href={`/checklists/preencher/${alert.sessionId}`}
-          className={cn(
-            buttonVariants({ size: "sm" }),
-            "min-h-11 w-full justify-center sm:w-auto",
-          )}
-        >
-          Abrir checklist
-        </Link>
-        <Link
-          href={`/clientes/${alert.clientId}/editar`}
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground w-full justify-center sm:w-auto",
-          )}
-        >
-          Ver cliente
-        </Link>
-      </div>
-    </article>
+    </Link>
   );
 }

@@ -340,6 +340,82 @@ export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEn
           ))}
         </div>
 
+        <div className="space-y-5 xl:hidden">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="border-border bg-card rounded-xl border p-3 text-center shadow-xs">
+              <ClipboardList className="text-primary mx-auto size-5 opacity-90" />
+              <p className="text-foreground mt-2 text-lg font-bold tabular-nums">
+                {stats.todayCount}
+              </p>
+              <p className="text-muted-foreground text-[0.65rem] leading-tight">
+                Hoje
+              </p>
+            </div>
+            <div className="border-border bg-card rounded-xl border p-3 text-center shadow-xs">
+              <CalendarDays className="text-primary mx-auto size-5 opacity-90" />
+              <p className="text-foreground mt-2 text-lg font-bold tabular-nums">
+                {stats.weekCount}
+              </p>
+              <p className="text-muted-foreground text-[0.65rem] leading-tight">
+                Semana
+              </p>
+            </div>
+            <div className="border-border bg-card rounded-xl border p-3 text-center shadow-xs">
+              <AlertCircle className="text-destructive mx-auto size-5 opacity-90" />
+              <p className="text-foreground mt-2 text-lg font-bold tabular-nums">
+                {stats.urgentWeek}
+              </p>
+              <p className="text-muted-foreground text-[0.65rem] leading-tight">
+                Urgentes
+              </p>
+            </div>
+          </div>
+
+          <section
+            className="border-border rounded-xl border bg-card/40 p-4"
+            aria-labelledby="dia-mobile-heading"
+          >
+            <h2
+              id="dia-mobile-heading"
+              className="text-foreground mb-3 flex items-center gap-2 text-sm font-semibold"
+            >
+              <CalendarDays className="size-4" />
+              {formatWeekdayShortDay(effectiveDayKey, tz)} — compromissos
+            </h2>
+            {dayVisitsSelected.length === 0 ? (
+              <p className="text-muted-foreground text-sm">
+                Nenhuma visita neste dia com o filtro atual.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {dayVisitsSelected.map((v) => (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDayKey(visitDayKey(v.scheduled_start, tz));
+                        setSelectedVisitId(v.id);
+                      }}
+                      className={cn(
+                        "w-full rounded-lg border p-3 text-left text-sm transition-colors",
+                        effectiveSelectedVisitId === v.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:bg-muted/40",
+                      )}
+                    >
+                      <span className="font-medium">{visitDisplayTitle(v)}</span>
+                      <span className="text-muted-foreground block text-xs">
+                        {formatTimeShort(v.scheduled_start, tz)} ·{" "}
+                        {visitPriorityLabel[v.priority]}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+
         <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3 shadow-xs sm:p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
@@ -516,57 +592,13 @@ export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEn
             </div>
           )}
         </div>
-
-        <section
-          className="border-border xl:hidden rounded-xl border bg-card/40 p-4"
-          aria-labelledby="dia-mobile-heading"
-        >
-          <h2
-            id="dia-mobile-heading"
-            className="text-foreground mb-3 flex items-center gap-2 text-sm font-semibold"
-          >
-            <CalendarDays className="size-4" />
-            {formatWeekdayShortDay(effectiveDayKey, tz)} — compromissos
-          </h2>
-          {dayVisitsSelected.length === 0 ? (
-            <p className="text-muted-foreground text-sm">
-              Nenhuma visita neste dia com o filtro atual.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {dayVisitsSelected.map((v) => (
-                <li key={v.id}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedDayKey(visitDayKey(v.scheduled_start, tz));
-                      setSelectedVisitId(v.id);
-                    }}
-                    className={cn(
-                      "w-full rounded-lg border p-3 text-left text-sm transition-colors",
-                      effectiveSelectedVisitId === v.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-muted/40",
-                    )}
-                  >
-                    <span className="font-medium">{visitDisplayTitle(v)}</span>
-                    <span className="text-muted-foreground block text-xs">
-                      {formatTimeShort(v.scheduled_start, tz)} ·{" "}
-                      {visitPriorityLabel[v.priority]}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
       </div>
 
       <aside
         className="border-border xl:border-l xl:pl-8 space-y-5 xl:w-[min(100%,20rem)] xl:shrink-0"
         aria-label="Resumo e detalhe da visita"
       >
-        <div className="grid grid-cols-3 gap-2">
+        <div className="hidden grid-cols-3 gap-2 xl:grid">
           <div className="border-border bg-card rounded-xl border p-3 text-center shadow-xs">
             <ClipboardList className="text-primary mx-auto size-5 opacity-90" />
             <p className="text-foreground mt-2 text-lg font-bold tabular-nums">

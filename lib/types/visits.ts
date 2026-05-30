@@ -42,7 +42,12 @@ export type ScheduledVisitRow = {
 
 /** Listagem com nomes para UI (embed Supabase). */
 export type ScheduledVisitWithTargets = ScheduledVisitRow & {
-  establishments: { id: string; name: string; client_id: string } | null;
+  establishments: {
+    id: string;
+    name: string;
+    client_id: string;
+    clients?: { legal_name: string; trade_name: string | null } | null;
+  } | null;
   patients: { id: string; full_name: string } | null;
   team_members: {
     id: string;

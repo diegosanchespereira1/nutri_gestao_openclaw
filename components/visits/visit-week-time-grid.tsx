@@ -1,24 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Building2, UserRound } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { visitPriorityAgendaSurface, visitPriorityLabel } from "@/lib/constants/visit-priorities";
+import { Plus } from "lucide-react";
+
+import {
+  visitKindBlockStyle,
+  visitKindIcon,
+  visitKindIconColor,
+} from "@/lib/constants/visit-kind-style";
+import { visitKindLabel } from "@/lib/constants/visit-kinds";
+import { visitPriorityAgendaSurface } from "@/lib/constants/visit-priorities";
 import {
   formatDayColumnHeader,
   formatTimeShort,
   minutesSinceMidnight,
 } from "@/lib/datetime/calendar-tz";
-import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
+import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
 import { visitDisplayTitle } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 
 /** Altura de cada hora na grelha (px). */
-const PX_PER_HOUR = 52;
+const PX_PER_HOUR = 80;
 /** Duração assumida por visita (sem `scheduled_end` na BD). */
 const DEFAULT_VISIT_DURATION_MIN = 60;
-const MIN_BLOCK_HEIGHT_PX = 44;
-const HOURS = Array.from({ length: 24 }, (_, h) => h);
+const MIN_BLOCK_HEIGHT_PX = 52;
 
 function formatHourRowLabel(hour: number): string {
   return `${String(hour).padStart(2, "0")}:00`;
@@ -35,8 +42,11 @@ type PlacedVisit = {
 function layoutVisitsForDayColumn(
   visits: ScheduledVisitWithTargets[],
   timeZone: string,
+  agendaStartHour: number,
 ): PlacedVisit[] {
   if (visits.length === 0) return [];
+
+  const offsetMin = agendaStartHour * 60;
 
   const enriched = visits
     .map((v) => {
@@ -67,7 +77,7 @@ function layoutVisitsForDayColumn(
     visit: it.v,
     lane: it.lane,
     laneCount,
-    topPx: (it.startMin / 60) * PX_PER_HOUR,
+    topPx: ((it.startMin - offsetMin) / 60) * PX_PER_HOUR,
     heightPx: Math.max(
       (DEFAULT_VISIT_DURATION_MIN / 60) * PX_PER_HOUR,
       MIN_BLOCK_HEIGHT_PX,
@@ -81,11 +91,14 @@ type Props = {
   todayKey: string;
   effectiveDayKey: string;
   effectiveSelectedVisitId: string | null;
+  agendaStartHour: number;
+  agendaEndHour: number;
   getVisitsForDay: (dayKey: string) => ScheduledVisitWithTargets[];
   onSelectDay: (dayKey: string) => void;
   onSelectVisit: (dayKey: string, visitId: string) => void;
-  /** Duplo clique no bloco (ex.: modal de detalhe). */
   onVisitDoubleClick?: (dayKey: string, visitId: string) => void;
+  onVisitDrop?: (visitId: string, newStartIso: string, oldStartIso: string) => void;
+  onSlotClick?: (dayKey: string, localDatetime: string) => void;
 };
 
 export function VisitWeekTimeGrid({
@@ -94,19 +107,26 @@ export function VisitWeekTimeGrid({
   todayKey,
   effectiveDayKey,
   effectiveSelectedVisitId,
+  agendaStartHour,
+  agendaEndHour,
   getVisitsForDay,
   onSelectDay,
   onSelectVisit,
   onVisitDoubleClick,
+  onVisitDrop,
+  onSlotClick,
 }: Props) {
-  const totalHeightPx = HOURS.length * PX_PER_HOUR;
+  // Apenas as horas dentro do intervalo configurado.
+  const hours = useMemo(
+    () => Array.from({ length: agendaEndHour - agendaStartHour + 1 }, (_, i) => agendaStartHour + i),
+    [agendaStartHour, agendaEndHour],
+  );
+  const totalHeightPx = hours.length * PX_PER_HOUR;
   const [nowMinutes, setNowMinutes] = useState<number | null>(null);
 
   useEffect(() => {
     function tick() {
-      setNowMinutes(
-        minutesSinceMidnight(new Date().toISOString(), timeZone),
-      );
+      setNowMinutes(minutesSinceMidnight(new Date().toISOString(), timeZone));
     }
     tick();
     const id = window.setInterval(tick, 60_000);
@@ -116,13 +136,13 @@ export function VisitWeekTimeGrid({
   const placedByDay = useMemo(() => {
     const m = new Map<string, PlacedVisit[]>();
     for (const dayKey of weekKeys) {
-      m.set(
-        dayKey,
-        layoutVisitsForDayColumn(getVisitsForDay(dayKey), timeZone),
-      );
+      m.set(dayKey, layoutVisitsForDayColumn(getVisitsForDay(dayKey), timeZone, agendaStartHour));
     }
     return m;
-  }, [weekKeys, getVisitsForDay, timeZone]);
+  }, [weekKeys, getVisitsForDay, timeZone, agendaStartHour]);
+
+  const dragInfoRef = useRef<{ visitId: string; oldStart: string } | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
   const gutterWidthClass = "w-12 sm:w-14";
 
@@ -154,7 +174,7 @@ export function VisitWeekTimeGrid({
                   )}
                 >
                   <span className="text-muted-foreground block text-[0.65rem] font-medium uppercase tracking-wide">
-                    {isToday ? "Hoje" : "\u00a0"}
+                    {isToday ? "Hoje" : " "}
                   </span>
                   <span className="text-foreground block text-xs font-semibold capitalize sm:text-sm">
                     {formatDayColumnHeader(dayKey, timeZone)}
@@ -172,11 +192,11 @@ export function VisitWeekTimeGrid({
                 "border-border sticky left-0 z-30 shrink-0 border-r bg-card",
               )}
             >
-              {HOURS.map((h) => (
+              {hours.map((h) => (
                 <div
                   key={h}
                   style={{ height: PX_PER_HOUR }}
-                  className="text-muted-foreground flex items-start justify-end pr-1 pt-0 text-[0.65rem] tabular-nums sm:pr-2 sm:text-xs"
+                  className="text-muted-foreground flex items-start justify-end pr-1 pt-1 text-[0.65rem] tabular-nums sm:pr-2 sm:text-xs"
                 >
                   {formatHourRowLabel(h)}
                 </div>
@@ -197,23 +217,72 @@ export function VisitWeekTimeGrid({
                     className={cn(
                       "relative min-w-0 flex-1 border-l",
                       isSelected && "bg-primary/[0.03]",
+                      dragOverDay === dayKey && "bg-primary/[0.07] ring-1 ring-inset ring-primary/30",
                     )}
+                    onDragOver={(e) => {
+                      if (!dragInfoRef.current) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverDay !== dayKey) setDragOverDay(dayKey);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                        setDragOverDay(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverDay(null);
+                      const info = dragInfoRef.current;
+                      dragInfoRef.current = null;
+                      if (!info || !onVisitDrop) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const yInColumn = Math.max(0, e.clientY - rect.top);
+                      const minutesFromStart = (yInColumn / PX_PER_HOUR) * 60;
+                      const snapped = Math.round(minutesFromStart / 15) * 15;
+                      const clamped = Math.max(0, Math.min(snapped, (agendaEndHour - agendaStartHour) * 60));
+                      const totalMinutes = agendaStartHour * 60 + clamped;
+                      const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+                      const mm = String(totalMinutes % 60).padStart(2, "0");
+                      const newStartIso = localDateTimeInTimeZoneToUtcIso(`${dayKey}T${hh}:${mm}`, timeZone);
+                      if (newStartIso) onVisitDrop(info.visitId, newStartIso, info.oldStart);
+                    }}
                   >
-                    <button
-                      type="button"
-                      aria-label={`Dia ${dayKey}: limpar seleção de visita`}
-                      className={cn(
-                        "absolute inset-0 z-0 w-full",
-                        isSelected ? "bg-primary/[0.02]" : "bg-transparent",
-                      )}
-                      onClick={() => onSelectDay(dayKey)}
-                    />
+                    {/* Slots de 30 min — hover individual + atalho para criar visita */}
+                    {hours.flatMap((h) =>
+                      [0, 30].map((minute) => {
+                        const topPx = ((h - agendaStartHour) * 60 + minute) / 60 * PX_PER_HOUR;
+                        const hh = String(h).padStart(2, "0");
+                        const mm = String(minute).padStart(2, "0");
+                        const localDatetime = `${dayKey}T${hh}:${mm}`;
+                        return (
+                          <button
+                            key={`slot-${h}-${minute}`}
+                            type="button"
+                            aria-label={`Agendar visita em ${dayKey} às ${hh}:${mm}`}
+                            style={{ top: topPx, height: PX_PER_HOUR / 2 }}
+                            className="group absolute left-0 right-0 z-0 flex items-center justify-center border-b border-transparent transition-colors hover:border-primary/10 hover:bg-primary/[0.05]"
+                            onClick={() => {
+                              onSelectDay(dayKey);
+                              onSlotClick?.(dayKey, localDatetime);
+                            }}
+                          >
+                            <span className="pointer-events-none flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                              <Plus className="text-primary size-3" aria-hidden />
+                              <span className="text-primary font-mono text-[0.6rem] font-medium tabular-nums">
+                                {hh}:{mm}
+                              </span>
+                            </span>
+                          </button>
+                        );
+                      }),
+                    )}
 
                     <div
                       className="pointer-events-none relative z-[1]"
                       style={{ height: totalHeightPx }}
                     >
-                      {HOURS.map((h) => (
+                      {hours.map((h) => (
                         <div
                           key={h}
                           style={{ height: PX_PER_HOUR }}
@@ -225,9 +294,7 @@ export function VisitWeekTimeGrid({
                     {isToday && nowMinutes !== null ? (
                       <div
                         className="pointer-events-none absolute right-0 left-0 z-20"
-                        style={{
-                          top: (nowMinutes / 60) * PX_PER_HOUR,
-                        }}
+                        style={{ top: ((nowMinutes - agendaStartHour * 60) / 60) * PX_PER_HOUR }}
                         aria-hidden
                       >
                         <div className="bg-primary relative h-0.5 shadow-sm">
@@ -246,11 +313,24 @@ export function VisitWeekTimeGrid({
                         const pct = 100 / p.laneCount;
                         const left = `calc(${p.lane * pct}% + ${gap / 2}px)`;
                         const width = `calc(${pct}% - ${gap}px)`;
+                        const kind = (p.visit.visit_kind ?? "other") as VisitKind;
+                        const KindIcon = visitKindIcon[kind];
+                        const professional = p.visit.team_members?.full_name ?? "Titular";
 
                         return (
                           <button
                             key={p.visit.id}
                             type="button"
+                            draggable={!!onVisitDrop}
+                            onDragStart={(e) => {
+                              e.dataTransfer.effectAllowed = "move";
+                              e.dataTransfer.setData("text/plain", p.visit.id);
+                              dragInfoRef.current = { visitId: p.visit.id, oldStart: p.visit.scheduled_start };
+                            }}
+                            onDragEnd={() => {
+                              dragInfoRef.current = null;
+                              setDragOverDay(null);
+                            }}
                             onClick={(e) => {
                               e.stopPropagation();
                               onSelectVisit(dayKey, p.visit.id);
@@ -261,11 +341,11 @@ export function VisitWeekTimeGrid({
                               onVisitDoubleClick?.(dayKey, p.visit.id);
                             }}
                             className={cn(
-                              "pointer-events-auto absolute flex flex-col overflow-hidden rounded-lg border-l-4 px-1.5 py-1 text-left shadow-xs transition-transform",
-                              visitPriorityAgendaSurface[p.visit.priority],
+                              "pointer-events-auto absolute flex flex-col overflow-hidden rounded-lg border-l-4 px-1.5 py-1.5 text-left shadow-xs transition-transform",
+                              visitKindBlockStyle[kind],
                               active
                                 ? "ring-primary z-[15] scale-[1.02] ring-2"
-                                : "hover:brightness-[0.98] dark:hover:brightness-110",
+                                : "hover:brightness-[0.97] dark:hover:brightness-110",
                             )}
                             style={{
                               top: p.topPx,
@@ -275,24 +355,27 @@ export function VisitWeekTimeGrid({
                               minHeight: MIN_BLOCK_HEIGHT_PX,
                             }}
                           >
-                            <span className="text-muted-foreground font-mono text-[0.6rem] leading-none sm:text-[0.65rem]">
-                              {formatTimeShort(
-                                p.visit.scheduled_start,
-                                timeZone,
-                              )}
+                            {/* Linha 1: ícone do tipo + hora */}
+                            <span className="flex items-center gap-1">
+                              <KindIcon
+                                className={cn("size-2.5 shrink-0", visitKindIconColor[kind])}
+                                aria-hidden
+                              />
+                              <span className="text-muted-foreground font-mono text-[0.6rem] leading-none sm:text-[0.65rem]">
+                                {formatTimeShort(p.visit.scheduled_start, timeZone)}
+                              </span>
                             </span>
-                            <span className="text-foreground mt-0.5 line-clamp-2 text-[0.65rem] font-semibold leading-tight sm:text-xs">
+
+                            {/* Linha 2: título */}
+                            <span className="text-foreground mt-1 line-clamp-2 text-[0.65rem] font-semibold leading-tight sm:text-xs">
                               {visitDisplayTitle(p.visit)}
                             </span>
-                            <span className="text-muted-foreground mt-auto flex items-center gap-0.5 text-[0.55rem]">
-                              {p.visit.target_type === "establishment" ? (
-                                <Building2 className="size-2.5 shrink-0" />
-                              ) : (
-                                <UserRound className="size-2.5 shrink-0" />
-                              )}
-                              <span className="truncate">
-                                {visitPriorityLabel[p.visit.priority]}
-                              </span>
+
+                            {/* Linha 3: profissional · tipo */}
+                            <span className="text-muted-foreground mt-auto truncate text-[0.55rem] leading-none sm:text-[0.6rem]">
+                              {professional}
+                              <span aria-hidden> · </span>
+                              {visitKindLabel[kind]}
                             </span>
                           </button>
                         );

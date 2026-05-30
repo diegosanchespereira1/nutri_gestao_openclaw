@@ -21,11 +21,11 @@ const errMessages: Record<string, string> = {
 };
 
 type Props = {
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<{ err?: string; scheduled_start_local?: string }>;
 };
 
 export default async function NovaVisitaPage({ searchParams }: Props) {
-  const { err } = await searchParams;
+  const { err, scheduled_start_local } = await searchParams;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
   const [{ rows: establishments }, { rows: patients }, { rows: teamMembers }] =
@@ -85,6 +85,7 @@ export default async function NovaVisitaPage({ searchParams }: Props) {
           establishments={establishments}
           patients={patients}
           teamMembers={teamMembers}
+          defaultScheduledStart={scheduled_start_local}
         />
       )}
     </div>

@@ -40,6 +40,7 @@ type Props = {
   establishments: EstablishmentWithClientNames[];
   patients: PatientWithContext[];
   teamMembers: TeamMemberRow[];
+  defaultScheduledStart?: string;
 };
 
 function hasSchedulableEstablishment(
@@ -58,6 +59,7 @@ export function VisitScheduleForm({
   establishments,
   patients,
   teamMembers,
+  defaultScheduledStart,
 }: Props) {
   const profileTimeZone = useAppTimeZone();
   const [targetType, setTargetType] = useState<VisitTargetType>(() => {
@@ -256,6 +258,7 @@ export function VisitScheduleForm({
           name="scheduled_start_local"
           type="datetime-local"
           required
+          defaultValue={defaultScheduledStart}
           className="w-full max-w-xs"
         />
         <p className="text-muted-foreground text-xs">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, Camera, ChevronRight, Globe, Lock, Tag, UserCircle } from "lucide-react";
+import { Building2, CalendarClock, Camera, ChevronRight, Globe, Lock, Tag, UserCircle } from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -23,6 +23,12 @@ const settingsItems = [
     icon: Globe,
     label: "Região e fuso horário",
     description: "Configure o fuso horário para visitas e calendário.",
+  },
+  {
+    href: "/definicoes/agenda",
+    icon: CalendarClock,
+    label: "Agenda",
+    description: "Hora de início da grelha semanal de visitas.",
   },
   {
     href: "/definicoes/checklist-fotos",

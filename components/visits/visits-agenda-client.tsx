@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   CalendarDays,
@@ -29,12 +30,17 @@ import {
   weekDayKeysFromMonday,
 } from "@/lib/datetime/calendar-tz";
 import { VisitQuickDetailDialog } from "@/components/visits/visit-quick-detail-dialog";
+import { VisitRescheduleConfirmDialog } from "@/components/visits/visit-reschedule-confirm-dialog";
+import { VisitScheduleDialog } from "@/components/visits/visit-schedule-dialog";
 import { VisitWeekTimeGrid } from "@/components/visits/visit-week-time-grid";
+import { rescheduleVisitAction } from "@/lib/actions/visits";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import { teamJobRoleLabel } from "@/lib/constants/team-roles";
-import type { TeamJobRole } from "@/lib/types/team-members";
+import type { TeamJobRole, TeamMemberRow } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind, VisitPriority } from "@/lib/types/visits";
-import { visitDisplayTitle } from "@/lib/visits/display-title";
+import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
+import type { PatientWithContext } from "@/lib/types/patients";
+import { visitDisplayTitle, visitTargetName } from "@/lib/visits/display-title";
 import { compareScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +58,11 @@ type Props = {
   visits: ScheduledVisitWithTargets[];
   /** Chave civil de «hoje» no fuso do perfil, calculada no servidor. */
   todayKey: string;
+  agendaStartHour: number;
+  agendaEndHour: number;
+  establishments: EstablishmentWithClientNames[];
+  patients: PatientWithContext[];
+  teamMembers: TeamMemberRow[];
 };
 
 function groupVisitsByDay(
@@ -78,8 +89,9 @@ function visitMatchesFilter(v: ScheduledVisitWithTargets, f: PriorityFilter): bo
 
 type ScheduleView = "week" | "list";
 
-export function VisitsAgendaClient({ visits, todayKey }: Props) {
+export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEndHour, establishments, patients, teamMembers }: Props) {
   const tz = useAppTimeZone();
+  const router = useRouter();
 
   const byDay = useMemo(
     () => groupVisitsByDay(visits, tz),
@@ -98,6 +110,18 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
   const [miniMonthAnchor, setMiniMonthAnchor] = useState(todayKey);
   const [scheduleView, setScheduleView] = useState<ScheduleView>("week");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  const [scheduleDialogOpen, setScheduleDialogOpen] = useState(false);
+  const [scheduleDialogStart, setScheduleDialogStart] = useState<string | undefined>(undefined);
+
+  const [pendingReschedule, setPendingReschedule] = useState<{
+    visitId: string;
+    visitTitle: string;
+    oldStart: string;
+    newStart: string;
+  } | null>(null);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [rescheduleError, setRescheduleError] = useState<string | null>(null);
 
   const weekKeys = useMemo(
     () => weekDayKeysFromMonday(weekMonday, tz),
@@ -184,6 +208,43 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
     setSelectedVisitId(null);
   }, []);
 
+  const handleVisitDrop = useCallback((visitId: string, newStartIso: string, oldStartIso: string) => {
+    const visit = visits.find((v) => v.id === visitId);
+    if (!visit) return;
+    setPendingReschedule({
+      visitId,
+      visitTitle: visitDisplayTitle(visit),
+      oldStart: oldStartIso,
+      newStart: newStartIso,
+    });
+    setRescheduleError(null);
+  }, [visits]);
+
+  const handleRescheduleConfirm = useCallback(async () => {
+    if (!pendingReschedule) return;
+    setIsRescheduling(true);
+    setRescheduleError(null);
+    const result = await rescheduleVisitAction(pendingReschedule.visitId, pendingReschedule.newStart);
+    setIsRescheduling(false);
+    if (result.ok) {
+      setPendingReschedule(null);
+      router.refresh();
+    } else {
+      setRescheduleError(result.error);
+    }
+  }, [pendingReschedule, router]);
+
+  const handleRescheduleCancel = useCallback(() => {
+    if (isRescheduling) return;
+    setPendingReschedule(null);
+    setRescheduleError(null);
+  }, [isRescheduling]);
+
+  const handleSlotClick = useCallback((_dayKey: string, localDatetime: string) => {
+    setScheduleDialogStart(localDatetime);
+    setScheduleDialogOpen(true);
+  }, []);
+
   const monthCells = useMemo(
     () => monthCalendarCells(miniMonthAnchor, tz),
     [miniMonthAnchor, tz],
@@ -209,8 +270,12 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
               Selecione um bloco para ver o detalhe à direita.
             </p>
           </div>
-          <Link
-            href="/visitas/nova"
+          <button
+            type="button"
+            onClick={() => {
+              setScheduleDialogStart(undefined);
+              setScheduleDialogOpen(true);
+            }}
             className={cn(
               buttonVariants(),
               "inline-flex min-h-11 shrink-0 items-center justify-center gap-2 self-start",
@@ -218,7 +283,7 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
           >
             <Plus className="size-4" aria-hidden />
             Agendar nova visita
-          </Link>
+          </button>
         </header>
 
         {visits.length === 0 ? (
@@ -373,6 +438,8 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
               effectiveDayKey={effectiveDayKey}
               effectiveSelectedVisitId={effectiveSelectedVisitId}
               getVisitsForDay={getVisitsForDay}
+              agendaStartHour={agendaStartHour}
+              agendaEndHour={agendaEndHour}
               onSelectDay={selectDay}
               onSelectVisit={(dayKey, visitId) => {
                 setSelectedDayKey(dayKey);
@@ -383,6 +450,8 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
                 setSelectedVisitId(visitId);
                 setDetailDialogOpen(true);
               }}
+              onVisitDrop={handleVisitDrop}
+              onSlotClick={handleSlotClick}
             />
           ) : (
             <div className="border-border rounded-xl border">
@@ -610,7 +679,7 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
                 Detalhe da visita
               </h2>
               <p className="text-foreground mt-2 text-lg font-semibold leading-snug">
-                {visitDisplayTitle(selectedVisit)}
+                {visitTargetName(selectedVisit) ?? visitDisplayTitle(selectedVisit)}
               </p>
               <dl className="text-muted-foreground mt-3 space-y-2 text-sm">
                 <div className="flex gap-2">
@@ -645,16 +714,6 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
                     {visitKindLabel[
                       (selectedVisit.visit_kind ?? "other") as VisitKind
                     ]}
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="min-w-[5rem] shrink-0 font-medium text-foreground/80">
-                    Destino
-                  </dt>
-                  <dd>
-                    {selectedVisit.target_type === "establishment"
-                      ? "Estabelecimento"
-                      : "Paciente"}
                   </dd>
                 </div>
                 <div className="flex gap-2">
@@ -717,8 +776,12 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
                   cartão na grelha para ver detalhes.
                 </p>
               )}
-              <Link
-                href="/visitas/nova"
+              <button
+                type="button"
+                onClick={() => {
+                  setScheduleDialogStart(undefined);
+                  setScheduleDialogOpen(true);
+                }}
                 className={cn(
                   buttonVariants({ variant: "secondary" }),
                   "mt-4 inline-flex w-full justify-center gap-2",
@@ -726,7 +789,7 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
               >
                 <Plus className="size-4" />
                 Nova visita neste contexto
-              </Link>
+              </button>
             </>
           )}
         </div>
@@ -738,6 +801,28 @@ export function VisitsAgendaClient({ visits, todayKey }: Props) {
         onOpenChange={setDetailDialogOpen}
         canStartVisit={canStartVisit}
       />
+
+      <VisitScheduleDialog
+        open={scheduleDialogOpen}
+        onClose={() => setScheduleDialogOpen(false)}
+        defaultScheduledStart={scheduleDialogStart}
+        establishments={establishments}
+        patients={patients}
+        teamMembers={teamMembers}
+      />
+
+      {pendingReschedule ? (
+        <VisitRescheduleConfirmDialog
+          open
+          visitTitle={pendingReschedule.visitTitle}
+          oldStart={pendingReschedule.oldStart}
+          newStart={pendingReschedule.newStart}
+          isLoading={isRescheduling}
+          error={rescheduleError}
+          onConfirm={handleRescheduleConfirm}
+          onCancel={handleRescheduleCancel}
+        />
+      ) : null}
     </div>
   );
 }

@@ -78,6 +78,46 @@ export async function fetchProfileTimeZone(
   return normalizeAppTimeZone(data.timezone);
 }
 
+export const DEFAULT_AGENDA_START_HOUR = 6;
+export const DEFAULT_AGENDA_END_HOUR = 22;
+
+/** Busca timezone + horas de início/fim da agenda num único roundtrip. */
+export async function fetchAgendaSettings(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{ timeZone: string; agendaStartHour: number; agendaEndHour: number }> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("timezone, agenda_start_hour, agenda_end_hour")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      timeZone: DEFAULT_PROFILE_TIME_ZONE,
+      agendaStartHour: DEFAULT_AGENDA_START_HOUR,
+      agendaEndHour: DEFAULT_AGENDA_END_HOUR,
+    };
+  }
+
+  const d = data as Record<string, unknown>;
+  const timeZone = data.timezone
+    ? normalizeAppTimeZone(data.timezone as string)
+    : DEFAULT_PROFILE_TIME_ZONE;
+  const startRaw = d["agenda_start_hour"];
+  const endRaw = d["agenda_end_hour"];
+  const agendaStartHour =
+    typeof startRaw === "number" && startRaw >= 0 && startRaw <= 12
+      ? startRaw
+      : DEFAULT_AGENDA_START_HOUR;
+  const agendaEndHour =
+    typeof endRaw === "number" && endRaw >= 12 && endRaw <= 23
+      ? endRaw
+      : DEFAULT_AGENDA_END_HOUR;
+
+  return { timeZone, agendaStartHour, agendaEndHour };
+}
+
 /**
  * Busca role e timezone do perfil em uma única query ao Supabase,
  * evitando dois roundtrips separados no layout da área autenticada.

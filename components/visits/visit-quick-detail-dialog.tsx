@@ -18,7 +18,7 @@ import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { formatDateTimeShort } from "@/lib/datetime/calendar-tz";
 import type { TeamJobRole } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
-import { visitDisplayTitle } from "@/lib/visits/display-title";
+import { visitDisplayTitle, visitTargetName } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -58,7 +58,7 @@ export function VisitQuickDetailDialog({
     );
   }
 
-  const title = visitDisplayTitle(visit);
+  const title = visitTargetName(visit) ?? visitDisplayTitle(visit);
   const assignee = assigneeLabel(visit);
 
   return (
@@ -79,16 +79,6 @@ export function VisitQuickDetailDialog({
             </dt>
             <dd>
               {visitKindLabel[(visit.visit_kind ?? "other") as VisitKind]}
-            </dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="text-foreground/80 w-28 shrink-0 font-medium">
-              Destino
-            </dt>
-            <dd>
-              {visit.target_type === "establishment"
-                ? "Estabelecimento"
-                : "Paciente"}
             </dd>
           </div>
           {assignee ? (

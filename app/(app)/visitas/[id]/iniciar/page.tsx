@@ -35,7 +35,7 @@ import {
   markScheduledVisitInProgress,
   resolveVisitChecklistEstablishmentId,
 } from "@/lib/actions/visit-checklist";
-import { loadScheduledVisitById } from "@/lib/actions/visits";
+import { loadScheduledVisitById } from "@/lib/visits/load-scheduled-visits";
 import { formatDateTimeShort, isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";

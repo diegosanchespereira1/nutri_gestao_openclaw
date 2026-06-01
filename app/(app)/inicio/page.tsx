@@ -24,7 +24,7 @@ import {
   visitsByMonthHasData,
 } from "@/lib/dashboard/visits-by-month";
 import { buildWeeklyBriefing } from "@/lib/dashboard/weekly-briefing";
-import { loadScheduledVisitsForAgenda } from "@/lib/actions/visits";
+import { loadScheduledVisitsForAgenda } from "@/lib/visits/load-scheduled-visits";
 import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { FirstClientReminderToast } from "@/components/dashboard/first-client-reminder-toast";

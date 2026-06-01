@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button-variants";
-import { loadScheduledVisitById } from "@/lib/actions/visits";
+import { loadScheduledVisitById } from "@/lib/visits/load-scheduled-visits";
 import {
   formatDateTimeShort,
   isSameCalendarDay,

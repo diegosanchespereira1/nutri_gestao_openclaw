@@ -6,7 +6,7 @@ import { after } from "next/server";
 
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
-import { loadScheduledVisitById } from "@/lib/actions/visits";
+import { loadScheduledVisitById } from "@/lib/visits/load-scheduled-visits";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";

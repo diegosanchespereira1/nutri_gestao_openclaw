@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { VisitsAgendaClient } from "@/components/visits/visits-agenda-client";
 import { todayKey as civilTodayKey } from "@/lib/datetime/calendar-tz";
-import { loadScheduledVisitsForAgenda } from "@/lib/actions/visits";
+import { loadScheduledVisitsForAgenda } from "@/lib/visits/load-scheduled-visits";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadAllPatientsForOwner } from "@/lib/actions/patients";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";

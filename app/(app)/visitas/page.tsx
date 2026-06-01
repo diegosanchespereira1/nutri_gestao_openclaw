@@ -2,16 +2,27 @@ import { redirect } from "next/navigation";
 
 import { VisitsAgendaClient } from "@/components/visits/visits-agenda-client";
 import { todayKey as civilTodayKey } from "@/lib/datetime/calendar-tz";
+import { loadScheduledVisitsForAgenda } from "@/lib/actions/visits";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadAllPatientsForOwner } from "@/lib/actions/patients";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
 import { fetchAgendaSettings } from "@/lib/supabase/profile";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
+import { parseProfileContextCookie } from "@/lib/auth/profile-context-cookie";
+import { cookies } from "next/headers";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 
 export default async function VisitasPage() {
-  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  const [cookieStore, { supabase, user, workspaceOwnerId }] = await Promise.all([
+    cookies(),
+    getServerContext(),
+  ]);
   if (!user || !workspaceOwnerId) redirect("/login");
+
+  const profileCtx = parseProfileContextCookie(
+    cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
+  );
 
   const now = new Date();
   const from = new Date(
@@ -21,18 +32,17 @@ export default async function VisitasPage() {
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90),
   ).toISOString();
 
-  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, visitsResult, { rows: establishments }, { rows: patients }, { rows: teamMembers }] =
+  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, { rows: visits }, { rows: establishments }, { rows: patients }, { rows: teamMembers }] =
     await Promise.all([
       fetchAgendaSettings(supabase, user.id),
-      supabase
-        .from("scheduled_visits")
-        .select(
-          `*, establishments(id, name, client_id, clients(legal_name, trade_name)), patients(id, full_name), team_members(id, full_name, job_role)`,
-        )
-        .eq("user_id", workspaceOwnerId)
-        .gte("scheduled_start", from)
-        .lte("scheduled_start", to)
-        .order("scheduled_start", { ascending: true }),
+      loadScheduledVisitsForAgenda({
+        supabase,
+        authUserId: user.id,
+        workspaceOwnerId,
+        role: profileCtx?.role,
+        from,
+        to,
+      }),
       loadEstablishmentsForOwner(),
       loadAllPatientsForOwner(),
       loadTeamMembersForOwner(),
@@ -42,7 +52,7 @@ export default async function VisitasPage() {
 
   return (
     <VisitsAgendaClient
-      visits={(visitsResult.data ?? []) as unknown as ScheduledVisitWithTargets[]}
+      visits={visits as ScheduledVisitWithTargets[]}
       todayKey={todayKey}
       agendaStartHour={agendaStartHour}
       agendaEndHour={agendaEndHour}

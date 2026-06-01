@@ -24,7 +24,7 @@ import {
   visitsByMonthHasData,
 } from "@/lib/dashboard/visits-by-month";
 import { buildWeeklyBriefing } from "@/lib/dashboard/weekly-briefing";
-import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
+import { loadScheduledVisitsForAgenda } from "@/lib/actions/visits";
 import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { FirstClientReminderToast } from "@/components/dashboard/first-client-reminder-toast";
@@ -71,29 +71,28 @@ export default async function InicioPage({
   ).toISOString();
 
   const [
-    visitsResult,
+    { rows: visitRows },
     complianceAlerts,
     validityAlerts,
     financialSummary,
     { rows: expiringContracts },
     clientCount,
   ] = await Promise.all([
-    supabase
-      .from("scheduled_visits")
-      .select(
-        `*, establishments(id, name, client_id), patients(id, full_name), team_members(id, full_name, job_role)`,
-      )
-      .eq("user_id", workspaceOwnerId)
-      .gte("scheduled_start", visitsFrom)
-      .lte("scheduled_start", visitsTo)
-      .order("scheduled_start", { ascending: true }),
+    loadScheduledVisitsForAgenda({
+      supabase,
+      authUserId: user.id,
+      workspaceOwnerId,
+      role: profileCtx?.role,
+      from: visitsFrom,
+      to: visitsTo,
+    }),
     loadComplianceDashboardAlerts(tz),
     loadChecklistValidityAlerts(tz),
     loadFinancialDashboardSummary(tz),
     loadExpiringContracts(60),
     countClientsForOwner(supabase, workspaceOwnerId),
   ]);
-  const rows = (visitsResult.data ?? []) as unknown as ScheduledVisitWithTargets[];
+  const rows = visitRows;
   const hasClients = clientCount > 0;
   const today = sortScheduledVisitsForDashboard(
     rows.filter(

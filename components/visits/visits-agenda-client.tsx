@@ -15,7 +15,7 @@ import {
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { visitPriorityAgendaSurface, visitPriorityLabel } from "@/lib/constants/visit-priorities";
-import { visitStatusLabel } from "@/lib/constants/visit-status";
+import { visitIsCancellable, visitStatusLabel } from "@/lib/constants/visit-status";
 import {
   addCalendarDays,
   formatDateTimeShort,
@@ -29,6 +29,7 @@ import {
   visitDayKey,
   weekDayKeysFromMonday,
 } from "@/lib/datetime/calendar-tz";
+import { VisitCancelButton } from "@/components/visits/visit-cancel-button";
 import { VisitQuickDetailDialog } from "@/components/visits/visit-quick-detail-dialog";
 import { VisitRescheduleConfirmDialog } from "@/components/visits/visit-reschedule-confirm-dialog";
 import { VisitScheduleDialog } from "@/components/visits/visit-schedule-dialog";
@@ -63,6 +64,8 @@ type Props = {
   establishments: EstablishmentWithClientNames[];
   patients: PatientWithContext[];
   teamMembers: TeamMemberRow[];
+  currentUserId: string;
+  isAgendaAdmin: boolean;
 };
 
 function groupVisitsByDay(
@@ -89,9 +92,31 @@ function visitMatchesFilter(v: ScheduledVisitWithTargets, f: PriorityFilter): bo
 
 type ScheduleView = "week" | "list";
 
-export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEndHour, establishments, patients, teamMembers }: Props) {
+export function VisitsAgendaClient({
+  visits: visitsProp,
+  todayKey,
+  agendaStartHour,
+  agendaEndHour,
+  establishments,
+  patients,
+  teamMembers,
+  currentUserId,
+  isAgendaAdmin,
+}: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
+
+  const visits = useMemo(
+    () => visitsProp.filter((v) => v.status !== "cancelled"),
+    [visitsProp],
+  );
+
+  const canCancelVisit = useCallback(
+    (v: ScheduledVisitWithTargets) =>
+      visitIsCancellable(v.status) &&
+      (isAgendaAdmin || v.user_id === currentUserId),
+    [currentUserId, isAgendaAdmin],
+  );
 
   const byDay = useMemo(
     () => groupVisitsByDay(visits, tz),
@@ -785,6 +810,16 @@ export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEn
                       : "Iniciar visita"}
                   </Link>
                 ) : null}
+                {canCancelVisit(selectedVisit) ? (
+                  <VisitCancelButton
+                    visitId={selectedVisit.id}
+                    visitTitle={visitDisplayTitle(selectedVisit)}
+                    fullWidth
+                    size="sm"
+                    variant="destructive"
+                    onCancelled={() => setSelectedVisitId(null)}
+                  />
+                ) : null}
               </div>
             </>
           ) : (
@@ -832,6 +867,7 @@ export function VisitsAgendaClient({ visits, todayKey, agendaStartHour, agendaEn
         open={detailDialogOpen}
         onOpenChange={setDetailDialogOpen}
         canStartVisit={canStartVisit}
+        canCancelVisit={canCancelVisit}
       />
 
       <VisitScheduleDialog

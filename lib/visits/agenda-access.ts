@@ -62,3 +62,16 @@ export async function canManageScheduledVisit(args: {
 
   return false;
 }
+
+/** Criador da visita ou titular/admin do workspace. */
+export function canCancelScheduledVisit(
+  authUserId: string,
+  workspaceOwnerId: string,
+  role: ProfileRole | null | undefined,
+  visit: { user_id: string },
+): boolean {
+  return (
+    visit.user_id === authUserId ||
+    canViewAllWorkspaceVisits(authUserId, workspaceOwnerId, role)
+  );
+}

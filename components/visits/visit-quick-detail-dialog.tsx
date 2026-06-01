@@ -15,6 +15,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import { visitPriorityLabel } from "@/lib/constants/visit-priorities";
+import { VisitCancelButton } from "@/components/visits/visit-cancel-button";
 import { visitStatusLabel } from "@/lib/constants/visit-status";
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { formatDateTimeShort } from "@/lib/datetime/calendar-tz";
@@ -45,6 +46,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   canStartVisit: (v: ScheduledVisitWithTargets) => boolean;
+  canCancelVisit?: (v: ScheduledVisitWithTargets) => boolean;
 };
 
 function assigneeLabel(visit: ScheduledVisitWithTargets): string | null {
@@ -59,6 +61,7 @@ export function VisitQuickDetailDialog({
   open,
   onOpenChange,
   canStartVisit,
+  canCancelVisit,
 }: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
@@ -205,7 +208,7 @@ export function VisitQuickDetailDialog({
           </p>
         ) : null}
 
-        <div className="flex flex-col gap-2 border-t pt-2 sm:flex-row">
+        <div className="flex flex-col gap-2 border-t pt-2 sm:flex-row sm:flex-wrap">
           <Link
             href={`/visitas/${visit.id}`}
             className={cn(
@@ -226,6 +229,16 @@ export function VisitQuickDetailDialog({
                 ? "Continuar visita"
                 : "Iniciar visita"}
             </Link>
+          ) : null}
+          {canCancelVisit?.(visit) ? (
+            <VisitCancelButton
+              visitId={visit.id}
+              visitTitle={title}
+              size="sm"
+              variant="destructive"
+              className="min-h-11 flex-1"
+              onCancelled={() => onOpenChange(false)}
+            />
           ) : null}
         </div>
       </DialogContent>

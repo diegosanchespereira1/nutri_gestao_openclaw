@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { VisitTargetType } from "@/lib/types/visits";
 import {
+  canCancelScheduledVisit,
   canManageScheduledVisit,
 } from "@/lib/visits/agenda-access";
 import { parseDossierRecipientEmailsFromText } from "@/lib/validators/dossier-email-recipients";
@@ -348,6 +349,69 @@ export async function rescheduleVisitAction(
 
   revalidatePath("/visitas");
   revalidatePath("/inicio");
+  return { ok: true };
+}
+
+export type CancelVisitResult = { ok: true } | { ok: false; error: string };
+
+export async function cancelVisitAction(
+  visitId: string,
+): Promise<CancelVisitResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const role = (profile?.role as ProfileRole | null | undefined) ?? null;
+
+  const { data: visit } = await supabase
+    .from("scheduled_visits")
+    .select("id, user_id, status")
+    .eq("id", visitId)
+    .maybeSingle();
+
+  if (!visit) {
+    return { ok: false, error: "Visita não encontrada." };
+  }
+
+  if (
+    !canCancelScheduledVisit(user.id, workspaceOwnerId, role, {
+      user_id: visit.user_id as string,
+    })
+  ) {
+    return { ok: false, error: "Sem permissão para cancelar esta visita." };
+  }
+
+  if (visit.status === "cancelled") {
+    return { ok: false, error: "Esta visita já está cancelada." };
+  }
+
+  if (visit.status === "completed") {
+    return { ok: false, error: "Visitas concluídas não podem ser canceladas." };
+  }
+
+  const { error } = await supabase
+    .from("scheduled_visits")
+    .update({ status: "cancelled" })
+    .eq("id", visitId);
+
+  if (error) {
+    console.error("[cancelVisitAction]", error.message);
+    return { ok: false, error: "Não foi possível cancelar a visita." };
+  }
+
+  revalidatePath("/visitas");
+  revalidatePath("/inicio");
+  revalidatePath(`/visitas/${visitId}`);
   return { ok: true };
 }
 

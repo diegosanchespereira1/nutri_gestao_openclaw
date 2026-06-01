@@ -10,7 +10,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { visitPriorityLabel } from "@/lib/constants/visit-priorities";
-import { visitStatusLabel } from "@/lib/constants/visit-status";
+import { VisitCancelButton } from "@/components/visits/visit-cancel-button";
+import { visitIsCancellable, visitStatusLabel } from "@/lib/constants/visit-status";
+import { canCancelScheduledVisit } from "@/lib/visits/agenda-access";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { fetchProfileRole } from "@/lib/supabase/profile";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import type { TeamJobRole } from "@/lib/types/team-members";
@@ -47,6 +51,14 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
     fetchProfileTimeZone(supabase, user.id),
   ]);
   if (!row) notFound();
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const role = await fetchProfileRole(supabase, user.id);
+  const canCancel =
+    visitIsCancellable(row.status) &&
+    canCancelScheduledVisit(user.id, workspaceOwnerId, role, {
+      user_id: row.user_id,
+    });
 
   const title = visitDisplayTitle(row);
   const avisoMsg =
@@ -136,6 +148,14 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
           >
             {row.status === "in_progress" ? "Continuar visita" : "Iniciar visita"}
           </Link>
+        ) : null}
+        {canCancel ? (
+          <VisitCancelButton
+            visitId={id}
+            visitTitle={title}
+            size="sm"
+            variant="destructive"
+          />
         ) : null}
       </div>
 

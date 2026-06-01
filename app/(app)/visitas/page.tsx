@@ -11,6 +11,7 @@ import { getServerContext } from "@/lib/supabase/get-server-user";
 import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
 import { parseProfileContextCookie } from "@/lib/auth/profile-context-cookie";
 import { cookies } from "next/headers";
+import { canViewAllWorkspaceVisits } from "@/lib/visits/agenda-access";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 
 export default async function VisitasPage() {
@@ -49,6 +50,11 @@ export default async function VisitasPage() {
     ]);
 
   const todayKey = civilTodayKey(new Date(), tz);
+  const isAgendaAdmin = canViewAllWorkspaceVisits(
+    user.id,
+    workspaceOwnerId,
+    profileCtx?.role,
+  );
 
   return (
     <VisitsAgendaClient
@@ -59,6 +65,8 @@ export default async function VisitasPage() {
       establishments={establishments}
       patients={patients}
       teamMembers={teamMembers}
+      currentUserId={user.id}
+      isAgendaAdmin={isAgendaAdmin}
     />
   );
 }

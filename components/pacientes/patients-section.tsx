@@ -90,19 +90,24 @@ export async function PatientsSection(
           {rows.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/pacientes/${p.id}/editar`}
-                className="hover:bg-muted/50 focus-visible:ring-ring block px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                href={`/pacientes/${p.id}`}
+                className="hover:bg-muted/50 focus-visible:ring-ring flex items-center justify-between px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
-                <span className="text-foreground font-medium">
-                  {p.full_name}
-                </span>
-                <span className="text-muted-foreground mt-1 block text-sm">
-                  {p.birth_date
-                    ? `Nasc.: ${p.birth_date}`
-                    : "Data de nascimento não indicada"}
-                  {p.document_id
-                    ? ` · CPF: ${formatCpfDisplay(p.document_id)}`
-                    : ""}
+                <div>
+                  <span className="text-foreground font-medium">
+                    {p.full_name}
+                  </span>
+                  <span className="text-muted-foreground mt-1 block text-sm">
+                    {p.birth_date
+                      ? `Nasc.: ${p.birth_date}`
+                      : "Data de nascimento não indicada"}
+                    {p.document_id
+                      ? ` · CPF: ${formatCpfDisplay(p.document_id)}`
+                      : ""}
+                  </span>
+                </div>
+                <span className="text-primary ml-4 shrink-0 text-sm font-medium">
+                  Ver prontuário →
                 </span>
               </Link>
             </li>

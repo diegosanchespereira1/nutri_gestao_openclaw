@@ -104,7 +104,11 @@ export async function loadScheduledVisitsForAgenda(args: {
   }
 
   const { data, error } = await query;
-  if (error || !data) return { rows: [] };
+  if (error) {
+    console.error("[loadScheduledVisitsForAgenda]", error.message);
+    return { rows: [] };
+  }
+  if (!data) return { rows: [] };
   return { rows: data as unknown as ScheduledVisitWithTargets[] };
 }
 
@@ -433,7 +437,10 @@ export async function createVisitDialogAction(
     .select("id")
     .single();
 
-  if (error || !created) return { ok: false, error: "Não foi possível guardar. Tente novamente." };
+  if (error || !created) {
+    console.error("[createVisitDialogAction] insert failed:", error?.message, error?.code);
+    return { ok: false, error: "Não foi possível guardar. Tente novamente." };
+  }
 
   revalidatePath("/visitas");
   revalidatePath("/inicio");

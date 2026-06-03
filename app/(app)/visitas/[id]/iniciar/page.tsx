@@ -30,7 +30,6 @@ import {
   chooseVisitEstablishmentContextAction,
   createVisitChecklistSessionAction,
   getLatestFillSessionIdForVisit,
-  insertVisitChecklistFillSession,
   loadVisitChecklistWizardModel,
   markScheduledVisitInProgress,
   resolveVisitChecklistEstablishmentId,
@@ -81,6 +80,9 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
   if (!isSameCalendarDay(row.scheduled_start, tz)) {
     redirect(`/visitas/${id}?aviso=inicio_somente_hoje`);
   }
+
+  /** Visita já iniciada antes — retoma sessão em curso; primeira vez exige escolha do checklist. */
+  const isContinuingVisit = row.status === "in_progress";
 
   await markScheduledVisitInProgress(id);
 
@@ -254,7 +256,9 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
     );
   }
 
-  const latestId = await getLatestFillSessionIdForVisit(id);
+  const latestId = isContinuingVisit
+    ? await getLatestFillSessionIdForVisit(id)
+    : null;
   if (latestId) {
     redirect(`/visitas/${id}/iniciar?session=${latestId}`);
   }
@@ -296,28 +300,6 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
         </Link>
       </div>
     );
-  }
-
-  if (options.length === 1) {
-    const created = await insertVisitChecklistFillSession({
-      visitId: id,
-      authUserId: user.id,
-      establishmentId,
-      option: options[0],
-    });
-    if ("error" in created) {
-      return (
-        <div className="space-y-6">
-          <p className="text-destructive text-sm" role="alert">
-            {created.error}
-          </p>
-          <Link href={`/visitas/${id}`} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
-            Voltar
-          </Link>
-        </div>
-      );
-    }
-    redirect(`/visitas/${id}/iniciar?session=${created.sessionId}`);
   }
 
   return (

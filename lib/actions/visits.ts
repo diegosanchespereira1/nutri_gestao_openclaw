@@ -14,6 +14,7 @@ import type { VisitTargetType } from "@/lib/types/visits";
 import {
   canCancelScheduledVisit,
   canManageScheduledVisit,
+  resolveAssignedTeamMemberIdOnCreate,
 } from "@/lib/visits/agenda-access";
 import { parseDossierRecipientEmailsFromText } from "@/lib/validators/dossier-email-recipients";
 
@@ -63,7 +64,12 @@ export async function createScheduledVisitAction(
   const assignRaw = String(
     formData.get("assigned_team_member_id") ?? "",
   ).trim();
-  const assignedTeamMemberId = assignRaw.length > 0 ? assignRaw : null;
+  const assignedTeamMemberId = await resolveAssignedTeamMemberIdOnCreate(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+    assignRaw,
+  );
 
   if (!targetType || !scheduledIso || !visitKind) {
     redirect("/visitas/nova?err=missing");
@@ -228,7 +234,12 @@ export async function createVisitDialogAction(
   }
 
   const assignRaw = String(formData.get("assigned_team_member_id") ?? "").trim();
-  const assignedTeamMemberId = assignRaw.length > 0 ? assignRaw : null;
+  const assignedTeamMemberId = await resolveAssignedTeamMemberIdOnCreate(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+    assignRaw,
+  );
 
   if (targetType === "establishment") {
     const { data: est } = await supabase

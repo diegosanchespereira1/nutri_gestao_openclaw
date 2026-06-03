@@ -54,4 +54,6 @@ export type ScheduledVisitWithTargets = ScheduledVisitRow & {
     full_name: string;
     job_role: string;
   } | null;
+  /** Preenchido quando não há team_members (ex.: titular sem linha em equipe). */
+  creator_full_name?: string | null;
 };

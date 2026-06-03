@@ -1,4 +1,6 @@
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
+import { teamJobRoleLabel } from "@/lib/constants/team-roles";
+import type { TeamJobRole } from "@/lib/types/team-members";
 
 function normalizeEmbed<T>(rel: T | T[] | null | undefined): T | null {
   if (rel == null) return null;
@@ -40,4 +42,20 @@ export function visitDisplayTitle(row: ScheduledVisitWithTargets): string {
   const name = visitTargetName(row);
   if (name) return name;
   return row.target_type === "establishment" ? "Estabelecimento" : "Paciente";
+}
+
+/** Nome do profissional responsável (membro atribuído ou criador da visita). */
+export function visitProfessionalLabel(
+  row: ScheduledVisitWithTargets,
+  creatorFullName?: string | null,
+): string {
+  const tm = normalizeEmbed(row.team_members);
+  if (tm?.full_name) {
+    const role =
+      teamJobRoleLabel[tm.job_role as TeamJobRole] ?? tm.job_role;
+    return `${tm.full_name} (${role})`;
+  }
+  const creator = creatorFullName?.trim();
+  if (creator) return creator;
+  return "Profissional não indicado";
 }

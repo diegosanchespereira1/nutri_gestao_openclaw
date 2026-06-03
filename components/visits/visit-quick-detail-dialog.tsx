@@ -21,9 +21,8 @@ import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { formatDateTimeShort } from "@/lib/datetime/calendar-tz";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
 import { rescheduleVisitAction } from "@/lib/actions/visits";
-import type { TeamJobRole } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
-import { visitDisplayTitle, visitTargetName } from "@/lib/visits/display-title";
+import { visitDisplayTitle, visitProfessionalLabel, visitTargetName } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 
 function toDatetimeLocalValue(isoUtc: string, tz: string): string {
@@ -49,11 +48,8 @@ type Props = {
   canCancelVisit?: (v: ScheduledVisitWithTargets) => boolean;
 };
 
-function assigneeLabel(visit: ScheduledVisitWithTargets): string | null {
-  if (!visit.team_members) return null;
-  const role = visit.team_members.job_role as TeamJobRole;
-  const roleLabel = teamJobRoleLabel[role] ?? visit.team_members.job_role;
-  return `${visit.team_members.full_name} (${roleLabel})`;
+function assigneeLabel(visit: ScheduledVisitWithTargets): string {
+  return visitProfessionalLabel(visit, visit.creator_full_name);
 }
 
 export function VisitQuickDetailDialog({
@@ -184,21 +180,12 @@ export function VisitQuickDetailDialog({
               {visitKindLabel[(visit.visit_kind ?? "other") as VisitKind]}
             </dd>
           </div>
-          {assignee ? (
-            <div className="flex gap-2">
-              <dt className="text-foreground/80 w-28 shrink-0 font-medium">
-                Profissional
-              </dt>
-              <dd>{assignee}</dd>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <dt className="text-foreground/80 w-28 shrink-0 font-medium">
-                Profissional
-              </dt>
-              <dd>Titular da conta</dd>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <dt className="text-foreground/80 w-28 shrink-0 font-medium">
+              Profissional
+            </dt>
+            <dd>{assignee}</dd>
+          </div>
         </dl>
 
         {visit.notes ? (

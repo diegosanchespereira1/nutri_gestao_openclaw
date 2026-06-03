@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants/visit-priorities";
 import { VISIT_KINDS, visitKindLabel } from "@/lib/constants/visit-kinds";
 import { MAX_DOSSIER_EMAIL_RECIPIENTS } from "@/lib/constants/dossier-email";
+import type { VisitAssigneeFormContext } from "@/lib/visits/assignee-context";
 import type { TeamMemberRow } from "@/lib/types/team-members";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ type Props = {
   patients: PatientWithContext[];
   teamMembers: TeamMemberRow[];
   defaultScheduledStart?: string;
+  assigneeContext: VisitAssigneeFormContext;
 };
 
 function hasSchedulableEstablishment(
@@ -60,6 +62,7 @@ export function VisitScheduleForm({
   patients,
   teamMembers,
   defaultScheduledStart,
+  assigneeContext,
 }: Props) {
   const profileTimeZone = useAppTimeZone();
   const [targetType, setTargetType] = useState<VisitTargetType>(() => {
@@ -163,10 +166,14 @@ export function VisitScheduleForm({
           id="visit-assignee"
           name="assigned_team_member_id"
           className={selectClassName}
-          defaultValue=""
+          defaultValue={assigneeContext.defaultAssigneeId}
         >
-          <option value="">Eu (titular da conta)</option>
-          {teamMembers.map((m) => (
+          <option value={assigneeContext.currentTeamMemberId ?? ""}>
+            {assigneeContext.selfAssigneeLabel}
+          </option>
+          {teamMembers
+            .filter((m) => m.id !== assigneeContext.currentTeamMemberId)
+            .map((m) => (
             <option key={m.id} value={m.id}>
               {m.full_name}
             </option>

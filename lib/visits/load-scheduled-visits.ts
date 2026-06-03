@@ -99,7 +99,37 @@ export async function loadScheduledVisitsForAgenda(args: {
     return { rows: [] };
   }
   if (!data) return { rows: [] };
-  return { rows: data as unknown as ScheduledVisitWithTargets[] };
+
+  const rows = data as unknown as ScheduledVisitWithTargets[];
+  const needsCreator = rows.filter((v) => !normalizeVisitTeamMember(v));
+  if (needsCreator.length === 0) return { rows };
+
+  const userIds = [...new Set(needsCreator.map((v) => v.user_id))];
+  const { data: profiles } = await args.supabase
+    .from("profiles")
+    .select("user_id, full_name")
+    .in("user_id", userIds);
+
+  const nameByUser = new Map(
+    (profiles ?? []).map((p) => [p.user_id as string, p.full_name as string]),
+  );
+
+  return {
+    rows: rows.map((v) => ({
+      ...v,
+      creator_full_name: normalizeVisitTeamMember(v)
+        ? null
+        : (nameByUser.get(v.user_id) ?? null),
+    })),
+  };
+}
+
+function normalizeVisitTeamMember(
+  row: ScheduledVisitWithTargets,
+): ScheduledVisitWithTargets["team_members"] {
+  const tm = row.team_members;
+  if (tm == null) return null;
+  return Array.isArray(tm) ? (tm[0] ?? null) : tm;
 }
 
 /**
@@ -142,5 +172,19 @@ export async function loadScheduledVisitById(
     .maybeSingle();
 
   if (error || !data) return { row: null };
-  return { row: data as unknown as ScheduledVisitWithTargets };
+
+  let row = data as unknown as ScheduledVisitWithTargets;
+  if (!normalizeVisitTeamMember(row)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("user_id", row.user_id)
+      .maybeSingle();
+    row = {
+      ...row,
+      creator_full_name: (profile?.full_name as string | null) ?? null,
+    };
+  }
+
+  return { row };
 }

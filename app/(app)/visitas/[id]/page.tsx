@@ -16,10 +16,8 @@ import { canCancelScheduledVisit } from "@/lib/visits/agenda-access";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { fetchProfileRole } from "@/lib/supabase/profile";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
-import { teamJobRoleLabel } from "@/lib/constants/team-roles";
-import type { TeamJobRole } from "@/lib/types/team-members";
 import type { VisitKind } from "@/lib/types/visits";
-import { visitDisplayTitle } from "@/lib/visits/display-title";
+import { visitDisplayTitle, visitProfessionalLabel } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 import { VisitDossierEmailPanel } from "@/components/visits/visit-dossier-email-panel";
 import type { DossierEmailSendStatus } from "@/lib/types/visits";
@@ -183,10 +181,8 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
             Profissional
           </dt>
           <dd>
-            {row.team_members
-              ? `${row.team_members.full_name} (${teamJobRoleLabel[row.team_members.job_role as TeamJobRole] ?? row.team_members.job_role})`
-              : "Titular da conta"}
-            {row.team_members ? null : (
+            {visitProfessionalLabel(row, row.creator_full_name)}
+            {!row.team_members ? (
               <>
                 {" "}
                 ·{" "}
@@ -197,7 +193,7 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
                   Gerir equipe
                 </Link>
               </>
-            )}
+            ) : null}
           </dd>
         </div>
       </dl>

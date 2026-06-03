@@ -282,6 +282,7 @@ export async function getLatestFillSessionIdForVisit(
     .from("checklist_fill_sessions")
     .select("id")
     .eq("scheduled_visit_id", visitId)
+    .is("dossier_approved_at", null)
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();

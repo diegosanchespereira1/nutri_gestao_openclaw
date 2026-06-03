@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { VisitScheduleForm } from "@/components/visits/visit-schedule-form";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadAllPatientsForOwner } from "@/lib/actions/patients";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
+import { getServerContext } from "@/lib/supabase/get-server-user";
+import { loadCurrentUserAssigneeContext } from "@/lib/visits/assignee-context";
 import { cn } from "@/lib/utils";
 
 const errMessages: Record<string, string> = {
@@ -28,12 +31,20 @@ export default async function NovaVisitaPage({ searchParams }: Props) {
   const { err, scheduled_start_local } = await searchParams;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
-  const [{ rows: establishments }, { rows: patients }, { rows: teamMembers }] =
-    await Promise.all([
-      loadEstablishmentsForOwner(),
-      loadAllPatientsForOwner(),
-      loadTeamMembersForOwner(),
-    ]);
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) redirect("/login");
+
+  const [
+    { rows: establishments },
+    { rows: patients },
+    { rows: teamMembers },
+    assigneeContext,
+  ] = await Promise.all([
+    loadEstablishmentsForOwner(),
+    loadAllPatientsForOwner(),
+    loadTeamMembersForOwner(),
+    loadCurrentUserAssigneeContext(supabase, user.id, workspaceOwnerId),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -86,6 +97,7 @@ export default async function NovaVisitaPage({ searchParams }: Props) {
           patients={patients}
           teamMembers={teamMembers}
           defaultScheduledStart={scheduled_start_local}
+          assigneeContext={assigneeContext}
         />
       )}
     </div>

@@ -12,6 +12,7 @@ import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
 import { parseProfileContextCookie } from "@/lib/auth/profile-context-cookie";
 import { cookies } from "next/headers";
 import { canViewAllWorkspaceVisits } from "@/lib/visits/agenda-access";
+import { loadCurrentUserAssigneeContext } from "@/lib/visits/assignee-context";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 
 export default async function VisitasPage() {
@@ -33,7 +34,7 @@ export default async function VisitasPage() {
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90),
   ).toISOString();
 
-  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, { rows: visits }, { rows: establishments }, { rows: patients }, { rows: teamMembers }] =
+  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, { rows: visits }, { rows: establishments }, { rows: patients }, { rows: teamMembers }, assigneeContext] =
     await Promise.all([
       fetchAgendaSettings(supabase, user.id),
       loadScheduledVisitsForAgenda({
@@ -47,6 +48,7 @@ export default async function VisitasPage() {
       loadEstablishmentsForOwner(),
       loadAllPatientsForOwner(),
       loadTeamMembersForOwner(),
+      loadCurrentUserAssigneeContext(supabase, user.id, workspaceOwnerId),
     ]);
 
   const todayKey = civilTodayKey(new Date(), tz);
@@ -67,6 +69,7 @@ export default async function VisitasPage() {
       teamMembers={teamMembers}
       currentUserId={user.id}
       isAgendaAdmin={isAgendaAdmin}
+      assigneeContext={assigneeContext}
     />
   );
 }

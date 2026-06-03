@@ -28,6 +28,26 @@ export async function resolveTeamMemberIdForAuthUser(
   return (data?.id as string | undefined) ?? null;
 }
 
+/**
+ * Quando o formulário deixa o profissional vazio («Eu»), associa automaticamente
+ * o membro da equipa correspondente ao utilizador autenticado.
+ */
+export async function resolveAssignedTeamMemberIdOnCreate(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+  assignRaw: string,
+): Promise<string | null> {
+  const trimmed = assignRaw.trim();
+  if (trimmed.length > 0) return trimmed;
+
+  return resolveTeamMemberIdForAuthUser(
+    supabase,
+    authUserId,
+    workspaceOwnerId,
+  );
+}
+
 export async function canManageScheduledVisit(args: {
   supabase: SupabaseClient;
   authUserId: string;

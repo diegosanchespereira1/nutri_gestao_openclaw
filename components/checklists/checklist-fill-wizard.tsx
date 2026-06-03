@@ -112,7 +112,7 @@ function ChecklistFillStructureHeading({ description }: { description: string })
       role="presentation"
       className="border-border/60 text-foreground border-b pb-2 pt-5 first:pt-0"
     >
-      <h3 className="text-sm font-semibold tracking-tight">{description}</h3>
+      <h3 className="text-sm font-bold tracking-tight">{description}</h3>
     </div>
   );
 }

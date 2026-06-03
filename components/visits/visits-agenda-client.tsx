@@ -36,12 +36,12 @@ import { VisitScheduleDialog } from "@/components/visits/visit-schedule-dialog";
 import { VisitWeekTimeGrid } from "@/components/visits/visit-week-time-grid";
 import { rescheduleVisitAction } from "@/lib/actions/visits";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
-import { teamJobRoleLabel } from "@/lib/constants/team-roles";
-import type { TeamJobRole, TeamMemberRow } from "@/lib/types/team-members";
+import type { TeamMemberRow } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind, VisitPriority } from "@/lib/types/visits";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
-import { visitDisplayTitle, visitTargetName } from "@/lib/visits/display-title";
+import type { VisitAssigneeFormContext } from "@/lib/visits/assignee-context";
+import { visitDisplayTitle, visitProfessionalLabel, visitTargetName } from "@/lib/visits/display-title";
 import { compareScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -66,6 +66,7 @@ type Props = {
   teamMembers: TeamMemberRow[];
   currentUserId: string;
   isAgendaAdmin: boolean;
+  assigneeContext: VisitAssigneeFormContext;
 };
 
 function groupVisitsByDay(
@@ -102,6 +103,7 @@ export function VisitsAgendaClient({
   teamMembers,
   currentUserId,
   isAgendaAdmin,
+  assigneeContext,
 }: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
@@ -778,9 +780,10 @@ export function VisitsAgendaClient({
                     Profissional
                   </dt>
                   <dd>
-                    {selectedVisit.team_members
-                      ? `${selectedVisit.team_members.full_name} (${teamJobRoleLabel[selectedVisit.team_members.job_role as TeamJobRole] ?? selectedVisit.team_members.job_role})`
-                      : "Titular da conta"}
+                    {visitProfessionalLabel(
+                      selectedVisit,
+                      selectedVisit.creator_full_name,
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -877,6 +880,7 @@ export function VisitsAgendaClient({
         establishments={establishments}
         patients={patients}
         teamMembers={teamMembers}
+        assigneeContext={assigneeContext}
       />
 
       {pendingReschedule ? (

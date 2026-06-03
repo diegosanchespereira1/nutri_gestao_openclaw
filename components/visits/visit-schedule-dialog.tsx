@@ -20,6 +20,7 @@ import { VISIT_KINDS, visitKindLabel } from "@/lib/constants/visit-kinds";
 import { VISIT_PRIORITIES, visitPriorityLabel } from "@/lib/constants/visit-priorities";
 import { MAX_DOSSIER_EMAIL_RECIPIENTS } from "@/lib/constants/dossier-email";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import type { VisitAssigneeFormContext } from "@/lib/visits/assignee-context";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
 import type { TeamMemberRow } from "@/lib/types/team-members";
@@ -47,6 +48,7 @@ type Props = {
   establishments: EstablishmentWithClientNames[];
   patients: PatientWithContext[];
   teamMembers: TeamMemberRow[];
+  assigneeContext: VisitAssigneeFormContext;
 };
 
 export function VisitScheduleDialog({
@@ -56,6 +58,7 @@ export function VisitScheduleDialog({
   establishments,
   patients,
   teamMembers,
+  assigneeContext,
 }: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
@@ -265,10 +268,14 @@ export function VisitScheduleDialog({
                   id="dlg-assignee"
                   name="assigned_team_member_id"
                   className={selectClassName}
-                  defaultValue=""
+                  defaultValue={assigneeContext.defaultAssigneeId}
                 >
-                  <option value="">Eu (titular da conta)</option>
-                  {teamMembers.map((m) => (
+                  <option value={assigneeContext.currentTeamMemberId ?? ""}>
+                    {assigneeContext.selfAssigneeLabel}
+                  </option>
+                  {teamMembers
+                    .filter((m) => m.id !== assigneeContext.currentTeamMemberId)
+                    .map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.full_name}
                     </option>

@@ -44,6 +44,15 @@ function connectSrcParts(): string[] {
   }
   parts.add("https://*.supabase.co");
   parts.add("wss://*.supabase.co");
+
+  // Capacitor WebView (iOS usa scheme capacitor://, Android usa https://)
+  // Necessário para que o app nativo consiga fazer fetch para o servidor.
+  const isCapacitorBuild = process.env.NEXT_PUBLIC_IS_CAPACITOR_BUILD === "true";
+  if (isCapacitorBuild) {
+    parts.add("capacitor://localhost");
+    parts.add("ionic://localhost");
+  }
+
   return [...parts];
 }
 

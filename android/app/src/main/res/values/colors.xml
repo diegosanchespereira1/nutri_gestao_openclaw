@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#2D6A4F</color>
+    <color name="colorPrimaryDark">#1B4332</color>
+    <color name="colorAccent">#E85D04</color>
+    <!-- Mesma cor do capacitor.config.ts (plugins.SplashScreen.backgroundColor) -->
+    <color name="splash_background">#F4F9F8</color>
+</resources>

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Camera, Images, Trash2, ZoomIn } from "lucide-react";
 
+import { isNativeApp } from "@/lib/mobile/platform";
+import { openNativeCamera, openNativeGallery } from "@/lib/mobile/camera";
+
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { Button } from "@/components/ui/button";
 import { ImageViewerModal } from "@/components/image-viewer-modal";
@@ -182,16 +185,6 @@ export function ChecklistItemPhotos({
   const atLimit = photos.length >= CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM;
   const busy = uploadState.status === "busy";
 
-  const openCamera = useCallback(() => {
-    setUploadError(null);
-    inputCameraRef.current?.click();
-  }, []);
-
-  const openGallery = useCallback(() => {
-    setUploadError(null);
-    inputGalleryRef.current?.click();
-  }, []);
-
   const onFileChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFiles = e.target.files ? Array.from(e.target.files) : [];
@@ -356,6 +349,38 @@ export function ChecklistItemPhotos({
     },
     [sessionId, itemId, itemResponseSource, photos, onPhotosChange, atLimit, disabled],
   );
+
+  // Câmera e galeria: usa plugin Capacitor no app nativo, <input> no browser.
+  // Declarados DEPOIS de onFileChange para evitar referência antes da atribuição.
+  const openCamera = useCallback(async () => {
+    setUploadError(null);
+    if (isNativeApp()) {
+      try {
+        const result = await openNativeCamera();
+        if (result) void onFileChange({ target: { files: [result.file], value: "" } } as unknown as React.ChangeEvent<HTMLInputElement>);
+      } catch {
+        setUploadError("Não foi possível acessar a câmera. Verifique as permissões.");
+      }
+      return;
+    }
+    inputCameraRef.current?.click();
+  }, [onFileChange]);
+
+  const openGallery = useCallback(async () => {
+    setUploadError(null);
+    if (isNativeApp()) {
+      try {
+        const results = await openNativeGallery(CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM);
+        for (const result of results) {
+          void onFileChange({ target: { files: [result.file], value: "" } } as unknown as React.ChangeEvent<HTMLInputElement>);
+        }
+      } catch {
+        setUploadError("Não foi possível acessar a galeria. Verifique as permissões.");
+      }
+      return;
+    }
+    inputGalleryRef.current?.click();
+  }, [onFileChange]);
 
   const onDelete = useCallback(
     async (photoId: string) => {

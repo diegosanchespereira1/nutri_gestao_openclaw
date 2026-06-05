@@ -135,7 +135,7 @@ export function AppShell({
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="bg-background flex min-h-screen w-full max-w-full overflow-x-clip">
+    <div className="bg-background flex min-h-screen w-full max-w-full overflow-x-hidden">
       <a
         href="#conteudo-principal"
         className="bg-primary text-primary-foreground focus:ring-ring sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:px-4 focus:py-2 focus:ring-2"
@@ -179,7 +179,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-clip lg:pl-60">
+      <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden lg:pl-60">
         {/* Header mobile / tablet */}
         <header
           className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex h-14 items-center gap-3 border-b px-4 backdrop-blur lg:hidden"
@@ -246,7 +246,7 @@ export function AppShell({
 
         <main
           id="conteudo-principal"
-          className="min-w-0 max-w-full flex-1 overflow-x-clip p-4 md:p-6"
+          className="min-w-0 max-w-full flex-1 overflow-x-hidden p-4 md:p-6"
           tabIndex={-1}
         >
           {children}

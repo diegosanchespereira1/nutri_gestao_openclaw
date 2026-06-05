@@ -88,7 +88,15 @@ export function ChecklistFillDossierPdfCard({
         setLocalErr(r.error);
         return;
       }
-      window.open(r.downloadUrl, "_blank", "noopener,noreferrer");
+      // No app nativo (Capacitor) window.open com _blank abre o Safari.
+      // Navegamos dentro do WebView usando location.href.
+      const isNative = !!(window as Window & { Capacitor?: { isNativePlatform?: () => boolean } })
+        .Capacitor?.isNativePlatform?.();
+      if (isNative) {
+        window.location.href = r.downloadUrl;
+      } else {
+        window.open(r.downloadUrl, "_blank", "noopener,noreferrer");
+      }
     });
   }
 

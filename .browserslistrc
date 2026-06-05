@@ -1,0 +1,11 @@
+# Alvo de compatibilidade JavaScript para Next.js SWC.
+# Chrome 67 cobre Android WebView desde 2018 (Android 7+).
+# Resolve SyntaxError em WebViews sem atualização do sistema.
+
+chrome >= 67
+firefox >= 68
+edge >= 79
+safari >= 12
+ios_saf >= 12
+samsung >= 8
+android >= 67

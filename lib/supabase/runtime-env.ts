@@ -13,12 +13,43 @@ function readRuntimeEnv(keys: string[]): string | undefined {
   return undefined;
 }
 
+function bakedSupabaseUrl(): string | undefined {
+  const url = pickBaked(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_URL,
+  );
+  return url || undefined;
+}
+
+function bakedSupabaseAnonKey(): string | undefined {
+  const key = pickBaked(
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    process.env.SUPABASE_ANON_KEY,
+  );
+  return key || undefined;
+}
+
+function pickBaked(...values: (string | undefined)[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
 export function readSupabaseUrl(): string | undefined {
-  return readRuntimeEnv(["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]);
+  return (
+    readRuntimeEnv(["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]) ??
+    bakedSupabaseUrl()
+  );
 }
 
 export function readSupabaseAnonKey(): string | undefined {
-  return readRuntimeEnv(["SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]);
+  return (
+    readRuntimeEnv(["SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) ??
+    bakedSupabaseAnonKey()
+  );
 }
 
 export function readSupabaseServiceRoleKey(): string | undefined {

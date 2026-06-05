@@ -26,6 +26,10 @@ export const metadata: Metadata = {
   description: "Gestão nutricional para profissionais",
 };
 
+// Evita cache RSC do shell com env do build (supabaseUrl vazio / chave errada no inline).
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 // Viewport separado do metadata (Next.js 14+).
 // viewportFit: 'cover' é essencial para o notch/Dynamic Island do iPhone
 // e para a barra inferior do iOS não cortar conteúdo no app nativo.

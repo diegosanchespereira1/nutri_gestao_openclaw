@@ -23,13 +23,17 @@ const SEX_LABEL: Record<string, string> = {
   other: "Outro",
 };
 
-function calcAge(isoDate: string): string {
+function calcAgeYears(isoDate: string): number {
   const birth = new Date(isoDate);
   const today = new Date();
   let years = today.getFullYear() - birth.getFullYear();
   const m = today.getMonth() - birth.getMonth();
   if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) years--;
-  return `${years} anos`;
+  return years;
+}
+
+function calcAge(isoDate: string): string {
+  return `${calcAgeYears(isoDate)} anos`;
 }
 
 function formatDateBR(iso: string): string {
@@ -83,7 +87,8 @@ export default async function ProntuarioPacientePage({
   const supabase = await createClient();
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
   const age = birthSlice ? calcAge(birthSlice) : null;
-  const isMinor = age !== null && age < 18;
+  const ageYears = birthSlice ? calcAgeYears(birthSlice) : null;
+  const isMinor = ageYears !== null && ageYears < 18;
 
   const avaliacaoOk = sp.avaliacao === "ok";
 

@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { SupabaseHashAuthRedirect } from "@/components/auth/supabase-hash-auth-redirect";
 import { AppLoadingScreen } from "@/components/mobile/app-loading-screen";
 import { CapacitorLinkInterceptor } from "@/components/mobile/capacitor-link-interceptor";
+import { CapacitorStatusBar } from "@/components/mobile/capacitor-status-bar";
 import { getAppVersion } from "@/lib/app-version";
 import { getPublicRuntimeEnv } from "@/lib/env/public-runtime";
 
@@ -76,6 +77,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col" style={{ backgroundColor: '#F4F9F8' }}>
         <AppLoadingScreen />
+        <CapacitorStatusBar />
         <CapacitorLinkInterceptor />
         <SupabaseHashAuthRedirect />
         {children}

@@ -39,7 +39,7 @@ export default async function AppAreaLayout({
       <AppVersionGuard />
       <Toaster />
       {onboardingOnly ? (
-        <div className="bg-background min-h-screen">{children}</div>
+        <div className="bg-background safe-top min-h-screen">{children}</div>
       ) : (
         <AppShell
           showAdminNav={showAdminNav}

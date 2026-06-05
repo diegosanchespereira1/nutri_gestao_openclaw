@@ -187,7 +187,7 @@ export function AppShell({
       <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden lg:pl-60">
         {/* Header mobile / tablet */}
         <header
-          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex h-14 items-center gap-3 border-b px-4 backdrop-blur lg:hidden"
+          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 safe-top flex min-h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur lg:hidden"
           role="banner"
         >
           <Button
@@ -216,7 +216,7 @@ export function AppShell({
           >
             <SheetTitle className="sr-only">Menu de navegação NutriGestão</SheetTitle>
 
-            <div className="flex h-14 items-center gap-2 pr-12 pl-4">
+            <div className="safe-top flex min-h-14 items-center gap-2 pr-12 pl-4">
               <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
               <Link
                 href="/inicio"

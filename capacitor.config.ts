@@ -35,15 +35,17 @@ const config: CapacitorConfig = {
       saveToGallery: false,
     },
     StatusBar: {
-      style: 'Default',
-      backgroundColor: '#ffffff',
+      // LIGHT = ícones/texto escuros em fundo claro (Style.Light no plugin).
+      style: 'LIGHT',
+      backgroundColor: '#F4F9F8',
+      overlaysWebView: false,
     },
   },
 
   ios: {
     // Respeita safe areas (notch, Dynamic Island, barra inferior)
     contentInset: 'automatic',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F4F9F8',
     // Scheme usado no iOS WebView
     scheme: 'nutrigestao',
     // Permite scroll com inércia nativo
@@ -53,7 +55,7 @@ const config: CapacitorConfig = {
   },
 
   android: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F4F9F8',
     // Não permite conteúdo HTTP dentro do app HTTPS
     allowMixedContent: false,
     // Suporte a back button nativo

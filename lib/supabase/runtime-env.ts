@@ -43,10 +43,16 @@ export type SupabaseRuntimeCredentials = {
   anonKey: string;
 };
 
-/** URL + anon key do mesmo tier — evita misturar runtime parcial com build. */
+/** URL + anon key do mesmo tier — build Docker antes de runtime Portainer. */
 export function readSupabaseCredentials():
   | SupabaseRuntimeCredentials
   | undefined {
+  const bakedUrl = bakedSupabaseUrl();
+  const bakedAnonKey = bakedSupabaseAnonKey();
+  if (bakedUrl && bakedAnonKey) {
+    return { url: bakedUrl, anonKey: bakedAnonKey };
+  }
+
   const runtimeUrl = readRuntimeEnv([
     "SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_URL",
@@ -57,12 +63,6 @@ export function readSupabaseCredentials():
   ]);
   if (runtimeUrl && runtimeAnonKey) {
     return { url: runtimeUrl, anonKey: runtimeAnonKey };
-  }
-
-  const bakedUrl = bakedSupabaseUrl();
-  const bakedAnonKey = bakedSupabaseAnonKey();
-  if (bakedUrl && bakedAnonKey) {
-    return { url: bakedUrl, anonKey: bakedAnonKey };
   }
 
   return undefined;

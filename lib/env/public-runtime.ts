@@ -109,9 +109,12 @@ function readWindowConfig(): SupabasePublicConfig | null {
  * DEV está completo em ambos os lados.
  */
 function resolveSupabasePublicConfig(): SupabasePublicConfig | null {
+  // Servidor: build Docker (secrets GitHub) antes do Portainer — em prod o runtime
+  // do stack por vezes mantém anon key antiga com URL nova (par inválido após merge).
+  // Cliente: script inline do HTML (gerado no servidor) antes do bundle.
   const tiers =
     typeof window === "undefined"
-      ? [readServerRuntimeConfig, readBakedConfig, readWindowConfig]
+      ? [readBakedConfig, readServerRuntimeConfig, readWindowConfig]
       : [readWindowConfig, readBakedConfig];
 
   for (const readTier of tiers) {

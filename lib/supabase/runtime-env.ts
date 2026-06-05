@@ -13,6 +13,15 @@ function readRuntimeEnv(keys: string[]): string | undefined {
   return undefined;
 }
 
+function pickBaked(...values: (string | undefined)[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim().length > 0) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
 function bakedSupabaseUrl(): string | undefined {
   const url = pickBaked(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -29,27 +38,42 @@ function bakedSupabaseAnonKey(): string | undefined {
   return key || undefined;
 }
 
-function pickBaked(...values: (string | undefined)[]): string {
-  for (const value of values) {
-    if (typeof value === "string" && value.trim().length > 0) {
-      return value.trim();
-    }
+export type SupabaseRuntimeCredentials = {
+  url: string;
+  anonKey: string;
+};
+
+/** URL + anon key do mesmo tier — build Docker antes de runtime Portainer. */
+export function readSupabaseCredentials():
+  | SupabaseRuntimeCredentials
+  | undefined {
+  const bakedUrl = bakedSupabaseUrl();
+  const bakedAnonKey = bakedSupabaseAnonKey();
+  if (bakedUrl && bakedAnonKey) {
+    return { url: bakedUrl, anonKey: bakedAnonKey };
   }
-  return "";
+
+  const runtimeUrl = readRuntimeEnv([
+    "SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_URL",
+  ]);
+  const runtimeAnonKey = readRuntimeEnv([
+    "SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  ]);
+  if (runtimeUrl && runtimeAnonKey) {
+    return { url: runtimeUrl, anonKey: runtimeAnonKey };
+  }
+
+  return undefined;
 }
 
 export function readSupabaseUrl(): string | undefined {
-  return (
-    readRuntimeEnv(["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]) ??
-    bakedSupabaseUrl()
-  );
+  return readSupabaseCredentials()?.url;
 }
 
 export function readSupabaseAnonKey(): string | undefined {
-  return (
-    readRuntimeEnv(["SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]) ??
-    bakedSupabaseAnonKey()
-  );
+  return readSupabaseCredentials()?.anonKey;
 }
 
 export function readSupabaseServiceRoleKey(): string | undefined {

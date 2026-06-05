@@ -1,11 +1,23 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDossierPdfBytes, foldTextForPdf } from "./dossier-pdf";
+import {
+  buildDossierPdfBytes,
+  foldTextForPdf,
+  normalizeCrnForPdf,
+} from "./dossier-pdf";
 
 describe("foldTextForPdf", () => {
   it("colapsa espaços e preserva acentos (fonte Unicode)", () => {
     expect(foldTextForPdf("Avaliação  Técnica")).toBe("Avaliação Técnica");
     expect(foldTextForPdf("  São  Paulo ")).toBe("São Paulo");
+  });
+});
+
+describe("normalizeCrnForPdf", () => {
+  it("remove prefixo CRN duplicado", () => {
+    expect(normalizeCrnForPdf("CRN 344654")).toBe("344654");
+    expect(normalizeCrnForPdf("crn 344654/P")).toBe("344654/P");
+    expect(normalizeCrnForPdf("344654")).toBe("344654");
   });
 });
 

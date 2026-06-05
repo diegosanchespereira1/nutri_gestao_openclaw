@@ -3,7 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { TENANT_LOGOS_BUCKET } from "@/lib/constants/tenant-logos-storage";
 import { fetchTenantLogoStoragePath } from "@/lib/tenant/logo-sync";
-import { buildDossierPdfBytes, foldTextForPdf } from "@/lib/pdf/dossier-pdf";
+import {
+  buildDossierPdfBytes,
+  foldTextForPdf,
+  normalizeCrnForPdf,
+} from "@/lib/pdf/dossier-pdf";
 import { DEFAULT_PDF_SETTINGS } from "@/lib/constants/checklist-pdf-settings";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
@@ -208,7 +212,7 @@ export async function buildApprovedDossierPdfBytes(
   const professionalName = foldTextForPdf(
     professional.fullName || "Profissional",
   );
-  const crn = foldTextForPdf(professional.crn);
+  const crn = normalizeCrnForPdf(professional.crn);
 
   let score: SessionScore = null;
   if (input.sessionId) {

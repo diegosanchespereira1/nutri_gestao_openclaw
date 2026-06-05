@@ -6,15 +6,11 @@ import { Loader2 } from "lucide-react";
 
 const SLOW_THRESHOLD_MS = 3500;
 
-function Overlay() {
-  const { pending } = useFormStatus();
+function OverlayInner({ pending }: { pending: boolean }) {
   const [slow, setSlow] = useState(false);
 
   useEffect(() => {
-    if (!pending) {
-      setSlow(false);
-      return;
-    }
+    if (!pending) return;
     const t = setTimeout(() => setSlow(true), SLOW_THRESHOLD_MS);
     return () => clearTimeout(t);
   }, [pending]);
@@ -44,7 +40,6 @@ function Overlay() {
           </p>
         </div>
 
-        {/* Progress bar indeterminada */}
         <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full bg-primary"
@@ -70,6 +65,11 @@ function Overlay() {
       `}</style>
     </div>
   );
+}
+
+function Overlay() {
+  const { pending } = useFormStatus();
+  return <OverlayInner key={pending ? "pending" : "idle"} pending={pending} />;
 }
 
 /**

@@ -1,29 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
+
+function subscribeClient(onChange: () => void) {
+  onChange();
+  return () => {};
+}
 
 /**
- * Tela de loading animada — aparece imediatamente via SSR (visible=true no servidor)
- * e desaparece com fade após o app hidratar.
+ * Tela de loading animada — aparece após hidratação no cliente e some com fade.
  */
 export function AppLoadingScreen() {
-  // Iniciar como false para não renderizar no SSR.
-  // No cliente, mostra imediatamente após montagem e some após 1200ms.
-  const [visible, setVisible] = useState(false);
+  const isClient = useSyncExternalStore(
+    subscribeClient,
+    () => true,
+    () => false,
+  );
+  const [visible, setVisible] = useState(true);
   const [fading, setFading] = useState(false);
 
   useEffect(() => {
-    // Mostrar imediatamente no cliente
-    setVisible(true);
-
+    if (!isClient) return;
     const timer = setTimeout(() => {
       setFading(true);
       setTimeout(() => setVisible(false), 500);
     }, 1200);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isClient]);
 
-  if (!visible) return null;
+  if (!isClient || !visible) return null;
 
   return (
     <>
@@ -56,7 +61,6 @@ export function AppLoadingScreen() {
       `}</style>
 
       <div className={`ng-loading-screen${fading ? ' fading' : ''}`} aria-hidden="true">
-        {/* Logo */}
         <img
           src="/app-icon.png"
           alt=""
@@ -70,7 +74,6 @@ export function AppLoadingScreen() {
           }}
         />
 
-        {/* Nome */}
         <p style={{
           marginTop: '24px',
           marginBottom: 0,
@@ -83,7 +86,6 @@ export function AppLoadingScreen() {
           NutriGestão
         </p>
 
-        {/* Subtítulo */}
         <p style={{
           marginTop: '6px',
           marginBottom: 0,
@@ -95,7 +97,6 @@ export function AppLoadingScreen() {
           GESTÃO NUTRICIONAL PROFISSIONAL
         </p>
 
-        {/* Dots */}
         <div style={{ display: 'flex', gap: '10px', marginTop: '40px' }}>
           {[0, 1, 2].map((i) => (
             <span

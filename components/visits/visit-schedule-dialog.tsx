@@ -77,11 +77,7 @@ export function VisitScheduleDialog({
     }
   }, [state, router, onClose]);
 
-  // Reset state when dialog closes so next open is clean
   const [formKey, setFormKey] = useState(0);
-  useEffect(() => {
-    if (!open) setFormKey((k) => k + 1);
-  }, [open]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     const form = e.currentTarget;
@@ -109,7 +105,12 @@ export function VisitScheduleDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o && !isPending) onClose();
+        if (!o) {
+          if (!isPending) {
+            setFormKey((k) => k + 1);
+            onClose();
+          }
+        }
       }}
     >
       <DialogContent className="flex max-h-[92dvh] max-w-lg flex-col" showCloseButton>

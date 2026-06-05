@@ -74,7 +74,7 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
 
   // Verifica propriedade directamente pelo user_id do paciente,
   // funciona mesmo quando client_id é null (paciente independente).
-  if ((anchor as any).user_id !== workspaceOwnerId) {
+  if (anchor.user_id !== workspaceOwnerId) {
     return {
       patientFullName: null,
       mergeByDocument: false,

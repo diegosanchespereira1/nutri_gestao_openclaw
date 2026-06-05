@@ -46,11 +46,12 @@ export function AgendaSettingsForm({
 
   useEffect(() => {
     if (state?.ok === true) {
-      setStartHour(state.agendaStartHour);
-      setEndHour(state.agendaEndHour);
       router.refresh();
     }
   }, [state, router]);
+
+  const resolvedStartHour = state?.ok === true ? state.agendaStartHour : startHour;
+  const resolvedEndHour = state?.ok === true ? state.agendaEndHour : endHour;
 
   return (
     <form action={formAction} className="max-w-lg space-y-6">
@@ -62,7 +63,7 @@ export function AgendaSettingsForm({
             id="agenda-start-hour"
             name="agenda_start_hour"
             required
-            value={startHour}
+            value={resolvedStartHour}
             onChange={(e) => setStartHour(Number(e.target.value))}
             className={selectClass}
             aria-describedby="agenda-hours-hint"
@@ -82,13 +83,13 @@ export function AgendaSettingsForm({
             id="agenda-end-hour"
             name="agenda_end_hour"
             required
-            value={endHour}
+            value={resolvedEndHour}
             onChange={(e) => setEndHour(Number(e.target.value))}
             className={selectClass}
             aria-describedby="agenda-hours-hint"
           >
             {END_OPTIONS.map(({ value, label }) => (
-              <option key={value} value={value} disabled={value <= startHour}>
+              <option key={value} value={value} disabled={value <= resolvedStartHour}>
                 {label}
               </option>
             ))}

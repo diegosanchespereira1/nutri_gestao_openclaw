@@ -1,6 +1,16 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
+
+function subscribeDesktopMq(onChange: () => void) {
+  const mq = window.matchMedia('(min-width: 1024px)');
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+function getDesktopMqSnapshot() {
+  return window.matchMedia('(min-width: 1024px)').matches;
+}
 
 /**
  * Painel decorativo lateral da tela de auth.
@@ -8,15 +18,11 @@ import { useEffect, useState } from 'react';
  * Nunca aparece no SSR — evita flash no Android WebView.
  */
 export function DecorativePanel() {
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
-    setShow(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setShow(e.matches);
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, []);
+  const show = useSyncExternalStore(
+    subscribeDesktopMq,
+    getDesktopMqSnapshot,
+    () => false,
+  );
 
   if (!show) return null;
 

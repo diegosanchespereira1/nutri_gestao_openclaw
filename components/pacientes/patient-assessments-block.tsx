@@ -294,7 +294,7 @@ function EmptyState({ label }: { label: string }) {
   return (
     <p className="text-sm text-muted-foreground py-2">
       Sem {label} registadas.{" "}
-      <span className="text-foreground">Use "Realizar avaliação" para o primeiro registo.</span>
+      <span className="text-foreground">Use &quot;Realizar avaliação&quot; para o primeiro registo.</span>
     </p>
   );
 }

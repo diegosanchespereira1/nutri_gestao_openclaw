@@ -4,6 +4,8 @@ import { Eye, MapPin, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+
+import { pushWithLoading } from "@/lib/navigation-pending";
 import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
@@ -720,7 +722,7 @@ export function ChecklistFillWizard({
       clearLeaveLinkTarget();
       cancelLeave();
       if (dest) {
-        router.push(dest);
+        pushWithLoading(router, dest);
       } else {
         completeBrowserBack();
       }
@@ -1796,7 +1798,7 @@ export function ChecklistFillWizard({
                     return;
                   }
                   setMultiAreaNextDialog(null);
-                  router.push(`/checklists/preencher/${next.sessionId}`);
+                  pushWithLoading(router, `/checklists/preencher/${next.sessionId}`);
                 })();
               }}
             >

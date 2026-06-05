@@ -1,6 +1,11 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { revalidatePath, updateTag } from "next/cache";
+
+function invalidateWorkspaceCatalogCache(workspaceOwnerId: string) {
+  updateTag(`workspace-catalog-${workspaceOwnerId}`);
+}
 import { redirect } from "next/navigation";
 
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
@@ -72,13 +77,10 @@ export type WorkspaceActionResult =
 
 /* ─── Carregamento ─────────────────────────────────────────────────────── */
 
-/** Lista todos os modelos do workspace (não arquivados). */
-export async function loadWorkspaceTemplatesForCatalog(): Promise<{
-  rows: WorkspaceTemplateListRow[];
-}> {
-  const { supabase, user, workspaceOwnerId } = await getServerContext();
-  if (!user || !workspaceOwnerId) return { rows: [] };
-
+async function fetchWorkspaceTemplatesForCatalogRows(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
+): Promise<WorkspaceTemplateListRow[]> {
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
     .select("id, name, created_by_user_id, version, updated_at")
@@ -86,14 +88,14 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
 
-  if (error || !templates || templates.length === 0) return { rows: [] };
+  if (error || !templates || templates.length === 0) return [];
 
   const templateIds = templates.map((t) => String(t.id));
   const userIds = [...new Set(templates.map((t) => String(t.created_by_user_id)))];
 
   // Fase 1: sections + profiles + "used" checks correm em paralelo
   // (todas dependem apenas de templateIds/userIds, já disponíveis)
-  const [sectionRows, profileRows, usedChecks] = await Promise.all([
+  const [sectionRows, profileRows, usedSessionRows] = await Promise.all([
     supabase
       .from("checklist_workspace_sections")
       .select("id, workspace_template_id")
@@ -106,15 +108,11 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
           .in("user_id", userIds)
           .then((r) => r.data ?? [])
       : Promise.resolve([]),
-    Promise.all(
-      templateIds.map((tid) =>
-        supabase
-          .from("checklist_fill_sessions")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_template_id", tid)
-          .then((r) => ({ tid, used: (r.count ?? 0) > 0 })),
-      ),
-    ),
+    supabase
+      .from("checklist_fill_sessions")
+      .select("workspace_template_id")
+      .in("workspace_template_id", templateIds)
+      .then((r) => r.data ?? []),
   ]);
 
   const sectionIds = sectionRows.map((s) => String(s.id));
@@ -130,8 +128,9 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   }
 
   const usedTemplateIds = new Set<string>();
-  for (const { tid, used } of usedChecks) {
-    if (used) usedTemplateIds.add(tid);
+  for (const row of usedSessionRows) {
+    const tid = String(row.workspace_template_id ?? "");
+    if (tid) usedTemplateIds.add(tid);
   }
 
   // Fase 2: items dependem dos sectionIds da fase anterior
@@ -154,19 +153,31 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
     }
   }
 
-  return {
-    rows: templates.map((t) => ({
-      id: String(t.id),
-      name: String(t.name),
-      created_by_user_id: String(t.created_by_user_id),
-      created_by_name: profileNames.get(String(t.created_by_user_id)) ?? null,
-      total_item_count: counts.get(String(t.id))?.total ?? 0,
-      required_item_count: counts.get(String(t.id))?.required ?? 0,
-      version: Number(t.version ?? 1),
-      updated_at: String(t.updated_at),
-      has_been_used: usedTemplateIds.has(String(t.id)),
-    })),
-  };
+  return templates.map((t) => ({
+    id: String(t.id),
+    name: String(t.name),
+    created_by_user_id: String(t.created_by_user_id),
+    created_by_name: profileNames.get(String(t.created_by_user_id)) ?? null,
+    total_item_count: counts.get(String(t.id))?.total ?? 0,
+    required_item_count: counts.get(String(t.id))?.required ?? 0,
+    version: Number(t.version ?? 1),
+    updated_at: String(t.updated_at),
+    has_been_used: usedTemplateIds.has(String(t.id)),
+  }));
+}
+
+/** Lista todos os modelos do workspace (não arquivados). */
+export async function loadWorkspaceTemplatesForCatalog(): Promise<{
+  rows: WorkspaceTemplateListRow[];
+}> {
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [] };
+
+  const rows = await fetchWorkspaceTemplatesForCatalogRows(
+    supabase,
+    workspaceOwnerId,
+  );
+  return { rows };
 }
 
 /** Estrutura para o builder de edição. */
@@ -474,6 +485,7 @@ export async function createWorkspaceTemplateAction(
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
 
   return { ok: true, id: templateId };
 }
@@ -656,6 +668,7 @@ export async function updateWorkspaceTemplateAction(
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");
   revalidatePath(`/checklists/equipe/${templateId}/editar`);
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
 
   return { ok: true, id: templateId };
 }
@@ -691,6 +704,7 @@ export async function archiveWorkspaceTemplateAction(
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
 
   return { ok: true, id: templateId };
 }

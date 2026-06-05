@@ -5,15 +5,7 @@ const RecipeForm = dynamic(
     import("@/components/technical-sheets/recipe-form").then(
       (mod) => mod.RecipeForm,
     ),
-  {
-    loading: () => (
-      <div className="space-y-4 animate-pulse" aria-label="Carregando formulário…">
-        <div className="h-10 rounded-lg bg-muted w-64" />
-        <div className="h-48 rounded-xl bg-muted" />
-        <div className="h-48 rounded-xl bg-muted" />
-      </div>
-    ),
-  },
+  { loading: () => null },
 );
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";

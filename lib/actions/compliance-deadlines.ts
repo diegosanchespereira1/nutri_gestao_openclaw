@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { addCalendarDays, todayKey } from "@/lib/datetime/calendar-tz";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import type {
   ComplianceDashboardAlert,
@@ -24,10 +25,7 @@ function parseDueDate(raw: string): string | null {
 export async function loadComplianceDashboardAlerts(
   timeZone: string,
 ): Promise<ComplianceDashboardAlert[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getServerContext();
   if (!user) return [];
 
   const tKey = todayKey(new Date(), timeZone);

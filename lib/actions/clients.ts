@@ -764,6 +764,9 @@ export async function deleteClientAction(formData: FormData) {
 /** Para a lista com filtros (RSC). */
 const CLIENTS_PAGE_SIZE = 20;
 
+const CLIENT_LIST_SELECT =
+  "id, owner_user_id, kind, legal_name, trade_name, document_id, lifecycle_status, business_segment, logo_storage_path";
+
 export async function loadClientsForOwner(options: {
   q?: string;
   kind?: ClientKind | "all";
@@ -780,7 +783,7 @@ export async function loadClientsForOwner(options: {
 
   let q = supabase
     .from("clients")
-    .select("*", { count: "exact" })
+    .select(CLIENT_LIST_SELECT, { count: "exact" })
     .eq("owner_user_id", workspaceOwnerId)
     .order("created_at", { ascending: false })
     .range(from, to);

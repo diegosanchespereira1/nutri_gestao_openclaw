@@ -1,5 +1,7 @@
 "use client";
 
+import { DropdownMenuScroll } from "@/components/ui/dropdown-menu-scroll";
+
 import * as React from "react";
 import { ChevronDownIcon } from "lucide-react";
 
@@ -101,8 +103,8 @@ export function BusinessSegmentFilterDropdown({
         </button>
 
         {isOpen && (
-          <div className="border-border bg-popover text-popover-foreground absolute top-full left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-md border shadow-md">
-            <div className="space-y-2 p-3">
+          <div className="border-border bg-popover text-popover-foreground absolute top-full left-0 right-0 z-50 mt-1 overflow-hidden rounded-md border shadow-md">
+            <DropdownMenuScroll className="max-h-60 space-y-2 p-3">
               {/* Select All / Clear buttons */}
               <div className="flex gap-2 pb-2 border-b border-border">
                 <Button
@@ -156,7 +158,7 @@ export function BusinessSegmentFilterDropdown({
                   />
                 ))}
               </div>
-            </div>
+            </DropdownMenuScroll>
           </div>
         )}
       </div>

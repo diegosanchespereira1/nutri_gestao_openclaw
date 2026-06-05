@@ -1,35 +1,28 @@
 import Link from "next/link";
-import dynamic from "next/dynamic";
+import { Suspense } from "react";
 
-const ChecklistCatalog = dynamic(
-  () =>
-    import("@/components/checklists/checklist-catalog").then(
-      (mod) => mod.ChecklistCatalog,
-    ),
-  {
-    loading: () => (
-      <div className="space-y-3 animate-pulse" aria-label="Carregando catálogo…">
-        <div className="h-10 rounded-lg bg-muted w-full" />
-        <div className="grid gap-3 sm:grid-cols-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="h-32 rounded-xl bg-muted" />
-          ))}
-        </div>
-      </div>
-    ),
-  },
-);
+import { ChecklistCatalogSection } from "@/components/checklists/checklist-catalog-section";
 import { PageHelpHint } from "@/components/help/page-help-hint";
-import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
-import { startChecklistFill } from "@/lib/actions/checklist-fill";
-import { loadWorkspaceTemplatesForCatalog } from "@/lib/actions/checklist-workspace";
-import {
-  loadRecentChecklistEstablishmentsAction,
-  loadEstablishmentPickerOptionById,
-} from "@/lib/actions/establishments";
-import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
+
+function ChecklistCatalogSkeleton() {
+  return (
+    <div
+      className="space-y-4 rounded-xl border border-border bg-card p-6"
+      role="status"
+      aria-live="polite"
+      aria-label="Carregando catálogo"
+    >
+      <div className="h-10 animate-pulse rounded-lg bg-muted" />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default async function ChecklistsPage({
   searchParams,
@@ -49,21 +42,6 @@ export default async function ChecklistsPage({
       : null;
   const initialEstablishmentId =
     typeof sp.est === "string" && /^[0-9a-f-]{36}$/i.test(sp.est) ? sp.est : null;
-
-  const [{ templates }, { rows: workspaceTemplates }, { rows: recentRaw }, preselected] =
-    await Promise.all([
-      loadChecklistCatalog(),
-      loadWorkspaceTemplatesForCatalog(),
-      loadRecentChecklistEstablishmentsAction(3),
-      initialEstablishmentId
-        ? loadEstablishmentPickerOptionById(initialEstablishmentId)
-        : Promise.resolve(null),
-    ]);
-
-  // Garante que o estabelecimento pré-selecionado aparece como primeira opção recente
-  const recentEstablishments = preselected
-    ? [preselected, ...recentRaw.filter((r) => r.id !== preselected.id)].slice(0, 3)
-    : recentRaw;
 
   return (
     <div className="space-y-6">
@@ -85,18 +63,21 @@ export default async function ChecklistsPage({
         <div className="flex flex-wrap gap-2">
           <Link
             href="/checklists/equipe"
+            prefetch
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Modelos da equipe
           </Link>
           <Link
             href="/checklists/personalizados"
+            prefetch
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Modelos personalizados
           </Link>
           <Link
             href="/checklists/novo"
+            prefetch
             className={cn(buttonVariants({ size: "sm" }))}
           >
             + Criar checklist personalizado
@@ -121,17 +102,13 @@ export default async function ChecklistsPage({
         </p>
       ) : null}
 
-      <ChecklistCatalog
-        key={initialEstablishmentId ?? focusTemplateId ?? focusWorkspaceTemplateId ?? "checklist-catalog-default"}
-        recentEstablishments={recentEstablishments}
-        templates={templates}
-        workspaceTemplates={workspaceTemplates}
-        startFillAction={startChecklistFill}
-        duplicateTemplateAction={duplicateGlobalTemplateAction}
-        focusTemplateId={focusTemplateId}
-        focusWorkspaceTemplateId={focusWorkspaceTemplateId}
-        initialEstablishmentId={initialEstablishmentId}
-      />
+      <Suspense fallback={<ChecklistCatalogSkeleton />}>
+        <ChecklistCatalogSection
+          focusTemplateId={focusTemplateId}
+          focusWorkspaceTemplateId={focusWorkspaceTemplateId}
+          initialEstablishmentId={initialEstablishmentId}
+        />
+      </Suspense>
     </div>
   );
 }

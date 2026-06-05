@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -34,6 +34,7 @@ import { VisitQuickDetailDialog } from "@/components/visits/visit-quick-detail-d
 import { VisitRescheduleConfirmDialog } from "@/components/visits/visit-reschedule-confirm-dialog";
 import { VisitScheduleDialog } from "@/components/visits/visit-schedule-dialog";
 import { VisitWeekTimeGrid } from "@/components/visits/visit-week-time-grid";
+import { loadVisitScheduleFormDataAction } from "@/lib/actions/visit-schedule-form-data";
 import { rescheduleVisitAction } from "@/lib/actions/visits";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import type { TeamMemberRow } from "@/lib/types/team-members";
@@ -61,12 +62,14 @@ type Props = {
   todayKey: string;
   agendaStartHour: number;
   agendaEndHour: number;
-  establishments: EstablishmentWithClientNames[];
-  patients: PatientWithContext[];
-  teamMembers: TeamMemberRow[];
+  establishments?: EstablishmentWithClientNames[];
+  patients?: PatientWithContext[];
+  teamMembers?: TeamMemberRow[];
   currentUserId: string;
   isAgendaAdmin: boolean;
   assigneeContext: VisitAssigneeFormContext;
+  /** Carrega estabelecimentos/pacientes/equipe em background após a agenda. */
+  deferScheduleFormData?: boolean;
 };
 
 function groupVisitsByDay(
@@ -98,15 +101,36 @@ export function VisitsAgendaClient({
   todayKey,
   agendaStartHour,
   agendaEndHour,
-  establishments,
-  patients,
-  teamMembers,
+  establishments: establishmentsProp = [],
+  patients: patientsProp = [],
+  teamMembers: teamMembersProp = [],
   currentUserId,
   isAgendaAdmin,
   assigneeContext,
+  deferScheduleFormData = false,
 }: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
+
+  const [establishments, setEstablishments] = useState(establishmentsProp);
+  const [patients, setPatients] = useState(patientsProp);
+  const [teamMembers, setTeamMembers] = useState(teamMembersProp);
+  const [formDataLoading, setFormDataLoading] = useState(deferScheduleFormData);
+
+  useEffect(() => {
+    if (!deferScheduleFormData) return;
+    let cancelled = false;
+    void loadVisitScheduleFormDataAction().then((data) => {
+      if (cancelled) return;
+      setEstablishments(data.establishments);
+      setPatients(data.patients);
+      setTeamMembers(data.teamMembers);
+      setFormDataLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [deferScheduleFormData]);
 
   const visits = useMemo(
     () => visitsProp.filter((v) => v.status !== "cancelled"),
@@ -881,6 +905,7 @@ export function VisitsAgendaClient({
         patients={patients}
         teamMembers={teamMembers}
         assigneeContext={assigneeContext}
+        isLoadingTargets={formDataLoading}
       />
 
       {pendingReschedule ? (

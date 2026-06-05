@@ -79,6 +79,13 @@
     @apply font-sans;
     overflow-x: hidden;          /* clip tem suporte inconsistente no iOS WebKit */
     overscroll-behavior-x: none; /* previne rubber-band horizontal no iPhone     */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  html::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
   body {
     @apply bg-background text-foreground;
@@ -86,6 +93,22 @@
     overscroll-behavior-x: none;
     max-width: 100%;
     width: 100%;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  body::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+  #conteudo-principal {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #conteudo-principal::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
 
@@ -122,4 +145,17 @@ html[data-theme] input:not([type=hidden]):not([type=range]):not([type=checkbox])
 html[data-theme] select,
 html[data-theme] textarea {
   font-size: max(16px, 0.875rem);
+}
+
+@keyframes ng-route-progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.route-progress-bar-indeterminate {
+  animation: ng-route-progress 1.1s ease-in-out infinite;
 }

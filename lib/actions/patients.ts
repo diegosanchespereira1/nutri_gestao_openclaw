@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getServerUser } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type { ClientKind } from "@/lib/types/clients";
@@ -361,23 +362,27 @@ export async function updatePatientClientAction(
   return { ok: true };
 }
 
+const PATIENT_LIST_SELECT = `
+  id,
+  client_id,
+  full_name,
+  birth_date,
+  document_id,
+  clients ( legal_name ),
+  establishments ( name )
+`.trim();
+
 /** Lista todos os pacientes do profissional autenticado, com joins de contexto.
  *  Suporta filtro por nome/CPF (q) e por cliente (clientId). */
 export async function loadAllPatientsForOwner(
   filters?: { q?: string; clientId?: string; independente?: boolean },
 ): Promise<{ rows: PatientWithContext[] }> {
-  const { supabase, user } = await getServerUser();
+  const { supabase, user } = await getServerContext();
   if (!user) return { rows: [] };
 
   let q = supabase
     .from("patients")
-    .select(
-      `
-      *,
-      clients ( legal_name, kind, lifecycle_status ),
-      establishments ( name )
-    `,
-    )
+    .select(PATIENT_LIST_SELECT)
     .order("full_name", { ascending: true });
 
   const search = filters?.q?.trim() ?? "";

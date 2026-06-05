@@ -11,6 +11,8 @@ import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { AppMainContent } from "@/components/app-main-content";
+import { AppRoutePrefetcher } from "@/components/app-route-prefetcher";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
@@ -92,6 +94,7 @@ function NavGroups({
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
                   onClick={onNavigate}
                   className={cn(
                     "flex min-h-9 min-w-0 items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150",
@@ -136,6 +139,7 @@ export function AppShell({
 
   return (
     <div className="bg-background flex min-h-screen w-full max-w-full overflow-x-hidden">
+      <AppRoutePrefetcher />
       <a
         href="#conteudo-principal"
         className="bg-primary text-primary-foreground focus:ring-ring sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:rounded-md focus:px-4 focus:py-2 focus:ring-2"
@@ -153,6 +157,7 @@ export function AppShell({
           <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
           <Link
             href="/inicio"
+            prefetch
             className="text-sidebar-foreground font-heading text-base font-semibold tracking-tight"
           >
             NutriGestão
@@ -215,6 +220,7 @@ export function AppShell({
               <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
               <Link
                 href="/inicio"
+                prefetch
                 onClick={() => setMenuOpen(false)}
                 className="text-sidebar-foreground font-heading text-base font-semibold tracking-tight"
               >
@@ -249,7 +255,7 @@ export function AppShell({
           className="min-w-0 max-w-full flex-1 overflow-x-hidden p-4 md:p-6"
           tabIndex={-1}
         >
-          {children}
+          <AppMainContent>{children}</AppMainContent>
         </main>
       </div>
     </div>

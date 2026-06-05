@@ -8,6 +8,7 @@ import {
   summarizeOverdueCharges,
 } from "@/lib/dashboard/financial-pending";
 import { todayKey } from "@/lib/datetime/calendar-tz";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import type {
   FinancialChargeListRow,
@@ -35,18 +36,14 @@ export async function loadFinancialDashboardSummary(timeZone: string): Promise<{
   overdueTotalCents: number;
   overdueTotalLabel: string;
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  const { supabase, workspaceOwnerId } = await getServerContext();
+  if (!workspaceOwnerId) {
     return {
       overdueCount: 0,
       overdueTotalCents: 0,
       overdueTotalLabel: formatBRLFromCents(0),
     };
   }
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
   const { data, error } = await supabase
     .from("financial_charges")

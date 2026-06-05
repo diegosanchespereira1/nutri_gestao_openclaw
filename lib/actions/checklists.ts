@@ -1,6 +1,10 @@
 "use server";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
+
 import { createClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getServerUser } from "@/lib/supabase/get-server-user";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import type {
@@ -96,49 +100,82 @@ function assembleTemplates(
   });
 }
 
+async function queryActiveChecklistCatalog(
+  supabase: SupabaseClient,
+): Promise<ChecklistTemplateWithSections[]> {
+  const { data, error } = await supabase
+    .from("checklist_templates")
+    .select(
+      `
+      *,
+      checklist_template_sections (
+        *,
+        checklist_template_items (*)
+      )
+    `,
+    )
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error || !data?.length) {
+    return [];
+  }
+
+  const templatesRaw: Record<string, unknown>[] = [];
+  const sectionsRaw: Record<string, unknown>[] = [];
+  const itemsRaw: Record<string, unknown>[] = [];
+
+  for (const row of data) {
+    const { checklist_template_sections: sections, ...template } = row as Record<
+      string,
+      unknown
+    > & {
+      checklist_template_sections?: Array<
+        Record<string, unknown> & {
+          checklist_template_items?: Record<string, unknown>[];
+        }
+      >;
+    };
+
+    templatesRaw.push(template);
+    for (const section of sections ?? []) {
+      const { checklist_template_items: items, ...sectionRow } = section;
+      sectionsRaw.push(sectionRow);
+      for (const item of items ?? []) {
+        itemsRaw.push(item);
+      }
+    }
+  }
+
+  return assembleTemplates(templatesRaw, sectionsRaw, itemsRaw);
+}
+
+/** Catálogo global — leitura idêntica para todos; service role evita cookies no cache. */
+async function fetchActiveChecklistCatalogCached(): Promise<
+  ChecklistTemplateWithSections[]
+> {
+  return queryActiveChecklistCatalog(createServiceRoleClient());
+}
+
+const getCachedActiveChecklistCatalog = unstable_cache(
+  fetchActiveChecklistCatalogCached,
+  ["checklist-catalog-active-v1"],
+  { revalidate: 300, tags: ["checklist-catalog"] },
+);
+
 export async function loadChecklistCatalog(): Promise<{
   templates: ChecklistTemplateWithSections[];
 }> {
   const { supabase, user } = await getServerUser();
   if (!user) return { templates: [] };
 
-  const { data: templatesRaw, error: tErr } = await supabase
-    .from("checklist_templates")
-    .select("*")
-    .eq("is_active", true)
-    .order("name", { ascending: true });
-
-  if (tErr || !templatesRaw?.length) {
-    return { templates: [] };
+  try {
+    const templates = await getCachedActiveChecklistCatalog();
+    return { templates };
+  } catch {
+    const templates = await queryActiveChecklistCatalog(supabase);
+    return { templates };
   }
-
-  const templateIds = templatesRaw.map((r) => String(r.id));
-
-  const { data: sectionsRaw, error: sErr } = await supabase
-    .from("checklist_template_sections")
-    .select("*")
-    .in("template_id", templateIds)
-    .order("position", { ascending: true });
-
-  if (sErr || !sectionsRaw) {
-    return { templates: assembleTemplates(templatesRaw, [], []) };
-  }
-
-  const sectionIds = sectionsRaw.map((r) => String(r.id));
-
-  const { data: itemsRaw, error: iErr } = await supabase
-    .from("checklist_template_items")
-    .select("*")
-    .in("section_id", sectionIds)
-    .order("position", { ascending: true });
-
-  if (iErr || !itemsRaw) {
-    return { templates: assembleTemplates(templatesRaw, sectionsRaw, []) };
-  }
-
-  return {
-    templates: assembleTemplates(templatesRaw, sectionsRaw, itemsRaw),
-  };
 }
 
 export async function getChecklistTemplateWithItems(

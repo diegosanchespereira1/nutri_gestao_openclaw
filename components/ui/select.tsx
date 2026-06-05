@@ -7,6 +7,8 @@ import { ChevronDownIcon, ChevronUpIcon, CheckIcon } from "lucide-react";
 import { touchMinHeight } from "@/lib/touch-targets"
 import { cn } from "@/lib/utils";
 
+import scrollStyles from "./dropdown-menu-scroll.module.css";
+
 function Select(props: SelectPrimitive.Root.Props<string>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
@@ -68,7 +70,11 @@ function SelectContent({
           <SelectPrimitive.ScrollUpArrow className="flex justify-center py-1">
             <ChevronUpIcon className="h-4 w-4" />
           </SelectPrimitive.ScrollUpArrow>
-          <SelectPrimitive.List>{children}</SelectPrimitive.List>
+          <SelectPrimitive.List
+            className={cn(scrollStyles.scroll, "max-h-60 py-0.5 pr-0.5")}
+          >
+            {children}
+          </SelectPrimitive.List>
           <SelectPrimitive.ScrollDownArrow className="flex justify-center py-1">
             <ChevronDownIcon className="h-4 w-4" />
           </SelectPrimitive.ScrollDownArrow>

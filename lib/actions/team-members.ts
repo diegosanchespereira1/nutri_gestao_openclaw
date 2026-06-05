@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { parseTeamJobRole } from "@/lib/constants/team-roles";
 import { canAccessAdminArea } from "@/lib/roles";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
@@ -175,18 +176,13 @@ async function findAuthUserByEmail(
 export async function loadTeamMembersForOwner(): Promise<{
   rows: TeamMemberRow[];
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
-
-  const ownerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { supabase, workspaceOwnerId } = await getServerContext();
+  if (!workspaceOwnerId) return { rows: [] };
 
   const { data, error } = await supabase
     .from("team_members")
-    .select("*")
-    .eq("owner_user_id", ownerId)
+    .select("id, owner_user_id, member_user_id, full_name, job_role, email, phone, professional_area, crn, notes, created_at, updated_at")
+    .eq("owner_user_id", workspaceOwnerId)
     .order("full_name", { ascending: true });
 
   if (error || !data) return { rows: [] };

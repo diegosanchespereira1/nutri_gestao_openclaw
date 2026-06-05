@@ -7,6 +7,11 @@ export type PublicRuntimeEnv = {
   version: string;
 };
 
+type SupabasePublicConfig = Pick<
+  PublicRuntimeEnv,
+  "supabaseUrl" | "supabaseAnonKey" | "siteUrl"
+>;
+
 declare global {
   interface Window {
     __NUTRIGESTAO_PUBLIC_ENV__?: PublicRuntimeEnv;
@@ -24,6 +29,15 @@ function pickEnv(...candidates: (string | undefined | null)[]): string {
     if (value) return value;
   }
   return "";
+}
+
+function isCompleteSupabaseConfig(
+  config: Partial<SupabasePublicConfig>,
+): config is SupabasePublicConfig {
+  return (
+    trimNonEmpty(config.supabaseUrl).length > 0 &&
+    trimNonEmpty(config.supabaseAnonKey).length > 0
+  );
 }
 
 function getFromWindow(): PublicRuntimeEnv | null {
@@ -44,14 +58,9 @@ function readServerEnv(keys: string[]): string {
 
 /**
  * Referências directas a `process.env` para o Next inlinar NEXT_PUBLIC_* no build
- * (Docker). `readServerEnv` com chave dinâmica não recebe esse inline — em
- * produção, se o Portainer não repetir NEXT_PUBLIC_SUPABASE_URL em runtime, o
- * SSR injetava `supabaseUrl: ""` e o login ficava preso em "Validando credenciais".
+ * (Docker). `readServerEnv` com chave dinâmica não recebe esse inline.
  */
-function readBakedPublicEnv(): Pick<
-  PublicRuntimeEnv,
-  "supabaseUrl" | "supabaseAnonKey" | "siteUrl"
-> {
+function readBakedPublicEnv(): SupabasePublicConfig {
   return {
     supabaseUrl: pickEnv(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -65,36 +74,67 @@ function readBakedPublicEnv(): Pick<
   };
 }
 
-export function getPublicRuntimeEnv(): PublicRuntimeEnv {
+function readServerRuntimeConfig(): SupabasePublicConfig | null {
+  const config: SupabasePublicConfig = {
+    supabaseUrl: readServerEnv(["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]),
+    supabaseAnonKey: readServerEnv([
+      "SUPABASE_ANON_KEY",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    ]),
+    siteUrl: readServerEnv(["SITE_URL", "NEXT_PUBLIC_SITE_URL"]),
+  };
+  return isCompleteSupabaseConfig(config) ? config : null;
+}
+
+function readBakedConfig(): SupabasePublicConfig | null {
+  const config = readBakedPublicEnv();
+  return isCompleteSupabaseConfig(config) ? config : null;
+}
+
+function readWindowConfig(): SupabasePublicConfig | null {
   const fromWindow = getFromWindow();
-  const baked = readBakedPublicEnv();
-  // Ordem: runtime do servidor (Portainer) → build Docker (inlinado pelo Next) → window.
-  // O script inline do layout pode ficar em cache RSC com valores do build antigo (f18755f);
-  // o window não pode ter prioridade sobre o bundle quando os campos estão vazios/errados.
-  const supabaseUrl = pickEnv(
-    readServerEnv(["SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"]),
-    baked.supabaseUrl,
-    fromWindow?.supabaseUrl,
-  );
-  const supabaseAnonKey = pickEnv(
-    readServerEnv(["SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"]),
-    baked.supabaseAnonKey,
-    fromWindow?.supabaseAnonKey,
-  );
-  const siteUrl = pickEnv(
-    readServerEnv(["SITE_URL", "NEXT_PUBLIC_SITE_URL"]),
-    baked.siteUrl,
-    fromWindow?.siteUrl,
-  );
+  if (!fromWindow) return null;
+  const config: SupabasePublicConfig = {
+    supabaseUrl: fromWindow.supabaseUrl,
+    supabaseAnonKey: fromWindow.supabaseAnonKey,
+    siteUrl: fromWindow.siteUrl,
+  };
+  return isCompleteSupabaseConfig(config) ? config : null;
+}
+
+/**
+ * URL e anon key devem vir do mesmo tier (runtime, build ou window).
+ * Em produção, o Portainer por vezes só tinha a anon key antiga em runtime e a URL
+ * vinha do build — par inválido → "Invalid API key". Dev funciona porque o par
+ * DEV está completo em ambos os lados.
+ */
+function resolveSupabasePublicConfig(): SupabasePublicConfig | null {
+  const tiers =
+    typeof window === "undefined"
+      ? [readServerRuntimeConfig, readBakedConfig, readWindowConfig]
+      : [readWindowConfig, readBakedConfig];
+
+  for (const readTier of tiers) {
+    const config = readTier();
+    if (config) return config;
+  }
+  return null;
+}
+
+export function getPublicRuntimeEnv(): PublicRuntimeEnv {
+  const resolved = resolveSupabasePublicConfig();
+  const fromWindow = getFromWindow();
 
   const version =
     fromWindow?.version ||
     (typeof window === "undefined" ? getAppVersion() : "");
 
   return {
-    supabaseUrl,
-    supabaseAnonKey,
-    siteUrl,
+    supabaseUrl: resolved?.supabaseUrl ?? "",
+    supabaseAnonKey: resolved?.supabaseAnonKey ?? "",
+    siteUrl:
+      resolved?.siteUrl ||
+      pickEnv(fromWindow?.siteUrl, readBakedPublicEnv().siteUrl),
     version: version || getAppVersion(),
   };
 }

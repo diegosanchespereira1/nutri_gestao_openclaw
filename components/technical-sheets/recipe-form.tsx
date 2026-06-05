@@ -58,6 +58,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { generateUUID } from "@/lib/utils/uuid";
 
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
@@ -98,7 +99,7 @@ const INITIAL_LINE_KEY = "__recipe-line-initial__";
 
 function newLine(key?: string): LineDraft {
   return {
-    key: key ?? crypto.randomUUID(),
+    key: key ?? generateUUID(),
     ingredient_name: "",
     quantity: "",
     unit: "g",
@@ -218,7 +219,7 @@ function linesFromStoredDraft(
         ? (rawMaterials.find((m) => m.id === l.raw_material_id) ?? null)
         : null;
     return {
-      key: index === 0 ? INITIAL_LINE_KEY : crypto.randomUUID(),
+      key: index === 0 ? INITIAL_LINE_KEY : generateUUID(),
       ingredient_name: l.ingredient_name,
       quantity: l.quantity,
       unit: l.unit,

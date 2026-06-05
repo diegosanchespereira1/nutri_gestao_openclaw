@@ -1,10 +1,19 @@
 "use server";
 
-import { addCalendarDays, todayKey } from "@/lib/datetime/calendar-tz";
-import { calendarDaysUntilDueDate } from "@/lib/datetime/calendar-tz";
-import { createClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { addCalendarDays, calendarDaysUntilDueDate, todayKey } from "@/lib/datetime/calendar-tz";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+
+type RpcAlertRow = {
+  response_id: string;
+  session_id: string;
+  client_id: string;
+  client_name: string;
+  checklist_name: string;
+  valid_until: string;
+};
 
 type SessionMeta = {
   id: string;
@@ -28,17 +37,81 @@ function chunk<T>(items: T[], size: number): T[][] {
   return out;
 }
 
-export async function loadChecklistValidityAlerts(
+function mapRpcRows(
+  rows: RpcAlertRow[],
+  timeZone: string,
+): ChecklistValidityAlert[] {
+  return rows.map((row) => {
+    const validUntil =
+      typeof row.valid_until === "string"
+        ? row.valid_until.slice(0, 10)
+        : String(row.valid_until);
+    const daysToExpire = calendarDaysUntilDueDate(
+      validUntil,
+      timeZone,
+      new Date(),
+    );
+    return {
+      responseId: String(row.response_id),
+      sessionId: String(row.session_id),
+      clientId: String(row.client_id),
+      clientName: String(row.client_name),
+      checklistName: String(row.checklist_name),
+      validUntil,
+      status: daysToExpire < 0 ? "vencido" : "proximo",
+      daysToExpire,
+    };
+  });
+}
+
+function isRpcUnavailable(errorMessage: string): boolean {
+  const msg = errorMessage.toLowerCase();
+  return (
+    msg.includes("could not find the function") ||
+    msg.includes("schema cache") ||
+    msg.includes("function") && msg.includes("does not exist")
+  );
+}
+
+async function loadChecklistValidityAlertsViaRpc(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
+  timeZone: string,
+  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+): Promise<ChecklistValidityAlert[] | null> {
+  const withinDays = options?.withinDays ?? 7;
+  const limit = options?.limit ?? 8;
+  const clientFilter = options?.clientId ?? null;
+
+  const tKey = todayKey(new Date(), timeZone);
+  const horizon = addCalendarDays(tKey, withinDays, timeZone);
+  const pastCap = addCalendarDays(tKey, -365, timeZone);
+
+  const { data, error } = await supabase.rpc("get_checklist_validity_alerts", {
+    p_owner_user_id: workspaceOwnerId,
+    p_horizon: horizon,
+    p_past_cap: pastCap,
+    p_limit: Math.max(1, limit),
+    p_client_id: clientFilter,
+  });
+
+  if (error) {
+    if (!isRpcUnavailable(error.message)) {
+      console.error("[loadChecklistValidityAlerts] RPC", error.message);
+    }
+    return null;
+  }
+
+  return mapRpcRows((data ?? []) as RpcAlertRow[], timeZone);
+}
+
+/** Fallback até a migração `20260805150000_perf_navigation_queries.sql` estar aplicada. */
+async function loadChecklistValidityAlertsLegacy(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
   timeZone: string,
   options?: { withinDays?: number; limit?: number; clientId?: string | null },
 ): Promise<ChecklistValidityAlert[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-
   const withinDays = options?.withinDays ?? 7;
   const limit = options?.limit ?? 8;
   const clientFilter = options?.clientId ?? null;
@@ -98,8 +171,11 @@ export async function loadChecklistValidityAlerts(
   if (sessionMap.size === 0) return [];
 
   const sessionIds = [...sessionMap.keys()];
-  const responseRows: Array<{ id: string; session_id: string; valid_until: string }> =
-    [];
+  const responseRows: Array<{
+    id: string;
+    session_id: string;
+    valid_until: string;
+  }> = [];
   for (const ids of chunk(sessionIds, IN_CHUNK_SIZE)) {
     const { data: rows, error: responseError } = await supabase
       .from("checklist_fill_item_responses")
@@ -121,16 +197,12 @@ export async function loadChecklistValidityAlerts(
 
   const templateIds = [
     ...new Set(
-      [...sessionMap.values()]
-        .map((s) => s.template_id)
-        .filter(Boolean),
+      [...sessionMap.values()].map((s) => s.template_id).filter(Boolean),
     ),
   ] as string[];
   const customTemplateIds = [
     ...new Set(
-      [...sessionMap.values()]
-        .map((s) => s.custom_template_id)
-        .filter(Boolean),
+      [...sessionMap.values()].map((s) => s.custom_template_id).filter(Boolean),
     ),
   ] as string[];
 
@@ -177,7 +249,11 @@ export async function loadChecklistValidityAlerts(
         : null) ??
       "Checklist";
 
-    const daysToExpire = calendarDaysUntilDueDate(validUntil, timeZone, new Date());
+    const daysToExpire = calendarDaysUntilDueDate(
+      validUntil,
+      timeZone,
+      new Date(),
+    );
     const status = daysToExpire < 0 ? "vencido" : "proximo";
     const templateScope = session.template_id
       ? `template:${session.template_id}`
@@ -223,4 +299,27 @@ export async function loadChecklistValidityAlerts(
   });
 
   return alerts.slice(0, Math.max(1, limit));
+}
+
+export async function loadChecklistValidityAlerts(
+  timeZone: string,
+  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+): Promise<ChecklistValidityAlert[]> {
+  const { supabase, workspaceOwnerId } = await getServerContext();
+  if (!workspaceOwnerId) return [];
+
+  const viaRpc = await loadChecklistValidityAlertsViaRpc(
+    supabase,
+    workspaceOwnerId,
+    timeZone,
+    options,
+  );
+  if (viaRpc) return viaRpc;
+
+  return loadChecklistValidityAlertsLegacy(
+    supabase,
+    workspaceOwnerId,
+    timeZone,
+    options,
+  );
 }

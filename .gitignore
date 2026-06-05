@@ -45,3 +45,16 @@ next-env.d.ts
 # Test environment (credenciais locais — nunca commitar)
 .env.test
 !.env.test.example
+
+# Capacitor — plataformas nativas geradas
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# Android — keystore de assinatura (NUNCA commitar — perder = não atualizar mais o app)
+*.keystore
+*.jks
+android/keystore.properties

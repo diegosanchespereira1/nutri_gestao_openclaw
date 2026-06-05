@@ -8,15 +8,7 @@ const ChecklistFillWizard = dynamic(
     import("@/components/checklists/checklist-fill-wizard").then(
       (mod) => mod.ChecklistFillWizard,
     ),
-  {
-    loading: () => (
-      <div className="space-y-4 animate-pulse" aria-label="Carregando checklist…">
-        <div className="h-10 w-48 rounded-lg bg-muted" />
-        <div className="h-64 rounded-xl bg-muted" />
-        <div className="h-64 rounded-xl bg-muted" />
-      </div>
-    ),
-  },
+  { loading: () => null },
 );
 import {
   getChecklistReopenEligibility,

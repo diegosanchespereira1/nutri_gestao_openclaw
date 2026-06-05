@@ -1,75 +1,28 @@
-import { redirect } from "next/navigation";
+import { Suspense } from "react";
 
-import { VisitsAgendaClient } from "@/components/visits/visits-agenda-client";
-import { todayKey as civilTodayKey } from "@/lib/datetime/calendar-tz";
-import { loadScheduledVisitsForAgenda } from "@/lib/visits/load-scheduled-visits";
-import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
-import { loadAllPatientsForOwner } from "@/lib/actions/patients";
-import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
-import { fetchAgendaSettings } from "@/lib/supabase/profile";
-import { getServerContext } from "@/lib/supabase/get-server-user";
-import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
-import { parseProfileContextCookie } from "@/lib/auth/profile-context-cookie";
-import { cookies } from "next/headers";
-import { canViewAllWorkspaceVisits } from "@/lib/visits/agenda-access";
-import { loadCurrentUserAssigneeContext } from "@/lib/visits/assignee-context";
-import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
+import { VisitasAgendaSection } from "@/components/visits/visitas-agenda-section";
 
-export default async function VisitasPage() {
-  const [cookieStore, { supabase, user, workspaceOwnerId }] = await Promise.all([
-    cookies(),
-    getServerContext(),
-  ]);
-  if (!user || !workspaceOwnerId) redirect("/login");
-
-  const profileCtx = parseProfileContextCookie(
-    cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
-  );
-
-  const now = new Date();
-  const from = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, now.getUTCDate()),
-  ).toISOString();
-  const to = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90),
-  ).toISOString();
-
-  const [{ timeZone: tz, agendaStartHour, agendaEndHour }, { rows: visits }, { rows: establishments }, { rows: patients }, { rows: teamMembers }, assigneeContext] =
-    await Promise.all([
-      fetchAgendaSettings(supabase, user.id),
-      loadScheduledVisitsForAgenda({
-        supabase,
-        authUserId: user.id,
-        workspaceOwnerId,
-        role: profileCtx?.role,
-        from,
-        to,
-      }),
-      loadEstablishmentsForOwner(),
-      loadAllPatientsForOwner(),
-      loadTeamMembersForOwner(),
-      loadCurrentUserAssigneeContext(supabase, user.id, workspaceOwnerId),
-    ]);
-
-  const todayKey = civilTodayKey(new Date(), tz);
-  const isAgendaAdmin = canViewAllWorkspaceVisits(
-    user.id,
-    workspaceOwnerId,
-    profileCtx?.role,
-  );
-
+function VisitasAgendaSkeleton() {
   return (
-    <VisitsAgendaClient
-      visits={visits as ScheduledVisitWithTargets[]}
-      todayKey={todayKey}
-      agendaStartHour={agendaStartHour}
-      agendaEndHour={agendaEndHour}
-      establishments={establishments}
-      patients={patients}
-      teamMembers={teamMembers}
-      currentUserId={user.id}
-      isAgendaAdmin={isAgendaAdmin}
-      assigneeContext={assigneeContext}
-    />
+    <div
+      className="space-y-4"
+      role="status"
+      aria-live="polite"
+      aria-label="Carregando agenda"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="h-8 w-32 animate-pulse rounded-md bg-muted" />
+        <div className="h-9 w-36 animate-pulse rounded-md bg-muted" />
+      </div>
+      <div className="h-[min(60vh,28rem)] animate-pulse rounded-xl border border-border bg-muted/40" />
+    </div>
+  );
+}
+
+export default function VisitasPage() {
+  return (
+    <Suspense fallback={<VisitasAgendaSkeleton />}>
+      <VisitasAgendaSection />
+    </Suspense>
   );
 }

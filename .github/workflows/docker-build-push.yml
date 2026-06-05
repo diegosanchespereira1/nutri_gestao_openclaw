@@ -122,3 +122,90 @@ jobs:
             NEXT_PUBLIC_APP_VERSION=${{ steps.appver.outputs.version }}
           cache-from: type=gha,scope=docker-dev
           cache-to: type=gha,mode=max,scope=docker-dev
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build de verificação Android (APK debug, sem assinatura).
+  # Garante que o projeto nativo compila. O app é uma casca Capacitor que
+  # aponta para a URL de produção, então não depende do build do Next.js.
+  # Para gerar o AAB assinado de release, configure a keystore e secrets.
+  # ──────────────────────────────────────────────────────────────────────────
+  android-build:
+    name: Build mobile (Android — APK debug, unsigned)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capacitor sync (Android)
+        run: npx cap sync android
+
+      - name: Build APK (debug)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nutrigestao-android-debug
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Build de verificação iOS (compilação para simulador, sem assinatura).
+  # Requer runner macOS. Não gera IPA distribuível — apenas valida o build.
+  # Para gerar IPA de release, configure certificado/provisioning + secrets.
+  # ──────────────────────────────────────────────────────────────────────────
+  ios-build:
+    name: Build mobile (iOS — simulador, unsigned)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Capacitor sync (iOS)
+        run: npx cap sync ios
+
+      - name: Build (iOS Simulator, sem assinatura)
+        working-directory: ios/App
+        run: |
+          xcodebuild build \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            | xcbeautify
+        # xcbeautify já vem instalado nos runners macOS do GitHub.

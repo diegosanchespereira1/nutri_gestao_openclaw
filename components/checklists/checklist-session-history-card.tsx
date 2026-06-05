@@ -171,8 +171,6 @@ export function ChecklistSessionHistoryCard({
         <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-2.5">
           <Link
             href={`/checklists/preencher/${session.id}?view=dossie`}
-            target="_blank"
-            rel="noopener"
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
               "h-7 gap-1 px-2 text-xs",
@@ -193,8 +191,6 @@ export function ChecklistSessionHistoryCard({
             <>
               <Link
                 href={`/checklists/preencher/${session.id}`}
-                target="_blank"
-                rel="noopener"
                 className={cn(buttonVariants({ size: "sm" }), "h-7 gap-1 px-2 text-xs")}
               >
                 Continuar preenchimento

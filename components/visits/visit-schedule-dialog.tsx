@@ -49,6 +49,7 @@ type Props = {
   patients: PatientWithContext[];
   teamMembers: TeamMemberRow[];
   assigneeContext: VisitAssigneeFormContext;
+  isLoadingTargets?: boolean;
 };
 
 export function VisitScheduleDialog({
@@ -59,6 +60,7 @@ export function VisitScheduleDialog({
   patients,
   teamMembers,
   assigneeContext,
+  isLoadingTargets = false,
 }: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
@@ -77,11 +79,7 @@ export function VisitScheduleDialog({
     }
   }, [state, router, onClose]);
 
-  // Reset state when dialog closes so next open is clean
   const [formKey, setFormKey] = useState(0);
-  useEffect(() => {
-    if (!open) setFormKey((k) => k + 1);
-  }, [open]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     const form = e.currentTarget;
@@ -109,7 +107,12 @@ export function VisitScheduleDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o && !isPending) onClose();
+        if (!o) {
+          if (!isPending) {
+            setFormKey((k) => k + 1);
+            onClose();
+          }
+        }
       }}
     >
       <DialogContent className="flex max-h-[92dvh] max-w-lg flex-col" showCloseButton>
@@ -120,7 +123,18 @@ export function VisitScheduleDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {noTargets ? (
+        {isLoadingTargets ? (
+          <div
+            className="flex-1 space-y-3 py-4"
+            role="status"
+            aria-live="polite"
+            aria-label="Carregando destinos"
+          >
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-10 animate-pulse rounded-md bg-muted" />
+            ))}
+          </div>
+        ) : noTargets ? (
           <div className="border-border bg-muted/30 flex-1 rounded-lg border border-dashed p-6 text-sm">
             <p className="text-muted-foreground">
               Precisa de pelo menos um estabelecimento ou paciente ativo para agendar.

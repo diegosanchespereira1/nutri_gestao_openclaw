@@ -273,11 +273,13 @@ export function ClientForm({
     const needsEstablishment =
       state.error.includes("estabelecimento") ||
       state.error.includes("Estabelecimento");
-    if (needsEstablishment) {
+    if (!needsEstablishment) return;
+    const id = window.setTimeout(() => {
       setEstValidationError(true);
       setEstValidationDialogOpen(true);
       setTab("pj-estabelecimento");
-    }
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [state]);
 
   function handleCreateSegment() {

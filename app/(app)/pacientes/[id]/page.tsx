@@ -83,15 +83,7 @@ export default async function ProntuarioPacientePage({
   const supabase = await createClient();
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
   const age = birthSlice ? calcAge(birthSlice) : null;
-
-  const serverNowMs = Date.now();
-  const defaultAge = birthSlice
-    ? Math.floor(
-        (serverNowMs - new Date(birthSlice).getTime()) /
-          (1000 * 60 * 60 * 24 * 365.25),
-      )
-    : undefined;
-  const isMinor = defaultAge !== undefined && defaultAge < 18;
+  const isMinor = age !== null && age < 18;
 
   const avaliacaoOk = sp.avaliacao === "ok";
 

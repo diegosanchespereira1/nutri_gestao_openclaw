@@ -53,7 +53,19 @@ const nextConfig: NextConfig = {
 
     const noStoreHtml = {
       key: "Cache-Control",
-      value: "no-store, must-revalidate",
+      // no-store + Pragma: no-cache garante que o Android WebView (Capacitor)
+      // não sirva versão em cache das páginas HTML
+      value: "no-store, no-cache, must-revalidate, proxy-revalidate",
+    };
+
+    const pragmaNoCache = {
+      key: "Pragma",
+      value: "no-cache",
+    };
+
+    const expires = {
+      key: "Expires",
+      value: "0",
     };
 
     return [
@@ -61,7 +73,7 @@ const nextConfig: NextConfig = {
       {
         source:
           "/((?!_next/static|_next/image|favicon.ico|runtime-env.js|.*\\.(?:ico|png|jpg|jpeg|gif|webp|svg|woff2?)$).*)",
-        headers: [noStoreHtml],
+        headers: [noStoreHtml, pragmaNoCache, expires],
       },
     ];
   },

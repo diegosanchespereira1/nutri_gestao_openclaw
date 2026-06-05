@@ -11,7 +11,23 @@ import {
 } from "./agenda-access";
 
 export const SCHEDULED_VISITS_WITH_TARGETS_SELECT = `
-  *,
+  id,
+  user_id,
+  target_type,
+  establishment_id,
+  patient_id,
+  scheduled_start,
+  priority,
+  status,
+  visit_kind,
+  assigned_team_member_id,
+  notes,
+  dossier_recipient_emails,
+  dossier_email_send_status,
+  dossier_email_last_error,
+  dossier_email_sent_at,
+  created_at,
+  updated_at,
   establishments ( id, name, client_id, clients ( legal_name, trade_name ) ),
   patients ( id, full_name ),
   team_members ( id, full_name, job_role )

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import type {
   BillingRecurrence,
@@ -90,12 +91,8 @@ export async function loadContractsForOwner(): Promise<{
 export async function loadExpiringContracts(
   withinDays = 60,
 ): Promise<{ rows: ContractAlertRow[] }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const { supabase, workspaceOwnerId } = await getServerContext();
+  if (!workspaceOwnerId) return { rows: [] };
 
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);

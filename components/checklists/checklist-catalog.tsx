@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
   ArrowRight,
@@ -17,6 +18,8 @@ import {
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { pushWithLoading } from "@/lib/navigation-pending";
+import { DropdownMenuScroll } from "@/components/ui/dropdown-menu-scroll";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +27,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 import {
   ESTABLISHMENT_TYPES,
@@ -82,6 +86,60 @@ const DROPDOWN_PAGE_SIZE = 80;
  * Formata tempo relativo em pt-BR sem Intl.RelativeTimeFormat
  * (compatibilidade com iOS < 14).
  */
+type DropdownPanelPosition = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+};
+
+function useDropdownPanelPosition(
+  anchorRef: React.RefObject<HTMLDivElement | null>,
+  open: boolean,
+  minWidth = 168,
+) {
+  const [position, setPosition] = useState<DropdownPanelPosition | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) {
+      setPosition(null);
+      return;
+    }
+
+    const update = () => {
+      const anchor = anchorRef.current;
+      if (!anchor) return;
+
+      const rect = anchor.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const width = Math.min(
+        Math.max(rect.width, minWidth),
+        viewportWidth - 16,
+      );
+      const left = Math.min(
+        Math.max(8, rect.left),
+        viewportWidth - width - 8,
+      );
+      const top = rect.bottom + 4;
+      const spaceBelow = viewportHeight - top - 8;
+      const maxHeight = Math.min(208, Math.max(120, spaceBelow));
+
+      setPosition({ top, left, width, maxHeight });
+    };
+
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [anchorRef, open, minWidth]);
+
+  return position;
+}
+
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
   const diffSecs = Math.floor(diffMs / 1000);
@@ -157,7 +215,7 @@ export function ChecklistCatalog({
   const [isSearchingEstablishments, setIsSearchingEstablishments] = useState(false);
   const [establishmentSearchError, setEstablishmentSearchError] = useState("");
   const [dropdownLoadError, setDropdownLoadError] = useState("");
-  const [isEstablishmentInputFocused, setIsEstablishmentInputFocused] = useState(false);
+  const [isEstablishmentSearchOpen, setIsEstablishmentSearchOpen] = useState(false);
   const [alphabeticalDropdownOptions, setAlphabeticalDropdownOptions] = useState<
     EstablishmentPickerOption[]
   >([]);
@@ -176,8 +234,14 @@ export function ChecklistCatalog({
       ? "system"
       : null;
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<EstablishmentType | null>(null);
-  const [ufFilter, setUfFilter] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<EstablishmentType[]>([]);
+  const [typeFilterDropdownOpen, setTypeFilterDropdownOpen] = useState(false);
+  const typeFilterDropdownRef = useRef<HTMLDivElement>(null);
+  const typeFilterPanelRef = useRef<HTMLDivElement>(null);
+  const [ufFilter, setUfFilter] = useState<string[]>([]);
+  const [ufFilterDropdownOpen, setUfFilterDropdownOpen] = useState(false);
+  const ufFilterDropdownRef = useRef<HTMLDivElement>(null);
+  const ufFilterPanelRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     focusTemplateId ? { [focusTemplateId]: true } : {},
   );
@@ -194,6 +258,7 @@ export function ChecklistCatalog({
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
   const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
   const areaDropdownRef = useRef<HTMLDivElement>(null);
+
   const [batchError, setBatchError] = useState<string | null>(null);
 
   /* Ref para o form de personalizar template — usado para submit programático */
@@ -223,12 +288,14 @@ export function ChecklistCatalog({
       );
     }
 
-    if (typeFilter) {
-      result = result.filter((t) => t.applies_to.includes(typeFilter));
+    if (typeFilter.length > 0) {
+      result = result.filter((t) =>
+        typeFilter.some((type) => t.applies_to.includes(type)),
+      );
     }
 
-    if (ufFilter) {
-      result = result.filter((t) => t.uf === "*" || t.uf === ufFilter);
+    if (ufFilter.length > 0) {
+      result = result.filter((t) => t.uf === "*" || ufFilter.includes(t.uf));
     }
 
     return result;
@@ -281,7 +348,31 @@ export function ChecklistCatalog({
 
   const step1Done = Boolean(establishmentId);
   const step2Done = Boolean(selectedTemplateId || selectedWorkspaceTemplateId);
-  const hasActiveFilters = Boolean(search || typeFilter || ufFilter);
+  const hasActiveFilters = Boolean(
+    search || typeFilter.length > 0 || ufFilter.length > 0,
+  );
+
+  const typeFilterLabel = useMemo(() => {
+    if (typeFilter.length === 0) return "Todos os tipos";
+    return typeFilter.map((type) => establishmentTypeLabel[type]).join(", ");
+  }, [typeFilter]);
+
+  const ufFilterLabel = useMemo(() => {
+    if (ufFilter.length === 0) return "Todas as UFs";
+    if (ufFilter.length === 1) return ufFilter[0]!;
+    return `${ufFilter.length} UFs selecionadas`;
+  }, [ufFilter]);
+
+  const typeFilterPanelPosition = useDropdownPanelPosition(
+    typeFilterDropdownRef,
+    typeFilterDropdownOpen,
+    220,
+  );
+  const ufFilterPanelPosition = useDropdownPanelPosition(
+    ufFilterDropdownRef,
+    ufFilterDropdownOpen,
+    136,
+  );
 
   /* ── efeito de scroll ── */
   useLayoutEffect(() => {
@@ -347,6 +438,40 @@ export function ChecklistCatalog({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [areaDropdownOpen]);
 
+  // Fechar dropdown de tipos ao clicar fora (inclui painel em portal)
+  useEffect(() => {
+    if (!typeFilterDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        typeFilterDropdownRef.current?.contains(target) ||
+        typeFilterPanelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setTypeFilterDropdownOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [typeFilterDropdownOpen]);
+
+  // Fechar dropdown de UF ao clicar fora (inclui painel em portal)
+  useEffect(() => {
+    if (!ufFilterDropdownOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        ufFilterDropdownRef.current?.contains(target) ||
+        ufFilterPanelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setUfFilterDropdownOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [ufFilterDropdownOpen]);
+
   useEffect(() => {
     const query = establishmentSearchTerm.trim();
     const showingSelectedLabel =
@@ -408,8 +533,22 @@ export function ChecklistCatalog({
 
   function clearFilters() {
     setSearch("");
-    setTypeFilter(null);
-    setUfFilter(null);
+    setTypeFilter([]);
+    setUfFilter([]);
+    setTypeFilterDropdownOpen(false);
+    setUfFilterDropdownOpen(false);
+  }
+
+  function toggleTypeFilter(type: EstablishmentType) {
+    setTypeFilter((prev) =>
+      prev.includes(type) ? prev.filter((row) => row !== type) : [...prev, type],
+    );
+  }
+
+  function toggleUfFilter(uf: string) {
+    setUfFilter((prev) =>
+      prev.includes(uf) ? prev.filter((row) => row !== uf) : [...prev, uf],
+    );
   }
 
   function upsertRecent(option: EstablishmentPickerOption) {
@@ -419,12 +558,40 @@ export function ChecklistCatalog({
     });
   }
 
+  function closeEstablishmentSearch() {
+    setIsEstablishmentSearchOpen(false);
+    if (selectedEstablishment) {
+      setEstablishmentSearchTerm(selectedEstablishment.label);
+    } else {
+      setEstablishmentSearchTerm("");
+      setSearchResults([]);
+    }
+    setEstablishmentSearchError("");
+  }
+
+  function openEstablishmentSearch() {
+    setIsEstablishmentSearchOpen(true);
+    if (selectedEstablishment) {
+      setEstablishmentSearchTerm("");
+    }
+    setEstablishmentSearchError("");
+    setSearchResults([]);
+  }
+
   function selectEstablishment(option: EstablishmentPickerOption) {
     setEstablishmentId(option.id);
     setSelectedEstablishment(option);
     setEstablishmentSearchTerm(option.label);
     setEstablishmentSearchError("");
     setSearchResults([]);
+    setIsEstablishmentSearchOpen(false);
+    setAlphabeticalDropdownOptions((prev) => {
+      const map = new Map(prev.map((row) => [row.id, row]));
+      map.set(option.id, option);
+      return Array.from(map.values()).sort((a, b) =>
+        a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }),
+      );
+    });
   }
 
   async function loadDropdownOptions(reset = false) {
@@ -502,7 +669,7 @@ export function ChecklistCatalog({
           items,
         });
       }
-      router.push(`/checklists/preencher/${result.firstSessionId}`);
+      pushWithLoading(router, `/checklists/preencher/${result.firstSessionId}`);
     } else {
       setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
     }
@@ -596,7 +763,7 @@ export function ChecklistCatalog({
             : "border-border bg-card shadow-sm",
         )}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <div
             className={cn(
               "flex size-8 shrink-0 items-center justify-center rounded-full font-bold text-sm transition-all",
@@ -607,7 +774,7 @@ export function ChecklistCatalog({
           >
             {step1Done ? <CheckCircle2 className="size-4" /> : "1"}
           </div>
-          <div className="flex-1 space-y-2.5">
+          <div className="min-w-0 flex-1 space-y-2.5">
             <div>
               <p className="text-sm font-semibold text-foreground">
                 Selecione o estabelecimento
@@ -616,57 +783,171 @@ export function ChecklistCatalog({
                 Necessário para filtrar templates aplicáveis e iniciar o preenchimento
               </p>
             </div>
-            <div className="w-full max-w-md">
-              <div className="relative">
-                <input
-                  id="checklist-establishment-search"
-                  type="search"
-                  autoComplete="off"
-                  className={cn(
-                    "h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none",
-                    "border-input bg-background text-foreground placeholder:text-muted-foreground",
-                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
-                    !step1Done && "border-primary/40",
-                  )}
-                  placeholder="Digite nome do estabelecimento ou cliente…"
-                  value={establishmentSearchTerm}
-                  onFocus={() => setIsEstablishmentInputFocused(true)}
-                  onBlur={() => {
-                    window.setTimeout(() => setIsEstablishmentInputFocused(false), 120);
-                  }}
+            <div className="w-full min-w-0 max-w-xl">
+              <div className="flex w-full min-w-0 items-center gap-2">
+                <select
+                  value={establishmentId}
                   onChange={(e) => {
-                    const next = e.target.value;
-                    setEstablishmentSearchTerm(next);
-                    setEstablishmentSearchError("");
-                    if (
-                      selectedEstablishment &&
-                      next.trim() !== selectedEstablishment.label
-                    ) {
+                    const nextId = e.target.value;
+                    if (!nextId) {
                       setEstablishmentId("");
                       setSelectedEstablishment(null);
+                      setEstablishmentSearchTerm("");
+                      return;
+                    }
+                    const option = establishmentDropdownOptions.find((row) => row.id === nextId);
+                    if (option) {
+                      selectEstablishment(option);
                     }
                   }}
-                  aria-label="Pesquisar estabelecimento para filtrar checklists"
-                />
-                {isEstablishmentInputFocused ? (
-                  <div className="border-border bg-background absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-lg border shadow-md">
-                    <div className="max-h-80 overflow-y-auto py-2">
-                      {recentOptions.length > 0 && (
-                        <div className="space-y-1 px-2 pb-2">
-                          <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Últimos abertos
+                  className={cn(
+                    "h-9 min-w-0 flex-1 rounded-lg border px-2.5 text-sm shadow-xs outline-none",
+                    "border-input bg-background text-foreground",
+                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
+                    !step1Done && "border-primary/40",
+                    touchMinHeight,
+                  )}
+                  aria-label="Selecionar estabelecimento"
+                >
+                  <option value="">Selecionar</option>
+                  {establishmentDropdownOptions.map((option) => (
+                    <option key={`dropdown-${option.id}`} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="size-9 shrink-0"
+                  onClick={openEstablishmentSearch}
+                  aria-label="Pesquisar estabelecimento"
+                  aria-expanded={isEstablishmentSearchOpen}
+                >
+                  <Search className="size-4" />
+                </Button>
+              </div>
+
+              <Dialog
+                open={isEstablishmentSearchOpen}
+                onOpenChange={(open) => {
+                  if (open) openEstablishmentSearch();
+                  else closeEstablishmentSearch();
+                }}
+              >
+                <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-md">
+                  <DialogHeader className="border-border border-b px-4 py-4">
+                    <DialogTitle>Buscar estabelecimento</DialogTitle>
+                    <DialogDescription>
+                      Digite o nome do estabelecimento ou do cliente para localizar na lista.
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="px-4 py-3">
+                    <div className="relative">
+                      <Search
+                        className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                        aria-hidden
+                      />
+                      <Input
+                        id="checklist-establishment-search"
+                        type="search"
+                        autoComplete="off"
+                        autoFocus
+                        placeholder="Nome do estabelecimento ou cliente…"
+                        value={establishmentSearchTerm}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setEstablishmentSearchTerm(next);
+                          setEstablishmentSearchError("");
+                          if (
+                            selectedEstablishment &&
+                            next.trim() !== selectedEstablishment.label
+                          ) {
+                            setEstablishmentId("");
+                            setSelectedEstablishment(null);
+                          }
+                        }}
+                        className="pl-9"
+                        aria-label="Pesquisar estabelecimento para filtrar checklists"
+                      />
+                    </div>
+                  </div>
+
+                  <DropdownMenuScroll className="border-border max-h-72 border-t px-2 py-2">
+                    {recentOptions.length > 0 && establishmentSearchTerm.trim().length === 0 && (
+                      <div className="space-y-1 px-1 pb-2">
+                        <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Últimos abertos
+                        </p>
+                        {recentOptions.map((option) => {
+                          const active = option.id === establishmentId;
+                          return (
+                            <button
+                              key={`recent-${option.id}`}
+                              type="button"
+                              className={cn(
+                                "hover:bg-muted/70 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
+                                active && "bg-primary/10",
+                                touchMinHeight,
+                              )}
+                              onClick={() => selectEstablishment(option)}
+                            >
+                              <span
+                                className={cn(
+                                  "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border",
+                                  active
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border",
+                                )}
+                              >
+                                {active ? <Check className="size-3" /> : null}
+                              </span>
+                              <span className="min-w-0 truncate">{option.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {establishmentSearchTerm.trim().length > 0 &&
+                      establishmentSearchTerm.trim().length < 3 && (
+                        <p className="px-3 py-2 text-xs text-muted-foreground">
+                          Digite ao menos 3 caracteres para pesquisar.
+                        </p>
+                      )}
+                    {establishmentSearchError ? (
+                      <p className="px-3 py-2 text-xs text-destructive" role="alert">
+                        {establishmentSearchError}
+                      </p>
+                    ) : null}
+
+                    {establishmentSearchTerm.trim().length >= 3 && (
+                      <div className="space-y-1 px-1">
+                        {isSearchingEstablishments ? (
+                          <p className="flex items-center gap-2 px-2 py-2 text-xs text-muted-foreground">
+                            <Loader2 className="size-3.5 animate-spin" />
+                            Pesquisando…
                           </p>
-                          {recentOptions.map((option) => {
+                        ) : searchResults.length === 0 ? (
+                          <p className="px-2 py-2 text-xs text-muted-foreground">
+                            Nenhum estabelecimento encontrado.
+                          </p>
+                        ) : (
+                          searchResults.map((option) => {
                             const active = option.id === establishmentId;
                             return (
                               <button
-                                key={`recent-${option.id}`}
+                                key={`search-${option.id}`}
                                 type="button"
                                 className={cn(
                                   "hover:bg-muted/70 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
                                   active && "bg-primary/10",
+                                  touchMinHeight,
                                 )}
-                                onMouseDown={() => selectEstablishment(option)}
+                                onClick={() => selectEstablishment(option)}
                               >
                                 <span
                                   className={cn(
@@ -681,100 +962,15 @@ export function ChecklistCatalog({
                                 <span className="min-w-0 truncate">{option.label}</span>
                               </button>
                             );
-                          })}
-                        </div>
-                      )}
-
-                      {establishmentSearchTerm.trim().length > 0 &&
-                        establishmentSearchTerm.trim().length < 3 && (
-                          <p className="px-4 py-2 text-xs text-muted-foreground">
-                            Digite ao menos 3 caracteres para pesquisar.
-                          </p>
+                          })
                         )}
-                      {establishmentSearchError ? (
-                        <p className="px-4 py-2 text-xs text-destructive" role="alert">
-                          {establishmentSearchError}
-                        </p>
-                      ) : null}
-
-                      {establishmentSearchTerm.trim().length >= 3 && (
-                        <div className="space-y-1 px-2">
-                          <p className="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                            Resultados
-                          </p>
-                          {isSearchingEstablishments ? (
-                            <p className="px-2 py-2 text-xs text-muted-foreground">
-                              Pesquisando…
-                            </p>
-                          ) : searchResults.length === 0 ? (
-                            <p className="px-2 py-2 text-xs text-muted-foreground">
-                              Nenhum estabelecimento encontrado.
-                            </p>
-                          ) : (
-                            searchResults.map((option) => {
-                              const active = option.id === establishmentId;
-                              return (
-                                <button
-                                  key={`search-${option.id}`}
-                                  type="button"
-                                  className={cn(
-                                    "hover:bg-muted/70 flex w-full items-start gap-2 rounded-md px-2 py-2 text-left text-sm transition-colors",
-                                    active && "bg-primary/10",
-                                  )}
-                                  onMouseDown={() => selectEstablishment(option)}
-                                >
-                                  <span
-                                    className={cn(
-                                      "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-sm border",
-                                      active
-                                        ? "border-primary bg-primary text-primary-foreground"
-                                        : "border-border",
-                                    )}
-                                  >
-                                    {active ? <Check className="size-3" /> : null}
-                                  </span>
-                                  <span className="min-w-0 truncate">{option.label}</span>
-                                </button>
-                              );
-                            })
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-              <select
-                value={establishmentId}
-                onChange={(e) => {
-                  const nextId = e.target.value;
-                  if (!nextId) {
-                    setEstablishmentId("");
-                    setSelectedEstablishment(null);
-                    setEstablishmentSearchTerm("");
-                    return;
-                  }
-                  const option = establishmentDropdownOptions.find((row) => row.id === nextId);
-                  if (option) {
-                    selectEstablishment(option);
-                  }
-                }}
-                className={cn(
-                  "mt-2 h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none",
-                  "border-input bg-background text-foreground",
-                  "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
-                )}
-                aria-label="Selecionar estabelecimento"
-              >
-                <option value="">Selecione um estabelecimento</option>
-                {establishmentDropdownOptions.map((option) => (
-                  <option key={`dropdown-${option.id}`} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="text-[11px] text-muted-foreground">
+                      </div>
+                    )}
+                  </DropdownMenuScroll>
+                </DialogContent>
+              </Dialog>
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <p className="min-w-0 text-[11px] text-muted-foreground">
                   {isLoadingDropdownOptions
                     ? "Carregando empresas..."
                     : `${alphabeticalDropdownOptions.length} de ${dropdownTotal || alphabeticalDropdownOptions.length} empresas carregadas (A-Z)`}
@@ -807,27 +1003,40 @@ export function ChecklistCatalog({
       </div>
 
       {/* ─── Etapa 2: Catálogo de templates ──────────────────────────────── */}
-      <div className="space-y-4">
-        {/* Cabeçalho da seção */}
-        <div className="flex items-center gap-2">
+      <div
+        className={cn(
+          "rounded-xl border p-4 transition-all duration-200",
+          step2Done
+            ? "border-primary/30 bg-primary/5"
+            : "border-border bg-card shadow-sm",
+        )}
+      >
+        <div className="flex min-w-0 items-start gap-3">
           <div
             className={cn(
-              "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+              "flex size-8 shrink-0 items-center justify-center rounded-full font-bold text-sm transition-all",
               step2Done
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground",
             )}
           >
-            {step2Done ? <CheckCircle2 className="size-3.5" /> : "2"}
+            {step2Done ? <CheckCircle2 className="size-4" /> : "2"}
           </div>
-          <p className="text-sm font-semibold text-foreground">
-            Escolha um template de checklist
-          </p>
-          <span className="ml-auto text-xs text-muted-foreground">
-            {filteredTemplates.length + workspaceTemplates.length} template
-            {filteredTemplates.length + workspaceTemplates.length !== 1 ? "s" : ""}
-          </span>
-        </div>
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Escolha um template de checklist
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Selecione um modelo regulatório ou da equipe para iniciar o preenchimento
+                </p>
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {filteredTemplates.length + workspaceTemplates.length} template
+                {filteredTemplates.length + workspaceTemplates.length !== 1 ? "s" : ""}
+              </span>
+            </div>
 
         {/* Busca e filtros */}
         <div className="space-y-3">
@@ -862,68 +1071,248 @@ export function ChecklistCatalog({
             )}
           </div>
 
-          {/* Chips de filtro */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-muted-foreground">Tipo:</span>
-            {ESTABLISHMENT_TYPES.map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setTypeFilter((prev) => (prev === type ? null : type))}
-                className={cn(
-                  "rounded-full border px-3 py-2 text-xs font-medium transition-all touch-manipulation",
-                  touchMinHeight,
-                  typeFilter === type
-                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                )}
-              >
-                {establishmentTypeLabel[type]}
-              </button>
-            ))}
+          {/* Filtros */}
+          <div className="min-w-0 space-y-2">
+            <div className="grid min-w-0 grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)] gap-3">
+              <div className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">Tipo</span>
+                <div ref={typeFilterDropdownRef} className="relative min-w-0 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUfFilterDropdownOpen(false);
+                      setTypeFilterDropdownOpen((open) => !open);
+                    }}
+                    className={cn(
+                      "flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-sm shadow-xs outline-none transition-colors touch-manipulation sm:px-3",
+                      "bg-background text-foreground",
+                      "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
+                      touchMinHeight,
+                      typeFilterDropdownOpen || typeFilter.length > 0
+                        ? "border-primary ring-1 ring-primary/30"
+                        : "border-input",
+                    )}
+                    aria-haspopup="listbox"
+                    aria-expanded={typeFilterDropdownOpen}
+                    aria-label="Filtrar por tipo de estabelecimento"
+                  >
+                    <span
+                      className={cn(
+                        "truncate text-left",
+                        typeFilter.length === 0 && "text-muted-foreground",
+                      )}
+                    >
+                      {typeFilterLabel}
+                    </span>
+                    <ChevronDown
+                      className={cn(
+                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        typeFilterDropdownOpen && "rotate-180",
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                </div>
+              </div>
 
-            {ufOptions.length > 0 && (
-              <>
-                <span className="text-xs font-medium text-muted-foreground">UF:</span>
-                <select
-                  value={ufFilter ?? ""}
-                  onChange={(e) => setUfFilter(e.target.value || null)}
-                  className={cn(
-                    "min-h-8 rounded-full border px-3 py-2 text-xs shadow-xs outline-none touch-manipulation",
-                    "bg-background focus-visible:ring-ring focus-visible:ring-2",
-                    touchMinHeight,
-                    ufFilter
-                      ? "border-primary text-primary font-medium"
-                      : "border-border text-muted-foreground",
-                  )}
-                  aria-label="Filtrar por UF"
-                >
-                  <option value="">Todas as UFs</option>
-                  {ufOptions.map((uf) => (
-                    <option key={uf} value={uf}>
-                      {uf}
-                    </option>
-                  ))}
-                </select>
-              </>
-            )}
+              {ufOptions.length > 0 ? (
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="text-xs font-medium text-muted-foreground">UF</span>
+                  <div ref={ufFilterDropdownRef} className="relative min-w-0 w-full max-w-[9.5rem]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTypeFilterDropdownOpen(false);
+                        setUfFilterDropdownOpen((open) => !open);
+                      }}
+                      className={cn(
+                        "flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-md border px-2 py-1.5 text-sm shadow-xs outline-none transition-colors touch-manipulation",
+                        "bg-background text-foreground",
+                        "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
+                        touchMinHeight,
+                        ufFilterDropdownOpen || ufFilter.length > 0
+                          ? "border-primary ring-1 ring-primary/30"
+                          : "border-input",
+                      )}
+                      aria-haspopup="listbox"
+                      aria-expanded={ufFilterDropdownOpen}
+                      aria-label="Filtrar por UF"
+                    >
+                      <span
+                        className={cn(
+                          "truncate text-left",
+                          ufFilter.length === 0 && "text-muted-foreground",
+                        )}
+                      >
+                        {ufFilterLabel}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 shrink-0 text-muted-foreground transition-transform",
+                          ufFilterDropdownOpen && "rotate-180",
+                        )}
+                        aria-hidden
+                      />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div aria-hidden />
+              )}
+            </div>
 
-            {hasActiveFilters && (
+            {typeFilterDropdownOpen && typeFilterPanelPosition
+              ? createPortal(
+                  <div
+                    ref={typeFilterPanelRef}
+                    className="border-border bg-popover text-popover-foreground fixed z-[120] overflow-hidden rounded-md border p-1 shadow-lg"
+                    style={{
+                      top: typeFilterPanelPosition.top,
+                      left: typeFilterPanelPosition.left,
+                      width: typeFilterPanelPosition.width,
+                    }}
+                    role="listbox"
+                    aria-multiselectable="true"
+                    aria-label="Tipos de estabelecimento"
+                  >
+                    <DropdownMenuScroll
+                      className="py-1 pr-0.5"
+                      style={{ maxHeight: typeFilterPanelPosition.maxHeight }}
+                    >
+                      {ESTABLISHMENT_TYPES.map((type) => {
+                        const picked = typeFilter.includes(type);
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            role="option"
+                            aria-selected={picked}
+                            onClick={() => toggleTypeFilter(type)}
+                            className={cn(
+                              "hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-sm transition-colors",
+                              picked && "bg-primary/5",
+                              touchMinHeight,
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex size-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                                picked
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border",
+                              )}
+                            >
+                              {picked ? <Check className="size-3" aria-hidden /> : null}
+                            </span>
+                            <span className={cn("truncate text-left", picked && "font-medium")}>
+                              {establishmentTypeLabel[type]}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </DropdownMenuScroll>
+                    <div className="border-border border-t px-3 py-1.5">
+                      <p className="text-[11px] text-muted-foreground">
+                        {typeFilter.length === 0
+                          ? "Nenhum filtro de tipo aplicado"
+                          : `${typeFilter.length} tipo${typeFilter.length !== 1 ? "s" : ""} selecionado${typeFilter.length !== 1 ? "s" : ""}`}
+                      </p>
+                    </div>
+                  </div>,
+                  document.body,
+                )
+              : null}
+
+            {ufFilterDropdownOpen && ufFilterPanelPosition
+              ? createPortal(
+                  <div
+                    ref={ufFilterPanelRef}
+                    className="border-border bg-popover text-popover-foreground fixed z-[120] overflow-hidden rounded-md border p-1 shadow-lg"
+                    style={{
+                      top: ufFilterPanelPosition.top,
+                      left: ufFilterPanelPosition.left,
+                      width: ufFilterPanelPosition.width,
+                    }}
+                    role="listbox"
+                    aria-multiselectable="true"
+                    aria-label="UFs"
+                  >
+                    <DropdownMenuScroll
+                      className="py-1 pr-0.5"
+                      style={{ maxHeight: ufFilterPanelPosition.maxHeight }}
+                    >
+                      {ufOptions.map((uf) => {
+                        const picked = ufFilter.includes(uf);
+                        return (
+                          <button
+                            key={uf}
+                            type="button"
+                            role="option"
+                            aria-selected={picked}
+                            onClick={() => toggleUfFilter(uf)}
+                            className={cn(
+                              "hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-sm transition-colors",
+                              picked && "bg-primary/5",
+                              touchMinHeight,
+                            )}
+                          >
+                            <span
+                              className={cn(
+                                "flex size-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                                picked
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border",
+                              )}
+                            >
+                              {picked ? <Check className="size-3" aria-hidden /> : null}
+                            </span>
+                            <span className={cn("truncate text-left", picked && "font-medium")}>
+                              {uf}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </DropdownMenuScroll>
+                    <div className="border-border border-t px-3 py-1.5">
+                      <p className="text-[11px] text-muted-foreground">
+                        {ufFilter.length === 0
+                          ? "Nenhum filtro de UF aplicado"
+                          : `${ufFilter.length} UF${ufFilter.length !== 1 ? "s" : ""} selecionada${ufFilter.length !== 1 ? "s" : ""}`}
+                      </p>
+                    </div>
+                  </div>,
+                  document.body,
+                )
+              : null}
+
+            {hasActiveFilters ? (
               <button
                 type="button"
                 onClick={clearFilters}
                 className={cn(
-                  "flex min-h-10 items-center gap-1 rounded-md px-1 text-xs text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
-                  "max-lg:min-h-11 [@media(pointer:coarse)]:min-h-11",
+                  "flex items-center gap-1 rounded-md px-1 text-xs text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
+                  touchMinHeight,
                 )}
               >
                 <X className="size-3" />
                 Limpar filtros
               </button>
-            )}
+            ) : null}
           </div>
         </div>
 
+            {step2Done && (
+              <p className="text-xs font-medium text-primary flex items-center gap-1">
+                <ListChecks className="size-3 shrink-0" />
+                Template selecionado: {selectedTemplateLabel}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Lista de templates (separada do bloco de escolha) */}
+      <div className="space-y-4">
         {/* Modelos da equipe (workspace) */}
         {workspaceTemplates.length > 0 ? (
           <div className="space-y-2">
@@ -1278,7 +1667,7 @@ export function ChecklistCatalog({
                       aria-multiselectable="true"
                       aria-label="Áreas do estabelecimento"
                     >
-                      <div className="max-h-52 overflow-y-auto py-1">
+                      <DropdownMenuScroll className="max-h-52 py-1 pr-0.5">
                         {availableAreas.map((area) => {
                           const picked = selectedAreaIds.includes(area.id);
                           return (
@@ -1315,7 +1704,7 @@ export function ChecklistCatalog({
                             </button>
                           );
                         })}
-                      </div>
+                      </DropdownMenuScroll>
                       {/* Rodapé informativo */}
                       <div className="border-t border-border px-3 py-1.5">
                         {selectedAreaIds.length === 0 ? (
@@ -1482,7 +1871,7 @@ export function ChecklistCatalog({
                 setConflictSession(null);
                 setPendingTemplateId(null);
                 void registerEstablishmentOpen();
-                router.push(`/checklists/preencher/${sessionId}`);
+                pushWithLoading(router, `/checklists/preencher/${sessionId}`);
               }}
             >
               <ArrowRight className="size-4 shrink-0" aria-hidden />

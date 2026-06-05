@@ -7,6 +7,8 @@ import { ChevronDownIcon, ChevronUpIcon, CheckIcon } from "lucide-react";
 import { touchMinHeight } from "@/lib/touch-targets"
 import { cn } from "@/lib/utils";
 
+import scrollStyles from "./dropdown-menu-scroll.module.css";
+
 function Select(props: SelectPrimitive.Root.Props<string>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
@@ -22,7 +24,7 @@ function SelectTrigger({
       id={id}
       data-slot="select-trigger"
       className={cn(
-        `border-input bg-background text-foreground placeholder:text-muted-foreground flex h-9 w-full touch-manipulation items-center justify-between rounded-md border px-3 py-1.5 text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${touchMinHeight}`,
+        `border-input bg-background text-foreground placeholder:text-muted-foreground flex h-9 w-full touch-manipulation items-center justify-between rounded-md border px-3 py-1.5 text-base md:text-sm shadow-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${touchMinHeight}`,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
         className,
       )}
@@ -68,7 +70,11 @@ function SelectContent({
           <SelectPrimitive.ScrollUpArrow className="flex justify-center py-1">
             <ChevronUpIcon className="h-4 w-4" />
           </SelectPrimitive.ScrollUpArrow>
-          <SelectPrimitive.List>{children}</SelectPrimitive.List>
+          <SelectPrimitive.List
+            className={cn(scrollStyles.scroll, "max-h-60 py-0.5 pr-0.5")}
+          >
+            {children}
+          </SelectPrimitive.List>
           <SelectPrimitive.ScrollDownArrow className="flex justify-center py-1">
             <ChevronDownIcon className="h-4 w-4" />
           </SelectPrimitive.ScrollDownArrow>

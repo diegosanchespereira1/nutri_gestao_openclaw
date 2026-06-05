@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 
 import { TableRow } from "@/components/ui/table";
+import { pushWithLoading } from "@/lib/navigation-pending";
 import { cn } from "@/lib/utils";
 
 export function ClickableTableRow({
@@ -14,7 +15,7 @@ export function ClickableTableRow({
   const router = useRouter();
   return (
     <TableRow
-      onClick={() => router.push(href)}
+      onClick={() => pushWithLoading(router, href)}
       className={cn("cursor-pointer", className)}
       {...props}
     >

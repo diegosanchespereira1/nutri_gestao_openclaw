@@ -10,6 +10,7 @@ import { navigateAfterAuth } from "@/lib/app-build-navigate";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { mapSupabaseLoginError } from "@/lib/map-supabase-auth-error";
 import { createClient } from "@/lib/supabase/client";
+import { generateUUID } from "@/lib/utils/uuid";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +37,7 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
-  const [requestId] = useState(() => crypto.randomUUID());
+  const [requestId] = useState(() => generateUUID());
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

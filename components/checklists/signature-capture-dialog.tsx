@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Eraser, Pen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -192,15 +192,16 @@ export function SignatureCaptureDialog({
   const [clientSignerName, setClientSignerName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) {
+  function handleOpenChange(nextOpen: boolean) {
+    if (!nextOpen) {
       setStep("professional");
       setProfessionalDataUrl(null);
       setClientDataUrl(null);
       setClientSignerName("");
       setError(null);
     }
-  }, [open]);
+    onOpenChange(nextOpen);
+  }
 
   const handleNext = () => {
     setError(null);
@@ -239,7 +240,7 @@ export function SignatureCaptureDialog({
   const isProfessional = step === "professional";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent showCloseButton className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
@@ -344,7 +345,7 @@ export function SignatureCaptureDialog({
             type="button"
             variant="ghost"
             size="sm"
-            onClick={isProfessional ? () => onOpenChange(false) : () => { setError(null); setStep("professional"); setClientDataUrl(null); }}
+            onClick={isProfessional ? () => handleOpenChange(false) : () => { setError(null); setStep("professional"); setClientDataUrl(null); }}
           >
             {isProfessional ? "Cancelar" : "← Voltar"}
           </Button>

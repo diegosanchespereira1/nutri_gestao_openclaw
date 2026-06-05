@@ -213,7 +213,10 @@ export function ChecklistPdfSettingsForm({
     if (!state) return;
     const message = state.ok ? "Configurações salvas com sucesso." : state.error;
     const tone: "success" | "error" = state.ok ? "success" : "error";
-    setToast({ id: Date.now(), message, tone, visible: true });
+    const id = window.setTimeout(() => {
+      setToast({ id: Date.now(), message, tone, visible: true });
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [state]);
 
   useEffect(() => {

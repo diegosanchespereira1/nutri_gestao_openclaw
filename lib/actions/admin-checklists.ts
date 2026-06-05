@@ -1,7 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
+
+function revalidateGlobalChecklistCatalog() {
+  updateTag("checklist-catalog");
+}
 import { createClient } from "@/lib/supabase/server";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
@@ -172,6 +176,7 @@ export async function updateChecklistTemplateMetaAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=meta_saved`);
 }
 
@@ -206,6 +211,7 @@ export async function addChecklistSectionAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=section_added`);
 }
 
@@ -232,6 +238,7 @@ export async function updateChecklistSectionAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=section_saved`);
 }
 
@@ -261,6 +268,7 @@ export async function deleteChecklistSectionAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=section_deleted`);
 }
 
@@ -306,6 +314,7 @@ export async function addChecklistItemAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=item_added`);
 }
 
@@ -334,6 +343,7 @@ export async function updateChecklistItemAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=item_saved`);
 }
 
@@ -362,6 +372,7 @@ export async function undoChecklistItemAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=item_saved`);
 }
 
@@ -385,6 +396,7 @@ export async function deleteChecklistItemAction(
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   redirect(`/admin/checklists/${templateId}/editar?ok=item_deleted`);
 }
 
@@ -416,6 +428,7 @@ export async function addSectionQuickAction(payload: {
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   return { ok: true };
 }
 
@@ -442,6 +455,7 @@ export async function deleteSectionQuickAction(payload: {
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   return { ok: true };
 }
 
@@ -482,6 +496,7 @@ export async function addItemQuickAction(payload: {
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   return { ok: true };
 }
 
@@ -502,6 +517,7 @@ export async function deleteItemQuickAction(payload: {
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
   return { ok: true };
 }
 
@@ -558,6 +574,7 @@ export async function saveChecklistDraftAction(payload: {
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
+  revalidateGlobalChecklistCatalog();
 
   return { ok: true };
 }

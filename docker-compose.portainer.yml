@@ -28,9 +28,13 @@ services:
     image: ${NUTRICAO_IMAGE:-stratostech/nutricao-stratostech:latest}
     environment:
       NODE_ENV: production
+      # Repetir no Portainer (SSR/middleware); se omitir URL, o build Docker ainda
+      # funciona via fallback embutido — mas defina sempre para evitar surpresas.
+      SUPABASE_URL: ${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL:-}}
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://nutricao.stratostech.com.br}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}

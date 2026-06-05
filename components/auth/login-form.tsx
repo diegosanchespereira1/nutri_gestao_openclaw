@@ -100,8 +100,10 @@ export function LoginForm() {
       step: "mfa",
       outcome: "attempt",
     });
-    const { data: factors, error: listErr } =
-      await supabase.auth.mfa.listFactors();
+    const { data: factors, error: listErr } = await withAuthTimeout(
+      supabase.auth.mfa.listFactors(),
+      "mfa_list_factors",
+    );
     if (listErr) {
       await logAuthTroubleshootingEvent({
         event: "mfa_factor_list_failed",
@@ -126,9 +128,12 @@ export function LoginForm() {
       setError("2FA ativo mas fator TOTP não encontrado. Contacte suporte.");
       return false;
     }
-    const { data: ch, error: chErr } = await supabase.auth.mfa.challenge({
-      factorId: totp.id,
-    });
+    const { data: ch, error: chErr } = await withAuthTimeout(
+      supabase.auth.mfa.challenge({
+        factorId: totp.id,
+      }),
+      "mfa_challenge",
+    );
     if (chErr || !ch?.id) {
       await logAuthTroubleshootingEvent({
         event: "mfa_challenge_failed",

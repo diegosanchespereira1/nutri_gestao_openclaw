@@ -1,1 +1,5 @@
 CAPACITOR_DEBUG = true
+
+// Team Apple Developer — sobrescreva em Signing.local.xcconfig (ver .example)
+DEVELOPMENT_TEAM = 89775LG366
+#include? "Signing.local.xcconfig"

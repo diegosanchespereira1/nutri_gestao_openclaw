@@ -3,6 +3,8 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { PageLoadingScreen } from '@/components/ui/page-loading-screen';
+import { hideNativeSplashAndConfigureStatusBar } from '@/lib/mobile/native-status-bar';
+import { isNativeApp } from '@/lib/mobile/platform';
 
 function subscribeClient(onChange: () => void) {
   onChange();
@@ -23,10 +25,19 @@ export function AppLoadingScreen() {
 
   useEffect(() => {
     if (!isClient) return;
+
+    if (isNativeApp()) {
+      void hideNativeSplashAndConfigureStatusBar();
+    }
+
+    const showMs = isNativeApp() ? 450 : 1200;
+    const fadeMs = isNativeApp() ? 250 : 500;
+
     const timer = setTimeout(() => {
       setFading(true);
-      setTimeout(() => setVisible(false), 500);
-    }, 1200);
+      setTimeout(() => setVisible(false), fadeMs);
+    }, showMs);
+
     return () => clearTimeout(timer);
   }, [isClient]);
 

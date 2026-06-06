@@ -1,13 +1,13 @@
 -- =============================================================================
--- APAGA DADOS / SCHEMA DE APLICAÇÃO PARA IMPORTAR schema.sql + data.sql DE NOVO
+-- APAGA DADOS / SCHEMA DE APLICAÇÃO PARA IMPORTAR scripts/database/schema.sql + scripts/database/data.sql DE NOVO
 -- Homologação self-hosted Supabase — PostgreSQL 15.x
 --
 -- PERIGO: irreversível. Só correr na base que queres zerar (ex.: postgres homolog).
 -- Correr como superuser / postgres.
 --
 -- Ordem sugerida depois deste script:
---   1) schema.sql
---   2) data.sql  (com transaction_timeout comentado em PG15)
+--   1) scripts/database/schema.sql
+--   2) scripts/database/data.sql  (com transaction_timeout comentado em PG15)
 --
 -- ERRO 25P02 ("current transaction is aborted"):
 --   Abre um editor SQL novo OU corre primeiro:  ROLLBACK;
@@ -20,7 +20,7 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1) Schema da app (tudo em public some; estrutura volta com schema.sql)
+-- 1) Schema da app (tudo em public some; estrutura volta com scripts/database/schema.sql)
 -- -----------------------------------------------------------------------------
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;

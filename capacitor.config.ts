@@ -1,5 +1,9 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+/** Para testar no device físico com código local: CAPACITOR_SERVER_URL=http://192.168.x.x:3000 */
+const devServerUrl = process.env.CAPACITOR_SERVER_URL;
+const productionServerUrl = 'https://nutricao.stratostech.com.br';
+
 const config: CapacitorConfig = {
   // ID único do app — NÃO ALTERAR após publicar nas stores
   appId: 'br.com.nutrigestao.app',
@@ -8,25 +12,29 @@ const config: CapacitorConfig = {
   // O app mobile é um WebView que carrega o Next.js hospedado em produção.
   // Alterar a URL abaixo para o domínio real de produção antes do build final.
   webDir: 'public',
-  server: {
-    url: 'https://nutricao.stratostech.com.br',
-    cleartext: false,
-    androidScheme: 'https',
-    // Domínios que podem navegar dentro do WebView sem abrir o browser externo
-    allowNavigation: [
-      'nutricao.stratostech.com.br',
-    ],
-  },
+  server: devServerUrl
+    ? {
+        url: devServerUrl,
+        cleartext: devServerUrl.startsWith('http://'),
+        androidScheme: devServerUrl.startsWith('https') ? 'https' : 'http',
+      }
+    : {
+        url: productionServerUrl,
+        cleartext: false,
+        androidScheme: 'https',
+        allowNavigation: [new URL(productionServerUrl).hostname],
+      },
 
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2500,  // Tempo suficiente para o WebView carregar a página
+      launchShowDuration: 800,   // fallback curto — o JS esconde antes quando possível
       launchAutoHide: true,
       backgroundColor: '#F4F9F8', // mesma cor do loading web — transição suave
       androidSplashResourceName: 'splash',
       showSpinner: false,
       splashFullScreen: true,
-      splashImmersive: true,
+      // Immersive esconde a status bar e, ao terminar, restaura overlay + ícones brancos.
+      splashImmersive: false,
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
@@ -35,15 +43,17 @@ const config: CapacitorConfig = {
       saveToGallery: false,
     },
     StatusBar: {
-      style: 'Default',
-      backgroundColor: '#ffffff',
+      // LIGHT = ícones/texto escuros em fundo claro (Style.Light no plugin).
+      style: 'LIGHT',
+      backgroundColor: '#F4F9F8',
+      overlaysWebView: false,
     },
   },
 
   ios: {
     // Respeita safe areas (notch, Dynamic Island, barra inferior)
     contentInset: 'automatic',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F4F9F8',
     // Scheme usado no iOS WebView
     scheme: 'nutrigestao',
     // Permite scroll com inércia nativo
@@ -53,7 +63,7 @@ const config: CapacitorConfig = {
   },
 
   android: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F4F9F8',
     // Não permite conteúdo HTTP dentro do app HTTPS
     allowMixedContent: false,
     // Suporte a back button nativo

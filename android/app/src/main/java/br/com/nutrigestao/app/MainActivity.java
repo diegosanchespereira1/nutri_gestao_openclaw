@@ -10,15 +10,12 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.splashscreen.SplashScreen;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    // Capacitor 8 requer WebView (Chromium) versão 97+.
-    // Abaixo disso o app pode abrir em branco ou crashar silenciosamente.
     private static final int MIN_WEBVIEW_VERSION = 97;
-
-    // Package name do Android System WebView / Chrome (ambos fornecem o WebView)
     private static final String WEBVIEW_PACKAGE_SYSTEM = "com.google.android.webview";
     private static final String WEBVIEW_PACKAGE_CHROME  = "com.android.chrome";
 
@@ -26,17 +23,16 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         SplashScreen.installSplashScreen(this);
 
-        // Verificar versão do WebView ANTES de inicializar o Capacitor Bridge.
-        // Se o WebView estiver desatualizado, mostrar dialog e não abrir o app.
         if (!isWebViewVersionSufficient()) {
             showWebViewUpdateDialog();
-            return; // não chama super.onCreate → Capacitor não inicializa
+            return;
         }
 
         super.onCreate(savedInstanceState);
 
-        // Desabilitar cache para sempre carregar conteúdo fresco do servidor.
-        // Resolve o problema de HTML antigo sendo servido após deploy.
+        // Evita edge-to-edge: plugins Capacitor (splash/status bar) resetam padding do WebView.
+        applySystemBarInsets();
+
         WebView webView = getBridge().getWebView();
         if (webView != null) {
             WebSettings settings = webView.getSettings();
@@ -45,45 +41,39 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
-    /**
-     * Verifica se a versão instalada do Android WebView é suficiente
-     * para rodar o Capacitor 8 (mínimo: Chromium 97).
-     *
-     * O WebView é fornecido pelo "Android System WebView" ou pelo Chrome,
-     * dependendo da versão do Android e do OEM.
-     */
+    @Override
+    public void onResume() {
+        super.onResume();
+        // SplashScreen.hide() e StatusBar podem reativar edge-to-edge após o carregamento.
+        applySystemBarInsets();
+    }
+
+    /** Conteúdo abaixo da status bar — estável após plugins Capacitor inicializarem. */
+    private void applySystemBarInsets() {
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+    }
+
     private boolean isWebViewVersionSufficient() {
         int version = getWebViewMajorVersion(WEBVIEW_PACKAGE_SYSTEM);
         if (version == -1) {
             version = getWebViewMajorVersion(WEBVIEW_PACKAGE_CHROME);
         }
-        // Se não conseguiu detectar a versão, assume suficiente para não bloquear
-        // dispositivos onde o WebView foi incorporado de outra forma.
         return version == -1 || version >= MIN_WEBVIEW_VERSION;
     }
 
-    /**
-     * Retorna o major version do pacote informado, ou -1 se não encontrado.
-     * Exemplo: "97.0.4692.71" → 97
-     */
     private int getWebViewMajorVersion(String packageName) {
         try {
             PackageInfo info = getPackageManager().getPackageInfo(packageName, 0);
-            String versionName = info.versionName; // ex: "97.0.4692.71"
+            String versionName = info.versionName;
             if (versionName != null) {
                 String major = versionName.split("\\.")[0];
                 return Integer.parseInt(major);
             }
         } catch (PackageManager.NameNotFoundException | NumberFormatException ignored) {
-            // pacote não encontrado ou formato inesperado
         }
         return -1;
     }
 
-    /**
-     * Exibe um dialog informando que o WebView precisa ser atualizado,
-     * com botão para abrir a Play Store direto na página do Android System WebView.
-     */
     private void showWebViewUpdateDialog() {
         new AlertDialog.Builder(this)
             .setTitle("Atualização necessária")
@@ -110,13 +100,11 @@ public class MainActivity extends BridgeActivity {
             .show();
     }
 
-    /** Abre a Play Store na página do Android System WebView. */
     private void openPlayStoreForWebView() {
         String playStoreUrl = "market://details?id=" + WEBVIEW_PACKAGE_SYSTEM;
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(playStoreUrl)));
         } catch (android.content.ActivityNotFoundException e) {
-            // Fallback para browser caso a Play Store não esteja instalada
             startActivity(new Intent(
                 Intent.ACTION_VIEW,
                 Uri.parse("https://play.google.com/store/apps/details?id=" + WEBVIEW_PACKAGE_SYSTEM)

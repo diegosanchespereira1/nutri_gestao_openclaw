@@ -2,6 +2,11 @@
 
 SaaS de nutrição (planeamento em `_bmad-output/planning-artifacts/`).
 
+## Documentação
+
+Índice da documentação (deploy, segurança, mobile, design system, assets de referência): **[docs/README.md](docs/README.md)**.  
+Estrutura do repositório e o que não mover sem revisão: **[docs/architecture/PROJECT_STRUCTURE.md](docs/architecture/PROJECT_STRUCTURE.md)**.
+
 ## Requisitos
 
 - Node.js 20+

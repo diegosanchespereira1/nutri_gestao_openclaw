@@ -118,15 +118,34 @@
    Requer viewportFit=cover no Viewport (app/layout.tsx).
 ──────────────────────────────────────────────────────────────────────────────── */
 :root {
-  --safe-area-top:    env(safe-area-inset-top,    0px);
+  /* Altura nativa (Capacitor getInfo) — fallback quando env(safe-area-*) = 0 no Android */
+  --status-bar-height: 0px;
+  --safe-area-top: max(env(safe-area-inset-top, 0px), var(--status-bar-height, 0px));
   --safe-area-right:  env(safe-area-inset-right,  0px);
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-left:   env(safe-area-inset-left,   0px);
 }
 
+/* Android edge-to-edge: env() costuma ser 0 no WebView — mínimo até getInfo() atualizar */
+html.native-android,
+html[data-ng-platform="android"] {
+  --safe-area-top: max(env(safe-area-inset-top, 0px), var(--status-bar-height, 0px), 28px);
+}
+
+/* Fallback quando .safe-top depende de variáveis que o React resetou no <html> */
+html[data-ng-platform="android"] .safe-top,
+html.native-android .safe-top {
+  padding-top: max(env(safe-area-inset-top, 0px), 28px);
+}
+
 /* Utilitários para elementos fixos no topo (navbar, header) e base (tab bar) */
 .safe-top    { padding-top:    var(--safe-area-top); }
 .safe-bottom { padding-bottom: var(--safe-area-bottom); }
+
+/* App nativo: fundo da barra de status igual ao app (evita faixa branca solta) */
+html.native-app {
+  background-color: #F4F9F8;
+}
 
 /* iOS WebView: impede zoom automático ao focar inputs.
    iOS faz zoom quando font-size < 16px — regra incondicional para dispositivos touch.

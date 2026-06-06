@@ -69,8 +69,38 @@ function isRpcUnavailable(errorMessage: string): boolean {
   return (
     msg.includes("could not find the function") ||
     msg.includes("schema cache") ||
-    msg.includes("function") && msg.includes("does not exist")
+    (msg.includes("function") && msg.includes("does not exist"))
   );
+}
+
+/** RPC ausente ou Supabase/CDN fora — usa fallback legado sem poluir o console. */
+function isExpectedRpcFailure(errorMessage: string): boolean {
+  const msg = errorMessage.toLowerCase();
+  if (isRpcUnavailable(errorMessage)) return true;
+  return (
+    msg.includes("<!doctype") ||
+    msg.includes("<html") ||
+    msg.includes("bad gateway") ||
+    msg.includes("502") ||
+    msg.includes("503") ||
+    msg.includes("504") ||
+    msg.includes("econnrefused") ||
+    msg.includes("fetch failed") ||
+    msg.includes("network error")
+  );
+}
+
+function summarizeSupabaseError(errorMessage: string): string {
+  const trimmed = errorMessage.trim();
+  if (trimmed.length <= 180) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if (lower.includes("bad gateway") || lower.includes("502")) {
+    return "Supabase indisponível (502 Bad Gateway)";
+  }
+  if (lower.includes("<!doctype") || lower.includes("<html")) {
+    return "Resposta HTML inesperada do Supabase (proxy/CDN ou host fora)";
+  }
+  return `${trimmed.slice(0, 180)}…`;
 }
 
 async function loadChecklistValidityAlertsViaRpc(
@@ -96,8 +126,11 @@ async function loadChecklistValidityAlertsViaRpc(
   });
 
   if (error) {
-    if (!isRpcUnavailable(error.message)) {
-      console.error("[loadChecklistValidityAlerts] RPC", error.message);
+    if (!isExpectedRpcFailure(error.message)) {
+      console.error(
+        "[loadChecklistValidityAlerts] RPC",
+        summarizeSupabaseError(error.message),
+      );
     }
     return null;
   }

@@ -4,7 +4,10 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { SupabaseHashAuthRedirect } from "@/components/auth/supabase-hash-auth-redirect";
 import { AppLoadingScreen } from "@/components/mobile/app-loading-screen";
 import { CapacitorLinkInterceptor } from "@/components/mobile/capacitor-link-interceptor";
+import { CapacitorNativeHtml } from "@/components/mobile/capacitor-native-html";
+import { CapacitorStatusBar } from "@/components/mobile/capacitor-status-bar";
 import { getAppVersion } from "@/lib/app-version";
+import { CAPACITOR_BOOTSTRAP_INLINE_SCRIPT } from "@/lib/mobile/capacitor-bootstrap-inline-script";
 import { getPublicRuntimeEnv } from "@/lib/env/public-runtime";
 
 import "./globals.css";
@@ -67,15 +70,27 @@ export default function RootLayout({
       <head>
         <meta name="app-version" content={getAppVersion()} />
         {/* Fundo imediato antes do CSS carregar — evita flash preto no Capacitor */}
-        <style dangerouslySetInnerHTML={{ __html: `html,body{background-color:#F4F9F8}` }} />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `html,body{background-color:#F4F9F8}
+html[data-ng-platform="android"]{--status-bar-height:28px;--safe-area-top:max(env(safe-area-inset-top,0px),28px)}`,
+          }}
+        />
         {/*
           Env vars injetadas inline: sem requisição de rede, sem risco de bloquear
           a hidratação do React no Android WebView.
         */}
         <script dangerouslySetInnerHTML={{ __html: inlineEnvScript }} />
+        {/*
+          Bootstrap Capacitor sem React: esconde splash nativo e corrige status bar
+          mesmo quando a hidratação demora ou o bundle remoto está desatualizado.
+        */}
+        <script dangerouslySetInnerHTML={{ __html: CAPACITOR_BOOTSTRAP_INLINE_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col" style={{ backgroundColor: '#F4F9F8' }}>
+        <CapacitorNativeHtml />
         <AppLoadingScreen />
+        <CapacitorStatusBar />
         <CapacitorLinkInterceptor />
         <SupabaseHashAuthRedirect />
         {children}

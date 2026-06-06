@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Artefactos Gradle (Capacitor sync) — não são TypeScript do projeto
+    "android/**/build/**",
   ]),
 ]);
 

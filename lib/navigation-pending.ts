@@ -19,3 +19,11 @@ export function pushWithLoading(
   signalNavigationStart();
   router.push(href);
 }
+
+export function replaceWithLoading(
+  router: { replace: (href: string) => void },
+  href: string,
+): void {
+  signalNavigationStart();
+  router.replace(href);
+}

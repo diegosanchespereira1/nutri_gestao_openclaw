@@ -102,7 +102,6 @@ function useDropdownPanelPosition(
 
   useLayoutEffect(() => {
     if (!open || !anchorRef.current) {
-      setPosition(null);
       return;
     }
 
@@ -137,7 +136,7 @@ function useDropdownPanelPosition(
     };
   }, [anchorRef, open, minWidth]);
 
-  return position;
+  return open ? position : null;
 }
 
 function formatRelativeTime(iso: string): string {

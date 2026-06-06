@@ -1,0 +1,3 @@
+// Configuração Release — assinatura automática (sem perfil .mobileprovision fixo no repo).
+DEVELOPMENT_TEAM = 89775LG366
+#include? "Signing.local.xcconfig"

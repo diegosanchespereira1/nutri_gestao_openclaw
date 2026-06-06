@@ -45,6 +45,13 @@ export function foldTextForPdf(s: string): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
+/** Remove prefixo "CRN" do valor guardado — o PDF acrescenta o rótulo uma vez. */
+export function normalizeCrnForPdf(crn: string): string {
+  const folded = foldTextForPdf(crn);
+  if (!folded) return "";
+  return folded.replace(/^CRN\s+/i, "").trim();
+}
+
 /* ── Paleta — importada do design system centralizado ──────────────────── */
 // Para alterar cores, tipografia ou espaçamentos, edite lib/pdf/dossier-pdf-theme.ts
 const C = PdfTheme.colors;
@@ -1273,6 +1280,11 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
 export async function buildDossierPdfBytes(
   input: DossierPdfBuildInput,
 ): Promise<Uint8Array> {
+  input = {
+    ...input,
+    crn: normalizeCrnForPdf(input.crn),
+  };
+
   const pdf = await PDFDocument.create();
   // Registrar fontkit para suporte a fontes TTF com Unicode completo (acentos, ç, etc.)
   pdf.registerFontkit(fontkit);

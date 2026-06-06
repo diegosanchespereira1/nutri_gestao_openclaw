@@ -29,7 +29,7 @@ Alias TypeScript: `@/*` → raiz do repositório (`tsconfig.json`). Não alterar
 
 | Caminho | Descrição |
 |---------|-----------|
-| `android/`, `ios/` | Projetos nativos geridos pelo Capacitor CLI |
+| `android/`, `ios/` | Projetos nativos geridos pelo Capacitor CLI. **Android:** não fixar `org.gradle.java.home` a um path do macOS — o CI usa `JAVA_HOME` (Temurin 21). No Mac com Java 25+, exportar `JAVA_HOME="$(/usr/libexec/java_home -v 21)"` antes do Gradle. |
 | `assets/` | Ícones e splash para `capacitor-assets` |
 | `capacitor.config.ts` | Configuração do shell WebView |
 | `scripts/mobile/` | Scripts Node para validação e dev no dispositivo |

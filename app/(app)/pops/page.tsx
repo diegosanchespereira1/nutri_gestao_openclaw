@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { badgeBase } from "@/components/clientes/clientes-list-badges";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
-import { getClientLogoSignedUrls } from "@/lib/clients/logo-sync";
+import { getClientLogoSignedUrls } from "@/lib/clientes/logo-sync";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   establishmentTypeBadgeClass,

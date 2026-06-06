@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { appendClientExamUploads } from "@/lib/actions/client-exams";
-import { normalizeClientRow } from "@/lib/clients/normalize-client-row";
+import { normalizeClientRow } from "@/lib/clientes/normalize-client-row";
 import {
   deleteLogoAtPathIfAny,
   resolveClientLogoPathFromForm,
-} from "@/lib/clients/logo-sync";
+} from "@/lib/clientes/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";

@@ -14,8 +14,8 @@ import { PaginationNav } from "@/components/ui/pagination-nav";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { clientLifecycleBadgeLabel } from "@/lib/constants/client-lifecycle";
-import { getClientLogoSignedUrls } from "@/lib/clients/logo-sync";
-import { loadLatestClientChecklistScores } from "@/lib/clients/list-enrichment";
+import { getClientLogoSignedUrls } from "@/lib/clientes/logo-sync";
+import { loadLatestClientChecklistScores } from "@/lib/clientes/list-enrichment";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
 import type {

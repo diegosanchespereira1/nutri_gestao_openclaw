@@ -1,4 +1,4 @@
--- Rodar UMA VEZ no Postgres da homologação (DBeaver ou psql) ANTES de importar data.sql,
+-- Rodar UMA VEZ no Postgres da homologação (DBeaver ou psql) ANTES de importar scripts/database/data.sql,
 -- quando o dump veio do Supabase Cloud mais novo que o schema auth do self-hosted.
 --
 -- Erro típico sem isto: column "invite_token" of relation "flow_state" does not exist

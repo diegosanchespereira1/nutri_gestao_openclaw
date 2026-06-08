@@ -7,6 +7,7 @@ import { z } from "zod";
 import { RECIPE_LINE_UNITS } from "@/lib/constants/recipe-line-units";
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import { countRecipesUsingRawMaterial } from "@/lib/technical-recipes/raw-material-recipe-impact";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -39,12 +40,10 @@ function mapRow(r: Record<string, unknown>): RawMaterialRow {
 export async function loadRawMaterialsForOwner(): Promise<{
   rows: RawMaterialRow[];
 }> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { rows: [] };
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  // getServerContext() lê workspaceOwnerId do cookie — evita round-trip ao
+  // Supabase Auth e query à tabela team_members.
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [] };
 
   const { data, error } = await supabase
     .from("professional_raw_materials")

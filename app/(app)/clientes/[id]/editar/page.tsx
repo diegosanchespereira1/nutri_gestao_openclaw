@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { ClientExamDocumentList } from "@/components/clientes/client-exam-document-list";
 import { ClientAvatar } from "@/components/clientes/client-avatar";
@@ -34,11 +35,12 @@ import { resolveClientEditTab } from "@/lib/clientes/client-edit-tab";
 import { todayKey } from "@/lib/datetime/calendar-tz";
 import { formatBRLFromCents } from "@/lib/dashboard/financial-pending";
 import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
+import { isTeamMember as checkIsTeamMember } from "@/lib/workspace";
 import type { EstablishmentRow } from "@/lib/types/establishments";
+import type { ClientRow } from "@/lib/types/clients";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 
@@ -47,89 +49,51 @@ function dateInputValue(isoOrDate: string | null): string {
   return isoOrDate.slice(0, 10);
 }
 
-async function ChecklistsTabSection({
-  clientId,
-  sp,
-}: {
-  clientId: string;
-  sp: { est?: string; area?: string; status?: string; page?: string };
-}) {
-  const scoreHistory = await loadChecklistScoreHistory(clientId);
+function TabContentSkeleton() {
   return (
-    <div className="space-y-6">
-      {scoreHistory.byTemplate.length > 0 && (
-        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
-          <h3 className="text-base font-semibold text-foreground tracking-tight">
-            Evolução da pontuação
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Pontuação por dossiê aprovado — cada linha representa um template de checklist.
-          </p>
-          <div className="mt-4">
-            <ChecklistScoreEvolutionChart byTemplate={scoreHistory.byTemplate} />
-          </div>
-        </div>
-      )}
-      <ClientChecklistHistorySection
-        clientId={clientId}
-        embeddedInClientEdit
-        searchParams={sp}
-      />
+    <div className="space-y-6 animate-pulse" aria-hidden>
+      <div className="h-12 rounded-xl bg-muted" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="h-10 rounded-lg bg-muted" />
+        <div className="h-10 rounded-lg bg-muted" />
+      </div>
+      <div className="h-10 rounded-lg bg-muted" />
+      <div className="h-32 rounded-lg bg-muted" />
     </div>
   );
 }
 
-export default async function EditarClientePage({
-  params,
-  searchParams,
+// ─── RSC de conteúdo das abas (Suspense boundary) ────────────────────────────
+// Faz o Phase 2 de data-fetching depois que o cabeçalho já foi enviado ao browser.
+
+async function ClientEditTabContent({
+  clientId,
+  row,
+  activeTab,
+  sp,
+  isTeamMember,
+  contractErr,
+  logoPreviewUrl,
 }: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{
-    contractErr?: string;
-    tab?: string;
-    formTab?: string;
-    est?: string;
-    area?: string;
-    status?: string;
-    page?: string;
-  }>;
+  clientId: string;
+  row: ClientRow;
+  activeTab: string;
+  sp: Record<string, string | undefined>;
+  isTeamMember: boolean;
+  contractErr?: string;
+  logoPreviewUrl: string | null;
 }) {
-  const { id } = await params;
-  const sp = await searchParams;
-  const { contractErr } = sp;
+  const { supabase, user } = await getServerContext();
 
-  const supabase = await createClient();
-
-  // Phase 1: cliente + sessão
-  const [{ data, error }, { data: { user } }] = await Promise.all([
-    supabase.from("clients").select("*").eq("id", id).maybeSingle(),
-    supabase.auth.getUser(),
-  ]);
-
-  if (error || !data) {
-    notFound();
-  }
-
-  const row = normalizeClientRow(data as Record<string, unknown>);
-
-  if (sp.tab === "estabelecimento" && row.kind === "pj") {
-    const q = new URLSearchParams();
-    if (sp.contractErr) q.set("contractErr", sp.contractErr);
-    q.set("tab", "dados");
-    q.set("formTab", "pj-estabelecimento");
-    redirect(`/clientes/${id}/editar?${q.toString()}`);
-  }
-
-  const activeTab = resolveClientEditTab(sp.tab, row.kind);
   const needDadosExtras = activeTab === "dados";
   const needFinancial = activeTab === "financeiro";
-  const needEstablishment = row.kind === "pj" && (needDadosExtras || activeTab === "checklists");
+  const needEstablishment =
+    row.kind === "pj" && (needDadosExtras || activeTab === "checklists");
 
-  // Phase 2: carrega só o necessário para o separador activo
+  // Phase 2: tudo em paralelo, incluindo loadAreasForEstablishment
+  // (antes era sequencial após este bloco — waterfall eliminado).
   const [
     { data: estData },
-    logoPreviewUrl,
-    workspaceOwnerId,
     tz,
     { rows: chargesForClient },
     { rows: contracts },
@@ -137,12 +101,12 @@ export default async function EditarClientePage({
     teamMembersForSelect,
   ] = await Promise.all([
     needEstablishment
-      ? supabase.from("establishments").select("*").eq("client_id", id).maybeSingle()
+      ? supabase
+          .from("establishments")
+          .select("*")
+          .eq("client_id", clientId)
+          .maybeSingle()
       : Promise.resolve({ data: null }),
-    row.logo_storage_path
-      ? getClientLogoSignedUrl(supabase, row.logo_storage_path)
-      : Promise.resolve(null),
-    getWorkspaceAccountOwnerId(supabase, user?.id ?? ""),
     needFinancial
       ? fetchProfileTimeZone(supabase, user?.id ?? "")
       : Promise.resolve(DEFAULT_PROFILE_TIME_ZONE),
@@ -161,12 +125,13 @@ export default async function EditarClientePage({
   ]);
 
   const social = row.social_links ?? {};
-  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
   const tKey = needFinancial ? todayKey(new Date(), tz) : "";
   const payMetrics = needFinancial
     ? metricsFromClientCharges(chargesForClient, tKey)
     : metricsFromClientCharges([], tKey);
 
+  // loadAreasForEstablishment agora corre logo após o Promise.all,
+  // sem esperar por Phase 2 completo (estData.id já disponível).
   const establishmentAreas =
     needDadosExtras && row.kind === "pj" && estData?.id
       ? await loadAreasForEstablishment(estData.id)
@@ -176,44 +141,8 @@ export default async function EditarClientePage({
     ? (estData as EstablishmentRow)
     : null;
 
-  const statusLabel =
-    row.lifecycle_status === "ativo"
-      ? "Ativo"
-      : row.lifecycle_status === "inativo"
-        ? "Inativo"
-        : "Finalizado";
-
-  const searchSnap = {
-    tab: sp.tab,
-    contractErr: sp.contractErr,
-    est: sp.est,
-    status: sp.status,
-    page: sp.page,
-  };
-
   return (
-    <PageLayout variant="form">
-      <div className="flex flex-wrap items-start gap-4">
-        <ClientAvatar
-          name={row.legal_name}
-          imageUrl={logoPreviewUrl}
-          size="lg"
-          className="shrink-0"
-        />
-        <PageHeader
-          title={row.legal_name}
-          description={`${row.kind === "pf" ? "Pessoa física" : "Pessoa jurídica"}${row.kind === "pj" ? ` · ${statusLabel}` : ""}`}
-          back={{ href: "/clientes", label: "Clientes" }}
-          className="flex-1 min-w-0"
-        />
-      </div>
-
-      <ClientEditTabNav
-        clientId={row.id}
-        kind={row.kind}
-        searchParams={searchSnap}
-      />
-
+    <>
       {activeTab === "dados" ? (
         <>
           <ClientFormLazy
@@ -222,7 +151,9 @@ export default async function EditarClientePage({
             defaultKind={row.kind}
             lockKind={row.kind === "pj"}
             initialFormTab={
-              sp.formTab === "pj-estabelecimento" ? "pj-estabelecimento" : undefined
+              sp.formTab === "pj-estabelecimento"
+                ? "pj-estabelecimento"
+                : undefined
             }
             defaultLegalName={row.legal_name}
             defaultTradeName={row.trade_name ?? ""}
@@ -314,8 +245,9 @@ export default async function EditarClientePage({
                   Zona de perigo
                 </h2>
                 <p className="text-muted-foreground mt-1 text-sm">
-                  Eliminar remove o cliente da sua carteira. Em versões futuras, dados
-                  ligados (estabelecimentos, pacientes) podem restringir esta ação.
+                  Eliminar remove o cliente da sua carteira. Em versões futuras,
+                  dados ligados (estabelecimentos, pacientes) podem restringir
+                  esta ação.
                 </p>
                 <div className="mt-3">
                   <DeleteClientButton clientId={row.id} />
@@ -415,11 +347,154 @@ export default async function EditarClientePage({
       ) : null}
 
       {activeTab === "checklists" && row.kind === "pj" ? (
-        <ChecklistsTabSection
-          clientId={row.id}
-          sp={{ est: sp.est, area: sp.area, status: sp.status, page: sp.page }}
-        />
+        <ChecklistsTabContent clientId={row.id} sp={sp} />
       ) : null}
+    </>
+  );
+}
+
+async function ChecklistsTabContent({
+  clientId,
+  sp,
+}: {
+  clientId: string;
+  sp: { est?: string; area?: string; status?: string; page?: string };
+}) {
+  const scoreHistory = await loadChecklistScoreHistory(clientId);
+  return (
+    <div className="space-y-6">
+      {scoreHistory.byTemplate.length > 0 && (
+        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+          <h3 className="text-base font-semibold text-foreground tracking-tight">
+            Evolução da pontuação
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Pontuação por dossiê aprovado — cada linha representa um template de
+            checklist.
+          </p>
+          <div className="mt-4">
+            <ChecklistScoreEvolutionChart byTemplate={scoreHistory.byTemplate} />
+          </div>
+        </div>
+      )}
+      <ClientChecklistHistorySection
+        clientId={clientId}
+        embeddedInClientEdit
+        searchParams={sp}
+      />
+    </div>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default async function EditarClientePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    contractErr?: string;
+    tab?: string;
+    formTab?: string;
+    est?: string;
+    area?: string;
+    status?: string;
+    page?: string;
+  }>;
+}) {
+  const { id } = await params;
+  const sp = await searchParams;
+
+  // Phase 1: usa getServerContext() — lê workspaceOwnerId do cookie,
+  // evitando round-trip ao Supabase Auth e query à tabela team_members.
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user) redirect("/login");
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) notFound();
+
+  const row = normalizeClientRow(data as Record<string, unknown>);
+
+  if (sp.tab === "estabelecimento" && row.kind === "pj") {
+    const q = new URLSearchParams();
+    if (sp.contractErr) q.set("contractErr", sp.contractErr);
+    q.set("tab", "dados");
+    q.set("formTab", "pj-estabelecimento");
+    redirect(`/clientes/${id}/editar?${q.toString()}`);
+  }
+
+  const activeTab = resolveClientEditTab(sp.tab, row.kind);
+  const isTeamMember = checkIsTeamMember(user.id, workspaceOwnerId);
+
+  // Logo URL cacheada (50 min) — evita round-trip ao Storage em cada render.
+  const logoPreviewUrl = row.logo_storage_path
+    ? await getClientLogoSignedUrl(supabase, row.logo_storage_path)
+    : null;
+
+  const statusLabel =
+    row.lifecycle_status === "ativo"
+      ? "Ativo"
+      : row.lifecycle_status === "inativo"
+        ? "Inativo"
+        : "Finalizado";
+
+  const searchSnap = {
+    tab: sp.tab,
+    contractErr: sp.contractErr,
+    est: sp.est,
+    status: sp.status,
+    page: sp.page,
+  };
+
+  return (
+    <PageLayout variant="form">
+      {/* Cabeçalho renderizado imediatamente (Phase 1 ~150 ms) */}
+      <div className="flex flex-wrap items-start gap-4">
+        <ClientAvatar
+          name={row.legal_name}
+          imageUrl={logoPreviewUrl}
+          size="lg"
+          className="shrink-0"
+        />
+        <PageHeader
+          title={row.legal_name}
+          description={`${row.kind === "pf" ? "Pessoa física" : "Pessoa jurídica"}${row.kind === "pj" ? ` · ${statusLabel}` : ""}`}
+          back={{ href: "/clientes", label: "Clientes" }}
+          className="flex-1 min-w-0"
+        />
+      </div>
+
+      <ClientEditTabNav
+        clientId={row.id}
+        kind={row.kind}
+        searchParams={searchSnap}
+      />
+
+      {/* Phase 2: conteúdo da aba em streaming — o browser recebe o cabeçalho
+          acima antes mesmo de as queries abaixo terminarem. */}
+      <Suspense fallback={<TabContentSkeleton />}>
+        <ClientEditTabContent
+          clientId={id}
+          row={row}
+          activeTab={activeTab}
+          sp={{
+            formTab: sp.formTab,
+            est: sp.est,
+            area: sp.area,
+            status: sp.status,
+            page: sp.page,
+          }}
+          isTeamMember={isTeamMember}
+          contractErr={sp.contractErr}
+          logoPreviewUrl={logoPreviewUrl}
+        />
+      </Suspense>
     </PageLayout>
   );
 }

@@ -1307,12 +1307,80 @@ function formatIssueWithSectionAndItem(
   return `Seção ${sectionIndex + 1} (${section.title}) — Item "${item.description}": ${issue.message}`;
 }
 
+/**
+ * Carregamento mínimo para aprovação — evita signed URLs de fotos e histórico PDF.
+ * A aprovação só precisa de: sessão (status + FK), template (para validar) e respostas.
+ */
+async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
+  session: ChecklistFillSessionRow & { custom_template_id?: string | null; workspace_template_id?: string | null };
+  template: ChecklistTemplateWithSections;
+  responses: FillResponsesMap;
+} | null> {
+  const { supabase, user } = await getServerContext();
+  if (!user) return null;
+
+  const { data: session } = await supabase
+    .from("checklist_fill_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .maybeSingle();
+  if (!session) return null;
+
+  const row = session as ChecklistFillSessionRow & {
+    custom_template_id?: string | null;
+    workspace_template_id?: string | null;
+  };
+
+  const templatePromise: Promise<ChecklistTemplateWithSections | null> =
+    row.workspace_template_id
+      ? loadWorkspaceTemplateBundle(row.workspace_template_id)
+      : row.custom_template_id
+        ? loadCustomTemplateUnified(row.custom_template_id)
+        : row.template_id
+          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id)
+          : Promise.resolve(null);
+
+  const [template, respResult] = await Promise.all([
+    templatePromise,
+    supabase
+      .from("checklist_fill_item_responses")
+      .select(
+        "template_item_id, custom_item_id, workspace_item_id, outcome, note, item_annotation, valid_until",
+      )
+      .eq("session_id", sessionId),
+  ]);
+
+  if (!template) return null;
+
+  const responses: FillResponsesMap = {};
+  for (const raw of respResult.data ?? []) {
+    const r = raw as ChecklistFillItemResponseRow & { workspace_item_id?: string | null };
+    const key = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
+    if (!key) continue;
+    responses[key] = {
+      outcome: r.outcome,
+      note: r.note,
+      annotation: r.item_annotation ?? null,
+      validUntil: r.valid_until ?? null,
+    };
+  }
+
+  return { session: row, template, responses };
+}
+
 /** Aprova o dossiê: valida todo o modelo, regista data e bloqueia edições (FR23); visita ligada → concluída. */
 export async function approveChecklistFillDossierAction(
   sessionId: string,
   signatures?: { professional: string; client: string; clientSignerName?: string } | null,
 ): Promise<ApproveDossierResult> {
-  const bundle = await loadFillSessionPageData(sessionId);
+  const _t0 = Date.now();
+
+  // Carrega bundle leve + configuração de assinatura em paralelo (evita signed URLs de fotos)
+  const [bundle, clientSignatureRequired] = await Promise.all([
+    loadFillSessionBundleForApproval(sessionId),
+    getClientSignatureRequiredAction(),
+  ]);
+  const _tBundle = Date.now();
   if (!bundle) return { ok: false, error: "Rascunho não encontrado." };
 
   if (bundle.session.dossier_approved_at) {
@@ -1338,9 +1406,9 @@ export async function approveChecklistFillDossierAction(
     bundle.session.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para aprovar este dossiê." };
+  const _tAuth = Date.now();
 
   const approvedAt = new Date().toISOString();
-  const clientSignatureRequired = await getClientSignatureRequiredAction();
 
   const MAX_SIG_BYTES = 512 * 1024;
   const validateSig = (url: string | undefined | null): string | null => {
@@ -1371,27 +1439,26 @@ export async function approveChecklistFillDossierAction(
   }
 
   // SHA-256: mesmos valores que serão persistidos (evita divergência hash vs BD).
+  // Busca profiles e team_members em paralelo para evitar waterfall serial.
   let documentHash: string | null = null;
   try {
-    const { data: profProfile } = await supabase
-      .from("profiles")
-      .select("full_name, crn")
-      .eq("user_id", auth.userId)
-      .maybeSingle();
-    let profName = String(profProfile?.full_name ?? "").trim();
-    let profCrn = String(profProfile?.crn ?? "").trim();
-    if (!profName || !profCrn) {
-      const { data: profMember } = await supabase
+    const [{ data: profProfile }, { data: profMember }] = await Promise.all([
+      supabase.from("profiles").select("full_name, crn").eq("user_id", auth.userId).maybeSingle(),
+      supabase
         .from("team_members")
         .select("full_name, crn")
         .eq("member_user_id", auth.userId)
         .order("updated_at", { ascending: false })
         .limit(1)
-        .maybeSingle();
-      if (!profName) profName = String(profMember?.full_name ?? "").trim();
-      if (!profCrn) profCrn = String(profMember?.crn ?? "").trim();
-    }
+        .maybeSingle(),
+    ]);
+    let profName = String(profProfile?.full_name ?? "").trim();
+    let profCrn = String(profProfile?.crn ?? "").trim();
+    if (!profName) profName = String(profMember?.full_name ?? "").trim();
+    if (!profCrn) profCrn = String(profMember?.crn ?? "").trim();
 
+    const _tProfiles = Date.now();
+    console.log(`[approveChecklist perf] profiles=${_tProfiles - _tAuth}ms | session=${sessionId}`);
     documentHash = generateDocumentHash({
       sessionId,
       approvedAtIso: approvedAt,
@@ -1466,12 +1533,14 @@ export async function approveChecklistFillDossierAction(
 
   const persistedHash =
     (finalUpdated as { document_hash?: string | null }).document_hash ?? finalDocumentHash;
+  const _tUpdate = Date.now();
 
   // ── 2. Pontuação (best-effort) ──────────────────────────────────────────
   // Calcular e persistir a pontuação (best-effort: não impede a aprovação se falhar)
   await supabase.rpc("calculate_and_store_session_score", {
     p_session_id: sessionId,
   });
+  const _tScore = Date.now();
 
   const at = String(finalUpdated.dossier_approved_at);
 
@@ -1502,6 +1571,15 @@ export async function approveChecklistFillDossierAction(
       );
     });
   }
+
+  console.log(
+    `[approveChecklist perf] session=${sessionId} responses=${Object.keys(bundle.responses).length}` +
+      ` | bundle+cfg=${_tBundle - _t0}ms` +
+      ` | auth+ownership=${_tAuth - _tBundle}ms` +
+      ` | update=${_tUpdate - _tAuth}ms` +
+      ` | score_rpc=${_tScore - _tUpdate}ms` +
+      ` | TOTAL=${_tScore - _t0}ms`,
+  );
 
   return { ok: true, approvedAt: at, documentHash: persistedHash };
 }

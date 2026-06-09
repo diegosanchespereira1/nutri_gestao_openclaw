@@ -8,9 +8,11 @@ import {
   CHECKLIST_FILL_PHOTO_SIGNED_URL_SEC,
   CHECKLIST_FILL_PHOTOS_BUCKET,
   CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM,
-  extensionForImageMime,
-  isAllowedChecklistPhotoContentType,
 } from "@/lib/constants/checklist-fill-photos-storage";
+import {
+  extensionForCanonicalImageMime,
+  normalizeImageMime,
+} from "@/lib/images/image-mime";
 import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { createClient } from "@/lib/supabase/server";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
@@ -304,16 +306,16 @@ export async function runUploadChecklistFillPhoto(
     return { ok: false, error: "A imagem é demasiado grande (máx. 6 MB)." };
   }
 
-  const mime = file.type || "application/octet-stream";
-  if (!isAllowedChecklistPhotoContentType(mime)) {
+  // Normaliza MIME (aceita variantes como "image/jpg" e MIME vazio via extensão).
+  const mime = normalizeImageMime(file.type, file.name);
+  if (!mime) {
     return {
       ok: false,
-      error: "Formato não suportado. Use JPEG, PNG ou WebP.",
+      error: "Formato não suportado. Use JPEG (.jpg), PNG ou WebP.",
     };
   }
 
-  const ext = extensionForImageMime(mime);
-  if (!ext) return { ok: false, error: "Formato inválido." };
+  const ext = extensionForCanonicalImageMime(mime);
 
   const sessionOk = await assertSessionItem(
     supabase,

@@ -2,9 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   MAX_PROFILE_PHOTO_BYTES,
-  PROFILE_PHOTO_ACCEPT_MIME,
   PROFILE_PHOTOS_BUCKET,
 } from "@/lib/constants/profile-photos-storage";
+import {
+  extensionForCanonicalImageMime,
+  normalizeImageMime,
+} from "@/lib/images/image-mime";
 
 function isFile(value: unknown): value is File {
   return typeof File !== "undefined" && value instanceof File;
@@ -44,20 +47,15 @@ export async function resolveProfilePhotoPathFromForm(args: {
     };
   }
 
-  const mime = (entry.type || "").toLowerCase();
-  if (!PROFILE_PHOTO_ACCEPT_MIME.has(mime)) {
+  const mime = normalizeImageMime(entry.type, entry.name);
+  if (!mime) {
     return {
       ok: false,
-      error: "Use PNG, JPEG ou WebP para a foto.",
+      error: "Use PNG, JPEG (.jpg) ou WebP para a foto.",
     };
   }
 
-  const ext =
-    mime === "image/png"
-      ? "png"
-      : mime === "image/webp"
-        ? "webp"
-        : "jpg";
+  const ext = extensionForCanonicalImageMime(mime);
   const path = `${userId}/profile_${crypto.randomUUID()}.${ext}`;
 
   const body = new Uint8Array(await entry.arrayBuffer());

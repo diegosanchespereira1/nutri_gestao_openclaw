@@ -2,9 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
   CLIENT_LOGOS_BUCKET,
-  CLIENT_LOGO_ACCEPT_MIME,
   MAX_CLIENT_LOGO_BYTES,
 } from "@/lib/constants/client-logos-storage";
+import {
+  extensionForCanonicalImageMime,
+  normalizeImageMime,
+} from "@/lib/images/image-mime";
 
 // ─── Cache em memória (nível de processo Node.js) ────────────────────────────
 // Evita chamar o Storage a cada render sem precisar de service role.
@@ -88,20 +91,15 @@ export async function resolveClientLogoPathFromForm(args: {
     };
   }
 
-  const mime = (entry.type || "").toLowerCase();
-  if (!CLIENT_LOGO_ACCEPT_MIME.has(mime)) {
+  const mime = normalizeImageMime(entry.type, entry.name);
+  if (!mime) {
     return {
       ok: false,
-      error: "Use PNG, JPEG ou WebP para o logótipo.",
+      error: "Use PNG, JPEG (.jpg) ou WebP para o logótipo.",
     };
   }
 
-  const ext =
-    mime === "image/png"
-      ? "png"
-      : mime === "image/webp"
-        ? "webp"
-        : "jpg";
+  const ext = extensionForCanonicalImageMime(mime);
   const path = `${userId}/${clientId}/logo_${crypto.randomUUID()}.${ext}`;
 
   const body = new Uint8Array(await entry.arrayBuffer());

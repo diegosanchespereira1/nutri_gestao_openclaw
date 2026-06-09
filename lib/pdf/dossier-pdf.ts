@@ -62,7 +62,7 @@ function scoreClassification(pct: number): { label: string; palette: Palette } {
   if (pct >= 90) return { label: "Excelente", palette: { soft: C.greenLight,  border: C.greenBorder, ink: C.green  } };
   if (pct >= 75) return { label: "Bom",       palette: { soft: C.skyLight,    border: C.sky,         ink: C.navy  } };
   if (pct >= 50) return { label: "Regular",   palette: { soft: C.amberLight,  border: C.amberBorder, ink: C.amber } };
-  return               { label: "Critico",    palette: { soft: C.redLight,    border: C.redBorder,   ink: C.red   } };
+  return               { label: "Crítico",    palette: { soft: C.redLight,    border: C.redBorder,   ink: C.red   } };
 }
 
 function outcomePalette(outcome: ChecklistFillOutcome | null): Palette {
@@ -270,7 +270,7 @@ async function drawHeader(ctx: Ctx, input: DossierPdfBuildInput): Promise<void> 
   const textW = PAGE_W - textX - scoreBoxW - MARGIN_X - 16;
 
   // Eyebrow — label do documento (cor de acento)
-  drawTextLine(ctx, "DOSSIE DE AUDITORIA", textX, PAGE_H - 18, 7.5, ctx.fontBold, accentCol);
+  drawTextLine(ctx, "DOSSIÊ DE AUDITORIA", textX, PAGE_H - 18, 7.5, ctx.fontBold, accentCol);
 
   // Título — nome do checklist (cor de texto configurável)
   const titleLines = wrapByWidth(input.templateName, ctx.fontBold, 16, textW).slice(0, 2);
@@ -350,10 +350,10 @@ function drawKpiStrip(ctx: Ctx, input: DossierPdfBuildInput): void {
   const cells: { topColor: RGB; label: string; value: string; sub?: string }[] = [
     { topColor: C.sky,   label: "ITENS AVALIADOS", value: String(totalItems),   sub: `${nas} N/A` },
     { topColor: C.green, label: "CONFORMES",        value: String(conformes),   sub: applied > 0 ? `${Math.round((conformes/applied)*100)}%` : "—" },
-    { topColor: C.red,   label: "NAO CONFORMES",   value: String(ncs),          sub: applied > 0 ? `${Math.round((ncs/applied)*100)}%` : "—" },
+    { topColor: C.red,   label: "NÃO CONFORMES",   value: String(ncs),          sub: applied > 0 ? `${Math.round((ncs/applied)*100)}%` : "—" },
     {
       topColor: input.score ? scoreClassification(input.score.percentage).palette.ink : C.navy,
-      label: "PONTUACAO",
+      label: "PONTUAÇÃO",
       value: input.score ? `${input.score.percentage}%` : "—",
       sub: input.score ? `${formatPoints(input.score.pointsEarned)}/${formatPoints(input.score.pointsTotal)}` : "",
     },
@@ -405,10 +405,10 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
     { label: "CHECKLIST",       value: foldTextForPdf(input.templateName) || "—" },
     { label: "PROFISSIONAL",    value: foldTextForPdf(input.professionalName) || "—" },
     { label: "CRN",             value: foldTextForPdf(input.crn) || "—" },
-    { label: "DATA DE EXECUCAO",value: foldTextForPdf(input.approvedAtLabel) || "—" },
+    { label: "DATA DE EXECUÇÃO",value: foldTextForPdf(input.approvedAtLabel) || "—" },
   ];
   if (input.areaName?.trim()) {
-    items.splice(2, 0, { label: "AREA AVALIADA", value: foldTextForPdf(input.areaName) });
+    items.splice(2, 0, { label: "ÁREA AVALIADA", value: foldTextForPdf(input.areaName) });
   }
 
   const colGap = 10;
@@ -446,7 +446,7 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
   // Barra topo navy (18 pt — comporta texto de 6.5 pt com padding confortável)
   ctx.page.drawRectangle({ x: cardX, y: cardTop - BAR_H, width: CONTENT_W, height: BAR_H, color: C.navy });
   // Label centrado verticalmente na barra
-  drawTextLine(ctx, "INFORMACOES DA AUDITORIA", cardX + 10, cardTop - 6, 6.5, ctx.fontBold, C.navyOnLight);
+  drawTextLine(ctx, "INFORMAÇÕES DA AUDITORIA", cardX + 10, cardTop - 6, 6.5, ctx.fontBold, C.navyOnLight);
 
   let cursorTop = cardTop - BAR_H - padding;
   for (let r = 0; r < rowsNeeded; r++) {
@@ -499,7 +499,7 @@ function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
   ctx.page.drawRectangle({ x: MARGIN_X, y: tableBottom, width: CONTENT_W, height: totalH, color: C.cardBg, borderColor: C.cardBorder, borderWidth: 0.5 });
   // Barra topo navy (18 pt — comporta texto de 6.5 pt com padding confortável)
   ctx.page.drawRectangle({ x: MARGIN_X, y: tableTop - BAR_H, width: CONTENT_W, height: BAR_H, color: C.navy });
-  drawTextLine(ctx, "RESULTADO POR SECAO", MARGIN_X + 10, tableTop - 6, 6.5, ctx.fontBold, C.navyOnLight);
+  drawTextLine(ctx, "RESULTADO POR SEÇÃO", MARGIN_X + 10, tableTop - 6, 6.5, ctx.fontBold, C.navyOnLight);
 
   // Cabeçalho das colunas
   const colsTop = tableTop - BAR_H;
@@ -509,7 +509,7 @@ function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
   // Títulos das colunas
   let cx = MARGIN_X + PAD_X;
   const colHeaders = [
-    { w: COL_TITLE_W, label: "SECAO" },
+    { w: COL_TITLE_W, label: "SEÇÃO" },
     { w: COL_ITEMS_W, label: "ITENS" },
     { w: COL_OK_W,    label: "OK" },
     { w: COL_NC_W,    label: "NC" },
@@ -810,7 +810,7 @@ async function drawItemDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<voi
     const noteBg = isNc ? C.redLight : C.graySoft;
     const noteBorder = isNc ? C.redBorder : C.grayBorder;
     const noteStripe = isNc ? C.redStripe : C.textMuted;
-    const noteLabel = isNc ? "NAO CONFORMIDADE" : "COMENTARIO";
+    const noteLabel = isNc ? "NÃO CONFORMIDADE" : "COMENTÁRIO";
     const noteLabelColor = isNc ? C.red : C.textMuted;
 
     ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: noteBg, borderColor: noteBorder, borderWidth: 0.5 });
@@ -837,7 +837,7 @@ async function drawItemDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<voi
     ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: BLOCK_W, height: bH, color: C.graySoft, borderColor: C.grayBorder, borderWidth: 0.5 });
     ctx.page.drawRectangle({ x: BLOCK_X, y: btm, width: 3, height: bH, color: C.textMuted });
 
-    drawTextLine(ctx, "ANOTACAO", BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, C.textMuted);
+    drawTextLine(ctx, "ANOTAÇÃO", BLOCK_X + padH, top - padV, labelSize, ctx.fontBold, C.textMuted);
     let lTop = top - padV - labelSize - 4;
     for (const ln of annLines) {
       drawTextLine(ctx, ln, BLOCK_X + padH, lTop, bodySize, ctx.font, C.textPrimary);
@@ -873,7 +873,7 @@ async function drawItemDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<voi
     ensureVerticalSpace(ctx, lblH + 4);
     const lblTop = ctx.y;
     ctx.page.drawRectangle({ x: BLOCK_X, y: lblTop - lblH, width: BLOCK_W, height: lblH, color: C.navy });
-    drawTextLine(ctx, `FOTOS DE EVIDENCIA  (${photoCount})`, BLOCK_X + padH, lblTop - 4, labelSize, ctx.fontBold, C.sky);
+    drawTextLine(ctx, `FOTOS DE EVIDÊNCIA  (${photoCount})`, BLOCK_X + padH, lblTop - 4, labelSize, ctx.fontBold, C.sky);
     ctx.y = lblTop - lblH;
 
     for (let i = 0; i < photoCount; i++) {
@@ -900,7 +900,7 @@ async function drawItemDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<voi
           width: iw, height: ih,
         });
       } else {
-        drawTextLine(ctx, "imagem indisponivel", BLOCK_X + BLOCK_W / 2 - 40, pTop - PHOTO_H / 2 + 4, 8, ctx.font, C.textFaint);
+        drawTextLine(ctx, "imagem indisponível", BLOCK_X + BLOCK_W / 2 - 40, pTop - PHOTO_H / 2 + 4, 8, ctx.font, C.textFaint);
       }
 
       // Caption navy com número
@@ -917,8 +917,8 @@ async function drawItemDetails(ctx: Ctx, item: DossierPdfItemInput): Promise<voi
 function formatValidUntilForPdf(value: string | null): string {
   if (!value) return "";
   const [year, month, day] = value.split("-");
-  if (!year || !month || !day) return `Valido ate: ${value}`;
-  return `Valido ate: ${day}/${month}/${year}`;
+  if (!year || !month || !day) return `Válido até: ${value}`;
+  return `Válido até: ${day}/${month}/${year}`;
 }
 
 /* ── Bloco de assinaturas ──────────────────────────────────────────────── */
@@ -1082,13 +1082,13 @@ async function drawSignaturesSection(
   };
 
   // Dados dos signatários
-  const profSubtitle = input.crn ? `CRN ${input.crn}` : "Responsavel tecnica";
+  const profSubtitle = input.crn ? `CRN ${input.crn}` : "Responsável técnica";
   const clientSignerName = foldTextForPdf(input.clientSignerName ?? "");
-  const clientOrg        = foldTextForPdf(input.clientLabel ?? "Responsavel pelo estabelecimento");
+  const clientOrg        = foldTextForPdf(input.clientLabel ?? "Responsável pelo estabelecimento");
 
   await renderCard({
     x: MARGIN_X,
-    roleLabel: "Profissional responsavel",
+    roleLabel: "Profissional responsável",
     signerName: input.professionalName,
     subtitle: profSubtitle,
     sigBuffer: input.professionalSignatureBuffer,
@@ -1096,7 +1096,7 @@ async function drawSignaturesSection(
 
   await renderCard({
     x: MARGIN_X + COL_W + COL_GAP,
-    roleLabel: "Cliente / Responsavel",
+    roleLabel: "Cliente / Responsável",
     signerName: clientSignerName || clientOrg,
     subtitle: clientSignerName ? clientOrg : "",
     sigBuffer: input.clientSignatureBuffer,
@@ -1229,7 +1229,7 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
     };
 
     // Profissional
-    const profSub   = input.crn ? `CRN ${input.crn}` : "Profissional responsavel";
+    const profSub   = input.crn ? `CRN ${input.crn}` : "Profissional responsável";
     const profLabel = `Assinado: ${foldTextForPdf(input.professionalName)}`;
     drawSigItem(col1X, halfW, proImg, profLabel, profSub);
 
@@ -1238,7 +1238,7 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
     const clientOrg   = foldTextForPdf(input.clientLabel ?? "");
     const clientLabel = clientName
       ? `Assinado: ${clientName}`
-      : (clientOrg ? `Assinado: ${clientOrg}` : "Cliente / Responsavel");
+      : (clientOrg ? `Assinado: ${clientOrg}` : "Cliente / Responsável");
     const clientSub   = (clientName && clientOrg) ? clientOrg : "";
     drawSigItem(col2X, halfW, clientImg, clientLabel, clientSub);
 
@@ -1249,10 +1249,10 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
     //  y ≈  5  │        Sistema desenvolvido por Stratos Tech        (centrado)
 
     // Linha 1 — doc + página
-    const docLine = foldTextForPdf("Documento assinado eletronicamente - NutriGestao");
+    const docLine = foldTextForPdf("Documento assinado eletronicamente - NutriGestão");
     page.drawText(docLine, { x: MARGIN_X, y: 25, size: 7, font: ctx.font, color: C.textFaint });
 
-    const pageStr = `Pagina ${i + 1} de ${total}`;
+    const pageStr = `Página ${i + 1} de ${total}`;
     const pw = ctx.font.widthOfTextAtSize(pageStr, 7);
     page.drawText(pageStr, { x: PAGE_W - MARGIN_X - pw, y: 25, size: 7, font: ctx.font, color: C.textMuted });
 

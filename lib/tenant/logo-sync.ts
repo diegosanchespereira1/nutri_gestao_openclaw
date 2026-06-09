@@ -3,8 +3,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   MAX_TENANT_LOGO_BYTES,
   TENANT_LOGOS_BUCKET,
-  TENANT_LOGO_ACCEPT_MIME,
 } from "@/lib/constants/tenant-logos-storage";
+import {
+  extensionForCanonicalImageMime,
+  normalizeImageMime,
+} from "@/lib/images/image-mime";
 
 function isFile(value: unknown): value is File {
   return typeof File !== "undefined" && value instanceof File;
@@ -48,20 +51,15 @@ export async function resolveTenantLogoPathFromForm(args: {
     };
   }
 
-  const mime = (entry.type || "").toLowerCase();
-  if (!TENANT_LOGO_ACCEPT_MIME.has(mime)) {
+  const mime = normalizeImageMime(entry.type, entry.name);
+  if (!mime) {
     return {
       ok: false,
-      error: "Use PNG, JPEG ou WebP para o logotipo.",
+      error: "Use PNG, JPEG (.jpg) ou WebP para o logotipo.",
     };
   }
 
-  const ext =
-    mime === "image/png"
-      ? "png"
-      : mime === "image/webp"
-        ? "webp"
-        : "jpg";
+  const ext = extensionForCanonicalImageMime(mime);
   const path = `${ownerUserId}/logo_${crypto.randomUUID()}.${ext}`;
 
   const body = new Uint8Array(await entry.arrayBuffer());

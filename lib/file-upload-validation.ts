@@ -3,6 +3,8 @@
  * Ensures only safe file types and sizes are accepted
  */
 
+import { normalizeImageMime } from "@/lib/images/image-mime";
+
 export interface FileValidationError {
   field: string;
   error: string;
@@ -29,11 +31,11 @@ export function validateImageFile(
   file: File,
   maxSize: number = MAX_FILE_SIZES.image
 ): FileValidationError | null {
-  // Check MIME type
-  if (!(ALLOWED_MIME_TYPES.images as readonly string[]).includes(file.type)) {
+  // Check MIME type (normaliza variantes como "image/jpg" e MIME vazio via extensão)
+  if (!normalizeImageMime(file.type, file.name)) {
     return {
       field: 'file',
-      error: `Tipo de ficheiro inválido. Aceites: JPEG, PNG, WebP. Recebido: ${file.type || 'desconhecido'}.`,
+      error: `Tipo de ficheiro inválido. Aceites: JPEG (.jpg), PNG, WebP. Recebido: ${file.type || 'desconhecido'}.`,
     };
   }
 

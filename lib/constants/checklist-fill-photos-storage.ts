@@ -10,16 +10,22 @@ export const CHECKLIST_FILL_PHOTOS_MAX_PER_ITEM = 12;
 /** TTL de URL assinada para pré-visualização (segundos). */
 export const CHECKLIST_FILL_PHOTO_SIGNED_URL_SEC = 3600;
 
-const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
+import {
+  extensionForCanonicalImageMime,
+  normalizeImageMime,
+} from "@/lib/images/image-mime";
 
-export function isAllowedChecklistPhotoContentType(mime: string): boolean {
-  return allowed.has(mime.toLowerCase());
+export function isAllowedChecklistPhotoContentType(
+  mime: string,
+  filename?: string,
+): boolean {
+  return normalizeImageMime(mime, filename) !== null;
 }
 
-export function extensionForImageMime(mime: string): string | null {
-  const m = mime.toLowerCase();
-  if (m === "image/jpeg") return "jpg";
-  if (m === "image/png") return "png";
-  if (m === "image/webp") return "webp";
-  return null;
+export function extensionForImageMime(
+  mime: string,
+  filename?: string,
+): string | null {
+  const canonical = normalizeImageMime(mime, filename);
+  return canonical ? extensionForCanonicalImageMime(canonical) : null;
 }

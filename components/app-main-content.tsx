@@ -133,6 +133,8 @@ export function AppMainContent({ children }: Props) {
 
       const target = anchor.getAttribute("target");
       if (target && target !== "_self") return;
+      // Download links não causam navegação de rota — ignorar para não ativar o overlay.
+      if (anchor.hasAttribute("download")) return;
       if (isSameRoute(href)) return;
 
       beginNavigation();

@@ -1,10 +1,10 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
 import type { ChecklistFillSessionReopenEventRow } from "@/lib/types/checklist-reopen";
 import type { EstablishmentType } from "@/lib/types/establishments";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 /* ─── Tipos exportados ───────────────────────────────────────────────────── */
 
@@ -109,13 +109,9 @@ export async function loadChecklistSessionsForClient(input: {
 }): Promise<{ rows: ChecklistSessionSummary[]; total: number }> {
   const empty = { rows: [], total: 0 };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return empty;
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  // Usa cookie-cached context — elimina auth.getUser() + getWorkspaceAccountOwnerId roundtrip.
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return empty;
 
   // ── Round 2: validação de posse + perfil próprio em paralelo ─────────────
   const [owned, ownProfileResult] = await Promise.all([
@@ -595,12 +591,9 @@ export async function loadChecklistSessionsForClient(input: {
 export async function loadChecklistSessionNcItems(
   sessionId: string,
 ): Promise<NcItemDetail[]> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return [];
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  // Usa cookie-cached context — elimina auth.getUser() + getWorkspaceAccountOwnerId roundtrip.
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return [];
 
   // VALIDAÇÃO: verificar que a sessão pertence a um estabelecimento de um cliente do usuário.
   const { data: sess } = await supabase
@@ -744,21 +737,16 @@ export async function loadChecklistScoreHistory(
 }> {
   const empty = { byTemplate: [] };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return empty;
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  // Usa cookie-cached context — elimina auth.getUser() + getWorkspaceAccountOwnerId roundtrip.
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return empty;
 
-  const owned = await assertClientOwned(supabase, workspaceOwnerId, clientId);
+  // Paralleliza validação de posse + busca de estabelecimentos.
+  const [owned, { data: ests }] = await Promise.all([
+    assertClientOwned(supabase, workspaceOwnerId, clientId),
+    supabase.from("establishments").select("id").eq("client_id", clientId),
+  ]);
   if (!owned) return empty;
-
-  // Estabelecimentos do cliente
-  const { data: ests } = await supabase
-    .from("establishments")
-    .select("id")
-    .eq("client_id", clientId);
   const estIds = (ests ?? []).map((e) => e.id as string);
   if (estIds.length === 0) return empty;
 

@@ -13,8 +13,9 @@ import { getChecklistReopenEligibility } from "@/lib/actions/checklist-fill-reop
 import { loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
 import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-alerts";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
+import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
@@ -78,25 +79,8 @@ export async function ClientChecklistHistorySection({
   embeddedInClientEdit = false,
   searchParams: sp,
 }: ClientChecklistHistorySectionProps) {
-  const supabase = await createClient();
-  const { data: client } = await supabase
-    .from("clients")
-    .select("id, legal_name, kind, owner_user_id")
-    .eq("id", clientId)
-    .maybeSingle();
-
-  if (!client || client.kind !== "pj") {
-    return null;
-  }
-
-  const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const tz = await fetchProfileTimeZone(supabase, user?.id ?? "");
-  const canReopenDossier = user
-    ? (await getChecklistReopenEligibility(supabase, user.id)).canReopen
-    : false;
+  // Usa cookie-cached context — elimina auth.getUser() redundante.
+  const { supabase, user } = await getServerContext();
 
   const page = Math.max(1, Number(sp.page ?? "1") || 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -107,20 +91,61 @@ export async function ClientChecklistHistorySection({
       ? sp.status
       : null;
 
-  const { rows, total } = await loadChecklistSessionsForClient({
-    clientId,
-    establishmentId: estFilter,
-    areaId: areaFilter,
-    status: statusFilter,
-    limit: PAGE_SIZE,
-    offset,
-  });
+  // Todas as queries independentes em paralelo — elimina waterfall de auth + queries sequenciais.
+  // As duas chamadas a loadChecklistSessionsForClient também correm em paralelo.
+  const [
+    { data: client },
+    tz,
+    canReopenResult,
+    { rows, total },
+    { rows: allRows },
+    { data: estRows },
+    { data: areaRows },
+  ] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, legal_name, kind, owner_user_id")
+      .eq("id", clientId)
+      .maybeSingle(),
+    user
+      ? fetchProfileTimeZone(supabase, user.id)
+      : Promise.resolve(DEFAULT_PROFILE_TIME_ZONE),
+    user
+      ? getChecklistReopenEligibility(supabase, user.id)
+      : Promise.resolve({ canReopen: false, actorRole: null as null }),
+    loadChecklistSessionsForClient({
+      clientId,
+      establishmentId: estFilter,
+      areaId: areaFilter,
+      status: statusFilter,
+      limit: PAGE_SIZE,
+      offset,
+    }),
+    loadChecklistSessionsForClient({
+      clientId,
+      limit: 500,
+      offset: 0,
+    }),
+    supabase
+      .from("establishments")
+      .select("id, name")
+      .eq("client_id", clientId)
+      .order("name"),
+    estFilter
+      ? supabase
+          .from("establishment_areas")
+          .select("id, name")
+          .eq("establishment_id", estFilter)
+          .order("position")
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
 
-  const { rows: allRows } = await loadChecklistSessionsForClient({
-    clientId,
-    limit: 500,
-    offset: 0,
-  });
+  if (!client || client.kind !== "pj") {
+    return null;
+  }
+
+  const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
+  const canReopenDossier = canReopenResult.canReopen;
 
   const totalChecklists = allRows.length;
   const totalAprovados = allRows.filter((r) => r.status === "aprovado").length;
@@ -157,21 +182,6 @@ export async function ClientChecklistHistorySection({
       count: a.scores.length,
     }))
     .sort((a, b) => a.avg - b.avg); // pior primeiro → mais atenção no topo
-
-  const { data: estRows } = await supabase
-    .from("establishments")
-    .select("id, name")
-    .eq("client_id", clientId)
-    .order("name");
-
-  // Carrega áreas do estabelecimento filtrado (para o seletor de área)
-  const { data: areaRows } = estFilter
-    ? await supabase
-        .from("establishment_areas")
-        .select("id, name")
-        .eq("establishment_id", estFilter)
-        .order("position")
-    : { data: [] };
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
   const validityAlerts = await loadChecklistValidityAlerts(tz, {

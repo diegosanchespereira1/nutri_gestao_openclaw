@@ -353,30 +353,43 @@ async function ClientEditTabContent({
   );
 }
 
-async function ChecklistsTabContent({
+/**
+ * Carrega e renderiza o gráfico de evolução de score em componente isolado,
+ * para que possa ser renderizado em paralelo com ClientChecklistHistorySection.
+ */
+async function ChecklistScoreHistoryBlock({ clientId }: { clientId: string }) {
+  const scoreHistory = await loadChecklistScoreHistory(clientId);
+  if (scoreHistory.byTemplate.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
+      <h3 className="text-base font-semibold text-foreground tracking-tight">
+        Evolução da pontuação
+      </h3>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Pontuação por dossiê aprovado — cada linha representa um template de
+        checklist.
+      </p>
+      <div className="mt-4">
+        <ChecklistScoreEvolutionChart byTemplate={scoreHistory.byTemplate} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Componente síncrono: React inicia ChecklistScoreHistoryBlock e
+ * ClientChecklistHistorySection em paralelo ao renderizar os filhos.
+ */
+function ChecklistsTabContent({
   clientId,
   sp,
 }: {
   clientId: string;
   sp: { est?: string; area?: string; status?: string; page?: string };
 }) {
-  const scoreHistory = await loadChecklistScoreHistory(clientId);
   return (
     <div className="space-y-6">
-      {scoreHistory.byTemplate.length > 0 && (
-        <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
-          <h3 className="text-base font-semibold text-foreground tracking-tight">
-            Evolução da pontuação
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Pontuação por dossiê aprovado — cada linha representa um template de
-            checklist.
-          </p>
-          <div className="mt-4">
-            <ChecklistScoreEvolutionChart byTemplate={scoreHistory.byTemplate} />
-          </div>
-        </div>
-      )}
+      <ChecklistScoreHistoryBlock clientId={clientId} />
       <ClientChecklistHistorySection
         clientId={clientId}
         embeddedInClientEdit

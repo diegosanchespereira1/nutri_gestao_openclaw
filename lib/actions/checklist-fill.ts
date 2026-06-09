@@ -738,7 +738,19 @@ export async function saveFillItemResponse(input: {
       .from("checklist_fill_item_responses")
       .update(payload)
       .eq("id", existing.id as string);
-    if (error) return { ok: false, error: "Não foi possível salvar." };
+    if (error) {
+      console.error(
+        "[saveFillItemResponse] UPDATE error",
+        JSON.stringify({
+          sessionId,
+          itemId,
+          itemColumn,
+          responseId: existing.id,
+          error,
+        }),
+      );
+      return { ok: false, error: "Não foi possível salvar." };
+    }
   } else {
     const insertPayload: Record<string, unknown> = {
       session_id: sessionId,
@@ -754,7 +766,18 @@ export async function saveFillItemResponse(input: {
     const { error } = await supabase
       .from("checklist_fill_item_responses")
       .insert(insertPayload);
-    if (error) return { ok: false, error: "Não foi possível salvar." };
+    if (error) {
+      console.error(
+        "[saveFillItemResponse] INSERT error",
+        JSON.stringify({
+          sessionId,
+          itemId,
+          itemColumn,
+          error,
+        }),
+      );
+      return { ok: false, error: "Não foi possível salvar." };
+    }
   }
 
   if (withRevalidate) {
@@ -1018,7 +1041,21 @@ export async function saveFillResponsesBatch(input: {
       supabase.from("checklist_fill_item_responses").update(payload).eq("id", id),
     ),
   ]);
-  if (results.some((r) => r.error)) {
+  const failedResult = results.find((r) => r.error);
+  if (failedResult) {
+    const ops = [
+      ...(deleteIds.length > 0 ? [`DELETE ids=[${deleteIds.join(",")}]`] : []),
+      ...(insertRows.length > 0 ? [`INSERT rows=${insertRows.length}`] : []),
+      ...(updateOps.length > 0 ? [`UPDATE ids=[${updateOps.map((u) => u.id).join(",")}]`] : []),
+    ];
+    console.error(
+      "[saveFillResponsesBatch] DB error",
+      JSON.stringify({
+        sessionId,
+        ops,
+        error: failedResult.error,
+      }),
+    );
     return { ok: false, error: "Não foi possível salvar." };
   }
 

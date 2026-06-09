@@ -310,20 +310,13 @@ export async function updateSession(request: NextRequest) {
       profileCtx = cachedProfileCtx;
     } else {
       try {
-        const guard = await withTimeout(
-          fetchProfileGuardContext(supabase, user.id),
-          "fetch_profile_guard_context",
-        );
-        const needsOnboarding =
-          guard.onboardingCompletedAt == null &&
-          (await withTimeout(
-            countClientsForOwner(supabase, user.id),
-            "count_clients_for_owner",
-          )) === 0;
-        const workspaceOwnerId = await withTimeout(
-          getWorkspaceAccountOwnerId(supabase, user.id),
-          "workspace_account_owner_id",
-        );
+        // Três queries independentes — paralelizar elimina ~400-600 ms por nova sessão.
+        const [guard, clientCount, workspaceOwnerId] = await Promise.all([
+          withTimeout(fetchProfileGuardContext(supabase, user.id), "fetch_profile_guard_context"),
+          withTimeout(countClientsForOwner(supabase, user.id), "count_clients_for_owner"),
+          withTimeout(getWorkspaceAccountOwnerId(supabase, user.id), "workspace_account_owner_id"),
+        ]);
+        const needsOnboarding = guard.onboardingCompletedAt == null && clientCount === 0;
         profileCtx = {
           userId: user.id,
           workspaceOwnerId,

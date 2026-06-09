@@ -264,36 +264,33 @@ export function LoginForm() {
         return;
       }
 
-      let sessionData: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"] | null =
-        null;
-      for (let attempt = 0; attempt < 3; attempt += 1) {
-        const result = await withAuthTimeout<
-          Awaited<ReturnType<typeof supabase.auth.getSession>>
-        >(
-          supabase.auth.getSession(),
-          "post_signin_get_session",
-        );
-        sessionData = result.data;
-        if (sessionData.session) break;
-        await new Promise((resolve) => window.setTimeout(resolve, 120));
-      }
-      await logAuthTroubleshootingEvent({
-        event: "post_signin_session_check",
-        step: "password",
-        outcome: sessionData?.session ? "success" : "error",
-        hasSession: Boolean(sessionData?.session),
-        userId: signInData.user?.id ?? null,
-        metadata: {
-          elapsed_ms: Math.round(performance.now() - startedAt),
-        },
-      });
-
-      if (!sessionData?.session) {
+      // signInWithPassword já devolve a sessão directamente — getSession() redundante removido.
+      if (!signInData?.session) {
+        await logAuthTroubleshootingEvent({
+          event: "post_signin_session_check",
+          step: "password",
+          outcome: "error",
+          hasSession: false,
+          userId: signInData?.user?.id ?? null,
+          metadata: {
+            elapsed_ms: Math.round(performance.now() - startedAt),
+          },
+        });
         setError(
           "Não foi possível concluir a sessão neste dispositivo. Tente novamente.",
         );
         return;
       }
+      await logAuthTroubleshootingEvent({
+        event: "post_signin_session_check",
+        step: "password",
+        outcome: "success",
+        hasSession: true,
+        userId: signInData.user?.id ?? null,
+        metadata: {
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        },
+      });
 
       navigateAfterAuth(next, router);
     } catch (err) {

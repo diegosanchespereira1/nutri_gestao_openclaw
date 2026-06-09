@@ -4,9 +4,9 @@
  * Story: 11.6
  */
 
-import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { NotificationCenter } from '@/components/notifications/notification-center';
+import { getServerContext } from '@/lib/supabase/get-server-user';
 
 export const metadata = {
   title: 'Notificações | NutriGestão',
@@ -14,16 +14,8 @@ export const metadata = {
 };
 
 export default async function NotificacoesPage() {
-  const supabase = await createClient();
-
-  // Verificar autenticação
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
+  const { user } = await getServerContext();
+  if (!user) redirect('/login');
 
   return (
     <div className="container mx-auto px-4 py-8">

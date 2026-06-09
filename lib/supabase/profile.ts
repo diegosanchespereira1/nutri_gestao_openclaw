@@ -43,12 +43,21 @@ export async function countClientsForOwner(
 /**
  * True quando o utilizador ainda deve ver o wizard de onboarding:
  * onboarding não concluído e sem nenhum cliente na conta.
- * Se já existir cliente (ex.: importação), não forçamos o passo a passo.
+ * Membros de equipa nunca precisam de onboarding — o wizard é apenas para titulares.
  */
 export async function profileNeedsOnboarding(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<boolean> {
+  // Membros de equipa têm uma linha em team_members com member_user_id = userId.
+  // Eles não devem ver o wizard de onboarding (desenhado para titulares de workspace).
+  const { data: teamMemberRow } = await supabase
+    .from("team_members")
+    .select("id")
+    .eq("member_user_id", userId)
+    .maybeSingle();
+  if (teamMemberRow) return false;
+
   const { data, error } = await supabase
     .from("profiles")
     .select("onboarding_completed_at")

@@ -5,8 +5,7 @@ import { ClientChecklistHistorySection } from "@/components/clientes/client-chec
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 
 export default async function ClientChecklistHistoryPage({
   params,
@@ -23,25 +22,19 @@ export default async function ClientChecklistHistoryPage({
   const { id: clientId } = await params;
   const sp = await searchParams;
 
-  const supabase = await createClient();
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) notFound();
 
-  const [{ data: client }, { data: { user } }] = await Promise.all([
+  const [{ data: client }, scoreHistory] = await Promise.all([
     supabase
       .from("clients")
       .select("id, legal_name, kind, owner_user_id")
       .eq("id", clientId)
       .maybeSingle(),
-    supabase.auth.getUser(),
-  ]);
-
-  if (!client || client.kind !== "pj") notFound();
-  if (!user) notFound();
-
-  const [workspaceOwnerId, scoreHistory] = await Promise.all([
-    getWorkspaceAccountOwnerId(supabase, user.id),
     loadChecklistScoreHistory(clientId),
   ]);
 
+  if (!client || client.kind !== "pj") notFound();
   if (client.owner_user_id !== workspaceOwnerId) notFound();
 
   return (

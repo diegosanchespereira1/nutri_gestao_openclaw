@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 
 import { PageHeader } from '@/components/layout/page-header';
 import { PageLayout } from '@/components/layout/page-layout';
-import { createClient } from '@/lib/supabase/server';
+import { getServerContext } from '@/lib/supabase/get-server-user';
 import { DsarForm } from '@/components/auditoria/dsar-form';
 
 export const metadata = {
@@ -10,10 +10,7 @@ export const metadata = {
 };
 
 export default async function DsarPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getServerContext();
   if (!user) redirect('/login');
 
   // Carregar lista de pacientes do utilizador

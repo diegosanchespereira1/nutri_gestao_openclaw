@@ -17,7 +17,7 @@ import {
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 
 export default async function ChecklistPreencherPage({
@@ -32,13 +32,12 @@ export default async function ChecklistPreencherPage({
   const viewOnlyDossier = sp.view === "dossie";
   const backHref = sp.returnTo ? safeNextPath(sp.returnTo) : undefined;
 
-  const supabase = await createClient();
+  const { supabase, user } = await getServerContext();
 
-  // Phase 1: session bundle + auth + static config in parallel
-  const [bundle, { data: { user } }, initialReopenEvents, clientSignatureRequired] =
+  // Phase 1: session bundle + static config in parallel
+  const [bundle, initialReopenEvents, clientSignatureRequired] =
     await Promise.all([
       loadFillSessionPageData(sessionId),
-      supabase.auth.getUser(),
       loadReopenEventsForSession(sessionId),
       getClientSignatureRequiredAction(),
     ]);
@@ -49,6 +48,10 @@ export default async function ChecklistPreencherPage({
 
   const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
 
+  // O profissional responsável é sempre o criador da sessão — nunca o visualizador atual.
+  // Isso evita que um admin/dono do workspace veja o próprio nome no dossiê de outra profissional.
+  const professionalUserId = bundle.session.user_id;
+
   // Phase 2: user-dependent fetches in parallel
   const [
     { canReopen: canReopenDossier },
@@ -57,25 +60,23 @@ export default async function ChecklistPreencherPage({
     bundle.itemResponseSource === "workspace" || !user
       ? Promise.resolve({ canReopen: false })
       : getChecklistReopenEligibility(supabase, user.id),
-    user
-      ? supabase
-          .from("profiles")
-          .select("full_name, crn")
-          .eq("user_id", user.id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
+    supabase
+      .from("profiles")
+      .select("full_name, crn")
+      .eq("user_id", professionalUserId)
+      .maybeSingle(),
   ]);
 
-  // Carrega nome e CRN do profissional para exibição no dialog de assinatura
+  // Carrega nome e CRN do profissional criador da sessão
   let professionalName: string | undefined = (professionalProfile?.data?.full_name as string | null) ?? undefined;
   let professionalCrn: string | undefined = (professionalProfile?.data?.crn as string | null) ?? undefined;
 
-  // Fallback: team_members (only when profile fields are missing)
-  if (user && (!professionalName || !professionalCrn)) {
+  // Fallback: team_members do criador da sessão (only when profile fields are missing)
+  if (!professionalName || !professionalCrn) {
     const { data: member } = await supabase
       .from("team_members")
       .select("full_name, crn")
-      .eq("member_user_id", user.id)
+      .eq("member_user_id", professionalUserId)
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle();

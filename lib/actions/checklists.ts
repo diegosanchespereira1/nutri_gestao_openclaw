@@ -195,19 +195,33 @@ export async function loadChecklistTemplateBundleById(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: t, error: tErr } = await supabase
-    .from("checklist_templates")
-    .select("*")
-    .eq("id", templateId)
-    .maybeSingle();
+  return loadChecklistTemplateBundleByIdDirect(supabase, templateId);
+}
+
+/**
+ * Variante sem verificação de autenticação — usa cliente Supabase fornecido pelo chamador.
+ * Paralleliza template + sections; items dependem dos section IDs.
+ * Usar quando o contexto autenticado já foi verificado antes da chamada.
+ */
+export async function loadChecklistTemplateBundleByIdDirect(
+  supabase: SupabaseClient,
+  templateId: string,
+): Promise<ChecklistTemplateWithSections | null> {
+  // Busca template metadata + sections em paralelo (items dependem de section IDs)
+  const [{ data: t, error: tErr }, { data: sectionsRaw }] = await Promise.all([
+    supabase
+      .from("checklist_templates")
+      .select("*")
+      .eq("id", templateId)
+      .maybeSingle(),
+    supabase
+      .from("checklist_template_sections")
+      .select("*")
+      .eq("template_id", templateId)
+      .order("position", { ascending: true }),
+  ]);
 
   if (tErr || !t) return null;
-
-  const { data: sectionsRaw } = await supabase
-    .from("checklist_template_sections")
-    .select("*")
-    .eq("template_id", templateId)
-    .order("position", { ascending: true });
 
   const sectionIds = (sectionsRaw ?? []).map((r) => String(r.id));
   const { data: itemsRaw } =

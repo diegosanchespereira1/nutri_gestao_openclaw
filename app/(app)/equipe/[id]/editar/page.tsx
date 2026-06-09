@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { TeamMemberForm } from "@/components/team/team-member-form";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,8 +16,7 @@ import {
   deleteTeamMemberAction,
   loadTeamMemberById,
 } from "@/lib/actions/team-members";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 
 const errMessages: Record<string, string> = {
   missing: "Preencha nome, área e cargo.",
@@ -37,10 +36,9 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
   const { row } = await loadTeamMemberById(id);
   if (!row) notFound();
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
-  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
+  const { user, workspaceOwnerId } = await getServerContext();
+  if (!user) redirect("/login");
+  const isTeamMember = !!user && !!workspaceOwnerId && user.id !== workspaceOwnerId;
 
   const canRemoveMember = await canCurrentUserDeleteTeamMembers();
 

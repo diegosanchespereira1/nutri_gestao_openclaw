@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { DeletePatientButton } from "@/components/pacientes/delete-patient-button";
 import { NutritionAssessmentsSection } from "@/components/pacientes/nutrition-assessments-section";
@@ -20,8 +20,7 @@ import { loadPatientById } from "@/lib/actions/patients";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
 import { loadClientsForOwner } from "@/lib/actions/clients";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
 
 export default async function EditarPacientePage({
@@ -38,15 +37,14 @@ export default async function EditarPacientePage({
   const avaliacaoAdultoOk =
     typeof sp.avaliacao_adulto === "string" && sp.avaliacao_adulto === "ok";
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user) redirect("/login");
 
-  const [workspaceOwnerId, { row }, teamMembers] = await Promise.all([
-    getWorkspaceAccountOwnerId(supabase, user?.id ?? ""),
+  const [{ row }, teamMembers] = await Promise.all([
     loadPatientById(id),
     loadTeamMembersForSelect(),
   ]);
-  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
+  const isTeamMember = !!user && !!workspaceOwnerId && user.id !== workspaceOwnerId;
   if (!row) notFound();
 
   // Carrega kind do cliente e estabelecimentos (só relevante para PJ)

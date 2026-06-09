@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { ImportWizard } from "@/components/importar/import-wizard";
 
 export const metadata = {
@@ -10,11 +10,7 @@ export const metadata = {
 };
 
 export default async function ImportarPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { user } = await getServerContext();
   if (!user) redirect("/login");
 
   return (

@@ -53,9 +53,8 @@ export async function updateProfileAction(
   if (!email.includes("@")) {
     return { ok: false, error: "Indique um email válido." };
   }
-  if (!crn) {
-    return { ok: false, error: "Indique o número do CRN." };
-  }
+  // CRN é opcional: membros de equipa de áreas não-nutrição podem não ter CRN.
+  // O campo fica em branco e é guardado como string vazia — sem bloquear o perfil.
 
   const { data: currentProfile } = await supabase
     .from("profiles")
@@ -91,9 +90,6 @@ export async function updateProfileAction(
     .select("id, crn")
     .maybeSingle();
 
-  let persistedProfile = afterUpdate;
-  let profileSaved = Boolean(afterUpdate?.id);
-
   if (updateError) {
     console.error("[updateProfileAction] profiles update failed", {
       userId: user.id,
@@ -105,7 +101,30 @@ export async function updateProfileAction(
     return { ok: false, error: "Não foi possível salvar. Tente novamente." };
   }
 
+  let persistedProfile = afterUpdate;
+  let profileSaved = Boolean(afterUpdate?.id);
+
+  // Em alguns cenários (concessões UPDATE por coluna + versão do PostgREST/Supabase),
+  // RETURNING pode devolver null mesmo quando o UPDATE foi bem-sucedido.
+  // Verifica o estado real antes de tentar INSERT — evita violação de unicidade (23505)
+  // para membros da equipe que já possuem linha em profiles.
   if (!persistedProfile) {
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("id, crn")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existingProfile?.id) {
+      // Linha existe — UPDATE funcionou silenciosamente (RETURNING estava vazio).
+      persistedProfile = existingProfile;
+      profileSaved = true;
+    }
+  }
+
+  if (!persistedProfile) {
+    // Linha genuinamente inexistente: cria agora (raro — trigger handle_new_user
+    // normalmente cria a linha no signup).
     const { data: inserted, error: insertError } = await supabase
       .from("profiles")
       .insert({
@@ -132,7 +151,7 @@ export async function updateProfileAction(
   const persistedCrn = String(persistedProfile?.crn ?? "").trim();
   // Mantém o cadastro de equipe sincronizado quando o utilizador logado
   // também existe em `team_members` (membro convidado).
-  const { data: syncedTeamMember, error: teamMemberSyncError } = await supabase
+  const { data: syncedTeamMemberRaw, error: teamMemberSyncError } = await supabase
     .from("team_members")
     .update({
       full_name,
@@ -151,6 +170,21 @@ export async function updateProfileAction(
       hint: teamMemberSyncError.hint,
     });
   }
+
+  // Mesmo fallback de verificação para team_members: RETURNING pode ser null
+  // mesmo com UPDATE bem-sucedido devido ao mesmo comportamento do PostgREST.
+  let syncedTeamMember = syncedTeamMemberRaw;
+  if (!syncedTeamMember && !teamMemberSyncError) {
+    const { data: existingMember } = await supabase
+      .from("team_members")
+      .select("id, crn")
+      .eq("member_user_id", user.id)
+      .maybeSingle();
+    if (existingMember?.id) {
+      syncedTeamMember = existingMember;
+    }
+  }
+
   const teamMemberCrn = String(syncedTeamMember?.crn ?? "").trim();
   const crnSavedOnProfile = profileSaved && persistedCrn === crn.trim();
   const crnSavedOnTeamMember = Boolean(syncedTeamMember?.id) && teamMemberCrn === crn.trim();

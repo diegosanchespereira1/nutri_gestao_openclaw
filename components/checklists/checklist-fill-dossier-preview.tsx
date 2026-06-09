@@ -268,7 +268,7 @@ export function ChecklistFillDossierPreview({
           </div>
 
           {hasSigImages ? (
-            <div className="grid grid-cols-2 divide-x divide-border">
+            <div className="grid grid-cols-1 divide-y divide-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
             {/* Profissional */}
             <div className="flex items-center gap-3 px-4 py-3">
               {professionalSignatureDataUrl ? (

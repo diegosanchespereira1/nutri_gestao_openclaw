@@ -8,36 +8,30 @@ import {
   clientBusinessSegmentLabel,
 } from "@/lib/constants/client-business-segment";
 import { canAccessAdminArea } from "@/lib/roles";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function DefinicoesCategoriasPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) redirect("/login");
 
-  const [workspaceOwnerId, profileRow] = await Promise.all([
-    getWorkspaceAccountOwnerId(supabase, user.id),
+  const [profileRow, { data: allSegments }] = await Promise.all([
     supabase
       .from("profiles")
       .select("role")
       .eq("user_id", user.id)
       .maybeSingle()
       .then((r) => r.data),
+    supabase
+      .from("client_custom_segments")
+      .select("id, label, built_in_key")
+      .eq("owner_user_id", workspaceOwnerId)
+      .order("label", { ascending: true }),
   ]);
 
   const canEdit =
     user.id === workspaceOwnerId || canAccessAdminArea(profileRow?.role);
-
-  const { data: allSegments } = await supabase
-    .from("client_custom_segments")
-    .select("id, label, built_in_key")
-    .eq("owner_user_id", workspaceOwnerId)
-    .order("label", { ascending: true });
 
   // Split into custom (no built_in_key) and built-in overrides
   const customSegments = (allSegments ?? [])

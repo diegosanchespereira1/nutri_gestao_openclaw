@@ -9,8 +9,9 @@ import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-se
 import { generateDocumentHash } from "@/lib/checklists/document-hash";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
-import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
+import { loadChecklistTemplateBundleByIdDirect } from "@/lib/actions/checklists";
 import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import {
@@ -277,10 +278,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   /** Info do utilizador que criou o rascunho (pode ser diferente do utilizador atual). */
   createdByName: string | null;
 } | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Usa o contexto já resolvido pela página (cookie-based, sem round-trip de autenticação)
+  const { supabase, user } = await getServerContext();
   if (!user) return null;
 
   const { data: session, error: sErr } = await supabase
@@ -302,21 +301,68 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
       ? "custom"
       : "global";
 
-  let template: ChecklistTemplateWithSections | null = null;
-  if (row.workspace_template_id) {
-    template = await loadWorkspaceTemplateBundle(row.workspace_template_id);
-  } else if (row.custom_template_id) {
-    template = await loadCustomTemplateUnified(row.custom_template_id);
-  } else if (row.template_id) {
-    template = await loadChecklistTemplateBundleById(row.template_id);
-  }
+  // Phase 2: todos os dados dependentes da sessão em paralelo.
+  // loadChecklistTemplateBundleByIdDirect usa o mesmo cliente — sem round-trip extra de auth.
+  // loadWorkspaceTemplateBundle / loadCustomTemplateUnified ainda criam o próprio cliente
+  // mas correm em paralelo com as outras queries, não adicionando ao caminho crítico.
+  const templatePromise: Promise<ChecklistTemplateWithSections | null> =
+    row.workspace_template_id
+      ? loadWorkspaceTemplateBundle(row.workspace_template_id)
+      : row.custom_template_id
+        ? loadCustomTemplateUnified(row.custom_template_id)
+        : row.template_id
+          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id)
+          : Promise.resolve(null);
+
+  const [
+    template,
+    respRowsResult,
+    estResult,
+    pdfResult,
+    itemPhotos,
+    creatorResult,
+    areaResult,
+  ] = await Promise.all([
+    templatePromise,
+    supabase
+      .from("checklist_fill_item_responses")
+      .select("*")
+      .eq("session_id", sessionId),
+    supabase
+      .from("establishments")
+      .select("*, clients(legal_name, trade_name, lifecycle_status)")
+      .eq("id", session.establishment_id)
+      .maybeSingle(),
+    supabase
+      .from("checklist_fill_pdf_exports")
+      .select(
+        "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
+      )
+      .eq("session_id", sessionId)
+      .order("version_number", { ascending: false })
+      .order("created_at", { ascending: false }),
+    loadSessionItemPhotosWithUrls(supabase, sessionId),
+    // Creator name — só se o rascunho foi criado por outro utilizador
+    row.user_id !== user.id
+      ? supabase
+          .from("profiles")
+          .select("full_name")
+          .eq("user_id", row.user_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    // Area name — só se a sessão tiver area_id
+    row.area_id
+      ? supabase
+          .from("establishment_areas")
+          .select("name")
+          .eq("id", row.area_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   if (!template) return null;
 
-  let { data: respRows } = await supabase
-    .from("checklist_fill_item_responses")
-    .select("*")
-    .eq("session_id", sessionId);
+  let { data: respRows } = respRowsResult;
 
   // Herança automática de itens com validade vigente (apenas na 1ª abertura)
   let inheritedCount = 0;
@@ -348,11 +394,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     };
   }
 
-  const { data: est } = await supabase
-    .from("establishments")
-    .select("*, clients(legal_name, trade_name, lifecycle_status)")
-    .eq("id", session.establishment_id)
-    .maybeSingle();
+  const est = estResult.data;
+  const { data: pdfRows, error: pdfErr } = pdfResult;
 
   const pdfClientLabel = est
     ? establishmentClientLabel(est as EstablishmentWithClientNames)
@@ -361,17 +404,6 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   const establishmentLabel = est
     ? `${(est as EstablishmentWithClientNames).name} — ${pdfClientLabel}`
     : "Estabelecimento";
-
-  const itemPhotos = await loadSessionItemPhotosWithUrls(supabase, sessionId);
-
-  const { data: pdfRows, error: pdfErr } = await supabase
-    .from("checklist_fill_pdf_exports")
-    .select(
-      "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
-    )
-    .eq("session_id", sessionId)
-    .order("version_number", { ascending: false })
-    .order("created_at", { ascending: false });
 
   const pdfList: ChecklistFillPdfExportRow[] = (pdfRows ?? []).map((raw) => ({
     id: raw.id as string,
@@ -404,26 +436,8 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     .filter((r) => r.status === "ready")
     .sort((a, b) => b.version_number - a.version_number);
 
-  let createdByName: string | null = null;
-  if (row.user_id !== user.id) {
-    const { data: creatorProfile } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("user_id", row.user_id)
-      .maybeSingle();
-    createdByName = creatorProfile?.full_name ?? null;
-  }
-
-  // Resolver nome da área (se a sessão tiver area_id)
-  let areaName: string | null = null;
-  if (row.area_id) {
-    const { data: areaRow } = await supabase
-      .from("establishment_areas")
-      .select("name")
-      .eq("id", row.area_id)
-      .maybeSingle();
-    areaName = areaRow?.name ?? null;
-  }
+  const createdByName: string | null = creatorResult.data?.full_name ?? null;
+  const areaName: string | null = areaResult.data?.name ?? null;
 
   return {
     session: { ...row, area_name: areaName },

@@ -6,23 +6,16 @@ import { ChecklistPdfSettingsForm } from "@/components/definicoes/checklist-pdf-
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { getPdfSettingsAction } from "@/lib/actions/checklist-pdf-settings";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChecklistFotosDefinicoesPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, workspaceOwnerId } = await getServerContext();
   if (!user) redirect("/login");
 
   // Apenas titulares podem editar; membros de equipa só lêem
-  const { data: member } = await supabase
-    .from("team_members")
-    .select("owner_user_id")
-    .eq("member_user_id", user.id)
-    .maybeSingle();
-
-  const canManage = !member?.owner_user_id;
+  const canManage = user.id === workspaceOwnerId;
 
   const pdfSettings = await getPdfSettingsAction();
 

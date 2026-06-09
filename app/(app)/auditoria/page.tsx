@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { PageLayout } from '@/components/layout/page-layout';
 import { buttonVariants } from '@/components/ui/button-variants';
 import { AuditLogViewer } from '@/components/auditoria/audit-log-viewer';
-import { createClient } from '@/lib/supabase/server';
+import { getServerContext } from '@/lib/supabase/get-server-user';
 import { loadAuditLogs } from '@/lib/actions/audit';
 import { cn } from '@/lib/utils';
 
@@ -19,10 +19,7 @@ export default async function AuditoriaPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user } = await getServerContext();
   if (!user) redirect('/login');
 
   const sp = await searchParams;

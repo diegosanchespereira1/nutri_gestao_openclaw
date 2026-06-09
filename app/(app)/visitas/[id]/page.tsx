@@ -7,13 +7,12 @@ import {
   formatDateTimeShort,
   isSameCalendarDay,
 } from "@/lib/datetime/calendar-tz";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { visitPriorityLabel } from "@/lib/constants/visit-priorities";
 import { VisitCancelButton } from "@/components/visits/visit-cancel-button";
 import { visitIsCancellable, visitStatusLabel } from "@/lib/constants/visit-status";
 import { canCancelScheduledVisit } from "@/lib/visits/agenda-access";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { fetchProfileRole } from "@/lib/supabase/profile";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import type { VisitKind } from "@/lib/types/visits";
@@ -37,21 +36,14 @@ type Props = {
 export default async function VisitaDetalhePage({ params, searchParams }: Props) {
   const { id } = await params;
   const { aviso } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
-  const [{ row }, tz] = await Promise.all([
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user) redirect("/login");
+  const [{ row }, tz, role] = await Promise.all([
     loadScheduledVisitById(id),
     fetchProfileTimeZone(supabase, user.id),
+    fetchProfileRole(supabase, user.id),
   ]);
   if (!row) notFound();
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  const role = await fetchProfileRole(supabase, user.id);
   const canCancel =
     visitIsCancellable(row.status) &&
     canCancelScheduledVisit(user.id, workspaceOwnerId, role, {

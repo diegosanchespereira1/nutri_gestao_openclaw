@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { DeleteEstablishmentButton } from "@/components/clientes/delete-establishment-button";
 import { EstablishmentChecklistHistorySection } from "@/components/clientes/establishment-checklist-history-section";
@@ -20,8 +20,7 @@ import {
   loadComplianceDeadlinesForEstablishment,
 } from "@/lib/actions/compliance-deadlines";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
-import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId, isTeamMember as checkIsTeamMember } from "@/lib/workspace";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 
 export default async function EditarEstabelecimentoPage({
@@ -35,10 +34,9 @@ export default async function EditarEstabelecimentoPage({
   const sp = await searchParams;
   const blockedPatients =
     typeof sp.blocked === "string" ? sp.blocked === "patients" : false;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user?.id ?? "");
-  const isTeamMember = !!user && checkIsTeamMember(user.id, workspaceOwnerId);
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user) redirect("/login");
+  const isTeamMember = !!user && !!workspaceOwnerId && user.id !== workspaceOwnerId;
 
   const { data: client } = await supabase
     .from("clients")

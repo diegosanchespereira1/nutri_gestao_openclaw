@@ -28,10 +28,9 @@
 }
 
 .contentOverlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 200;
-  min-height: min(70vh, 32rem);
 }
 
 .inline {

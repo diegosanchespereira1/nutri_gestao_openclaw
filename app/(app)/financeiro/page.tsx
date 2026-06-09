@@ -57,7 +57,7 @@ import {
   formatBRLFromCents,
   isOpenOverdue,
 } from "@/lib/dashboard/financial-pending";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import type { FinancialChargeListRow } from "@/lib/types/financial-charges";
 import { cn } from "@/lib/utils";
@@ -129,13 +129,8 @@ function chartSlugForFilename(w: ResolvedChartWindow): string {
 }
 
 export default async function FinanceiroPage({ searchParams }: Props) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await getServerContext();
+  if (!user) redirect("/login");
 
   const tz = await fetchProfileTimeZone(supabase, user.id);
   const tKey = todayKey(new Date(), tz);

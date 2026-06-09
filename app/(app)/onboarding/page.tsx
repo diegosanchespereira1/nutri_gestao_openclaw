@@ -2,14 +2,11 @@ import { redirect } from "next/navigation";
 
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { profileNeedsOnboarding } from "@/lib/supabase/profile";
 
 export default async function OnboardingPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await getServerContext();
   if (!user) redirect("/login");
 
   const needsOnboarding = await profileNeedsOnboarding(supabase, user.id);

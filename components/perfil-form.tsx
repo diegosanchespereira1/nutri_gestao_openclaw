@@ -213,14 +213,13 @@ export function PerfilForm({
           <Input
             id="perfil-crn"
             name="crn"
-            required
             value={crnValue}
             onChange={(event) => setCrnValue(event.target.value)}
             placeholder="Ex.: 12345"
             aria-describedby={state?.ok === false ? "perfil-err" : undefined}
           />
           <p className="text-muted-foreground text-xs">
-            Número de registo profissional usado em documentos gerados pelo sistema.
+            Número de registo profissional usado em documentos gerados pelo sistema. Obrigatório para nutricionistas.
           </p>
         </div>
 

@@ -28,7 +28,7 @@ import {
 } from "@/lib/actions/visit-checklist";
 import { loadScheduledVisitById } from "@/lib/visits/load-scheduled-visits";
 import { formatDateTimeShort, isSameCalendarDay } from "@/lib/datetime/calendar-tz";
-import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { visitDisplayTitle } from "@/lib/visits/display-title";
@@ -53,13 +53,8 @@ type Props = {
 export default async function IniciarVisitaPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { session: sessionParam, ctx_est: ctxEst, err } = await searchParams;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    redirect("/login");
-  }
+  const { supabase, user } = await getServerContext();
+  if (!user) redirect("/login");
   const [{ row }, tz] = await Promise.all([
     loadScheduledVisitById(id),
     fetchProfileTimeZone(supabase, user.id),

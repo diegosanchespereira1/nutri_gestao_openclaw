@@ -8,7 +8,8 @@ type WallParts = {
   minute: number;
 };
 
-const LOCAL_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+// Aceita YYYY-MM-DDTHH:mm (desktop) e YYYY-MM-DDTHH:mm:ss[.SSS] (Android Chrome).
+const LOCAL_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/;
 
 function getWallPartsInTimeZone(utcMs: number, timeZone: string): WallParts {
   const parts = new Intl.DateTimeFormat("en-CA", {

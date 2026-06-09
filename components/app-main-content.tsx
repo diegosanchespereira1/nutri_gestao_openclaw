@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PageLoadingScreen } from "@/components/ui/page-loading-screen";
@@ -52,12 +52,15 @@ function isSameRoute(href: string): boolean {
  */
 export function AppMainContent({ children }: Props) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [showLoading, setShowLoading] = useState(false);
 
   const pendingRef = useRef(false);
   const showLoadingRef = useRef(false);
   const shownAtRef = useRef(0);
-  const prevPathnameRef = useRef(pathname);
+  // Rastreia o caminho completo (pathname + search) para detectar navegações
+  // que só alteram os search params — como a troca de abas com ?tab=…
+  const prevRouteRef = useRef(`${pathname}?${searchParams.toString()}`);
   const showTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const navTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -101,11 +104,12 @@ export function AppMainContent({ children }: Props) {
   }, [endNavigation]);
 
   useEffect(() => {
-    if (prevPathnameRef.current !== pathname) {
-      prevPathnameRef.current = pathname;
+    const route = `${pathname}?${searchParams.toString()}`;
+    if (prevRouteRef.current !== route) {
+      prevRouteRef.current = route;
       endNavigation();
     }
-  }, [pathname, endNavigation]);
+  }, [pathname, searchParams, endNavigation]);
 
   useEffect(() => subscribeNavigationStart(beginNavigation), [beginNavigation]);
   // Quando o guard do checklist (ou outro interceptor) cancela a navegação,

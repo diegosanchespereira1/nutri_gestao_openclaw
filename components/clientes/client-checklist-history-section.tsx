@@ -10,7 +10,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { getChecklistReopenEligibility } from "@/lib/actions/checklist-fill-reopen";
-import { loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
+import { loadChecklistClientStats, loadChecklistSessionsForClient } from "@/lib/actions/checklist-history";
 import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-alerts";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { getServerContext } from "@/lib/supabase/get-server-user";
@@ -91,25 +91,30 @@ export async function ClientChecklistHistorySection({
       ? sp.status
       : null;
 
-  // Todas as queries independentes em paralelo — elimina waterfall de auth + queries sequenciais.
-  // As duas chamadas a loadChecklistSessionsForClient também correm em paralelo.
+  // Busca tz antecipadamente (query leve, ~30 ms) para poder incluir
+  // loadChecklistValidityAlerts no Promise.all abaixo em vez de executá-la de
+  // forma sequencial após as queries principais (eliminação de ~100–500 ms).
+  const tz = user
+    ? await fetchProfileTimeZone(supabase, user.id)
+    : DEFAULT_PROFILE_TIME_ZONE;
+
+  // Todas as queries independentes em paralelo.
+  // loadChecklistClientStats substitui loadChecklistSessionsForClient({ limit: 500 }):
+  // 4 rounds de DB (vs. 6+ rounds com 13 queries paralelas) para os cards de resumo.
   const [
     { data: client },
-    tz,
     canReopenResult,
     { rows, total },
-    { rows: allRows },
+    stats,
     { data: estRows },
     { data: areaRows },
+    validityAlerts,
   ] = await Promise.all([
     supabase
       .from("clients")
       .select("id, legal_name, kind, owner_user_id")
       .eq("id", clientId)
       .maybeSingle(),
-    user
-      ? fetchProfileTimeZone(supabase, user.id)
-      : Promise.resolve(DEFAULT_PROFILE_TIME_ZONE),
     user
       ? getChecklistReopenEligibility(supabase, user.id)
       : Promise.resolve({ canReopen: false, actorRole: null as null }),
@@ -121,11 +126,7 @@ export async function ClientChecklistHistorySection({
       limit: PAGE_SIZE,
       offset,
     }),
-    loadChecklistSessionsForClient({
-      clientId,
-      limit: 500,
-      offset: 0,
-    }),
+    loadChecklistClientStats(clientId),
     supabase
       .from("establishments")
       .select("id, name")
@@ -138,6 +139,7 @@ export async function ClientChecklistHistorySection({
           .eq("establishment_id", estFilter)
           .order("position")
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    loadChecklistValidityAlerts(tz, { clientId, limit: 12, withinDays: 7 }),
   ]);
 
   if (!client || client.kind !== "pj") {
@@ -147,48 +149,15 @@ export async function ClientChecklistHistorySection({
   const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
   const canReopenDossier = canReopenResult.canReopen;
 
-  const totalChecklists = allRows.length;
-  const totalAprovados = allRows.filter((r) => r.status === "aprovado").length;
-  const totalEmAndamento = allRows.filter((r) => r.status === "em_andamento").length;
-  const totalNcsAbertas = allRows
-    .filter((r) => r.status === "em_andamento")
-    .reduce((acc, r) => acc + r.nc_count, 0);
-
-  // Nota média geral (apenas aprovados com score calculado)
-  const scoredApproved = allRows.filter(
-    (r) => r.status === "aprovado" && r.score_percentage != null,
-  );
-  const avgScore =
-    scoredApproved.length > 0
-      ? Math.round(
-          scoredApproved.reduce((acc, r) => acc + r.score_percentage!, 0) /
-            scoredApproved.length,
-        )
-      : null;
-
-  // Nota média por área (apenas quando há áreas distintas com score)
-  const areaScoreMap = new Map<string, { name: string; scores: number[] }>();
-  for (const r of allRows) {
-    if (r.status !== "aprovado" || r.score_percentage == null || !r.area_id) continue;
-    const key = r.area_id;
-    const name = r.area_name ?? "Área sem nome";
-    if (!areaScoreMap.has(key)) areaScoreMap.set(key, { name, scores: [] });
-    areaScoreMap.get(key)!.scores.push(r.score_percentage);
-  }
-  const areaScores = Array.from(areaScoreMap.values())
-    .map((a) => ({
-      name: a.name,
-      avg: Math.round(a.scores.reduce((s, v) => s + v, 0) / a.scores.length),
-      count: a.scores.length,
-    }))
-    .sort((a, b) => a.avg - b.avg); // pior primeiro → mais atenção no topo
+  // Estatísticas vindas de loadChecklistClientStats — leve e já calculadas.
+  const totalChecklists = stats.total;
+  const totalAprovados = stats.approved;
+  const totalEmAndamento = stats.inProgress;
+  const totalNcsAbertas = stats.ncsOpenCount;
+  const avgScore = stats.avgScore;
+  const areaScores = stats.areaScores;
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
-  const validityAlerts = await loadChecklistValidityAlerts(tz, {
-    clientId,
-    limit: 12,
-    withinDays: 7,
-  });
 
   const basePath = embeddedInClientEdit
     ? `/clientes/${clientId}/editar`
@@ -310,7 +279,7 @@ export async function ClientChecklistHistorySection({
                   {avgScore}%
                 </p>
                 <p className={cn("text-xs font-medium", scoreColorClasses.text)}>
-                  {scoreLabel} · {scoredApproved.length} avaliação{scoredApproved.length !== 1 ? "ões" : ""}
+                  {scoreLabel} · {stats.scoredApprovedCount} avaliação{stats.scoredApprovedCount !== 1 ? "ões" : ""}
                 </p>
               </CardContent>
             </Card>

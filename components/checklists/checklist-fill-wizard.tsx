@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
-import { pushWithLoading } from "@/lib/navigation-pending";
+import { pushWithLoading, signalNavigationCancel } from "@/lib/navigation-pending";
 import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
@@ -707,6 +707,10 @@ export function ChecklistFillWizard({
     cancelLeave();
     clearLeaveLinkTarget();
     setLeaveActionError(null);
+    // O popstate dispara `beginNavigation` no AppMainContent antes de sabermos
+    // se o utilizador vai confirmar ou cancelar a saída. Se cancelar, precisamos
+    // desfazer o loading overlay — caso contrário fica preso até o timeout de 45 s.
+    signalNavigationCancel();
   }, [cancelLeave, clearLeaveLinkTarget]);
 
   const handleConfirmLeaveDialog = useCallback(async () => {

@@ -63,6 +63,38 @@ function TabContentSkeleton() {
   );
 }
 
+function ScoreHistorySkeleton() {
+  return (
+    <div className="rounded-xl border border-border bg-white p-4 shadow-xs animate-pulse" aria-hidden>
+      <div className="h-4 w-44 rounded bg-muted mb-2" />
+      <div className="h-3 w-64 rounded bg-muted mb-4" />
+      <div className="h-40 rounded-lg bg-muted" />
+    </div>
+  );
+}
+
+function ChecklistHistorySkeleton() {
+  return (
+    <div className="space-y-6 animate-pulse" aria-hidden>
+      <div className="h-28 rounded-xl bg-muted" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-20 rounded-lg bg-muted" />
+        ))}
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="h-9 w-48 rounded-lg bg-muted" />
+        <div className="h-9 w-36 rounded-lg bg-muted" />
+      </div>
+      <div className="space-y-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-24 rounded-lg bg-muted" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── RSC de conteúdo das abas (Suspense boundary) ────────────────────────────
 // Faz o Phase 2 de data-fetching depois que o cabeçalho já foi enviado ao browser.
 
@@ -379,6 +411,8 @@ async function ChecklistScoreHistoryBlock({ clientId }: { clientId: string }) {
 /**
  * Componente síncrono: React inicia ChecklistScoreHistoryBlock e
  * ClientChecklistHistorySection em paralelo ao renderizar os filhos.
+ * Cada filho tem o seu próprio Suspense para streaming progressivo —
+ * o score chart aparece mal os dados cheguem, sem esperar pelo histórico.
  */
 function ChecklistsTabContent({
   clientId,
@@ -389,12 +423,16 @@ function ChecklistsTabContent({
 }) {
   return (
     <div className="space-y-6">
-      <ChecklistScoreHistoryBlock clientId={clientId} />
-      <ClientChecklistHistorySection
-        clientId={clientId}
-        embeddedInClientEdit
-        searchParams={sp}
-      />
+      <Suspense fallback={<ScoreHistorySkeleton />}>
+        <ChecklistScoreHistoryBlock clientId={clientId} />
+      </Suspense>
+      <Suspense fallback={<ChecklistHistorySkeleton />}>
+        <ClientChecklistHistorySection
+          clientId={clientId}
+          embeddedInClientEdit
+          searchParams={sp}
+        />
+      </Suspense>
     </div>
   );
 }

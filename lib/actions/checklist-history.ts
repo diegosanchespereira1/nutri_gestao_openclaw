@@ -581,6 +581,140 @@ export async function loadChecklistSessionsForClient(input: {
   return { rows, total: totalCount ?? rows.length };
 }
 
+/* ─── E.1b: loadChecklistClientStats ────────────────────────────────────── */
+
+/**
+ * Agrega estatísticas de checklists de um cliente de forma leve:
+ * apenas 4 rounds de DB (vs. os 6+ rounds do loadChecklistSessionsForClient completo),
+ * sem buscar templates, PDFs, eventos de reabertura ou itens.
+ *
+ * Usado em ClientChecklistHistorySection para exibir os cards de resumo sem
+ * ter de carregar o histórico paginado completo.
+ */
+export type ChecklistClientStats = {
+  total: number;
+  approved: number;
+  inProgress: number;
+  /** Total de NCs abertas (outcome = 'nc') nas sessões em andamento. */
+  ncsOpenCount: number;
+  /** Nota média (0-100) das sessões aprovadas com score; null quando não há nenhuma. */
+  avgScore: number | null;
+  /** Número de sessões aprovadas com score calculado (denominador do avgScore). */
+  scoredApprovedCount: number;
+  /** Nota média por área, ordenada da pior para a melhor. */
+  areaScores: { name: string; avg: number; count: number }[];
+};
+
+export async function loadChecklistClientStats(
+  clientId: string,
+): Promise<ChecklistClientStats> {
+  const empty: ChecklistClientStats = {
+    total: 0,
+    approved: 0,
+    inProgress: 0,
+    ncsOpenCount: 0,
+    avgScore: null,
+    scoredApprovedCount: 0,
+    areaScores: [],
+  };
+
+  // Usa cookie-cached context — elimina auth.getUser() + getWorkspaceAccountOwnerId roundtrip.
+  const { supabase, workspaceOwnerId } = await getServerContext();
+  if (!workspaceOwnerId) return empty;
+
+  // Round 2: validação de posse + estabelecimentos em paralelo
+  const [owned, { data: ests }] = await Promise.all([
+    assertClientOwned(supabase, workspaceOwnerId, clientId),
+    supabase.from("establishments").select("id").eq("client_id", clientId),
+  ]);
+  if (!owned || !ests || ests.length === 0) return empty;
+
+  const estIds = ests.map((e) => e.id as string);
+
+  // Round 3: sessões com colunas mínimas (sem templates, PDFs, eventos de reabertura)
+  const { data: sessions } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id, dossier_approved_at, score_percentage, area_id")
+    .in("establishment_id", estIds);
+
+  if (!sessions || sessions.length === 0) return empty;
+
+  const inProgressIds = sessions
+    .filter((s) => !s.dossier_approved_at)
+    .map((s) => s.id as string);
+
+  const areaIds = [
+    ...new Set(
+      sessions
+        .filter((s) => s.area_id && s.dossier_approved_at && s.score_percentage != null)
+        .map((s) => s.area_id as string),
+    ),
+  ];
+
+  // Round 4: NCs dos em-andamento + nomes das áreas em paralelo
+  const [ncResult, areaResult] = await Promise.all([
+    inProgressIds.length > 0
+      ? supabase
+          .from("checklist_fill_item_responses")
+          .select("session_id")
+          .in("session_id", inProgressIds)
+          .eq("outcome", "nc")
+      : Promise.resolve({ data: [] as { session_id: string }[] }),
+    areaIds.length > 0
+      ? supabase
+          .from("establishment_areas")
+          .select("id, name")
+          .in("id", areaIds)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+
+  // Agrega estatísticas
+  const total = sessions.length;
+  const approved = sessions.filter((s) => s.dossier_approved_at !== null).length;
+  const inProgress = total - approved;
+  const ncsOpenCount = (ncResult.data ?? []).length;
+
+  // Nota média (sessões aprovadas com score)
+  const scoredApproved = sessions.filter(
+    (s) => s.dossier_approved_at !== null && s.score_percentage != null,
+  );
+  const scoredApprovedCount = scoredApproved.length;
+  const avgScore =
+    scoredApprovedCount > 0
+      ? Math.round(
+          scoredApproved.reduce((sum, s) => sum + (s.score_percentage as number), 0) /
+            scoredApprovedCount,
+        )
+      : null;
+
+  // Breakdown de nota por área (pior primeiro)
+  const areaNameMap = new Map<string, string>();
+  for (const a of areaResult.data ?? []) {
+    areaNameMap.set(a.id, a.name);
+  }
+
+  const areaScoreAccum = new Map<string, { name: string; scores: number[] }>();
+  for (const s of sessions) {
+    if (!s.dossier_approved_at || s.score_percentage == null || !s.area_id) continue;
+    const areaId = s.area_id as string;
+    const name = areaNameMap.get(areaId) ?? "Área sem nome";
+    if (!areaScoreAccum.has(areaId)) {
+      areaScoreAccum.set(areaId, { name, scores: [] });
+    }
+    areaScoreAccum.get(areaId)!.scores.push(s.score_percentage as number);
+  }
+
+  const areaScores = Array.from(areaScoreAccum.values())
+    .map((a) => ({
+      name: a.name,
+      avg: Math.round(a.scores.reduce((s, v) => s + v, 0) / a.scores.length),
+      count: a.scores.length,
+    }))
+    .sort((a, b) => a.avg - b.avg);
+
+  return { total, approved, inProgress, ncsOpenCount, avgScore, scoredApprovedCount, areaScores };
+}
+
 /* ─── E.2: loadChecklistSessionNcItems ─────────────────────────────────── */
 
 /**

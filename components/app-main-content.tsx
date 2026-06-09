@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PageLoadingScreen } from "@/components/ui/page-loading-screen";
 import { RouteProgressBar } from "@/components/ui/route-progress-bar";
-import { subscribeNavigationStart } from "@/lib/navigation-pending";
+import { subscribeNavigationCancel, subscribeNavigationStart } from "@/lib/navigation-pending";
 
 type Props = {
   children: React.ReactNode;
@@ -108,6 +108,9 @@ export function AppMainContent({ children }: Props) {
   }, [pathname, endNavigation]);
 
   useEffect(() => subscribeNavigationStart(beginNavigation), [beginNavigation]);
+  // Quando o guard do checklist (ou outro interceptor) cancela a navegação,
+  // encerra o loading para não deixar o overlay preso indefinidamente.
+  useEffect(() => subscribeNavigationCancel(endNavigation), [endNavigation]);
 
   useEffect(() => {
     function onDocumentClick(event: MouseEvent) {

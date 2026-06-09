@@ -1,15 +1,31 @@
 type Listener = () => void;
 
 const listeners = new Set<Listener>();
+const cancelListeners = new Set<Listener>();
 
 export function subscribeNavigationStart(listener: Listener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
 
+/** Cancela um loading iniciado por `signalNavigationStart` / popstate interceptado. */
+export function subscribeNavigationCancel(listener: Listener): () => void {
+  cancelListeners.add(listener);
+  return () => cancelListeners.delete(listener);
+}
+
 /** Dispara o loading padrão antes de `router.push` / `router.replace`. */
 export function signalNavigationStart(): void {
   listeners.forEach((listener) => listener());
+}
+
+/**
+ * Sinaliza que a navegação foi cancelada (ex.: utilizador escolheu "Não, ficar"
+ * no guard do checklist). Usado por `AppMainContent` para fechar o overlay de
+ * loading que foi aberto pelo `popstate`.
+ */
+export function signalNavigationCancel(): void {
+  cancelListeners.forEach((listener) => listener());
 }
 
 export function pushWithLoading(

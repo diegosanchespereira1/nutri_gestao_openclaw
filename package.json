@@ -14,6 +14,9 @@
     "test:watch": "vitest",
     "test:rls": "vitest run --config vitest.config.rls.ts",
     "test:rls:watch": "vitest --config vitest.config.rls.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed --workers=1",
     "mobile:sync": "npx cap sync",
     "mobile:ios": "npx cap open ios",
     "mobile:android": "npx cap open android",
@@ -63,6 +66,7 @@
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",

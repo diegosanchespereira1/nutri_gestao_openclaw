@@ -63,17 +63,22 @@ export function ChecklistFillDossierItemBody({
       const r = responses[itemId] ?? emptyItem();
       if (!r.outcome) return;
       setSavingItemId(itemId);
-      await saveFillItemResponse({
-        sessionId,
-        itemId,
-        itemResponseSource,
-        outcome: r.outcome,
-        note: r.note,
-        annotation: r.annotation,
-        validUntil: r.validUntil,
-        withRevalidate: false,
-      });
-      setSavingItemId(null);
+      try {
+        await saveFillItemResponse({
+          sessionId,
+          itemId,
+          itemResponseSource,
+          outcome: r.outcome,
+          note: r.note,
+          annotation: r.annotation,
+          validUntil: r.validUntil,
+          withRevalidate: false,
+        });
+      } catch (err) {
+        console.error("[flushItem] falha de conexão ao salvar", err);
+      } finally {
+        setSavingItemId(null);
+      }
     },
     [emptyItem, itemResponseSource, responses, sessionId],
   );

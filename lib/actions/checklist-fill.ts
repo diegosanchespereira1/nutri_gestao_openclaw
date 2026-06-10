@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
@@ -11,6 +11,7 @@ import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-phot
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleByIdDirect } from "@/lib/actions/checklists";
 import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
+import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
@@ -706,6 +707,7 @@ export async function saveFillItemResponse(input: {
       }
     }
 
+    revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
     return { ok: true };
   }
 
@@ -766,7 +768,39 @@ export async function saveFillItemResponse(input: {
     const { error } = await supabase
       .from("checklist_fill_item_responses")
       .insert(insertPayload);
-    if (error) {
+    if (error && error.code === "23505") {
+      // Corrida benigna: outro save (autosave/blur ou outro dispositivo) inseriu
+      // a resposta entre o SELECT e o INSERT. A linha já existe — atualiza-a.
+      const { data: raceRow } = await supabase
+        .from("checklist_fill_item_responses")
+        .select("id, note, item_annotation, valid_until")
+        .eq("session_id", sessionId)
+        .eq(itemColumn, itemId)
+        .maybeSingle();
+      if (raceRow) {
+        const racePayload = buildResponseUpdatePayload({
+          outcome,
+          noteTrim,
+          annotationTrim,
+          validUntil: normalizedValidUntil,
+          existingNote: raceRow.note as string | null,
+          existingAnnotation: raceRow.item_annotation as string | null,
+          existingValidUntil: raceRow.valid_until as string | null,
+          persistMode,
+        });
+        const { error: raceErr } = await supabase
+          .from("checklist_fill_item_responses")
+          .update(racePayload)
+          .eq("id", raceRow.id as string);
+        if (raceErr) {
+          console.error(
+            "[saveFillItemResponse] UPDATE-after-conflict error",
+            JSON.stringify({ sessionId, itemId, itemColumn, error: raceErr }),
+          );
+          return { ok: false, error: "Não foi possível salvar." };
+        }
+      }
+    } else if (error) {
       console.error(
         "[saveFillItemResponse] INSERT error",
         JSON.stringify({
@@ -797,6 +831,7 @@ export async function saveFillItemResponse(input: {
     }
   }
 
+  revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
   return { ok: true };
 }
 
@@ -1029,34 +1064,123 @@ export async function saveFillResponsesBatch(input: {
     insertRows.push(insertPayload);
   }
 
-  // Execute all DB mutations in parallel (3 operations max instead of N)
-  const results = await Promise.all([
-    ...(deleteIds.length > 0
-      ? [supabase.from("checklist_fill_item_responses").delete().in("id", deleteIds)]
-      : []),
-    ...(insertRows.length > 0
-      ? [supabase.from("checklist_fill_item_responses").insert(insertRows)]
-      : []),
-    ...updateOps.map(({ id, payload }) =>
-      supabase.from("checklist_fill_item_responses").update(payload).eq("id", id),
-    ),
-  ]);
-  const failedResult = results.find((r) => r.error);
-  if (failedResult) {
-    const ops = [
-      ...(deleteIds.length > 0 ? [`DELETE ids=[${deleteIds.join(",")}]`] : []),
-      ...(insertRows.length > 0 ? [`INSERT rows=${insertRows.length}`] : []),
-      ...(updateOps.length > 0 ? [`UPDATE ids=[${updateOps.map((u) => u.id).join(",")}]`] : []),
-    ];
+  /**
+   * INSERT com recuperação de corrida (23505): se outro save concorrente
+   * (blur + autosave, outro separador/dispositivo) inseriu a mesma resposta
+   * entre o SELECT e o INSERT, converte as linhas em conflito para UPDATE
+   * em vez de devolver "Não foi possível salvar." ao utilizador.
+   */
+  const runInsertsWithConflictRecovery = async (): Promise<{ error: unknown }> => {
+    if (insertRows.length === 0) return { error: null };
+    const { error } = await supabase
+      .from("checklist_fill_item_responses")
+      .insert(insertRows);
+    if (!error || error.code !== "23505") return { error };
+
+    const insertItemIds = insertRows.map((row) => String(row[itemColumn]));
+    const { data: raceRows, error: raceSelErr } = await supabase
+      .from("checklist_fill_item_responses")
+      .select("id, note, item_annotation, valid_until, template_item_id, custom_item_id, workspace_item_id")
+      .eq("session_id", sessionId)
+      .in(itemColumn, insertItemIds);
+    if (raceSelErr) return { error: raceSelErr };
+
+    const raceByItemId = new Map<
+      string,
+      { id: string; note: string | null; item_annotation: string | null; valid_until: string | null }
+    >();
+    for (const row of raceRows ?? []) {
+      const key =
+        (row.template_item_id as string | null) ??
+        (row.custom_item_id as string | null) ??
+        (row.workspace_item_id as string | null);
+      if (!key) continue;
+      raceByItemId.set(key, {
+        id: String(row.id),
+        note: (row.note as string | null) ?? null,
+        item_annotation: (row.item_annotation as string | null) ?? null,
+        valid_until: (row.valid_until as string | null) ?? null,
+      });
+    }
+
+    for (const row of insertRows) {
+      const itemId = String(row[itemColumn]);
+      const existing = raceByItemId.get(itemId);
+      if (!existing) {
+        const { error: retryInsErr } = await supabase
+          .from("checklist_fill_item_responses")
+          .insert(row);
+        if (retryInsErr && retryInsErr.code !== "23505") return { error: retryInsErr };
+        continue;
+      }
+      const payload = buildResponseUpdatePayload({
+        outcome: row.outcome as ChecklistFillOutcome,
+        noteTrim: (row.note as string | null) ?? "",
+        annotationTrim: (row.item_annotation as string | null) ?? "",
+        validUntil: (row.valid_until as string | null) ?? null,
+        existingNote: existing.note,
+        existingAnnotation: existing.item_annotation,
+        existingValidUntil: existing.valid_until,
+        persistMode,
+      });
+      const { error: raceUpdErr } = await supabase
+        .from("checklist_fill_item_responses")
+        .update(payload)
+        .eq("id", existing.id);
+      if (raceUpdErr) return { error: raceUpdErr };
+    }
+    return { error: null };
+  };
+
+  // Em sequência (não Promise.all): vários UPDATEs em paralelo disputavam o mesmo
+  // lock em checklist_fill_sessions via trigger touch_session.
+  if (deleteIds.length > 0) {
+    const { error: delErr } = await supabase
+      .from("checklist_fill_item_responses")
+      .delete()
+      .in("id", deleteIds);
+    if (delErr) {
+      console.error(
+        "[saveFillResponsesBatch] DB error",
+        JSON.stringify({
+          sessionId,
+          ops: [`DELETE ids=[${deleteIds.join(",")}]`],
+          error: delErr,
+        }),
+      );
+      return { ok: false, error: "Não foi possível salvar." };
+    }
+  }
+
+  const insertErrResult = await runInsertsWithConflictRecovery();
+  if (insertErrResult.error) {
     console.error(
       "[saveFillResponsesBatch] DB error",
       JSON.stringify({
         sessionId,
-        ops,
-        error: failedResult.error,
+        ops: insertRows.length > 0 ? [`INSERT rows=${insertRows.length}`] : [],
+        error: insertErrResult.error,
       }),
     );
     return { ok: false, error: "Não foi possível salvar." };
+  }
+
+  for (const { id, payload } of updateOps) {
+    const { error: updErr } = await supabase
+      .from("checklist_fill_item_responses")
+      .update(payload)
+      .eq("id", id);
+    if (updErr) {
+      console.error(
+        "[saveFillResponsesBatch] DB error",
+        JSON.stringify({
+          sessionId,
+          ops: [`UPDATE id=${id}`],
+          error: updErr,
+        }),
+      );
+      return { ok: false, error: "Não foi possível salvar." };
+    }
   }
 
   if (withRevalidate) {
@@ -1069,6 +1193,7 @@ export async function saveFillResponsesBatch(input: {
     }
   }
 
+  revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
   return { ok: true };
 }
 

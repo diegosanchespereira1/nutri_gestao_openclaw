@@ -1,7 +1,9 @@
 "use server";
 
+import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { addCalendarDays, calendarDaysUntilDueDate, todayKey } from "@/lib/datetime/calendar-tz";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
@@ -341,18 +343,39 @@ export async function loadChecklistValidityAlerts(
   const { supabase, workspaceOwnerId } = await getServerContext();
   if (!workspaceOwnerId) return [];
 
-  const viaRpc = await loadChecklistValidityAlertsViaRpc(
-    supabase,
-    workspaceOwnerId,
-    timeZone,
-    options,
-  );
-  if (viaRpc) return viaRpc;
+  const withinDays = options?.withinDays ?? 7;
+  const limit = options?.limit ?? 8;
+  const clientId = options?.clientId ?? null;
 
-  return loadChecklistValidityAlertsLegacy(
-    supabase,
-    workspaceOwnerId,
-    timeZone,
-    options,
+  const cachedLoad = unstable_cache(
+    async () => {
+      const viaRpc = await loadChecklistValidityAlertsViaRpc(
+        supabase,
+        workspaceOwnerId,
+        timeZone,
+        { withinDays, limit, clientId },
+      );
+      if (viaRpc) return viaRpc;
+      return loadChecklistValidityAlertsLegacy(
+        supabase,
+        workspaceOwnerId,
+        timeZone,
+        { withinDays, limit, clientId },
+      );
+    },
+    [
+      "checklist-validity-alerts-v1",
+      workspaceOwnerId,
+      timeZone,
+      String(withinDays),
+      String(limit),
+      clientId ?? "",
+    ],
+    {
+      revalidate: 120,
+      tags: [checklistValidityAlertsCacheTag(workspaceOwnerId)],
+    },
   );
+
+  return cachedLoad();
 }

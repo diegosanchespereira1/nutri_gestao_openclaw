@@ -553,6 +553,19 @@ export function ChecklistFillWizard({
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyItemIdsRef = useRef<Set<string>>(new Set());
   const saveBatchInFlightRef = useRef(false);
+  /** Ref para o próprio saveProgressBatch — permite reagendar saves concorrentes sem dependência circular. */
+  const saveProgressBatchRef = useRef<(scope: "section" | "all", forceAll: boolean) => void>(
+    () => {},
+  );
+
+  /** Reagenda um ciclo de save (itens continuam dirty) em vez de o descartar. */
+  const rescheduleSave = useCallback((scope: "section" | "all", forceAll: boolean, delayMs: number) => {
+    if (autosaveTimerRef.current !== null) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      saveProgressBatchRef.current(scope, forceAll);
+    }, delayMs);
+  }, []);
 
   function reportSaving() {
     if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
@@ -805,25 +818,41 @@ export function ChecklistFillWizard({
         const cur = responsesRef.current[itemId];
         if (!cur?.outcome) return;
         if (!dirtyItemIdsRef.current.has(itemId)) return;
+        if (saveBatchInFlightRef.current) {
+          // Há um save em curso — o item continua dirty; reagenda para o
+          // próximo ciclo em vez de disparar uma escrita concorrente
+          // (evita corrida INSERT duplicado → "Não foi possível salvar").
+          rescheduleSave("all", false, RADIO_AUTOSAVE_DEBOUNCE_MS);
+          return;
+        }
+        saveBatchInFlightRef.current = true;
         reportSaving();
-        const result = await saveFillItemResponse({
-          sessionId,
-          itemId,
-          itemResponseSource,
-          outcome: cur.outcome,
-          note: cur.note ?? null,
-          annotation: cur.annotation ?? null,
-          validUntil: cur.validUntil ?? null,
-          persistMode: "full",
-          withRevalidate: false,
-        });
-        if (result.ok) {
-          clearDirtyItems([itemId]);
-          reportSaved();
-        } else reportSaveError(result.error);
+        try {
+          const result = await saveFillItemResponse({
+            sessionId,
+            itemId,
+            itemResponseSource,
+            outcome: cur.outcome,
+            note: cur.note ?? null,
+            annotation: cur.annotation ?? null,
+            validUntil: cur.validUntil ?? null,
+            persistMode: "full",
+            withRevalidate: false,
+          });
+          if (result.ok) {
+            clearDirtyItems([itemId]);
+            reportSaved();
+          } else reportSaveError(result.error);
+        } catch (err) {
+          console.error("[persistItemOnBlur] falha de conexão", err);
+          reportSaveError("Falha de conexão ao salvar. Tentando novamente…");
+          rescheduleSave("all", false, 4000);
+        } finally {
+          saveBatchInFlightRef.current = false;
+        }
       });
     },
-    [clearDirtyItems, sessionId, itemResponseSource],
+    [clearDirtyItems, sessionId, itemResponseSource, rescheduleSave],
   );
 
   const section = sections[sectionIndex];
@@ -880,7 +909,12 @@ export function ChecklistFillWizard({
 
   const saveProgressBatch = useCallback(
     (scope: "section" | "all", forceAll: boolean) => {
-      if (!section || saveBatchInFlightRef.current) return;
+      if (!section) return;
+      if (saveBatchInFlightRef.current) {
+        // Save em curso — reagenda em vez de descartar (itens continuam dirty).
+        rescheduleSave(scope, forceAll, RADIO_AUTOSAVE_DEBOUNCE_MS);
+        return;
+      }
 
       const itemIds = pickBatchItemIdsForSave({
         scope,
@@ -904,25 +938,38 @@ export function ChecklistFillWizard({
             validUntil: cur?.validUntil ?? null,
           };
         });
-        const result = await saveFillResponsesBatch({
-          sessionId,
-          itemResponseSource,
-          entries,
-          persistMode: "full",
-          withRevalidate: false,
-        });
-        if (!result.ok) {
+        try {
+          const result = await saveFillResponsesBatch({
+            sessionId,
+            itemResponseSource,
+            entries,
+            persistMode: "full",
+            withRevalidate: false,
+          });
+          if (!result.ok) {
+            reportSaveError(result.error);
+            return;
+          }
+          clearDirtyItems(itemIds);
+          reportSaved();
+        } catch (err) {
+          // Falha de rede / deploy a meio da sessão: não pode travar o autosave
+          // para sempre (flag in-flight presa) — reagenda nova tentativa.
+          console.error("[saveProgressBatch] falha de conexão", err);
+          reportSaveError("Falha de conexão ao salvar. Tentando novamente…");
+          rescheduleSave(scope, forceAll, 4000);
+        } finally {
           saveBatchInFlightRef.current = false;
-          reportSaveError(result.error);
-          return;
         }
-        clearDirtyItems(itemIds);
-        saveBatchInFlightRef.current = false;
-        reportSaved();
       });
     },
-    [clearDirtyItems, itemResponseSource, section, sessionId],
+    [clearDirtyItems, itemResponseSource, section, sessionId, rescheduleSave],
   );
+
+  // Mantém a ref sincronizada para reagendamentos (sem dependência circular).
+  useEffect(() => {
+    saveProgressBatchRef.current = saveProgressBatch;
+  }, [saveProgressBatch]);
 
   const scheduleRadioAutosave = useCallback(() => {
     if (autosaveTimerRef.current !== null) {

@@ -469,7 +469,7 @@ export default async function EditarClientePage({
 
   if (error || !data) notFound();
 
-  const row = normalizeClientRow(data as Record<string, unknown>);
+  const row = normalizeClientRow(data as unknown as Record<string, unknown>);
   const shell = shellFromClientRow(row);
 
   if (sp.tab === "estabelecimento" && shell.kind === "pj") {

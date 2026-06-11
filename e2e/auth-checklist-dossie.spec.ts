@@ -162,7 +162,7 @@ test.describe("Checklist do sistema — dossiê completo com PDF", () => {
       await nextSection.waitFor({ state: "visible" });
       if (await nextSection.isDisabled()) break;
       await nextSection.click();
-      // Aguardar a transição de seção (autosave + render).
+      // Aguardar a transição de seção (overlay de carregamento).
       await expect(
         page.getByRole("button", { name: "Carregando..." }),
       ).toHaveCount(0, { timeout: 30_000 });

@@ -32,7 +32,6 @@ import {
   approveChecklistFillDossierAction,
   loadFillResponsesMapForSession,
   saveFillResponsesBatch,
-  saveFillItemResponse,
   type FillActionResult,
 } from "@/lib/actions/checklist-fill";
 import {
@@ -104,7 +103,8 @@ const sectionSelectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full min-w-[12rem] max-w-xl rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
 
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
-const RADIO_AUTOSAVE_DEBOUNCE_MS = 500;
+/** Reagendar save em lote quando já há um em curso (evita corridas). */
+const SAVE_BATCH_RESCHEDULE_MS = 500;
 
 /* ── Visualização de assinaturas após aprovação ─────────────────────── */
 /** Cabeçalho de subseção (sem avaliação nem fotos). */
@@ -139,7 +139,6 @@ type ChecklistFillItemProps = {
   onSetNote: (itemId: string, note: string) => void;
   onSetValidUntil: (itemId: string, validUntil: string) => void;
   onSetAnnotation: (itemId: string, annotation: string) => void;
-  onPersistOnBlur: (itemId: string) => void;
   onPhotosChange: (itemId: string, photos: ChecklistFillPhotoView[]) => void;
 };
 
@@ -156,7 +155,6 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
   onSetNote,
   onSetValidUntil,
   onSetAnnotation,
-  onPersistOnBlur,
   onPhotosChange,
 }: ChecklistFillItemProps) {
   if (isStructureOnlyItem(item)) {
@@ -268,7 +266,6 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
             rows={3}
             value={empty.note ?? ""}
             onChange={(e) => onSetNote(item.id, e.target.value)}
-            onBlur={() => onPersistOnBlur(item.id)}
             className={textareaClass}
             aria-invalid={Boolean(err)}
             aria-describedby={err ? `err-${item.id}` : undefined}
@@ -288,7 +285,6 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
               type="date"
               value={empty.validUntil ?? ""}
               onChange={(e) => onSetValidUntil(item.id, e.target.value)}
-              onBlur={() => onPersistOnBlur(item.id)}
               disabled={formLocked}
               className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 min-w-[10rem] flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
@@ -301,7 +297,6 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
                 disabled={formLocked}
                 onClick={() => {
                   onSetValidUntil(item.id, "");
-                  setTimeout(() => onPersistOnBlur(item.id), 0);
                 }}
               >
                 <X className="size-4" aria-hidden />
@@ -324,7 +319,6 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
             maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
             value={empty.annotation ?? ""}
             onChange={(e) => onSetAnnotation(item.id, e.target.value)}
-            onBlur={() => onPersistOnBlur(item.id)}
             className={textareaClass}
             aria-describedby={`annotation-hint-${item.id}`}
           />
@@ -811,50 +805,6 @@ export function ChecklistFillWizard({
     return () => document.removeEventListener("click", handleClickCapture, true);
   }, [formLocked]);
 
-  /** Grava nota/anotação só ao sair do campo — evita salvar a cada tecla. */
-  const persistItemOnBlur = useCallback(
-    (itemId: string) => {
-      startTransition(async () => {
-        const cur = responsesRef.current[itemId];
-        if (!cur?.outcome) return;
-        if (!dirtyItemIdsRef.current.has(itemId)) return;
-        if (saveBatchInFlightRef.current) {
-          // Há um save em curso — o item continua dirty; reagenda para o
-          // próximo ciclo em vez de disparar uma escrita concorrente
-          // (evita corrida INSERT duplicado → "Não foi possível salvar").
-          rescheduleSave("all", false, RADIO_AUTOSAVE_DEBOUNCE_MS);
-          return;
-        }
-        saveBatchInFlightRef.current = true;
-        reportSaving();
-        try {
-          const result = await saveFillItemResponse({
-            sessionId,
-            itemId,
-            itemResponseSource,
-            outcome: cur.outcome,
-            note: cur.note ?? null,
-            annotation: cur.annotation ?? null,
-            validUntil: cur.validUntil ?? null,
-            persistMode: "full",
-            withRevalidate: false,
-          });
-          if (result.ok) {
-            clearDirtyItems([itemId]);
-            reportSaved();
-          } else reportSaveError(result.error);
-        } catch (err) {
-          console.error("[persistItemOnBlur] falha de conexão", err);
-          reportSaveError("Falha de conexão ao salvar. Tentando novamente…");
-          rescheduleSave("all", false, 4000);
-        } finally {
-          saveBatchInFlightRef.current = false;
-        }
-      });
-    },
-    [clearDirtyItems, sessionId, itemResponseSource, rescheduleSave],
-  );
-
   const section = sections[sectionIndex];
   const isLast = sectionIndex >= sections.length - 1;
 
@@ -912,7 +862,7 @@ export function ChecklistFillWizard({
       if (!section) return;
       if (saveBatchInFlightRef.current) {
         // Save em curso — reagenda em vez de descartar (itens continuam dirty).
-        rescheduleSave(scope, forceAll, RADIO_AUTOSAVE_DEBOUNCE_MS);
+        rescheduleSave(scope, forceAll, SAVE_BATCH_RESCHEDULE_MS);
         return;
       }
 
@@ -953,8 +903,7 @@ export function ChecklistFillWizard({
           clearDirtyItems(itemIds);
           reportSaved();
         } catch (err) {
-          // Falha de rede / deploy a meio da sessão: não pode travar o autosave
-          // para sempre (flag in-flight presa) — reagenda nova tentativa.
+          // Falha de rede / deploy a meio do save: não deixar a flag in-flight presa.
           console.error("[saveProgressBatch] falha de conexão", err);
           reportSaveError("Falha de conexão ao salvar. Tentando novamente…");
           rescheduleSave(scope, forceAll, 4000);
@@ -969,24 +918,6 @@ export function ChecklistFillWizard({
   // Mantém a ref sincronizada para reagendamentos (sem dependência circular).
   useEffect(() => {
     saveProgressBatchRef.current = saveProgressBatch;
-  }, [saveProgressBatch]);
-
-  const scheduleRadioAutosave = useCallback(() => {
-    if (autosaveTimerRef.current !== null) {
-      clearTimeout(autosaveTimerRef.current);
-    }
-    autosaveTimerRef.current = setTimeout(() => {
-      autosaveTimerRef.current = null;
-      saveProgressBatch("all", false);
-    }, RADIO_AUTOSAVE_DEBOUNCE_MS);
-  }, [saveProgressBatch]);
-
-  const saveCurrentSectionFields = useCallback(() => {
-    if (autosaveTimerRef.current !== null) {
-      clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
-    saveProgressBatch("section", false);
   }, [saveProgressBatch]);
 
   // ── Handlers memoizados — estáveis entre renders para que React.memo
@@ -1006,10 +937,8 @@ export function ChecklistFillWizard({
         ...prev,
         [itemId]: { outcome, note, annotation, validUntil },
       }));
-      reportSaving();
-      scheduleRadioAutosave();
     },
-    [markItemDirty, scheduleRadioAutosave],
+    [markItemDirty],
   );
 
   const setNote = useCallback((itemId: string, note: string) => {
@@ -1049,16 +978,12 @@ export function ChecklistFillWizard({
     setAdvanceError(null);
     if (!section || isLast) return;
     setSectionNavLoading(true);
-    // Salvar campos antes de ir para próxima seção
-    saveCurrentSectionFields();
     setSectionIndex((i) => i + 1);
   }
 
   function handlePrev() {
     setAdvanceError(null);
     setSectionNavLoading(true);
-    // Salvar campos antes de ir para seção anterior
-    saveCurrentSectionFields();
     setSectionIndex((i) => Math.max(0, i - 1));
   }
 
@@ -1246,7 +1171,7 @@ export function ChecklistFillWizard({
               Carregando seção...
             </span>
           ) : null}
-          {/* Task D: indicador de auto-save */}
+          {/* Indicador de gravação explícita (Salvar agora / finalizar) */}
           {saveStatus === "saving" && (
             <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
               <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -1374,7 +1299,6 @@ export function ChecklistFillWizard({
             onSetNote={setNote}
             onSetValidUntil={setValidUntil}
             onSetAnnotation={setAnnotation}
-            onPersistOnBlur={persistItemOnBlur}
             onPhotosChange={handlePhotosChange}
           />
           ))}
@@ -1397,7 +1321,6 @@ export function ChecklistFillWizard({
                   const next = Number.parseInt(e.target.value, 10);
                   if (!Number.isFinite(next)) return;
                   setSectionNavLoading(true);
-                  saveCurrentSectionFields();
                   setSectionIndex(Math.min(Math.max(0, next), sections.length - 1));
                 }}
                 aria-label="Escolher seção do checklist"
@@ -1448,6 +1371,7 @@ export function ChecklistFillWizard({
               onClick={() => {
                 setAdvanceError(null);
                 setFinalizeDialogError(null);
+                setFinalizeBusy(false);
                 setFinalizeDialogOpen(true);
               }}
             >
@@ -1455,6 +1379,15 @@ export function ChecklistFillWizard({
             </Button>
           ) : null}
         </div>
+        {!formLocked ? (
+          <p className="text-muted-foreground max-w-xl text-xs">
+            As respostas só são gravadas no servidor ao usar{" "}
+            <span className="text-foreground font-medium">Salvar agora</span>, ao
+            confirmar{" "}
+            <span className="text-foreground font-medium">Finalizar e ver dossiê</span>, ao
+            aprovar o dossiê ou ao sair da página escolhendo gravar o rascunho.
+          </p>
+        ) : null}
         {dossierPreviewConfirmed || dossierApprovedAt ? (
           <div className="space-y-4">
             <div className="bg-muted/50 rounded-lg border p-4 text-sm">
@@ -1466,7 +1399,7 @@ export function ChecklistFillWizard({
               <p className="text-muted-foreground mt-1">
                 {dossierApprovedAt
                   ? "Dossiê aprovado e registrado. Se esta sessão estiver ligada a uma visita, a visita foi marcada como concluída."
-                  : "Dossiê compilado abaixo. Ajuste textos se necessário e aprove para fechar o ciclo."}
+                  : "Dossiê compilado abaixo. Ajuste textos se necessário; ao aprovar, as alterações são gravadas no servidor e o ciclo fecha."}
               </p>
               {dossierApprovedAt ? (
                 <p
@@ -1592,7 +1525,10 @@ export function ChecklistFillWizard({
         open={finalizeDialogOpen}
         onOpenChange={(open) => {
           setFinalizeDialogOpen(open);
-          if (!open) setFinalizeDialogError(null);
+          if (!open) {
+            setFinalizeDialogError(null);
+            setFinalizeBusy(false);
+          }
         }}
       >
         <DialogContent showCloseButton>
@@ -1601,8 +1537,8 @@ export function ChecklistFillWizard({
             <DialogDescription>
               Será gerado um relatório único com todas as seções, avaliações, textos de
               não conformidade, anotações e fotos. Ao confirmar, sincronizamos com o
-              servidor e validamos tudo outra vez. Se faltar algum requisito, indicamos a
-              seção a corrigir.
+              servidor tudo o que ainda não foi gravado e validamos outra vez. Se faltar
+              algum requisito, indicamos a seção a corrigir.
             </DialogDescription>
           </DialogHeader>
           {finalizeDialogError ? (
@@ -1640,14 +1576,24 @@ export function ChecklistFillWizard({
                 setFinalizeDialogError(null);
                 setFinalizeBusy(true);
                 void (async () => {
-                  const synced = await runReconcileThenSync();
-                  setFinalizeBusy(false);
-                  if (!synced.ok) {
-                    setFinalizeDialogError(synced.error);
-                    return;
+                  try {
+                    const synced = await runReconcileThenSync();
+                    if (!synced.ok) {
+                      setFinalizeDialogError(synced.error);
+                      return;
+                    }
+                    setDossierPreviewConfirmed(true);
+                    setFinalizeDialogOpen(false);
+                  } catch (err) {
+                    console.error("[checklist-fill-wizard] finalizar dossiê", err);
+                    setFinalizeDialogError(
+                      err instanceof Error
+                        ? err.message
+                        : "Erro inesperado ao sincronizar. Tente de novo ou recarregue a página.",
+                    );
+                  } finally {
+                    setFinalizeBusy(false);
                   }
-                  setDossierPreviewConfirmed(true);
-                  setFinalizeDialogOpen(false);
                 })();
               }}
             >
@@ -1762,13 +1708,13 @@ export function ChecklistFillWizard({
                   </>
                 ) : (
                   <>
-                    Vista com base no que já foi salvo (rascunho). Itens por preencher
-                    aparecem como “Sem avaliação”. Continue nas seções; quando terminar,
-                    use{" "}
+                    Pré-visualização com o rascunho atual nesta página (inclui alterações
+                    ainda não gravadas com o botão Salvar agora). Para rever, editar textos
+                    e aprovar, use{" "}
                     <span className="text-foreground font-medium">
                       Finalizar e ver dossiê
-                    </span>{" "}
-                    para rever, editar textos e aprovar.
+                    </span>
+                    .
                   </>
                 )}
               </DialogDescription>
@@ -1875,35 +1821,45 @@ export function ChecklistFillWizard({
           setSignatureDialogOpen(false);
           setApproveError(null);
           startApproveTransition(async () => {
-            const synced = await runReconcileThenSync();
-            if (!synced.ok) {
-              setApproveError(synced.error);
+            try {
+              const synced = await runReconcileThenSync();
+              if (!synced.ok) {
+                setApproveError(synced.error);
+                setPendingSignatures(null);
+                return;
+              }
+              const r = await approveChecklistFillDossierAction(
+                sessionId,
+                signatures,
+              );
+              if (!r.ok) {
+                setApproveError(r.error);
+                setPendingSignatures(null);
+                return;
+              }
+              // Persiste assinaturas e hash localmente para exibição imediata
+              setSavedProfessionalSig(signatures.professional);
+              setSavedClientSig(signatures.client || null);
+              setSavedClientSignerName(signatures.clientSignerName || null);
+              setSavedDocumentHash(r.documentHash ?? null);
               setPendingSignatures(null);
-              return;
-            }
-            const r = await approveChecklistFillDossierAction(
-              sessionId,
-              signatures,
-            );
-            if (!r.ok) {
-              setApproveError(r.error);
+              setDossierApprovedAt(r.approvedAt);
+              const nextInBatch = getNextBatchItemAfterSession(sessionId);
+              if (nextInBatch) {
+                setMultiAreaNextDialog(nextInBatch);
+              } else {
+                clearChecklistFillBatch();
+              }
+              router.refresh();
+            } catch (err) {
+              console.error("[checklist-fill-wizard] aprovar dossiê", err);
+              setApproveError(
+                err instanceof Error
+                  ? err.message
+                  : "Erro inesperado ao aprovar. Tente de novo ou recarregue a página.",
+              );
               setPendingSignatures(null);
-              return;
             }
-            // Persiste assinaturas e hash localmente para exibição imediata
-            setSavedProfessionalSig(signatures.professional);
-            setSavedClientSig(signatures.client || null);
-            setSavedClientSignerName(signatures.clientSignerName || null);
-            setSavedDocumentHash(r.documentHash ?? null);
-            setPendingSignatures(null);
-            setDossierApprovedAt(r.approvedAt);
-            const nextInBatch = getNextBatchItemAfterSession(sessionId);
-            if (nextInBatch) {
-              setMultiAreaNextDialog(nextInBatch);
-            } else {
-              clearChecklistFillBatch();
-            }
-            router.refresh();
           });
         }}
       />

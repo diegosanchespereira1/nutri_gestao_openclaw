@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, X, ZoomIn } from "lucide-react";
-
-import { saveFillItemResponse } from "@/lib/actions/checklist-fill";
 import { Button } from "@/components/ui/button";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
@@ -47,7 +45,6 @@ export function ChecklistFillDossierItemBody({
   itemResponseSource,
   onPatchResponse,
 }: Props) {
-  const [savingItemId, setSavingItemId] = useState<string | null>(null);
   const [viewingImage, setViewingImage] = useState<{
     url: string;
     hasLocation: boolean;
@@ -56,32 +53,6 @@ export function ChecklistFillDossierItemBody({
   const canEdit =
     reviewEditable &&
     Boolean(sessionId && itemResponseSource && onPatchResponse);
-
-  const flushItem = useCallback(
-    async (itemId: string) => {
-      if (!sessionId || !itemResponseSource) return;
-      const r = responses[itemId] ?? emptyItem();
-      if (!r.outcome) return;
-      setSavingItemId(itemId);
-      try {
-        await saveFillItemResponse({
-          sessionId,
-          itemId,
-          itemResponseSource,
-          outcome: r.outcome,
-          note: r.note,
-          annotation: r.annotation,
-          validUntil: r.validUntil,
-          withRevalidate: false,
-        });
-      } catch (err) {
-        console.error("[flushItem] falha de conexão ao salvar", err);
-      } finally {
-        setSavingItemId(null);
-      }
-    },
-    [emptyItem, itemResponseSource, responses, sessionId],
-  );
 
   return (
     <>
@@ -98,7 +69,6 @@ export function ChecklistFillDossierItemBody({
         }
         const r = responses[item.id] ?? emptyItem();
         const photos = itemPhotos[item.id] ?? [];
-        const busy = savingItemId === item.id;
         const isNc = r.outcome === "nc";
         return (
           <li
@@ -145,12 +115,10 @@ export function ChecklistFillDossierItemBody({
                       id={`dossier-nc-${item.id}`}
                       rows={3}
                       maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
-                      disabled={busy}
                       value={r.note ?? ""}
                       onChange={(e) =>
                         onPatchResponse?.(item.id, { note: e.target.value })
                       }
-                      onBlur={() => void flushItem(item.id)}
                       className={textareaClass}
                     />
                   </>
@@ -182,14 +150,12 @@ export function ChecklistFillDossierItemBody({
                       id={`dossier-ann-${item.id}`}
                       rows={3}
                       maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
-                      disabled={busy}
                       value={r.annotation ?? ""}
                       onChange={(e) =>
                         onPatchResponse?.(item.id, {
                           annotation: e.target.value,
                         })
                       }
-                      onBlur={() => void flushItem(item.id)}
                       className={textareaClass}
                       aria-describedby={`dossier-ann-hint-${item.id}`}
                     />
@@ -227,7 +193,6 @@ export function ChecklistFillDossierItemBody({
                       <input
                         id={`dossier-valid-until-${item.id}`}
                         type="date"
-                        disabled={busy}
                         value={r.validUntil ?? ""}
                         onChange={(e) => {
                           const v = e.target.value.trim();
@@ -235,7 +200,6 @@ export function ChecklistFillDossierItemBody({
                             validUntil: v === "" ? null : e.target.value,
                           });
                         }}
-                        onBlur={() => void flushItem(item.id)}
                         className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 min-w-[10rem] flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                       />
                       {(r.validUntil ?? "").trim() ? (
@@ -244,10 +208,8 @@ export function ChecklistFillDossierItemBody({
                           variant="outline"
                           size="sm"
                           className="shrink-0 gap-1"
-                          disabled={busy}
                           onClick={() => {
                             onPatchResponse?.(item.id, { validUntil: null });
-                            setTimeout(() => void flushItem(item.id), 0);
                           }}
                         >
                           <X className="size-4" aria-hidden />

@@ -798,6 +798,9 @@ export function ChecklistFillWizard({
       leavePromptOpenRef.current = true;
       leaveLinkTargetRef.current = dest;
       setLeaveLinkTarget(dest);
+      // AppMainContent (capture no document) corre antes e agenda o overlay; aqui a
+      // navegação não vai avançar — mostramos o modal. Cancelar o loading evitado.
+      signalNavigationCancel();
     }
 
     document.addEventListener("click", handleClickCapture, true);

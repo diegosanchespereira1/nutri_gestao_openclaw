@@ -36,8 +36,9 @@ import {
 import { touchMinHeight, touchMinTarget } from "@/lib/touch-targets";
 import { cn } from "@/lib/utils";
 import {
-  checkExistingOpenFillSession,
   startChecklistFillBatch,
+  startSystemTemplateFillOrGetConflict,
+  startWorkspaceTemplateFillOrGetConflict,
   type ExistingOpenSession,
 } from "@/lib/actions/checklist-fill";
 import { startWorkspaceTemplateFillBatch } from "@/lib/actions/checklist-workspace";
@@ -630,6 +631,35 @@ export function ChecklistCatalog({
   }
 
   /** Inicia uma ou mais sessões via batch e navega para a primeira. */
+  /** Após criar sessão(ões): recente + batch local + navegação (registo recente em background). */
+  async function finalizeAfterStart(
+    result: { sessionIds: string[]; firstSessionId: string },
+    templateId: string,
+    source: SelectedTemplateSource,
+  ) {
+    void registerChecklistEstablishmentOpenAction(establishmentId);
+    if (result.sessionIds.length >= 2) {
+      const items = result.sessionIds.map((sid, i) => {
+        const areaId =
+          i < selectedAreaIds.length ? (selectedAreaIds[i] ?? null) : null;
+        const area = areaId
+          ? availableAreas.find((a) => a.id === areaId)
+          : null;
+        return {
+          sessionId: sid,
+          areaId,
+          areaName: area?.name ?? null,
+        };
+      });
+      saveChecklistFillBatch({
+        templateId,
+        establishmentId,
+        items,
+      });
+    }
+    pushWithLoading(router, `/checklists/preencher/${result.firstSessionId}`);
+  }
+
   async function launchBatch(
     templateId: string,
     source: SelectedTemplateSource = "system",
@@ -648,33 +678,13 @@ export function ChecklistCatalog({
             areaIds: selectedAreaIds,
           });
     if (result.ok) {
-      await registerEstablishmentOpen();
-      if (result.sessionIds.length >= 2) {
-        const items = result.sessionIds.map((sid, i) => {
-          const areaId =
-            i < selectedAreaIds.length ? (selectedAreaIds[i] ?? null) : null;
-          const area = areaId
-            ? availableAreas.find((a) => a.id === areaId)
-            : null;
-          return {
-            sessionId: sid,
-            areaId,
-            areaName: area?.name ?? null,
-          };
-        });
-        saveChecklistFillBatch({
-          templateId,
-          establishmentId,
-          items,
-        });
-      }
-      pushWithLoading(router, `/checklists/preencher/${result.firstSessionId}`);
+      await finalizeAfterStart(result, templateId, source);
     } else {
       setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
     }
   }
 
-  /** Verifica conflito antes de criar — usa batch para multi-área. */
+  /** Verifica conflito e cria sessão numa única ida ao servidor (modelo sistema ou equipe). */
   async function handleUsarTemplate() {
     if (!establishmentId) return;
     if (availableAreas.length > 0 && selectedAreaIds.length === 0) return;
@@ -683,31 +693,42 @@ export function ChecklistCatalog({
     setCheckingSession(true);
     try {
       if (selectedWorkspaceTemplate) {
-        const existing = await checkExistingOpenFillSession({
-          establishmentId,
-          templateId: null,
-          customTemplateId: null,
+        const prep = await startWorkspaceTemplateFillOrGetConflict({
           workspaceTemplateId: selectedWorkspaceTemplate.id,
+          establishmentId,
+          areaIds: selectedAreaIds,
         });
-        if (existing) {
+        if (!prep.ok) {
+          setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
+          return;
+        }
+        if (prep.kind === "conflict") {
           setPendingTemplateId(selectedWorkspaceTemplate.id);
           setPendingTemplateSource("workspace");
-          setConflictSession(existing);
+          setConflictSession(prep.existing);
         } else {
-          await launchBatch(selectedWorkspaceTemplate.id, "workspace");
+          await finalizeAfterStart(
+            prep,
+            selectedWorkspaceTemplate.id,
+            "workspace",
+          );
         }
       } else if (selectedTemplate) {
-        const existing = await checkExistingOpenFillSession({
-          establishmentId,
+        const prep = await startSystemTemplateFillOrGetConflict({
           templateId: selectedTemplate.id,
-          customTemplateId: null,
+          establishmentId,
+          areaIds: selectedAreaIds,
         });
-        if (existing) {
+        if (!prep.ok) {
+          setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
+          return;
+        }
+        if (prep.kind === "conflict") {
           setPendingTemplateId(selectedTemplate.id);
           setPendingTemplateSource("system");
-          setConflictSession(existing);
+          setConflictSession(prep.existing);
         } else {
-          await launchBatch(selectedTemplate.id, "system");
+          await finalizeAfterStart(prep, selectedTemplate.id, "system");
         }
       }
     } finally {

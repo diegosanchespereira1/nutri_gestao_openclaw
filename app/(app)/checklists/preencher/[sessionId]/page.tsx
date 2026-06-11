@@ -1,14 +1,7 @@
 import { Info } from "lucide-react";
-import dynamic from "next/dynamic";
 import { notFound } from "next/navigation";
 
-const ChecklistFillWizard = dynamic(
-  () =>
-    import("@/components/checklists/checklist-fill-wizard").then(
-      (mod) => mod.ChecklistFillWizard,
-    ),
-  { loading: () => null },
-);
+import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import {
   getChecklistReopenEligibility,

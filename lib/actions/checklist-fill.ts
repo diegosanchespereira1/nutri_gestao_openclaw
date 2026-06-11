@@ -10,7 +10,10 @@ import { generateDocumentHash } from "@/lib/checklists/document-hash";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleByIdDirect } from "@/lib/actions/checklists";
-import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
+import {
+  loadWorkspaceTemplateBundle,
+  startWorkspaceTemplateFillBatch,
+} from "@/lib/actions/checklist-workspace";
 import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
@@ -1380,6 +1383,78 @@ export async function startChecklistFillBatch(input: {
     sessionIds,
     firstSessionId: first,
     totalSessions: sessionIds.length,
+  };
+}
+
+/** Resultado de «Usar template» no catálogo: conflito com rascunho existente ou sessão criada. */
+export type CatalogTemplateFillPrepareResult =
+  | { ok: true; kind: "conflict"; existing: ExistingOpenSession }
+  | {
+      ok: true;
+      kind: "started";
+      sessionIds: string[];
+      firstSessionId: string;
+      totalSessions: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Uma única chamada ao servidor para o fluxo «Usar template» (sistema): verifica sessão
+ * em aberto com respostas e, se não houver conflito, cria a(s) sessão(ões).
+ */
+export async function startSystemTemplateFillOrGetConflict(input: {
+  templateId: string;
+  establishmentId: string;
+  areaIds: string[];
+}): Promise<CatalogTemplateFillPrepareResult> {
+  const existing = await checkExistingOpenFillSession({
+    establishmentId: input.establishmentId,
+    templateId: input.templateId,
+    customTemplateId: null,
+  });
+  if (existing) {
+    return { ok: true, kind: "conflict", existing };
+  }
+  const started = await startChecklistFillBatch(input);
+  if (!started.ok) {
+    return { ok: false, error: started.error };
+  }
+  return {
+    ok: true,
+    kind: "started",
+    sessionIds: started.sessionIds,
+    firstSessionId: started.firstSessionId,
+    totalSessions: started.totalSessions,
+  };
+}
+
+/**
+ * Uma única chamada ao servidor para o fluxo «Usar template» (modelo da equipe).
+ */
+export async function startWorkspaceTemplateFillOrGetConflict(input: {
+  workspaceTemplateId: string;
+  establishmentId: string;
+  areaIds: string[];
+}): Promise<CatalogTemplateFillPrepareResult> {
+  const existing = await checkExistingOpenFillSession({
+    establishmentId: input.establishmentId,
+    templateId: null,
+    customTemplateId: null,
+    workspaceTemplateId: input.workspaceTemplateId,
+  });
+  if (existing) {
+    return { ok: true, kind: "conflict", existing };
+  }
+  const started = await startWorkspaceTemplateFillBatch(input);
+  if (!started.ok) {
+    return { ok: false, error: started.error };
+  }
+  return {
+    ok: true,
+    kind: "started",
+    sessionIds: started.sessionIds,
+    firstSessionId: started.firstSessionId,
+    totalSessions: started.totalSessions,
   };
 }
 

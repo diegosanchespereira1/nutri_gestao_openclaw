@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { cn } from "@/lib/utils";
 
 import styles from "./page-loading-screen.module.css";
@@ -42,13 +44,14 @@ export function PageLoadingScreen({
         className,
       )}
     >
-      <img
+      <Image
         src="/app-icon.png"
         alt=""
         width={120}
         height={120}
         className={styles.logo}
         style={{ width: 120, height: 120, maxWidth: 120, maxHeight: 120 }}
+        priority={false}
       />
 
       <p className={styles.title}>NutriGestão</p>

@@ -1,0 +1,13 @@
+#!/usr/bin/env sh
+# Acrescenta a versão actual da app (package.json) ao rodapé da mensagem de commit.
+MSG_FILE=${1:?}
+SOURCE=${2:-}
+
+case "$SOURCE" in merge|squash) exit 0 ;; esac
+
+if grep -q '^\[app v' "$MSG_FILE" 2>/dev/null; then
+  exit 0
+fi
+
+VERSION=$(node -p "require('./package.json').version")
+printf '\n\n[app v%s]\n' "$VERSION" >> "$MSG_FILE"

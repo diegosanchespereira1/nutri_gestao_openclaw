@@ -1135,8 +1135,7 @@ async function drawFooters(ctx: Ctx, input: DossierPdfBuildInput): Promise<void>
   const IMG_MAX_W = 44;   // largura máxima das miniaturas de assinatura
 
   // Cores configuráveis no rodapé (mesmas do cabeçalho)
-  const accentCol = hexToRgb(input.accentColor, C.sky);
-  const headerBg  = hexToRgb(input.headerBgColor, C.navy);
+  const headerBg = hexToRgb(input.headerBgColor, C.navy);
 
   // Incorpora imagens uma única vez no documento (pdf-lib não deduplica automaticamente)
   let proImg:    PDFImage | null = null;

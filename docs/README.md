@@ -16,6 +16,6 @@
 | [PaginasExemplos/](PaginasExemplos/) | Protótipos HTML de UI |
 | [tooling/](tooling/) | Skills, Cursor, Claude e convenções de agentes |
 
-Scripts utilitários: `scripts/database/` (SQL de referência), `scripts/pdf/` (geração de PDFs), `scripts/mobile/` (Capacitor), `scripts/perf/`.
+Scripts utilitários: `scripts/database/` (SQL de referência), `scripts/pdf/` (geração de PDFs), `scripts/mobile/` (Capacitor), `scripts/version/` (versão da app + hooks Git), `scripts/perf/`.
 
 Planeamento de produto e sprint: `_bmad-output/` na raiz do repositório.

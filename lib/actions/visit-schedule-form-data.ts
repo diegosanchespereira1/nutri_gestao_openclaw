@@ -13,7 +13,7 @@ export type VisitScheduleFormData = {
   teamMembers: TeamMemberRow[];
 };
 
-/** Dados do formulário «Agendar visita» — carregados sob demanda para não bloquear a agenda. */
+/** Dados do formulário «Agendar visita» — usados em paralelo com a agenda na página /visitas. */
 export async function loadVisitScheduleFormDataAction(): Promise<VisitScheduleFormData> {
   const [{ rows: establishments }, { rows: patients }, { rows: teamMembers }] =
     await Promise.all([

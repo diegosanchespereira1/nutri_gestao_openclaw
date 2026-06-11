@@ -10,7 +10,6 @@ import {
   visitKindIconColor,
 } from "@/lib/constants/visit-kind-style";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
-import { visitPriorityAgendaSurface } from "@/lib/constants/visit-priorities";
 import {
   formatDayColumnHeader,
   formatTimeShort,

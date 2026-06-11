@@ -1665,7 +1665,8 @@ export async function approveChecklistFillDossierAction(
       errText.includes("42703") ||
       (errText.includes("column") && errText.includes("does not exist"))
     ) {
-      const { document_hash: _omit, ...withoutHash } = approvalPayload;
+      const { document_hash, ...withoutHash } = approvalPayload;
+      void document_hash;
       const retry = await supabase
         .from("checklist_fill_sessions")
         .update(withoutHash)

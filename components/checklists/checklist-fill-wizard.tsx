@@ -505,7 +505,7 @@ export function ChecklistFillWizard({
 
   /* ── Assinaturas ── */
   const [signatureDialogOpen, setSignatureDialogOpen] = useState(false);
-  const [pendingSignatures, setPendingSignatures] = useState<SignaturePair | null>(null);
+  const [, setPendingSignatures] = useState<SignaturePair | null>(null);
   // Assinaturas persistidas — inicializadas com os dados vindos do servidor
   const [savedProfessionalSig, setSavedProfessionalSig] = useState<string | null>(
     initialProfessionalSignatureDataUrl ?? null,

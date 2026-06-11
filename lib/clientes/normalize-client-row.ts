@@ -1,6 +1,7 @@
 import { isClientBusinessSegment } from "@/lib/constants/client-business-segment";
 import type {
   ClientBusinessSegment,
+  ClientKind,
   ClientLifecycleStatus,
   ClientRow,
   ClientSocialLinks,
@@ -18,6 +19,31 @@ function normalizeLifecycle(raw: unknown): ClientLifecycleStatus {
     return raw;
   }
   return "ativo";
+}
+
+function normalizeClientKind(raw: unknown): ClientKind {
+  if (raw === "pj" || raw === "pf") return raw;
+  return "pf";
+}
+
+/** Dados leves para cabeçalho / tabs — query rápida na fase 1 da edição. */
+export type ClientEditShell = Pick<
+  ClientRow,
+  "id" | "kind" | "legal_name" | "lifecycle_status" | "logo_storage_path"
+>;
+
+export function normalizeClientEditShell(
+  raw: Record<string, unknown>,
+): ClientEditShell {
+  return {
+    id: typeof raw.id === "string" ? raw.id : String(raw.id ?? ""),
+    kind: normalizeClientKind(raw.kind),
+    legal_name:
+      typeof raw.legal_name === "string" ? raw.legal_name : String(raw.legal_name ?? ""),
+    lifecycle_status: normalizeLifecycle(raw.lifecycle_status),
+    logo_storage_path:
+      typeof raw.logo_storage_path === "string" ? raw.logo_storage_path : null,
+  };
 }
 
 function normalizeBusinessSegment(

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 
 import { VisitsAgendaClient } from "@/components/visits/visits-agenda-client";
 import { todayKey as civilTodayKey } from "@/lib/datetime/calendar-tz";
+import { loadVisitScheduleFormDataAction } from "@/lib/actions/visit-schedule-form-data";
 import { loadScheduledVisitsForAgenda } from "@/lib/visits/load-scheduled-visits";
 import { fetchAgendaSettings } from "@/lib/supabase/profile";
 import { getServerContext } from "@/lib/supabase/get-server-user";
@@ -35,6 +36,7 @@ export async function VisitasAgendaSection() {
     { timeZone: tz, agendaStartHour, agendaEndHour },
     { rows: visits },
     assigneeContext,
+    { establishments, patients, teamMembers },
   ] = await Promise.all([
     fetchAgendaSettings(supabase, user.id),
     loadScheduledVisitsForAgenda({
@@ -46,6 +48,7 @@ export async function VisitasAgendaSection() {
       to,
     }),
     loadCurrentUserAssigneeContext(supabase, user.id, workspaceOwnerId),
+    loadVisitScheduleFormDataAction(),
   ]);
 
   const todayKey = civilTodayKey(new Date(), tz);
@@ -61,10 +64,12 @@ export async function VisitasAgendaSection() {
       todayKey={todayKey}
       agendaStartHour={agendaStartHour}
       agendaEndHour={agendaEndHour}
+      establishments={establishments}
+      patients={patients}
+      teamMembers={teamMembers}
       currentUserId={user.id}
       isAgendaAdmin={isAgendaAdmin}
       assigneeContext={assigneeContext}
-      deferScheduleFormData
     />
   );
 }

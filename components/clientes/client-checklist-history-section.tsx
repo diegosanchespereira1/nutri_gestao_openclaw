@@ -91,16 +91,7 @@ export async function ClientChecklistHistorySection({
       ? sp.status
       : null;
 
-  // Busca tz antecipadamente (query leve, ~30 ms) para poder incluir
-  // loadChecklistValidityAlerts no Promise.all abaixo em vez de executá-la de
-  // forma sequencial após as queries principais (eliminação de ~100–500 ms).
-  const tz = user
-    ? await fetchProfileTimeZone(supabase, user.id)
-    : DEFAULT_PROFILE_TIME_ZONE;
-
-  // Todas as queries independentes em paralelo.
-  // loadChecklistClientStats substitui loadChecklistSessionsForClient({ limit: 500 }):
-  // 4 rounds de DB (vs. 6+ rounds com 13 queries paralelas) para os cards de resumo.
+  // Todas as queries independentes em paralelo (timezone + alertas num único async para não bloquear o array).
   const [
     { data: client },
     canReopenResult,
@@ -108,7 +99,7 @@ export async function ClientChecklistHistorySection({
     stats,
     { data: estRows },
     { data: areaRows },
-    validityAlerts,
+    validityPack,
   ] = await Promise.all([
     supabase
       .from("clients")
@@ -139,8 +130,21 @@ export async function ClientChecklistHistorySection({
           .eq("establishment_id", estFilter)
           .order("position")
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    loadChecklistValidityAlerts(tz, { clientId, limit: 12, withinDays: 7 }),
+    (async () => {
+      const t = user
+        ? await fetchProfileTimeZone(supabase, user.id)
+        : DEFAULT_PROFILE_TIME_ZONE;
+      const alerts = await loadChecklistValidityAlerts(t, {
+        clientId,
+        limit: 12,
+        withinDays: 7,
+      });
+      return { alerts, tz: t };
+    })(),
   ]);
+
+  const validityAlerts = validityPack.alerts;
+  const tz = validityPack.tz;
 
   if (!client || client.kind !== "pj") {
     return null;

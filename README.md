@@ -38,6 +38,7 @@ Estrutura do repositório e o que não mover sem revisão: **[docs/architecture/
 | `npm run dev`  | Servidor de desenvolvimento (Next.js) |
 | `npm run build`| Build de produção      |
 | `npm run start`| Servidor após `build`  |
+| `npm run version:bump-patch` | Sobe patch em `package.json` e alinha versões Android/iOS (lojas) |
 | `npm run lint` | ESLint                 |
 
 ## Stack (Story 1.1)

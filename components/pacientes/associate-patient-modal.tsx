@@ -48,14 +48,6 @@ export function AssociatePatientModal({
     FormData
   >(associatePatientToEstablishmentAction, undefined);
 
-  function handleSuccess() {
-    if (state?.ok) {
-      setOpen(false);
-      setQuery("");
-      setSelected(null);
-    }
-  }
-
   // Close dialog on success — effect-free: react to state change inline
   if (state?.ok && open) {
     setOpen(false);

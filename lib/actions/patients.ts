@@ -5,7 +5,6 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
-import { getServerUser } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
 import type { ClientKind } from "@/lib/types/clients";
 import type {

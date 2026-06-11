@@ -18,7 +18,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { SupabaseClient } from "@supabase/supabase-js";
 import {
   createServiceClient,
-  getTestEnv,
   signInTenant,
   createTenantClient,
 } from "./helpers/supabase";
@@ -65,7 +64,6 @@ let seed: LocalSeed;
 
 beforeAll(async () => {
   const service = createServiceClient();
-  const env = getTestEnv();
 
   // Criar utilizadores
   const [adminId, regularId] = await Promise.all([

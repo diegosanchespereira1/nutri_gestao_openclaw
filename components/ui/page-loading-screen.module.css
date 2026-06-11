@@ -30,7 +30,8 @@
 .contentOverlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  /* Abaixo de Dialog/AlertDialog (z-50) para nunca cobrir confirmações (ex.: sair do checklist). */
+  z-index: 45;
 }
 
 .inline {

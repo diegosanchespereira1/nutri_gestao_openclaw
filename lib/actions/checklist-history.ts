@@ -88,6 +88,49 @@ function mapPdfRow(raw: Record<string, unknown>): ChecklistFillPdfExportRow {
   };
 }
 
+/** Mensagem legível para logs (PostgrestError muitas vezes não serializa bem com console.error). */
+function formatSupabaseError(err: unknown): string {
+  if (err == null) return "";
+  if (typeof err === "object" && err !== null) {
+    const o = err as Record<string, unknown>;
+    const message = String(o.message ?? "").trim();
+    const code = String(o.code ?? "").trim();
+    const details = String(o.details ?? "").trim();
+    const hint = String(o.hint ?? "").trim();
+    const parts = [message, code, details, hint].filter((p) => p.length > 0);
+    if (parts.length > 0) return parts.join(" | ");
+  }
+  if (err instanceof Error) return err.message;
+  try {
+    return JSON.stringify(err);
+  } catch {
+    return String(err);
+  }
+}
+
+/**
+ * Replica `checklist_fill_sessions_seq_lookup`: ROW_NUMBER global por created_at, id
+ * entre sessões dos estabelecimentos indicados (mesmo cliente).
+ */
+async function buildChecklistSessionSeqMapFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  establishmentIds: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (establishmentIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id, created_at")
+    .in("establishment_id", establishmentIds)
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
+  if (error || !data?.length) return out;
+  data.forEach((row, index) => {
+    out.set(String(row.id), index + 1);
+  });
+  return out;
+}
+
 /* ─── E.1: loadChecklistSessionsForClient ───────────────────────────────── */
 
 /**
@@ -206,7 +249,7 @@ export async function loadChecklistSessionsForClient(input: {
   const [
     profilesResult,
     teamMembersResult,
-    allSessionIdsResult,
+    seqLookupResult,
     responsesResult,
     templateNamesResult,
     customTemplateNamesResult,
@@ -235,12 +278,13 @@ export async function loadChecklistSessionsForClient(input: {
           .in("member_user_id", sessionUserIds)
       : Promise.resolve({ data: [] as { member_user_id: string | null; full_name: string | null }[] }),
 
-    // Numeração sequencial (ordenada por created_at)
-    supabase
-      .from("checklist_fill_sessions")
-      .select("id")
-      .in("establishment_id", estIds)
-      .order("created_at", { ascending: true }),
+    // Numeração sequencial (ROW_NUMBER no Postgres — evita SELECT de todos os ids)
+    sessionIds.length > 0
+      ? supabase.rpc("checklist_fill_sessions_seq_lookup", {
+          p_establishment_ids: estIds,
+          p_session_ids: sessionIds,
+        })
+      : Promise.resolve({ data: [] as { session_id: string; seq_number: number }[], error: null }),
 
     // Contagem de respostas por sessão
     supabase
@@ -342,10 +386,33 @@ export async function loadChecklistSessionsForClient(input: {
     }
   }
 
-  // Mapa de numeração sequencial
+  // Mapa de numeração sequencial (RPC checklist_fill_sessions_seq_lookup)
   const seqMap = new Map<string, number>();
-  for (let i = 0; i < (allSessionIdsResult.data ?? []).length; i++) {
-    seqMap.set(allSessionIdsResult.data![i].id, i + 1);
+  const seqRows = (seqLookupResult.data ?? []) as {
+    session_id?: string;
+    sessionId?: string;
+    seq_number?: number;
+    seqNumber?: number;
+  }[];
+  for (const r of seqRows) {
+    const sid = r.session_id ?? r.sessionId;
+    const n = Number(r.seq_number ?? r.seqNumber) || 0;
+    if (sid) seqMap.set(String(sid), n);
+  }
+
+  const missingSeqIds = sessionIds.filter((id) => !seqMap.has(String(id)));
+  if (missingSeqIds.length > 0 && estIds.length > 0) {
+    if (seqLookupResult.error) {
+      console.warn(
+        "[loadChecklistSessionsForClient] seq_lookup RPC falhou — a usar fallback (lista por created_at).",
+        formatSupabaseError(seqLookupResult.error) || "(sem mensagem)",
+      );
+    }
+    const fbMap = await buildChecklistSessionSeqMapFallback(supabase, estIds);
+    for (const id of missingSeqIds) {
+      const n = fbMap.get(String(id));
+      if (n != null) seqMap.set(String(id), n);
+    }
   }
 
   // Contagem de respostas por sessão
@@ -884,8 +951,9 @@ export async function loadChecklistScoreHistory(
   const estIds = (ests ?? []).map((e) => e.id as string);
   if (estIds.length === 0) return empty;
 
-  // Sessões aprovadas com score
-  const { data: sessions } = await supabase
+  // Sessões aprovadas com score (limite para o gráfico — evita payload enorme)
+  const SCORE_HISTORY_CAP = 120;
+  const { data: sessionsDesc } = await supabase
     .from("checklist_fill_sessions")
     .select(
       "id, template_id, custom_template_id, workspace_template_id, dossier_approved_at, score_percentage, area_id",
@@ -893,7 +961,14 @@ export async function loadChecklistScoreHistory(
     .in("establishment_id", estIds)
     .not("dossier_approved_at", "is", null)
     .not("score_percentage", "is", null)
-    .order("dossier_approved_at", { ascending: true });
+    .order("dossier_approved_at", { ascending: false })
+    .limit(SCORE_HISTORY_CAP);
+
+  const sessions = [...(sessionsDesc ?? [])].sort(
+    (a, b) =>
+      new Date(String(a.dossier_approved_at)).getTime() -
+      new Date(String(b.dossier_approved_at)).getTime(),
+  );
 
   if (!sessions || sessions.length === 0) return empty;
 

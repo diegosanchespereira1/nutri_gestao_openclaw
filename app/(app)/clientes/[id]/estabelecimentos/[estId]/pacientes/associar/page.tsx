@@ -36,7 +36,11 @@ export default async function AssociarPacientePage({
     <PageLayout variant="form">
       <PageHeader
         title="Associar paciente"
-        description={`Selecione um paciente do cliente para associar a ${establishment.name}.`}
+        description={
+          client?.legal_name
+            ? `Selecione um paciente de ${client.legal_name} para associar a ${establishment.name}.`
+            : `Selecione um paciente do cliente para associar a ${establishment.name}.`
+        }
         back={{
           href: `/clientes/${clientId}/estabelecimentos/${estId}/pacientes`,
           label: `Pacientes — ${establishment.name}`,

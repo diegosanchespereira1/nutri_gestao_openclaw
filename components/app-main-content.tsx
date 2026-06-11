@@ -47,6 +47,24 @@ function isSameRoute(href: string): boolean {
 }
 
 /**
+ * Edição de cliente: mesmo pathname (`/clientes/:id/editar`), só mudam query params
+ * (`tab`, `formTab`, filtros de checklists, etc.). Não deve mostrar o overlay com logo
+ * — é percepção de "app avariado" sem ganho real (RSC já faz streaming na zona da aba).
+ */
+function isClientEditShellOnlyQueryChange(href: string): boolean {
+  try {
+    const dest = new URL(href, window.location.origin);
+    const current = new URL(window.location.href);
+    return (
+      dest.pathname === current.pathname &&
+      /^\/clientes\/[^/]+\/editar$/.test(dest.pathname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Overlay de navegação na área de conteúdo — logo + pontos enquanto a rota destino carrega.
  * Dispara em cliques em links internos e em `pushWithLoading` / `signalNavigationStart`.
  *
@@ -145,6 +163,7 @@ export function AppMainContent({ children }: Props) {
       // Download links não causam navegação de rota — ignorar para não ativar o overlay.
       if (anchor.hasAttribute("download")) return;
       if (isSameRoute(href)) return;
+      if (isClientEditShellOnlyQueryChange(href)) return;
 
       beginNavigation();
     }

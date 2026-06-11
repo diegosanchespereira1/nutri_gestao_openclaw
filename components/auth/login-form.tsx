@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { AppBuildLabel } from "@/components/app-version-guard";
@@ -34,7 +34,6 @@ async function withAuthTimeout<T>(promise: Promise<T>, step: string): Promise<T>
 }
 
 export function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
   const [requestId] = useState(() => generateUUID());
@@ -47,6 +46,8 @@ export function LoginForm() {
   const [challengeId, setChallengeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  /** Depois de credenciais OK: mostrar “A abrir…” antes do redirect completo. */
+  const [openingApp, setOpeningApp] = useState(false);
   const submitLockRef = useRef(false);
 
   function isInvalidRefreshTokenError(message?: string): boolean {
@@ -95,7 +96,7 @@ export function LoginForm() {
   }
 
   async function beginMfaChallenge(supabase: ReturnType<typeof createClient>) {
-    await logAuthTroubleshootingEvent({
+    void logAuthTroubleshootingEvent({
       event: "mfa_challenge_start",
       step: "mfa",
       outcome: "attempt",
@@ -107,7 +108,7 @@ export function LoginForm() {
       "mfa_list_factors",
     );
     if (listErr) {
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: "mfa_factor_list_failed",
         step: "mfa",
         outcome: "error",
@@ -122,7 +123,7 @@ export function LoginForm() {
         f.factor_type === "totp" && f.status === "verified",
     );
     if (!totp?.id) {
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: "mfa_factor_missing",
         step: "mfa",
         outcome: "error",
@@ -139,7 +140,7 @@ export function LoginForm() {
       "mfa_challenge",
     );
     if (chErr || !ch?.id) {
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: "mfa_challenge_failed",
         step: "mfa",
         outcome: "error",
@@ -149,7 +150,7 @@ export function LoginForm() {
       setError(chErr?.message ?? "Não foi possível iniciar o desafio 2FA.");
       return false;
     }
-    await logAuthTroubleshootingEvent({
+    void logAuthTroubleshootingEvent({
       event: "mfa_challenge_started",
       step: "mfa",
       outcome: "success",
@@ -165,12 +166,13 @@ export function LoginForm() {
     if (submitLockRef.current) return;
     submitLockRef.current = true;
     setError(null);
+    setOpeningApp(false);
     setLoading(true);
     const supabase = createClient();
     const startedAt = performance.now();
 
     try {
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: "password_signin",
         step: "password",
         outcome: "attempt",
@@ -200,7 +202,7 @@ export function LoginForm() {
 
         const staleRefreshToken = isInvalidRefreshTokenError(signErr.message);
         if (attempt === 1 && staleRefreshToken) {
-          await logAuthTroubleshootingEvent({
+          void logAuthTroubleshootingEvent({
             event: "password_signin_stale_refresh_recovery",
             step: "password",
             outcome: "error",
@@ -216,7 +218,7 @@ export function LoginForm() {
       }
 
       if (signErr) {
-        await logAuthTroubleshootingEvent({
+        void logAuthTroubleshootingEvent({
           event: "password_signin_failed",
           step: "password",
           outcome: "error",
@@ -226,7 +228,7 @@ export function LoginForm() {
         setError(mapSupabaseLoginError(signErr));
         return;
       }
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: "password_signin_success",
         step: "password",
         outcome: "success",
@@ -240,7 +242,7 @@ export function LoginForm() {
         "mfa_aal_check",
       );
       if (aalErr) {
-        await logAuthTroubleshootingEvent({
+        void logAuthTroubleshootingEvent({
           event: "mfa_aal_check_failed",
           step: "password",
           outcome: "error",
@@ -253,7 +255,7 @@ export function LoginForm() {
       }
 
       if (aal?.nextLevel === "aal2" && aal?.currentLevel === "aal1") {
-        await logAuthTroubleshootingEvent({
+        void logAuthTroubleshootingEvent({
           event: "mfa_required",
           step: "password",
           outcome: "success",
@@ -266,7 +268,7 @@ export function LoginForm() {
 
       // signInWithPassword já devolve a sessão directamente — getSession() redundante removido.
       if (!signInData?.session) {
-        await logAuthTroubleshootingEvent({
+        void logAuthTroubleshootingEvent({
           event: "post_signin_session_check",
           step: "password",
           outcome: "error",
@@ -281,7 +283,11 @@ export function LoginForm() {
         );
         return;
       }
-      await logAuthTroubleshootingEvent({
+      setOpeningApp(true);
+      // Permite ao React pintar "A abrir…" antes do redirect completo.
+      await Promise.resolve();
+      navigateAfterAuth(next);
+      void logAuthTroubleshootingEvent({
         event: "post_signin_session_check",
         step: "password",
         outcome: "success",
@@ -291,12 +297,10 @@ export function LoginForm() {
           elapsed_ms: Math.round(performance.now() - startedAt),
         },
       });
-
-      navigateAfterAuth(next, router);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro inesperado";
       const isTimeout = message.startsWith("AUTH_TIMEOUT:");
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: isTimeout ? "password_signin_timeout" : "password_signin_exception",
         step: "password",
         outcome: "error",
@@ -312,6 +316,7 @@ export function LoginForm() {
       );
     } finally {
       setLoading(false);
+      setOpeningApp(false);
       submitLockRef.current = false;
     }
   }
@@ -322,6 +327,7 @@ export function LoginForm() {
     if (submitLockRef.current) return;
     submitLockRef.current = true;
     setError(null);
+    setOpeningApp(false);
     setLoading(true);
     const supabase = createClient();
     const startedAt = performance.now();
@@ -339,7 +345,7 @@ export function LoginForm() {
       );
 
       if (vErr) {
-        await logAuthTroubleshootingEvent({
+        void logAuthTroubleshootingEvent({
           event: "mfa_verify_failed",
           step: "mfa",
           outcome: "error",
@@ -358,28 +364,39 @@ export function LoginForm() {
         supabase.auth.getSession(),
         "mfa_post_verify_get_session",
       );
-      await logAuthTroubleshootingEvent({
-        event: "mfa_verify_success",
-        step: "mfa",
-        outcome: sessionData.session ? "success" : "error",
-        hasSession: Boolean(sessionData.session),
-        metadata: {
-          elapsed_ms: Math.round(performance.now() - startedAt),
-        },
-      });
 
       if (!sessionData.session) {
+        void logAuthTroubleshootingEvent({
+          event: "mfa_verify_success",
+          step: "mfa",
+          outcome: "error",
+          hasSession: false,
+          metadata: {
+            elapsed_ms: Math.round(performance.now() - startedAt),
+          },
+        });
         setError(
           "Não foi possível concluir o segundo fator neste dispositivo. Tente novamente.",
         );
         return;
       }
 
-      navigateAfterAuth(next, router);
+      setOpeningApp(true);
+      await Promise.resolve();
+      void logAuthTroubleshootingEvent({
+        event: "mfa_verify_success",
+        step: "mfa",
+        outcome: "success",
+        hasSession: true,
+        metadata: {
+          elapsed_ms: Math.round(performance.now() - startedAt),
+        },
+      });
+      navigateAfterAuth(next);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro inesperado";
       const isTimeout = message.startsWith("AUTH_TIMEOUT:");
-      await logAuthTroubleshootingEvent({
+      void logAuthTroubleshootingEvent({
         event: isTimeout ? "mfa_verify_timeout" : "mfa_verify_exception",
         step: "mfa",
         outcome: "error",
@@ -395,6 +412,7 @@ export function LoginForm() {
       );
     } finally {
       setLoading(false);
+      setOpeningApp(false);
       submitLockRef.current = false;
     }
   }
@@ -489,11 +507,13 @@ export function LoginForm() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Entrando…" : "Entrar"}
+            {loading ? (openingApp ? "A abrir…" : "Entrando…") : "Entrar"}
           </Button>
           {loading ? (
             <p className="text-muted-foreground text-center text-xs">
-              Validando suas credenciais...
+              {openingApp
+                ? "A abrir a aplicação…"
+                : "Validando suas credenciais…"}
             </p>
           ) : null}
         </form>
@@ -527,14 +547,19 @@ export function LoginForm() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Verificando…" : "Confirmar"}
+            {loading ? (openingApp ? "A abrir…" : "Verificando…") : "Confirmar"}
           </Button>
+          {loading && openingApp ? (
+            <p className="text-muted-foreground text-center text-xs">
+              A abrir a aplicação…
+            </p>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
             className="w-full"
             onClick={async () => {
-              await logAuthTroubleshootingEvent({
+              void logAuthTroubleshootingEvent({
                 event: "mfa_back_to_password",
                 step: "mfa",
                 outcome: "success",

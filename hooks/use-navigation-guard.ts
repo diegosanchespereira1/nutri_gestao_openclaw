@@ -23,7 +23,8 @@ type UseNavigationGuardReturn = {
  * durante o preenchimento de um checklist.
  *
  * - `beforeunload` → aviso nativo do browser ao fechar aba / recarregar.
- * - `popstate` → ao pressionar Voltar, repõe a entrada sentinel e exibe o modal.
+ * - `popstate` → repõe a entrada sentinel; o modal "Sair?" só abre fora de uma janela
+ *   curta após instalar o sentinel (evita eco do App Router / histórico ao abrir a página).
  */
 export function useNavigationGuard(
   options: UseNavigationGuardOptions,
@@ -34,6 +35,8 @@ export function useNavigationGuard(
   const guardPushedRef = useRef(false);
   const completingRef = useRef(false);
   const fallbackHrefRef = useRef(fallbackHref);
+  /** Ignorar abertura do modal por `popstate` logo após instalar o sentinel (Next.js / histórico). */
+  const suppressLeaveModalUntilRef = useRef(0);
 
   useEffect(() => {
     activeRef.current = active;
@@ -59,14 +62,17 @@ export function useNavigationGuard(
     function handlePopState() {
       if (completingRef.current) return;
       if (!activeRef.current) return;
-      setGuardTriggered(true);
+      // Repõe sempre a entrada sentinel para não perder o estado da página.
       history.pushState({ navGuard: 1 }, "", window.location.href);
+      if (Date.now() < suppressLeaveModalUntilRef.current) return;
+      setGuardTriggered(true);
     }
 
     if (!guardPushedRef.current) {
       history.pushState({ navGuard: 1 }, "", window.location.href);
       guardPushedRef.current = true;
     }
+    suppressLeaveModalUntilRef.current = Date.now() + 600;
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("popstate", handlePopState);

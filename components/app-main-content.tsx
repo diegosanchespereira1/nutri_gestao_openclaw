@@ -49,6 +49,11 @@ function isSameRoute(href: string): boolean {
 /**
  * Overlay de navegação na área de conteúdo — logo + pontos enquanto a rota destino carrega.
  * Dispara em cliques em links internos e em `pushWithLoading` / `signalNavigationStart`.
+ *
+ * Não ligamos `popstate` a `beginNavigation`: o History API dispara `popstate` em situações
+ * em que o pathname do Next.js ainda não mudou (ex.: reconciliação do App Router, sentinel
+ * do guarda do checklist), o que deixava o overlay até ao timeout de 45s e podia abrir o
+ * modal "Salvar e sair" sem o utilizador ter premido Voltar de propósito.
  */
 export function AppMainContent({ children }: Props) {
   const pathname = usePathname();
@@ -144,16 +149,10 @@ export function AppMainContent({ children }: Props) {
       beginNavigation();
     }
 
-    function onPopState() {
-      beginNavigation();
-    }
-
     document.addEventListener("click", onDocumentClick, true);
-    window.addEventListener("popstate", onPopState);
 
     return () => {
       document.removeEventListener("click", onDocumentClick, true);
-      window.removeEventListener("popstate", onPopState);
       clearTimeout(showTimerRef.current);
       clearTimeout(hideTimerRef.current);
       clearTimeout(navTimeoutRef.current);

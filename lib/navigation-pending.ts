@@ -8,7 +8,7 @@ export function subscribeNavigationStart(listener: Listener): () => void {
   return () => listeners.delete(listener);
 }
 
-/** Cancela um loading iniciado por `signalNavigationStart` / popstate interceptado. */
+/** Cancela um loading iniciado por `signalNavigationStart` (links internos, pushWithLoading). */
 export function subscribeNavigationCancel(listener: Listener): () => void {
   cancelListeners.add(listener);
   return () => cancelListeners.delete(listener);
@@ -22,7 +22,7 @@ export function signalNavigationStart(): void {
 /**
  * Sinaliza que a navegação foi cancelada (ex.: utilizador escolheu "Não, ficar"
  * no guard do checklist). Usado por `AppMainContent` para fechar o overlay de
- * loading que foi aberto pelo `popstate`.
+ * loading que foi aberto por navegação (ex.: clique em link interno).
  */
 export function signalNavigationCancel(): void {
   cancelListeners.forEach((listener) => listener());

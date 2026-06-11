@@ -714,9 +714,8 @@ export function ChecklistFillWizard({
     cancelLeave();
     clearLeaveLinkTarget();
     setLeaveActionError(null);
-    // O popstate dispara `beginNavigation` no AppMainContent antes de sabermos
-    // se o utilizador vai confirmar ou cancelar a saída. Se cancelar, precisamos
-    // desfazer o loading overlay — caso contrário fica preso até o timeout de 45 s.
+    // Cliques em links internos disparam `beginNavigation` no AppMainContent antes de
+    // sabermos se o utilizador confirma ou cancela a saída. Se cancelar, fechamos o overlay.
     signalNavigationCancel();
   }, [cancelLeave, clearLeaveLinkTarget]);
 

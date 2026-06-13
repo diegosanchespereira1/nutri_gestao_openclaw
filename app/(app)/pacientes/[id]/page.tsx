@@ -176,13 +176,13 @@ export default async function ProntuarioPacientePage({
       {/* ── Identificação + Contacto ─────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
-          <CardHeader className="border-b border-border pb-3">
+          <CardHeader className="border-b border-border pb-2">
             <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
               <User className="size-3.5" aria-hidden />
               Identificação
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 pt-4">
+          <CardContent className="space-y-2 pt-3">
             {birthSlice ? (
               <InfoRow
                 label="Data de nascimento"
@@ -205,13 +205,13 @@ export default async function ProntuarioPacientePage({
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border pb-3">
+          <CardHeader className="border-b border-border pb-2">
             <CardTitle className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-foreground/70">
               <Phone className="size-3.5" aria-hidden />
               Contacto
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 pt-4">
+          <CardContent className="space-y-2 pt-3">
             {row.email ? (
               <InfoRow label="Email" value={row.email} href={`mailto:${row.email}`} />
             ) : (

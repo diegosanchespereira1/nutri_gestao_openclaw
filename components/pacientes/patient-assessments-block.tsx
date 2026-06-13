@@ -9,10 +9,20 @@ import {
 } from "@/components/pacientes/assessment-evolution-charts";
 import { NutritionAssessmentHistoryItem } from "@/components/pacientes/nutrition-assessment-history-item";
 import { GeriatricAssessmentHistoryItem } from "@/components/pacientes/geriatric-assessment-history-item";
+import { ChildAssessmentHistoryItem } from "@/components/pacientes/child-assessment-history-item";
+import { SemestralReminder } from "@/components/pacientes/child-assessments-section";
+import {
+  ChildAssessmentEvolution,
+  type ChildEvolutionPoint,
+} from "@/components/pacientes/child-assessment-evolution";
 import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
 import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-assessments";
 import { loadAdultNutritionAssessmentsForPatient } from "@/lib/actions/adult-nutrition-assessments";
 import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
+import { loadChildAssessmentsForPatient } from "@/lib/actions/child-assessments";
+import { CHILD_COLOR_CLASSES } from "@/lib/nutrition/child/labels";
+import type { ChildColor, ChildIndicator } from "@/lib/nutrition/child/types";
+import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
 import {
   PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
@@ -210,14 +220,39 @@ function IndicatorCard({
   );
 }
 
+// Card de estado nutricional infantil (com cor do semáforo).
+function ChildStatusCard({
+  label,
+  classification,
+  color,
+  date,
+}: {
+  label: string;
+  classification: string;
+  color: ChildColor;
+  date: string;
+}) {
+  return (
+    <div className={cn("rounded-lg border px-3 py-2.5", CHILD_COLOR_CLASSES[color])}>
+      <p className="text-[10px] font-semibold uppercase tracking-widest opacity-80">
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm font-bold leading-tight">{classification}</p>
+      <p className="mt-1 text-[10px] opacity-70">{date}</p>
+    </div>
+  );
+}
+
 function AssessmentIndicatorStrip({
   generalRows,
   adultRows,
   geriatricRows,
+  childRows,
 }: {
   generalRows: NutritionAssessmentRow[];
   adultRows: AdultNutritionAssessmentRow[];
   geriatricRows: Awaited<ReturnType<typeof loadGeriatricAssessmentsForPatient>>["rows"];
+  childRows: ChildAssessmentRow[];
 }) {
   const cards: React.ReactNode[] = [];
 
@@ -266,6 +301,33 @@ function AssessmentIndicatorStrip({
       cards.push(<IndicatorCard key="np" label="Nec. Proteica" value={fmt(latestAnthro.protein_needs_g, 1)} unit="g/dia" date={date} />);
     if (riskLabel)
       cards.push(<IndicatorCard key="risco" label="Risco Nutricional" value={riskLabel} date={date} accent />);
+  }
+
+  // Estado nutricional infantil (classificação da avaliação infantil mais recente)
+  const latestChild = childRows[0] ?? null;
+  if (latestChild) {
+    const date = fmtDate(latestChild.recorded_at);
+    const results = Array.isArray(latestChild.results) ? latestChild.results : [];
+    const order: Array<{ indicator: ChildIndicator; label: string }> = [
+      { indicator: "bmi_for_age", label: "IMC / Idade" },
+      { indicator: "height_for_age", label: "Estatura / Idade" },
+      { indicator: "weight_for_age", label: "Peso / Idade" },
+      { indicator: "weight_for_height", label: "Peso / Estatura" },
+    ];
+    for (const { indicator, label } of order) {
+      const r = results.find((x) => x.indicator === indicator);
+      if (r?.classification && r.color) {
+        cards.push(
+          <ChildStatusCard
+            key={`child-${indicator}`}
+            label={label}
+            classification={r.classification}
+            color={r.color}
+            date={date}
+          />,
+        );
+      }
+    }
   }
 
   if (cards.length === 0) return null;
@@ -406,6 +468,43 @@ function GeriatricTabContent({
   );
 }
 
+function ChildTabContent({
+  chartData,
+  rows,
+}: {
+  chartData: ChildEvolutionPoint[];
+  rows: ChildAssessmentRow[];
+}) {
+  return (
+    <div className="space-y-6 pt-2">
+      <SemestralReminder lastRecordedAt={rows[0]?.recorded_at ?? null} />
+
+      {chartData.length >= 2 && (
+        <div>
+          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+            <TrendingUp className="size-3.5" aria-hidden />
+            Evolução (percentil por indicador)
+          </p>
+          <ChildAssessmentEvolution data={chartData} />
+        </div>
+      )}
+
+      <div>
+        <SectionHeader title="Histórico" count={rows.length} />
+        {rows.length === 0 ? (
+          <EmptyState label="avaliações infantis" />
+        ) : (
+          <ul className="space-y-2">
+            {rows.map((r) => (
+              <ChildAssessmentHistoryItem key={r.id} row={r} />
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Componente público ────────────────────────────────────────────────────────
 
 export async function PatientAssessmentsBlock({
@@ -415,12 +514,17 @@ export async function PatientAssessmentsBlock({
   patientId: string;
   isMinor?: boolean;
 }) {
-  const [{ rows: generalRows }, { rows: adultRows }, { rows: geriatricRows }] =
-    await Promise.all([
-      loadNutritionAssessmentsForPatient(patientId),
-      loadAdultNutritionAssessmentsForPatient(patientId),
-      loadGeriatricAssessmentsForPatient(patientId),
-    ]);
+  const [
+    { rows: generalRows },
+    { rows: adultRows },
+    { rows: geriatricRows },
+    { rows: childRows },
+  ] = await Promise.all([
+    loadNutritionAssessmentsForPatient(patientId),
+    loadAdultNutritionAssessmentsForPatient(patientId),
+    loadGeriatricAssessmentsForPatient(patientId),
+    loadChildAssessmentsForPatient(patientId),
+  ]);
 
   // Rows vêm em ordem descendente; para gráficos precisamos de ascendente
   const generalAsc = [...generalRows].reverse().slice(-20);
@@ -444,6 +548,21 @@ export async function PatientAssessmentsBlock({
   const adultChartData: AnthroChartPoint[] = adultAsc.map(toAnthroPoint);
   const geriatricChartData: AnthroChartPoint[] = geriatricAsc.map(toAnthroPoint);
 
+  const childAsc = [...childRows].reverse().slice(-20);
+  const childChartData: ChildEvolutionPoint[] = childAsc.map((r) => {
+    const byIndicator = (indicator: string) =>
+      (Array.isArray(r.results) ? r.results : []).find(
+        (i) => i.indicator === indicator,
+      )?.percentile ?? null;
+    return {
+      date: fmtDate(r.recorded_at),
+      weight_for_age: byIndicator("weight_for_age"),
+      height_for_age: byIndicator("height_for_age"),
+      bmi_for_age: byIndicator("bmi_for_age"),
+    };
+  });
+  const showChildTab = isMinor || childRows.length > 0;
+
   return (
     <div className="space-y-4">
       {/* CTA */}
@@ -462,13 +581,18 @@ export async function PatientAssessmentsBlock({
         generalRows={generalRows}
         adultRows={adultRows}
         geriatricRows={geriatricRows}
+        childRows={childRows}
       />
 
       {/* Tabs com gráficos + histórico */}
       <NutritionAssessmentsTabs
         showAdultTabs={!isMinor}
+        showChildTab={showChildTab}
         generalTab={
           <GeneralTabContent chartData={generalChartData} rows={generalRows} />
+        }
+        childTab={
+          <ChildTabContent chartData={childChartData} rows={childRows} />
         }
         adultTab={
           <AdultTabContent chartData={adultChartData} rows={adultRows} />

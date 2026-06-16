@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { Building2 } from "lucide-react";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
@@ -88,10 +89,7 @@ export async function ClientesTableSection({ searchParams: sp }: Props) {
     .filter((r) => r.kind === "pj" && r.logo_storage_path)
     .map((r) => r.logo_storage_path as string);
 
-  const [logoUrlMap, clientScores] = await Promise.all([
-    getClientLogoSignedUrls(supabase, logoPaths),
-    loadLatestClientChecklistScores(supabase, clientIds),
-  ]);
+  const logoUrlMap = await getClientLogoSignedUrls(supabase, logoPaths);
 
   const rowsWithLogos: { row: ClientRow; logoUrl: string | null }[] = rows.map(
     (row) => ({
@@ -129,6 +127,69 @@ export async function ClientesTableSection({ searchParams: sp }: Props) {
     );
   }
 
+  return (
+    <Suspense
+      fallback={
+        <ClientesTableView
+          rowsWithLogos={rowsWithLogos}
+          clientScores={new Map()}
+          page={page}
+          total={total}
+          pageSize={pageSize}
+          from={from}
+          to={to}
+          totalPages={totalPages}
+          searchParams={sp}
+        />
+      }
+    >
+      <ClientesTableWithScores
+        clientIds={clientIds}
+        rowsWithLogos={rowsWithLogos}
+        page={page}
+        total={total}
+        pageSize={pageSize}
+        from={from}
+        to={to}
+        totalPages={totalPages}
+        searchParams={sp}
+      />
+    </Suspense>
+  );
+}
+
+type TableViewProps = {
+  rowsWithLogos: { row: ClientRow; logoUrl: string | null }[];
+  clientScores: Map<string, number>;
+  page: number;
+  total: number;
+  pageSize: number;
+  from: number;
+  to: number;
+  totalPages: number;
+  searchParams: Record<string, string | string[] | undefined>;
+};
+
+async function ClientesTableWithScores({
+  clientIds,
+  ...viewProps
+}: Omit<TableViewProps, "clientScores"> & { clientIds: string[] }) {
+  const { supabase } = await getServerContext();
+  const clientScores = await loadLatestClientChecklistScores(supabase, clientIds);
+  return <ClientesTableView {...viewProps} clientScores={clientScores} />;
+}
+
+function ClientesTableView({
+  rowsWithLogos,
+  clientScores,
+  page,
+  total,
+  pageSize,
+  from,
+  to,
+  totalPages,
+  searchParams: sp,
+}: TableViewProps) {
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm md:hidden">

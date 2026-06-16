@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ClientesFilters } from "@/components/clientes/clientes-filters";
 import { ClientesTableSection } from "@/components/clientes/clientes-table-section";
+import { ClientesTableSkeleton } from "@/components/clientes/clientes-table-skeleton";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -18,23 +19,6 @@ function parseSegmentos(
   return values.filter((v) => isClientBusinessSegment(v)) as ClientBusinessSegment[];
 }
 
-function ClientesTableSkeleton() {
-  return (
-    <div
-      className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"
-      role="status"
-      aria-live="polite"
-      aria-label="Carregando clientes"
-    >
-      <div className="space-y-3 p-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-12 animate-pulse rounded-md bg-muted" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default async function ClientesPage({
   searchParams,
 }: {
@@ -46,6 +30,8 @@ export default async function ClientesPage({
   const situacaoRaw =
     typeof sp.situacao === "string" ? sp.situacao : undefined;
   const segmentos = parseSegmentos(sp.segmentos);
+  const pageKey = typeof sp.page === "string" ? sp.page : "1";
+  const suspenseKey = `${q}|${situacaoRaw ?? "all"}|${segmentos.join(",")}|${pageKey}`;
 
   return (
     <PageLayout>
@@ -81,7 +67,7 @@ export default async function ClientesPage({
         defaultSegmentos={segmentos}
       />
 
-      <Suspense fallback={<ClientesTableSkeleton />}>
+      <Suspense key={suspenseKey} fallback={<ClientesTableSkeleton />}>
         <ClientesTableSection searchParams={sp} />
       </Suspense>
     </PageLayout>

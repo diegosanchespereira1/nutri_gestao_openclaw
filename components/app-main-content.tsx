@@ -47,6 +47,28 @@ function isSameRoute(href: string): boolean {
 }
 
 /**
+ * Lista com paginação (?page=): mesmo pathname, só muda a página.
+ * Evita overlay pesado — a tabela já tem Suspense com skeleton próprio.
+ */
+function isListPaginationOnly(href: string): boolean {
+  try {
+    const dest = new URL(href, window.location.origin);
+    const current = new URL(window.location.href);
+    if (dest.pathname !== current.pathname) return false;
+
+    const destParams = new URLSearchParams(dest.search);
+    const curParams = new URLSearchParams(current.search);
+    if (destParams.get("page") === curParams.get("page")) return false;
+
+    destParams.delete("page");
+    curParams.delete("page");
+    return destParams.toString() === curParams.toString();
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Edição de cliente: mesmo pathname (`/clientes/:id/editar`), só mudam query params
  * (`tab`, `formTab`, filtros de checklists, etc.). Não deve mostrar o overlay com logo
  * — é percepção de "app avariado" sem ganho real (RSC já faz streaming na zona da aba).
@@ -164,6 +186,7 @@ export function AppMainContent({ children }: Props) {
       if (anchor.hasAttribute("download")) return;
       if (isSameRoute(href)) return;
       if (isClientEditShellOnlyQueryChange(href)) return;
+      if (isListPaginationOnly(href)) return;
 
       beginNavigation();
     }

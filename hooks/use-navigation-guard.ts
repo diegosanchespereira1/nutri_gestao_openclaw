@@ -68,14 +68,13 @@ export function useNavigationGuard(
       setGuardTriggered(true);
     }
 
-    // Instala o sentinel após o App Router concluir a navegação client-side.
-    // pushState imediato no mount disputa com router.push e pode devolver ao catálogo.
+    // Instala o sentinel só depois da página estabilizar (evita popstate do App Router).
     const installTimer = window.setTimeout(() => {
       if (!activeRef.current || guardPushedRef.current) return;
       history.pushState({ navGuard: 1 }, "", window.location.href);
       guardPushedRef.current = true;
-      suppressLeaveModalUntilRef.current = Date.now() + 600;
-    }, 0);
+      suppressLeaveModalUntilRef.current = Date.now() + 2000;
+    }, 500);
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("popstate", handlePopState);

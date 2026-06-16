@@ -15,10 +15,9 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { pushWithLoading, replaceWithLoading } from "@/lib/navigation-pending";
+import { navigateToChecklistFill } from "@/lib/checklist-fill-navigate";
 import { DropdownMenuScroll } from "@/components/ui/dropdown-menu-scroll";
 import {
   Dialog,
@@ -202,8 +201,6 @@ export function ChecklistCatalog({
   focusWorkspaceTemplateId = null,
   initialEstablishmentId = null,
 }: Props) {
-  const router = useRouter();
-
   /* ── estado ── */
   const [establishmentId, setEstablishmentId] = useState<string>("");
   const [selectedEstablishment, setSelectedEstablishment] =
@@ -630,7 +627,12 @@ export function ChecklistCatalog({
     if (selectedEstablishment) upsertRecent(selectedEstablishment);
   }
 
-  /** Inicia uma ou mais sessões via batch e navega para a primeira. */
+  function checklistCatalogReturnTo(): string {
+    return establishmentId
+      ? `/checklists?est=${encodeURIComponent(establishmentId)}`
+      : "/checklists";
+  }
+
   /** Após criar sessão(ões): recente + batch local + navegação (registo recente em background). */
   async function finalizeAfterStart(
     result: { sessionIds: string[]; firstSessionId: string },
@@ -657,7 +659,9 @@ export function ChecklistCatalog({
         items,
       });
     }
-    replaceWithLoading(router, `/checklists/preencher/${result.firstSessionId}`);
+    navigateToChecklistFill(result.firstSessionId, {
+      returnTo: checklistCatalogReturnTo(),
+    });
   }
 
   async function launchBatch(
@@ -1891,7 +1895,9 @@ export function ChecklistCatalog({
                 setConflictSession(null);
                 setPendingTemplateId(null);
                 void registerEstablishmentOpen();
-                pushWithLoading(router, `/checklists/preencher/${sessionId}`);
+                navigateToChecklistFill(sessionId, {
+                  returnTo: checklistCatalogReturnTo(),
+                });
               }}
             >
               <ArrowRight className="size-4 shrink-0" aria-hidden />

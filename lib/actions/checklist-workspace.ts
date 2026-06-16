@@ -872,9 +872,6 @@ export async function startWorkspaceTemplateFillBatch(input: {
 
   const first = sessionIds[0];
   if (!first) return { ok: false, error: "session_create_failed" };
-  // Não revalidar /checklists aqui: o cliente navega imediatamente para /preencher
-  // e revalidatePath na rota atual causa corrida com router.push (volta ao catálogo).
-  revalidatePath(`/checklists/preencher/${first}`);
   return {
     ok: true,
     sessionIds,

@@ -1375,9 +1375,10 @@ export async function startChecklistFillBatch(input: {
     sessionIds.push(session.id);
   }
 
-  revalidatePath("/checklists");
   const first = sessionIds[0];
   if (!first) return { ok: false, error: "session_create_failed" };
+  // Não revalidar /checklists aqui: ver startWorkspaceTemplateFillBatch.
+  revalidatePath(`/checklists/preencher/${first}`);
   return {
     ok: true,
     sessionIds,

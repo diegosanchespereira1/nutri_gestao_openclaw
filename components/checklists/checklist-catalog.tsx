@@ -18,7 +18,7 @@ import {
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { pushWithLoading } from "@/lib/navigation-pending";
+import { pushWithLoading, replaceWithLoading } from "@/lib/navigation-pending";
 import { DropdownMenuScroll } from "@/components/ui/dropdown-menu-scroll";
 import {
   Dialog,
@@ -657,7 +657,7 @@ export function ChecklistCatalog({
         items,
       });
     }
-    pushWithLoading(router, `/checklists/preencher/${result.firstSessionId}`);
+    replaceWithLoading(router, `/checklists/preencher/${result.firstSessionId}`);
   }
 
   async function launchBatch(

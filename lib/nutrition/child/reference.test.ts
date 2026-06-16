@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { getReference, hasCoverage, isMethodAvailable } from "./reference";
 
 describe("isMethodAvailable", () => {
-  it("percentil disponível, escore-Z ainda não", () => {
+  it("percentil e escore-Z disponíveis", () => {
     expect(isMethodAvailable("percentile")).toBe(true);
-    expect(isMethodAvailable("zscore")).toBe(false);
+    expect(isMethodAvailable("zscore")).toBe(true);
   });
 });
 
@@ -31,7 +31,10 @@ describe("getReference (percentil)", () => {
     expect(hasCoverage("bmi_for_age", "female", 228, "percentile")).toBe(true);
   });
 
-  it("escore-Z sem dados → null", () => {
+  it("escore-Z com cobertura nos novos indicadores (CB, mês 3)", () => {
+    expect(
+      getReference("arm_circumference_for_age", "female", 3, "zscore"),
+    ).not.toBeNull();
     expect(getReference("bmi_for_age", "female", 61, "zscore")).toBeNull();
   });
 

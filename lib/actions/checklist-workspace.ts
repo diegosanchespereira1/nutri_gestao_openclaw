@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 function invalidateWorkspaceCatalogCache(workspaceOwnerId: string) {
-  revalidateTag(`workspace-catalog-${workspaceOwnerId}`);
+  revalidateTag(`workspace-catalog-${workspaceOwnerId}`, "max");
 }
 import { redirect } from "next/navigation";
 

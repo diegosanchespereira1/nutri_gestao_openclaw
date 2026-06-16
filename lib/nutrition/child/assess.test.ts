@@ -66,30 +66,51 @@ describe("assessChild (percentil)", () => {
     expect(height.adequateHigh).toBeNull(); // estatura: só limite inferior
   });
 
-  it("retorna três indicadores (P/E só quando a tabela for carregada)", () => {
+  it("retorna indicadores base + novos (CB, PCT, SE, PC) sem P/E quando tabela P/E ausente", () => {
     const result = assessChild(base);
-    expect(result.indicators).toHaveLength(3);
+    expect(result.indicators).toHaveLength(7);
     expect(
       result.indicators.some((i) => i.indicator === "weight_for_height"),
     ).toBe(false);
+    expect(
+      result.indicators.map((i) => i.indicator),
+    ).toEqual(
+      expect.arrayContaining([
+        "weight_for_age",
+        "height_for_age",
+        "bmi_for_age",
+        "arm_circumference_for_age",
+        "triceps_skinfold_for_age",
+        "subscapular_skinfold_for_age",
+        "head_circumference_for_age",
+      ]),
+    );
   });
 });
 
 describe("assessChild — casos de borda", () => {
-  it("escore-Z indisponível → todos os indicadores fora de faixa", () => {
+  it("escore-Z fora da faixa dos novos indicadores (idade > 60m) → CB/PCT/SE/PC fora de faixa", () => {
     const r = assessChild({
       sex: "female",
       ageMonths: 61,
       weightKg: 22,
       heightCm: 120,
       method: "zscore",
-      armCircumferenceCm: null,
-      tricepsSkinfoldMm: null,
-      subscapularSkinfoldMm: null,
-      headCircumferenceCm: null,
+      armCircumferenceCm: 15,
+      tricepsSkinfoldMm: 10,
+      subscapularSkinfoldMm: 8,
+      headCircumferenceCm: 48,
     });
-    expect(r.indicators.every((i) => i.outOfRange)).toBe(true);
-    expect(r.indicators.every((i) => i.classification === null)).toBe(true);
+    const newOnes = r.indicators.filter((i) =>
+      [
+        "arm_circumference_for_age",
+        "triceps_skinfold_for_age",
+        "subscapular_skinfold_for_age",
+        "head_circumference_for_age",
+      ].includes(i.indicator),
+    );
+    expect(newOnes.every((i) => i.outOfRange)).toBe(true);
+    expect(pick(r, "bmi_for_age").outOfRange).toBe(true);
   });
 
   it("idade fora da tabela de peso (>120m) → só peso fica fora de faixa", () => {

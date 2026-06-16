@@ -8,6 +8,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AGE_CATEGORY_LABELS, parseAgeCategory } from "@/lib/pacientes/age-category";
 import { cn } from "@/lib/utils";
 
 function parseSituacao(raw: string | undefined): "independente" | "all" {
@@ -41,6 +42,9 @@ export default async function PacientesPage({
   const q = typeof sp.q === "string" ? sp.q : "";
   const situacao = parseSituacao(
     typeof sp.situacao === "string" ? sp.situacao : undefined,
+  );
+  const categoria = parseAgeCategory(
+    typeof sp.categoria === "string" ? sp.categoria : undefined,
   );
 
   return (
@@ -83,6 +87,22 @@ export default async function PacientesPage({
             >
               <option value="all">Todos</option>
               <option value="independente">Independentes (sem cliente)</option>
+            </select>
+          </div>
+        </div>
+        <div className="w-full lg:w-auto lg:min-w-[12rem] lg:max-w-xs">
+          <div className="space-y-2">
+            <Label htmlFor="filtro-categoria">Categoria</Label>
+            <select
+              id="filtro-categoria"
+              name="categoria"
+              defaultValue={categoria}
+              className="border-input bg-white ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-card"
+            >
+              <option value="all">Todas</option>
+              <option value="crianca">{AGE_CATEGORY_LABELS.crianca} (até 17 anos)</option>
+              <option value="adulto">{AGE_CATEGORY_LABELS.adulto} (18 a 59)</option>
+              <option value="idoso">{AGE_CATEGORY_LABELS.idoso} (60+)</option>
             </select>
           </div>
         </div>

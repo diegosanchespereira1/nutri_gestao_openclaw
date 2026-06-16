@@ -1,31 +1,37 @@
 import { AdultNutritionAssessmentsSection } from "@/components/pacientes/adult-nutrition-assessments-section";
+import { ChildAssessmentsSection } from "@/components/pacientes/child-assessments-section";
 import { GeriatricAssessmentsSection } from "@/components/pacientes/geriatric-assessments-section";
 import { NutritionAssessmentForm } from "@/components/pacientes/nutrition-assessment-form";
 import { NutritionAssessmentHistoryItem } from "@/components/pacientes/nutrition-assessment-history-item";
 import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
 import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-assessments";
+import type { ChildSex } from "@/lib/nutrition/child/types";
+import {
+  ageCategoryFromYears,
+  assessmentVisibilityForCategory,
+} from "@/lib/pacientes/age-category";
 
 /**
  * Conteúdo do card "Avaliações nutricionais" na página do paciente.
  *
- * Abas:
- * - Avaliação Geral — formulário padrão + histórico interativo (editar/eliminar)
- * - Avaliação Adultos — antropometria adulto
- * - Avaliação para Idosos — Chumlea idoso + histórico interativo
- *
- * As abas são um Client Component; o conteúdo de cada aba é Server-rendered
- * e passado como slot (ReactNode), respeitando o padrão RSC de composição.
+ * As avaliações especializadas (infantil/adulto/idoso) aparecem conforme a
+ * faixa etária do paciente. A "Avaliação Geral" é sempre exibida.
  */
 export async function NutritionAssessmentsSection({
   patientId,
   defaultAge,
-  isMinor = false,
+  defaultSex,
+  defaultBirthDate,
 }: {
   patientId: string;
   defaultAge?: number;
-  isMinor?: boolean;
+  defaultSex?: ChildSex | null;
+  defaultBirthDate?: string | null;
 }) {
   const { rows } = await loadNutritionAssessmentsForPatient(patientId);
+  const { showChild, showAdult, showGeriatric } = assessmentVisibilityForCategory(
+    ageCategoryFromYears(defaultAge ?? null),
+  );
 
   const generalTabContent = (
     <div className="space-y-6" aria-label="Avaliações nutricionais gerais">
@@ -51,6 +57,14 @@ export async function NutritionAssessmentsSection({
     </div>
   );
 
+  const childTabContent = (
+    <ChildAssessmentsSection
+      patientId={patientId}
+      defaultSex={defaultSex}
+      defaultBirthDate={defaultBirthDate}
+    />
+  );
+
   const adultTabContent = (
     <AdultNutritionAssessmentsSection
       patientId={patientId}
@@ -65,9 +79,12 @@ export async function NutritionAssessmentsSection({
   return (
     <NutritionAssessmentsTabs
       generalTab={generalTabContent}
+      childTab={childTabContent}
       adultTab={adultTabContent}
       geriatricTab={geriatricTabContent}
-      showAdultTabs={!isMinor}
+      showChild={showChild}
+      showAdult={showAdult}
+      showGeriatric={showGeriatric}
     />
   );
 }

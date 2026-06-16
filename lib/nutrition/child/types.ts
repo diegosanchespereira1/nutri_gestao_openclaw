@@ -12,7 +12,11 @@ export type ChildIndicator =
   | "weight_for_age"
   | "height_for_age"
   | "bmi_for_age"
-  | "weight_for_height";
+  | "weight_for_height"
+  | "arm_circumference_for_age"
+  | "triceps_skinfold_for_age"
+  | "subscapular_skinfold_for_age"
+  | "head_circumference_for_age";
 
 /** Sexo biológico usado para escolher a curva de referência. */
 export type ChildSex = "female" | "male";
@@ -79,6 +83,11 @@ export type ChildAssessmentInput = {
   weightKg: number | null;
   heightCm: number | null;
   method: ClassificationMethod;
+  // Novos parâmetros WHO (3–60 meses para CB/PCT/SE; 0–60 meses para PC)
+  armCircumferenceCm: number | null;
+  tricepsSkinfoldMm: number | null;
+  subscapularSkinfoldMm: number | null;
+  headCircumferenceCm: number | null;
 };
 
 /** Saída do orquestrador. */

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Relatório de Avaliação Nutricional — modelo</title>
+<style>
+  :root{
+    --ink:#2b2b28; --muted:#6c6a63; --line:#e7e3d8;
+    --cream:#f7f4ec; --paper:#ffffff;
+    --green:#5f9233; --green-d:#3f6a1f; --green-bg:#eef5e3;
+    --amber:#c77700; --amber-bg:#fbf0db;
+    --red:#b5332b; --red-bg:#f7e6e3;
+    --brand:#6fa539; --brand-d:#4e7a26; --accent:#e0892a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#eceae3;color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.55;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .page{max-width:820px;margin:24px auto;background:var(--paper);
+    box-shadow:0 6px 30px rgba(0,0,0,.08);overflow:hidden;border-radius:14px}
+  .pad{padding:28px 36px}
+
+  /* Cabeçalho */
+  header{background:linear-gradient(120deg,#f3f7ec 0%,#fbf2e4 100%);
+    border-bottom:3px solid var(--brand);padding:26px 36px;display:flex;
+    align-items:center;justify-content:space-between;gap:20px}
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{width:46px;height:46px;border-radius:50%;border:5px solid var(--brand);
+    border-right-color:var(--accent);border-bottom-color:var(--red);
+    display:flex;align-items:center;justify-content:center}
+  .logo span{font-size:14px;font-weight:700;color:var(--brand-d)}
+  .brand h1{margin:0;font-size:18px;letter-spacing:.5px;color:var(--brand-d)}
+  .brand p{margin:0;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+  .doc-meta{text-align:right;font-size:12px;color:var(--muted)}
+  .doc-meta strong{display:block;font-size:14px;color:var(--ink)}
+
+  h2.section{font-size:12px;letter-spacing:2px;text-transform:uppercase;color:var(--brand-d);
+    margin:0 0 14px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+
+  /* Identificação */
+  .ident{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .field label{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+  .field span{font-size:14px;font-weight:600}
+
+  /* Resumo - semáforo */
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .scard{border-radius:12px;padding:16px;border:1px solid var(--line)}
+  .scard .top{display:flex;align-items:center;justify-content:space-between}
+  .scard .ind{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+  .dot{width:12px;height:12px;border-radius:50%}
+  .scard .status{font-size:17px;font-weight:700;margin:8px 0 2px}
+  .scard .val{font-size:12px;color:var(--muted)}
+  .scard .range{font-size:11px;color:var(--muted);margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+  .ok{background:var(--green-bg)} .ok .status{color:var(--green-d)} .ok .dot{background:var(--green)}
+  .warn{background:var(--amber-bg)} .warn .status{color:var(--amber)} .warn .dot{background:var(--amber)}
+  .bad{background:var(--red-bg)} .bad .status{color:var(--red)} .bad .dot{background:var(--red)}
+
+  /* Barra de percentil */
+  .pbar{margin-top:10px}
+  .track{position:relative;height:8px;border-radius:6px;
+    background:linear-gradient(90deg,var(--red) 0%,var(--amber) 12%,var(--green) 30%,var(--green) 70%,var(--amber) 88%,var(--red) 100%);
+    opacity:.85}
+  .marker{position:absolute;top:-4px;width:3px;height:16px;background:#1f2d3d;border-radius:2px;
+    box-shadow:0 0 0 2px #fff}
+  .scale{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:3px}
+
+  /* Tabela de medidas */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line)}
+  th{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);font-weight:600}
+  td.num{font-variant-numeric:tabular-nums;font-weight:600}
+  tr.tot td{background:var(--cream)}
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+  .pill.ok{background:var(--green-bg);color:var(--green-d)}
+  .pill.warn{background:var(--amber-bg);color:var(--amber)}
+  .pill.bad{background:var(--red-bg);color:var(--red)}
+
+  /* Evolução */
+  .evo{display:flex;gap:8px;align-items:flex-end;height:120px;padding-top:6px}
+  .evo .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end;height:100%}
+  .evo .bar{width:60%;background:var(--brand);border-radius:6px 6px 0 0}
+  .evo .lbl{font-size:10px;color:var(--muted)}
+  .evo .pv{font-size:11px;font-weight:700;color:var(--brand-d)}
+
+  /* Explicação */
+  .explain{background:var(--cream);border-radius:12px;padding:18px 20px;font-size:13px}
+  .explain h3{margin:0 0 8px;font-size:13px;color:var(--brand-d)}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:10px;font-size:12px}
+  .legend span{display:flex;align-items:center;gap:6px}
+
+  .notes{font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);
+    border-left:4px solid var(--accent);border-radius:0 10px 10px 0;padding:14px 16px}
+
+  footer{border-top:1px solid var(--line);padding:22px 36px;display:flex;
+    justify-content:space-between;align-items:flex-end;gap:20px}
+  .sign{text-align:center;min-width:230px}
+  .sign .line{border-top:1px solid var(--ink);margin-bottom:6px}
+  .sign strong{font-size:13px} .sign p{margin:2px 0;font-size:11px;color:var(--muted)}
+  .disc{font-size:10px;color:var(--muted);max-width:380px}
+
+  .divider{height:22px}
+  @media print{
+    body{background:#fff} .page{box-shadow:none;margin:0;border-radius:0;max-width:none}
+    @page{margin:14mm}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <!-- Cabeçalho com a marca do TENANT (nome + logo vindos do workspace) -->
+    <div class="brand">
+      <div class="logo"><span>BN</span></div>
+      <div>
+        <h1>Clínica Bem Nutrir</h1>
+        <p>Nutrição &amp; Saúde · CNPJ 00.000.000/0001-00</p>
+      </div>
+    </div>
+    <div class="doc-meta">
+      <strong>Relatório de Avaliação Nutricional</strong>
+      Emitido em 13/06/2026<br>
+      Avaliação infantil · 0–19 anos
+    </div>
+  </header>
+
+  <div class="pad">
+    <h2 class="section">Dados do paciente</h2>
+    <div class="ident">
+      <div class="field"><label>Nome</label><span>Laura Martins Costa</span></div>
+      <div class="field"><label>Data de nascimento</label><span>12/03/2018</span></div>
+      <div class="field"><label>Idade na avaliação</label><span>7 anos e 3 meses</span></div>
+      <div class="field"><label>Sexo</label><span>Feminino</span></div>
+    </div>
+  </div>
+
+  <div class="pad" style="padding-top:0">
+    <h2 class="section">Resumo do estado nutricional</h2>
+    <div class="summary">
+
+      <div class="scard ok">
+        <div class="top"><span class="ind">IMC para idade</span><span class="dot"></span></div>
+        <div class="status">Peso saudável</div>
+        <div class="val">IMC 15,3 kg/m² · percentil 52</div>
+        <div class="pbar">
+          <div class="track"><div class="marker" style="left:52%"></div></div>
+          <div class="scale"><span>baixo</span><span>adequado</span><span>elevado</span></div>
+        </div>
+        <div class="range">Faixa saudável para a idade: 13,1–17,5 kg/m²</div>
+      </div>
+
+      <div class="scard ok">
+        <div class="top"><span class="ind">Peso para idade</span><span class="dot"></span></div>
+        <div class="status">Peso adequado</div>
+        <div class="val">22,0 kg · percentil 55</div>
+        <div class="pbar">
+          <div class="track"><div class="marker" style="left:55%"></div></div>
+          <div class="scale"><span>baixo</span><span>adequado</span><span>elevado</span></div>
+        </div>
+        <div class="range">Faixa adequada para a idade: 17,5–28,4 kg</div>
+      </div>
+
+      <div class="scard ok">
+        <div class="top"><span class="ind">Estatura para idade</span><span class="dot"></span></div>
+        <div class="status">Crescimento adequado</div>
+        <div class="val">120 cm · percentil 40</div>
+        <div class="pbar">
+          <div class="track"><div class="marker" style="left:40%"></div></div>
+          <div class="scale"><span>baixa</span><span>adequada</span><span>alta</span></div>
+        </div>
+        <div class="range">Esperado para a idade: a partir de 111 cm</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="pad" style="padding-top:0">
+    <h2 class="section">Medidas e classificação</h2>
+    <table>
+      <thead>
+        <tr><th>Indicador</th><th>Medida</th><th>Percentil</th><th>Faixa saudável</th><th>Classificação</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>IMC para idade</td><td class="num">15,3 kg/m²</td><td class="num">P52</td><td>13,1–17,5 kg/m²</td><td><span class="pill ok">Peso saudável</span></td></tr>
+        <tr><td>Peso para idade</td><td class="num">22,0 kg</td><td class="num">P55</td><td>17,5–28,4 kg</td><td><span class="pill ok">Adequado</span></td></tr>
+        <tr><td>Estatura para idade</td><td class="num">120 cm</td><td class="num">P40</td><td>≥ 111 cm</td><td><span class="pill ok">Adequada</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="pad" style="padding-top:0">
+    <h2 class="section">Evolução — comparativo das avaliações</h2>
+    <table>
+      <thead>
+        <tr><th>Data</th><th>Idade</th><th>Peso</th><th>Estatura</th><th>IMC</th><th>Percentil IMC</th><th>Classificação</th></tr>
+      </thead>
+      <tbody>
+        <tr class="tot">
+          <td class="num">13/06/2026 <span class="pill ok" style="margin-left:4px">atual</span></td>
+          <td>7a 3m</td><td class="num">22,0 kg</td><td class="num">120 cm</td><td class="num">15,3</td><td class="num">P52 ↑</td>
+          <td><span class="pill ok">Peso saudável</span></td>
+        </tr>
+        <tr>
+          <td class="num">12/03/2026</td><td>7a 0m</td><td class="num">21,2 kg</td><td class="num">118 cm</td><td class="num">15,2</td><td class="num">P50</td>
+          <td><span class="pill ok">Peso saudável</span></td>
+        </tr>
+        <tr>
+          <td class="num">10/12/2025</td><td>6a 9m</td><td class="num">20,4 kg</td><td class="num">116 cm</td><td class="num">15,2</td><td class="num">P48</td>
+          <td><span class="pill ok">Peso saudável</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="font-size:12px;color:var(--muted);margin:10px 0 0">
+      Nas últimas 3 avaliações o IMC manteve-se estável e dentro da faixa saudável (entre o percentil 3 e o 85),
+      com ganho de peso e estatura compatíveis com o crescimento esperado.
+    </p>
+  </div>
+
+  <div class="pad" style="padding-top:0">
+    <h2 class="section">Como ler este relatório</h2>
+    <div class="explain">
+      <h3>O que é o percentil?</h3>
+      O percentil compara a criança com outras 100 da mesma idade e sexo. Estar no
+      <strong>percentil 52</strong> significa que, de cada 100 crianças, cerca de 52 têm valor menor
+      e 48 têm valor maior — ou seja, a criança está bem no meio, dentro do esperado.
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green)"></span> Verde: dentro do padrão saudável</span>
+        <span><span class="dot" style="background:var(--amber)"></span> Amarelo: atenção, acompanhar</span>
+        <span><span class="dot" style="background:var(--red)"></span> Vermelho: fora do padrão</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="pad" style="padding-top:0">
+    <h2 class="section">Orientações da nutricionista</h2>
+    <div class="notes">
+      Laura está com crescimento e peso adequados para a idade. Manter alimentação variada,
+      com frutas e legumes diários, e atividade física regular. Próxima reavaliação sugerida em
+      6 meses (dez/2026).
+    </div>
+  </div>
+
+  <footer>
+    <div class="disc">
+      Documento gerado a partir das avaliações registradas no NutriGestão. Referência: curvas de
+      crescimento OMS 2006/2007. Este relatório não substitui consulta médica.
+    </div>
+    <div class="sign">
+      <div class="line"></div>
+      <strong>Dra. Ana Saber</strong>
+      <p>Nutricionista · CRN-3 12345</p>
+      <p>13/06/2026</p>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

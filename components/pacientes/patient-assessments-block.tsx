@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, TrendingUp, ChevronDown } from "lucide-react";
+import { ClipboardList, TrendingUp, ChevronDown, FileDown } from "lucide-react";
 
 import {
   GeneralEvolutionCharts,
@@ -20,6 +20,10 @@ import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-asse
 import { loadAdultNutritionAssessmentsForPatient } from "@/lib/actions/adult-nutrition-assessments";
 import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
 import { loadChildAssessmentsForPatient } from "@/lib/actions/child-assessments";
+import {
+  assessmentVisibilityForCategory,
+  patientAgeCategory,
+} from "@/lib/pacientes/age-category";
 import { CHILD_COLOR_CLASSES } from "@/lib/nutrition/child/labels";
 import type { ChildColor, ChildIndicator } from "@/lib/nutrition/child/types";
 import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
@@ -469,15 +473,33 @@ function GeriatricTabContent({
 }
 
 function ChildTabContent({
+  patientId,
   chartData,
   rows,
 }: {
+  patientId: string;
   chartData: ChildEvolutionPoint[];
   rows: ChildAssessmentRow[];
 }) {
   return (
     <div className="space-y-6 pt-2">
       <SemestralReminder lastRecordedAt={rows[0]?.recorded_at ?? null} />
+
+      {rows.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={`/pacientes/${patientId}/relatorio-infantil/pdf`}
+            download
+            className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
+          >
+            <FileDown className="mr-1.5 size-3.5" aria-hidden />
+            Baixar relatório (PDF)
+          </a>
+          <span className="text-xs text-muted-foreground">
+            Relatório para enviar ao paciente, com a marca da sua clínica.
+          </span>
+        </div>
+      )}
 
       {chartData.length >= 2 && (
         <div>
@@ -509,10 +531,10 @@ function ChildTabContent({
 
 export async function PatientAssessmentsBlock({
   patientId,
-  isMinor = false,
+  birthDate = null,
 }: {
   patientId: string;
-  isMinor?: boolean;
+  birthDate?: string | null;
 }) {
   const [
     { rows: generalRows },
@@ -561,7 +583,12 @@ export async function PatientAssessmentsBlock({
       bmi_for_age: byIndicator("bmi_for_age"),
     };
   });
-  const showChildTab = isMinor || childRows.length > 0;
+  // Visibilidade por categoria etária; no prontuário também exibimos a aba se
+  // houver histórico daquele tipo (para não esconder registos anteriores).
+  const vis = assessmentVisibilityForCategory(patientAgeCategory(birthDate));
+  const showChildTab = vis.showChild || childRows.length > 0;
+  const showAdultTab = vis.showAdult || adultRows.length > 0;
+  const showGeriatricTab = vis.showGeriatric || geriatricRows.length > 0;
 
   return (
     <div className="space-y-4">
@@ -586,13 +613,18 @@ export async function PatientAssessmentsBlock({
 
       {/* Tabs com gráficos + histórico */}
       <NutritionAssessmentsTabs
-        showAdultTabs={!isMinor}
-        showChildTab={showChildTab}
+        showChild={showChildTab}
+        showAdult={showAdultTab}
+        showGeriatric={showGeriatricTab}
         generalTab={
           <GeneralTabContent chartData={generalChartData} rows={generalRows} />
         }
         childTab={
-          <ChildTabContent chartData={childChartData} rows={childRows} />
+          <ChildTabContent
+            patientId={patientId}
+            chartData={childChartData}
+            rows={childRows}
+          />
         }
         adultTab={
           <AdultTabContent chartData={adultChartData} rows={adultRows} />

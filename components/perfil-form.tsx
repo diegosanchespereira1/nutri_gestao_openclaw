@@ -18,6 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MAX_PROFILE_PHOTO_BYTES } from "@/lib/constants/profile-photos-storage";
+import { SignatureField } from "@/components/perfil/signature-field";
 import { createClient } from "@/lib/supabase/client";
 import { formatBrazilPhoneInput } from "@/lib/validators/br-phone";
 
@@ -32,6 +33,7 @@ export function PerfilForm({
   defaultPhone,
   defaultCrn,
   defaultPhotoUrl,
+  defaultSignatureUrl,
 }: {
   defaultFullName: string;
   defaultEmail: string;
@@ -39,6 +41,7 @@ export function PerfilForm({
   defaultPhone: string;
   defaultCrn: string;
   defaultPhotoUrl: string | null;
+  defaultSignatureUrl: string | null;
 }) {
   const [state, formAction] = useActionState(updateProfileAction, initial);
   const [fullNameValue, setFullNameValue] = useState(defaultFullName);
@@ -257,6 +260,10 @@ export function PerfilForm({
               className="border-input bg-transparent text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
               aria-describedby={state?.ok === false ? "perfil-err" : undefined}
             />
+          </div>
+
+          <div className="border-t border-border pt-4">
+            <SignatureField defaultUrl={defaultSignatureUrl} />
           </div>
 
           {state?.ok === false ? (

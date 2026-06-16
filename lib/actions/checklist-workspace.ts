@@ -1,10 +1,10 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { revalidatePath, updateTag } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 function invalidateWorkspaceCatalogCache(workspaceOwnerId: string) {
-  updateTag(`workspace-catalog-${workspaceOwnerId}`);
+  revalidateTag(`workspace-catalog-${workspaceOwnerId}`);
 }
 import { redirect } from "next/navigation";
 

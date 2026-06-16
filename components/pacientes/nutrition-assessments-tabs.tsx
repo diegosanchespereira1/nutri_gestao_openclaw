@@ -9,40 +9,57 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 
+/**
+ * Abas de avaliação. Cada avaliação especializada (infantil/adulto/idoso) é
+ * exibida conforme a faixa etária do paciente — não se mostra a aba de adulto
+ * para uma criança/idoso e vice-versa. A "Avaliação Geral" é sempre exibida.
+ */
 export function NutritionAssessmentsTabs({
   generalTab,
   adultTab,
   geriatricTab,
   childTab,
-  showAdultTabs = true,
-  showChildTab = false,
+  showAdult = true,
+  showGeriatric = true,
+  showChild = false,
 }: {
   generalTab: ReactNode;
   adultTab: ReactNode;
   geriatricTab: ReactNode;
   childTab?: ReactNode;
-  showAdultTabs?: boolean;
-  showChildTab?: boolean;
+  showAdult?: boolean;
+  showGeriatric?: boolean;
+  showChild?: boolean;
 }) {
-  const showChild = showChildTab && childTab != null;
+  const childVisible = showChild && childTab != null;
+  const adultVisible = showAdult && adultTab != null;
+  const geriatricVisible = showGeriatric && geriatricTab != null;
+
+  const defaultValue = childVisible
+    ? "child"
+    : adultVisible
+      ? "adult"
+      : geriatricVisible
+        ? "geriatric"
+        : "general";
 
   return (
-    <Tabs defaultValue={showChild ? "child" : "general"}>
+    <Tabs defaultValue={defaultValue}>
       <TabsList className="flex h-auto min-h-10 w-full flex-wrap gap-1">
         <TabsTrigger value="general">Avaliação Geral</TabsTrigger>
-        {showChild && <TabsTrigger value="child">Avaliação Infantil</TabsTrigger>}
-        {showAdultTabs && (
-          <TabsTrigger value="adult">Avaliação Adultos</TabsTrigger>
-        )}
-        {showAdultTabs && (
+        {childVisible && <TabsTrigger value="child">Avaliação Infantil</TabsTrigger>}
+        {adultVisible && <TabsTrigger value="adult">Avaliação Adultos</TabsTrigger>}
+        {geriatricVisible && (
           <TabsTrigger value="geriatric">Avaliação para Idosos</TabsTrigger>
         )}
       </TabsList>
 
       <TabsContent value="general">{generalTab}</TabsContent>
-      {showChild && <TabsContent value="child">{childTab}</TabsContent>}
-      {showAdultTabs && <TabsContent value="adult">{adultTab}</TabsContent>}
-      {showAdultTabs && <TabsContent value="geriatric">{geriatricTab}</TabsContent>}
+      {childVisible && <TabsContent value="child">{childTab}</TabsContent>}
+      {adultVisible && <TabsContent value="adult">{adultTab}</TabsContent>}
+      {geriatricVisible && (
+        <TabsContent value="geriatric">{geriatricTab}</TabsContent>
+      )}
     </Tabs>
   );
 }

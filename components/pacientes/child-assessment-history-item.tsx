@@ -45,6 +45,10 @@ export function ChildAssessmentHistoryItem({ row }: { row: ChildAssessmentRow })
     weightKg: weight,
     heightCm: height,
     method: row.classification_method,
+    armCircumferenceCm:    num(row.arm_circumference_cm    ?? null),
+    tricepsSkinfoldMm:     num(row.triceps_skinfold_mm     ?? null),
+    subscapularSkinfoldMm: num(row.subscapular_skinfold_mm ?? null),
+    headCircumferenceCm:   num(row.head_circumference_cm   ?? null),
   });
   const bmi = assessment.bmi ?? num(row.bmi);
   const indicators = assessment.indicators;

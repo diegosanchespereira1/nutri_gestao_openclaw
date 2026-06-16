@@ -46,6 +46,10 @@ const UNIT: Record<ChildIndicator, string> = {
   height_for_age: "cm",
   bmi_for_age: "kg/m²",
   weight_for_height: "kg",
+  arm_circumference_for_age: "cm",
+  triceps_skinfold_for_age: "mm",
+  subscapular_skinfold_for_age: "mm",
+  head_circumference_for_age: "cm",
 };
 
 function buildData(

@@ -20,6 +20,10 @@ describe("assessChild (percentil)", () => {
     weightKg: 22,
     heightCm: 120,
     method: "percentile" as const,
+    armCircumferenceCm: null,
+    tricepsSkinfoldMm: null,
+    subscapularSkinfoldMm: null,
+    headCircumferenceCm: null,
   };
 
   it("calcula o IMC", () => {
@@ -79,6 +83,10 @@ describe("assessChild — casos de borda", () => {
       weightKg: 22,
       heightCm: 120,
       method: "zscore",
+      armCircumferenceCm: null,
+      tricepsSkinfoldMm: null,
+      subscapularSkinfoldMm: null,
+      headCircumferenceCm: null,
     });
     expect(r.indicators.every((i) => i.outOfRange)).toBe(true);
     expect(r.indicators.every((i) => i.classification === null)).toBe(true);
@@ -91,6 +99,10 @@ describe("assessChild — casos de borda", () => {
       weightKg: 30,
       heightCm: 135,
       method: "percentile",
+      armCircumferenceCm: null,
+      tricepsSkinfoldMm: null,
+      subscapularSkinfoldMm: null,
+      headCircumferenceCm: null,
     });
     expect(pick(r, "weight_for_age").outOfRange).toBe(true);
     expect(pick(r, "bmi_for_age").outOfRange).toBe(false);
@@ -104,6 +116,10 @@ describe("assessChild — casos de borda", () => {
       weightKg: null,
       heightCm: null,
       method: "percentile",
+      armCircumferenceCm: null,
+      tricepsSkinfoldMm: null,
+      subscapularSkinfoldMm: null,
+      headCircumferenceCm: null,
     });
     expect(r.bmi).toBeNull();
     const wfa = pick(r, "weight_for_age");
@@ -118,6 +134,10 @@ describe("assessChild — casos de borda", () => {
       weightKg: 0,
       heightCm: 86,
       method: "percentile",
+      armCircumferenceCm: null,
+      tricepsSkinfoldMm: null,
+      subscapularSkinfoldMm: null,
+      headCircumferenceCm: null,
     });
     expect(pick(r, "weight_for_age").classification).toBeNull();
     expect(pick(r, "height_for_age").classification).not.toBeNull();

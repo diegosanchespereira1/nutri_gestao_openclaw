@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { useSessionKeepAlive } from "@/hooks/use-session-keep-alive";
 import { cn } from "@/lib/utils";
 import {
   approveChecklistFillDossierAction,
@@ -605,6 +606,9 @@ export function ChecklistFillWizard({
   const [leaveActionBusy, setLeaveActionBusy] = useState(false);
   const [leaveActionError, setLeaveActionError] = useState<string | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+
+  /* ── Mantém a sessão Supabase renovada durante o preenchimento ── */
+  useSessionKeepAlive();
 
   /* ── Task B: guarda de navegação (Voltar do browser + links internos) ── */
   const { guardTriggered, cancelLeave, completeBrowserBack } = useNavigationGuard({

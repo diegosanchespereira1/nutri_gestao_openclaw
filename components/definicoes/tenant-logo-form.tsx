@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
   type UpdateTenantLogoResult,
@@ -17,12 +17,35 @@ const TOAST_ANIMATION_MS = 220;
 
 export function TenantLogoForm({
   defaultLogoUrl,
+  defaultTenantName,
   canManage,
 }: {
   defaultLogoUrl: string | null;
+  defaultTenantName: string;
   canManage: boolean;
 }) {
   const [state, formAction] = useActionState(updateTenantLogoAction, initial);
+  const [tenantName, setTenantName] = useState(defaultTenantName);
+  const [logoFileName, setLogoFileName] = useState("");
+  const [removeChecked, setRemoveChecked] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const dirty =
+    tenantName.trim() !== defaultTenantName.trim() ||
+    logoFileName !== "" ||
+    removeChecked;
+
+  // Após salvar com sucesso, limpa os controles de logo (o botão volta a
+  // desabilitar, pois não há mais alterações pendentes).
+  useEffect(() => {
+    if (!state?.ok) return;
+    const frameId = window.requestAnimationFrame(() => {
+      setLogoFileName("");
+      setRemoveChecked(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [state]);
   const [toast, setToast] = useState<{
     id: number;
     message: string;
@@ -80,7 +103,26 @@ export function TenantLogoForm({
           </p>
         </div>
 
-        <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4">
+        <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-5">
+          <div className="space-y-2">
+            <Label htmlFor="tenant-name">Nome da empresa / clínica</Label>
+            <p className="text-muted-foreground text-xs">
+              Aparece no topo dos relatórios e documentos. Se ficar em branco, é
+              usado o nome do profissional.
+            </p>
+            <Input
+              id="tenant-name"
+              name="tenant_name"
+              type="text"
+              maxLength={120}
+              placeholder="Ex.: Clínica Bem Nutrir"
+              value={tenantName}
+              onChange={(e) => setTenantName(e.target.value)}
+              disabled={!canManage}
+              autoComplete="organization"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="tenant-logo-file">
               {hasLogo ? "Substituir logotipo" : "Enviar logotipo"}
@@ -106,6 +148,8 @@ export function TenantLogoForm({
                     value="1"
                     className="border-input size-4 accent-primary"
                     disabled={!canManage}
+                    checked={removeChecked}
+                    onChange={(e) => setRemoveChecked(e.target.checked)}
                   />
                   Remover logotipo atual
                 </label>
@@ -113,11 +157,13 @@ export function TenantLogoForm({
             ) : null}
 
             <Input
+              ref={fileInputRef}
               id="tenant-logo-file"
               name="logo"
               type="file"
               accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
               disabled={!canManage}
+              onChange={(e) => setLogoFileName(e.target.value)}
               className="border-input bg-background text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
               aria-invalid={state?.ok === false}
               aria-describedby={
@@ -141,8 +187,8 @@ export function TenantLogoForm({
             </p>
           ) : null}
 
-          <Button type="submit" disabled={!canManage}>
-            Salvar logotipo
+          <Button type="submit" disabled={!canManage || !dirty}>
+            Salvar
           </Button>
         </form>
       </section>

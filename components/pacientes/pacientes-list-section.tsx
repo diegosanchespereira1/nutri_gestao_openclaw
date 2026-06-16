@@ -5,6 +5,11 @@ import { EmptyState } from "@/components/common/empty-state";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadAllPatientsForOwner } from "@/lib/actions/patients";
 import { formatCpfDisplay } from "@/lib/format/br-document";
+import {
+  AGE_CATEGORY_LABELS,
+  parseAgeCategory,
+  patientAgeCategory,
+} from "@/lib/pacientes/age-category";
 import { cn } from "@/lib/utils";
 
 function parseSituacao(raw: string | undefined): "independente" | "all" {
@@ -20,13 +25,21 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
   const situacao = parseSituacao(
     typeof sp.situacao === "string" ? sp.situacao : undefined,
   );
+  const categoria = parseAgeCategory(
+    typeof sp.categoria === "string" ? sp.categoria : undefined,
+  );
 
-  const { rows } = await loadAllPatientsForOwner({
+  const { rows: allRows } = await loadAllPatientsForOwner({
     q,
     independente: situacao === "independente",
   });
 
-  const hasFilters = !!(q || situacao !== "all");
+  const rows =
+    categoria === "all"
+      ? allRows
+      : allRows.filter((p) => patientAgeCategory(p.birth_date) === categoria);
+
+  const hasFilters = !!(q || situacao !== "all" || categoria !== "all");
 
   if (rows.length === 0) {
     return hasFilters ? (
@@ -63,6 +76,7 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
 
         const cpfDisplay = p.document_id ? formatCpfDisplay(p.document_id) : null;
         const birthDisplay = p.birth_date ? String(p.birth_date).slice(0, 10) : null;
+        const ageCat = patientAgeCategory(p.birth_date);
 
         return (
           <li key={p.id}>
@@ -79,6 +93,11 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
                   {!p.client_id ? (
                     <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                       Independente
+                    </span>
+                  ) : null}
+                  {ageCat ? (
+                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                      {AGE_CATEGORY_LABELS[ageCat]}
                     </span>
                   ) : null}
                 </div>

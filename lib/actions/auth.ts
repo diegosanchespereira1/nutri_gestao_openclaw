@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { clearAppSessionCookies } from "@/lib/auth/clear-app-session-cookies";
 import { getServerAppOrigin } from "@/lib/app-origin";
 import { resolveProfilePhotoPathFromForm } from "@/lib/profile/photo-sync";
+import { resolveProfileSignaturePathFromForm } from "@/lib/profile/signature-sync";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeBrazilPhone } from "@/lib/validators/br-phone";
 
@@ -58,7 +59,7 @@ export async function updateProfileAction(
 
   const { data: currentProfile } = await supabase
     .from("profiles")
-    .select("photo_storage_path")
+    .select("photo_storage_path, signature_storage_path")
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -72,11 +73,24 @@ export async function updateProfileAction(
     return { ok: false, error: photoRes.error };
   }
 
+  const signatureRes = await resolveProfileSignaturePathFromForm({
+    supabase,
+    userId: user.id,
+    formData,
+    previousPath:
+      (currentProfile as { signature_storage_path?: string | null } | null)
+        ?.signature_storage_path ?? null,
+  });
+  if (!signatureRes.ok) {
+    return { ok: false, error: signatureRes.error };
+  }
+
   const profileFields = {
     full_name,
     crn,
     phone,
     photo_storage_path: photoRes.path,
+    signature_storage_path: signatureRes.path,
     updated_at: new Date().toISOString(),
   };
 

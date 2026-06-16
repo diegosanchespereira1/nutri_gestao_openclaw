@@ -75,6 +75,11 @@ export function ChildAssessmentForm({
   const [height, setHeight] = useState<string>("");
   const [method, setMethod] = useState<ClassificationMethod>("percentile");
   const [notes, setNotes] = useState<string>("");
+  // Novos parâmetros WHO (3–60 meses para CB/PCT/SE; 0–60 meses para PC)
+  const [armCircumference, setArmCircumference] = useState<string>("");
+  const [tricepsSkinfold, setTricepsSkinfold] = useState<string>("");
+  const [subscapularSkinfold, setSubscapularSkinfold] = useState<string>("");
+  const [headCircumference, setHeadCircumference] = useState<string>("");
 
   const ageMonths = useMemo<number | null>(() => {
     if (!birthDate || !recordedAt) return null;
@@ -85,6 +90,14 @@ export function ChildAssessmentForm({
 
   const numWeight = toNum(weight);
   const numHeight = toNum(height);
+  const numArmCircumference    = toNum(armCircumference);
+  const numTricepsSkinfold     = toNum(tricepsSkinfold);
+  const numSubscapularSkinfold = toNum(subscapularSkinfold);
+  const numHeadCircumference   = toNum(headCircumference);
+
+  // Faixas de exibição dos novos campos conforme tabelas WHO disponíveis
+  const showSkinfoldAndCB = ageMonths != null && ageMonths >= 3 && ageMonths <= 60;
+  const showHeadCirc      = ageMonths != null && ageMonths >= 0 && ageMonths <= 60;
 
   const assessment = useMemo(() => {
     if (sex === "" || ageMonths == null) return null;
@@ -94,8 +107,12 @@ export function ChildAssessmentForm({
       weightKg: numWeight,
       heightCm: numHeight,
       method,
+      armCircumferenceCm:    numArmCircumference,
+      tricepsSkinfoldMm:     numTricepsSkinfold,
+      subscapularSkinfoldMm: numSubscapularSkinfold,
+      headCircumferenceCm:   numHeadCircumference,
     });
-  }, [sex, ageMonths, numWeight, numHeight, method]);
+  }, [sex, ageMonths, numWeight, numHeight, method, numArmCircumference, numTricepsSkinfold, numSubscapularSkinfold, numHeadCircumference]);
 
   const canSubmit =
     sex !== "" && ageMonths != null && (numWeight != null || numHeight != null);
@@ -111,6 +128,10 @@ export function ChildAssessmentForm({
       <input type="hidden" name="height_cm" value={numHeight != null ? String(numHeight) : ""} />
       <input type="hidden" name="measured_lying" value={String(measuredLying)} />
       <input type="hidden" name="classification_method" value={method} />
+      <input type="hidden" name="arm_circumference_cm"    value={numArmCircumference    != null ? String(numArmCircumference)    : ""} />
+      <input type="hidden" name="triceps_skinfold_mm"     value={numTricepsSkinfold     != null ? String(numTricepsSkinfold)     : ""} />
+      <input type="hidden" name="subscapular_skinfold_mm" value={numSubscapularSkinfold != null ? String(numSubscapularSkinfold) : ""} />
+      <input type="hidden" name="head_circumference_cm"   value={numHeadCircumference   != null ? String(numHeadCircumference)   : ""} />
 
       {/* Perfil + datas */}
       <fieldset className="space-y-4">
@@ -218,6 +239,72 @@ export function ChildAssessmentForm({
             </option>
           </select>
         </div>
+
+        {/* Campos WHO 0–60 meses: Perímetro cefálico */}
+        {showHeadCirc && (
+          <div className="space-y-2">
+            <Label htmlFor="ca-head-circ">Perímetro cefálico (cm)</Label>
+            <Input
+              id="ca-head-circ"
+              type="number"
+              step="0.1"
+              min={0}
+              inputMode="decimal"
+              placeholder="Ex.: 39,5"
+              className="tabular-nums"
+              value={headCircumference}
+              onChange={(e) => setHeadCircumference(e.target.value)}
+            />
+          </div>
+        )}
+
+        {/* Campos WHO 3–60 meses: CB, PCT, SE */}
+        {showSkinfoldAndCB && (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="ca-arm-circ">Circunferência do braço (cm)</Label>
+              <Input
+                id="ca-arm-circ"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 14,5"
+                className="tabular-nums"
+                value={armCircumference}
+                onChange={(e) => setArmCircumference(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ca-triceps">Prega tricipital (mm)</Label>
+              <Input
+                id="ca-triceps"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 8,5"
+                className="tabular-nums"
+                value={tricepsSkinfold}
+                onChange={(e) => setTricepsSkinfold(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ca-subscapular">Prega subescapular (mm)</Label>
+              <Input
+                id="ca-subscapular"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 6,1"
+                className="tabular-nums"
+                value={subscapularSkinfold}
+                onChange={(e) => setSubscapularSkinfold(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
       </fieldset>
 
       {/* Resultado em tempo real */}

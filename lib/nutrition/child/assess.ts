@@ -61,6 +61,11 @@ function adequateBand(
       return { low: row[P3], high: row[P97] }; // adequado: P3–P97
     case "height_for_age":
       return { low: row[P3], high: null }; // adequada: ≥ P3
+    case "arm_circumference_for_age":
+    case "triceps_skinfold_for_age":
+    case "subscapular_skinfold_for_age":
+    case "head_circumference_for_age":
+      return { low: row[P3], high: row[P97] }; // adequado: P3–P97
   }
 }
 
@@ -79,6 +84,9 @@ function measureFor(
       return heightCm;
     case "bmi_for_age":
       return bmi;
+    default:
+      // Novos indicadores têm valor passado diretamente — não passam por aqui.
+      return null;
   }
 }
 
@@ -111,7 +119,17 @@ function buildResult(
 }
 
 export function assessChild(input: ChildAssessmentInput): ChildAssessmentResult {
-  const { sex, ageMonths, weightKg, heightCm, method } = input;
+  const {
+    sex,
+    ageMonths,
+    weightKg,
+    heightCm,
+    method,
+    armCircumferenceCm,
+    tricepsSkinfoldMm,
+    subscapularSkinfoldMm,
+    headCircumferenceCm,
+  } = input;
 
   const bmi =
     weightKg != null && heightCm != null ? computeBmi(heightCm, weightKg) : null;
@@ -127,6 +145,21 @@ export function assessChild(input: ChildAssessmentInput): ChildAssessmentResult 
   if (method === "percentile" && isWeightForHeightAvailable() && heightCm != null) {
     const row = getReferenceByHeight(sex, heightCm);
     indicators.push(buildResult("weight_for_height", ageMonths, weightKg, row));
+  }
+
+  // Novos indicadores WHO 3–60 meses (CB, PCT, SE) e 0–60 meses (PC).
+  // A tabela de referência já limita a cobertura: se `ageMonths` não tiver linha,
+  // getReference retorna null e buildResult marca outOfRange=true.
+  const newIndicatorInputs: Array<{ indicator: ChildIndicator; value: number | null }> = [
+    { indicator: "arm_circumference_for_age",    value: armCircumferenceCm    },
+    { indicator: "triceps_skinfold_for_age",     value: tricepsSkinfoldMm     },
+    { indicator: "subscapular_skinfold_for_age", value: subscapularSkinfoldMm },
+    { indicator: "head_circumference_for_age",   value: headCircumferenceCm   },
+  ];
+
+  for (const { indicator, value } of newIndicatorInputs) {
+    const row = getReference(indicator, sex, ageMonths, method);
+    indicators.push(buildResult(indicator, ageMonths, value, row));
   }
 
   return { bmi, indicators };

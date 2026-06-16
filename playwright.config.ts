@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { config as loadDotenv } from "dotenv";
 
 /**
  * Testes funcionais (E2E) com Playwright.
@@ -8,9 +9,14 @@ import { defineConfig, devices } from "@playwright/test";
  *  - auth   → precisam de E2E_EMAIL / E2E_PASSWORD + Supabase real
  *             (são automaticamente ignorados quando as variáveis não existem).
  *
+ * Credenciais e IDs de pacientes ficam em .env.test (ignorado pelo git).
+ *
  * Local:  npm run test:e2e        (arranca `next dev` automaticamente)
  * CI:     faz build antes e o Playwright arranca `next start`.
  */
+
+// Carrega .env.test se existir (não sobrescreve variáveis já definidas no shell)
+loadDotenv({ path: ".env.test", override: false });
 
 const PORT = Number(process.env.E2E_PORT ?? 3000);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${PORT}`;

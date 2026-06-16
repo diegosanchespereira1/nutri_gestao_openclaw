@@ -2,6 +2,7 @@ import { PerfilForm } from "@/components/perfil-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { PROFILE_PHOTOS_BUCKET } from "@/lib/constants/profile-photos-storage";
+import { PROFESSIONAL_SIGNATURES_BUCKET } from "@/lib/constants/professional-signatures-storage";
 import { profileRoleLabel } from "@/lib/roles";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 
@@ -18,7 +19,7 @@ export default async function PerfilPage() {
     supabase.auth.getUser(),
     supabase
       .from("profiles")
-      .select("full_name, crn, phone, photo_storage_path, role")
+      .select("full_name, crn, phone, photo_storage_path, signature_storage_path, role")
       .eq("user_id", ctxUser.id)
       .maybeSingle(),
     supabase
@@ -52,6 +53,16 @@ export default async function PerfilPage() {
     defaultPhotoUrl = data?.signedUrl ?? null;
   }
 
+  let defaultSignatureUrl: string | null = null;
+  const signaturePath = (profile as { signature_storage_path?: string | null } | null)
+    ?.signature_storage_path;
+  if (signaturePath) {
+    const { data } = await supabase.storage
+      .from(PROFESSIONAL_SIGNATURES_BUCKET)
+      .createSignedUrl(signaturePath, 60 * 60);
+    defaultSignatureUrl = data?.signedUrl ?? null;
+  }
+
   return (
     <PageLayout variant="form">
       <PageHeader
@@ -66,6 +77,7 @@ export default async function PerfilPage() {
         defaultPhone={effectivePhone}
         defaultCrn={effectiveCrn}
         defaultPhotoUrl={defaultPhotoUrl}
+        defaultSignatureUrl={defaultSignatureUrl}
       />
     </PageLayout>
   );

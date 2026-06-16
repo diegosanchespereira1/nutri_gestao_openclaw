@@ -29,6 +29,43 @@ export async function updateTenantLogoAction(
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
   const previousPath = await fetchTenantLogoStoragePath(supabase);
 
+  // ── Nome da empresa/clínica ──────────────────────────────────────────────
+  let nameChanged = false;
+  let nameMigrationPending = false;
+  if (formData.has("tenant_name")) {
+    const nextName = String(formData.get("tenant_name") ?? "").trim().slice(0, 120);
+    const { data: prevNameRaw, error: readError } =
+      await supabase.rpc("workspace_tenant_name");
+    // Migração ainda não aplicada (função inexistente): não bloqueia o logo.
+    const missingFn = (code?: string, msg?: string) =>
+      code === "PGRST202" ||
+      code === "42883" ||
+      /could not find the function|does not exist/i.test(msg ?? "");
+
+    if (readError && missingFn(readError.code, readError.message)) {
+      nameMigrationPending = true;
+    } else {
+      const prevName = typeof prevNameRaw === "string" ? prevNameRaw.trim() : "";
+      if (nextName !== prevName) {
+        const { error: nameError } = await supabase.rpc("set_workspace_tenant_name", {
+          p_name: nextName,
+        });
+        if (nameError && missingFn(nameError.code, nameError.message)) {
+          nameMigrationPending = true;
+        } else if (nameError) {
+          console.error("[updateTenantLogoAction] tenant name update failed", {
+            code: nameError.code,
+            message: nameError.message,
+          });
+          return { ok: false, error: "Não foi possível salvar o nome da empresa." };
+        } else {
+          nameChanged = true;
+        }
+      }
+    }
+  }
+
+  // ── Logotipo ─────────────────────────────────────────────────────────────
   const logoRes = await resolveTenantLogoPathFromForm({
     supabase,
     ownerUserId: workspaceOwnerId,
@@ -39,32 +76,37 @@ export async function updateTenantLogoAction(
     return { ok: false, error: logoRes.error };
   }
 
-  if (logoRes.path === previousPath) {
+  const logoChanged = logoRes.path !== previousPath;
+  if (logoChanged) {
+    const { error: updateError } = await supabase.rpc(
+      "set_workspace_tenant_logo_storage_path",
+      { p_path: logoRes.path },
+    );
+    if (updateError) {
+      console.error("[updateTenantLogoAction] workspace logo update failed", {
+        userId: user.id,
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+      });
+      return {
+        ok: false,
+        error: "Não foi possível salvar o logotipo. Tente novamente.",
+      };
+    }
+  }
+
+  if (nameMigrationPending) {
     return {
-      ok: true,
-      message: "Nenhuma alteração no logótipo.",
+      ok: false,
+      error:
+        "O nome da empresa ainda não pode ser salvo: aplique a migração pendente do banco (supabase migration up) e tente novamente.",
     };
   }
 
-  const { error: updateError } = await supabase.rpc(
-    "set_workspace_tenant_logo_storage_path",
-    {
-      p_path: logoRes.path,
-    },
-  );
-
-  if (updateError) {
-    console.error("[updateTenantLogoAction] workspace logo update failed", {
-      userId: user.id,
-      code: updateError.code,
-      message: updateError.message,
-      details: updateError.details,
-      hint: updateError.hint,
-    });
-    return {
-      ok: false,
-      error: "Não foi possível salvar o logotipo. Tente novamente.",
-    };
+  if (!logoChanged && !nameChanged) {
+    return { ok: true, message: "Nenhuma alteração." };
   }
 
   revalidatePath("/definicoes/empresa");
@@ -73,8 +115,8 @@ export async function updateTenantLogoAction(
   return {
     ok: true,
     message:
-      logoRes.path === null
-        ? "Logotipo removido com sucesso."
-        : "Logotipo atualizado com sucesso.",
+      logoChanged && logoRes.path === null
+        ? "Dados da empresa atualizados (logotipo removido)."
+        : "Dados da empresa atualizados com sucesso.",
   };
 }

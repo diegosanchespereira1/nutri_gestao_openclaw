@@ -33,4 +33,9 @@ export type ChildAssessmentRow = {
   bmi: number | string | null;
   results: ChildResultEntry[];
   clinical_notes: string | null;
+  // Novos parâmetros WHO 0–60 meses
+  arm_circumference_cm: number | string | null;
+  triceps_skinfold_mm: number | string | null;
+  subscapular_skinfold_mm: number | string | null;
+  head_circumference_cm: number | string | null;
 };

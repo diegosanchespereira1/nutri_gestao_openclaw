@@ -87,8 +87,6 @@ export default async function ProntuarioPacientePage({
   const supabase = await createClient();
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
   const age = birthSlice ? calcAge(birthSlice) : null;
-  const ageYears = birthSlice ? calcAgeYears(birthSlice) : null;
-  const isMinor = ageYears !== null && ageYears < 18;
 
   const avaliacaoOk = sp.avaliacao === "ok";
 
@@ -281,7 +279,7 @@ export default async function ProntuarioPacientePage({
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-4">
-          <PatientAssessmentsBlock patientId={row.id} isMinor={isMinor} />
+          <PatientAssessmentsBlock patientId={row.id} birthDate={row.birth_date} />
         </CardContent>
       </Card>
     </PageLayout>

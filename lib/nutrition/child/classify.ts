@@ -56,5 +56,29 @@ export function classifyByPercentile(
       if (value < p3) return { classification: "Baixa estatura para a idade", color: "yellow" };
       return { classification: "Estatura adequada para a idade", color: "green" };
     }
+
+    case "arm_circumference_for_age": {
+      if (value < p3)  return { classification: "CB baixa para a idade",    color: "yellow" };
+      if (value < p97) return { classification: "CB adequada para a idade",  color: "green"  };
+      return                 { classification: "CB elevada para a idade",   color: "yellow" };
+    }
+
+    case "triceps_skinfold_for_age": {
+      if (value < p3)  return { classification: "PCT baixa para a idade",   color: "yellow" };
+      if (value < p97) return { classification: "PCT adequada para a idade", color: "green"  };
+      return                 { classification: "PCT elevada para a idade",  color: "yellow" };
+    }
+
+    case "subscapular_skinfold_for_age": {
+      if (value < p3)  return { classification: "SE baixa para a idade",    color: "yellow" };
+      if (value < p97) return { classification: "SE adequada para a idade",  color: "green"  };
+      return                 { classification: "SE elevada para a idade",   color: "yellow" };
+    }
+
+    case "head_circumference_for_age": {
+      if (value < p3)  return { classification: "Microcefalia",              color: "red"    };
+      if (value < p97) return { classification: "PC adequado para a idade",  color: "green"  };
+      return                 { classification: "Macrocefalia",              color: "yellow" };
+    }
   }
 }

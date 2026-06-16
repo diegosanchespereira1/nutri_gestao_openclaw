@@ -18,15 +18,22 @@ export default async function DefinicoesEmpresaPage() {
 
   const logoPath = await fetchTenantLogoStoragePath(supabase);
   const defaultLogoUrl = await getTenantLogoSignedUrl(supabase, logoPath, 3600);
+  const { data: tenantNameRaw } = await supabase.rpc("workspace_tenant_name");
+  const defaultTenantName =
+    typeof tenantNameRaw === "string" ? tenantNameRaw : "";
 
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Empresa e logotipo"
-        description="Envie o logotipo da sua empresa para personalizar PDFs, e-mails e comunicações. Se nenhum logotipo for enviado, os documentos são gerados sem marca."
+        description="Defina o nome e o logotipo da sua empresa para personalizar PDFs, e-mails e comunicações."
         back={{ href: "/definicoes", label: "Definições" }}
       />
-      <TenantLogoForm defaultLogoUrl={defaultLogoUrl} canManage />
+      <TenantLogoForm
+        defaultLogoUrl={defaultLogoUrl}
+        defaultTenantName={defaultTenantName}
+        canManage
+      />
     </PageLayout>
   );
 }

@@ -116,8 +116,24 @@ export async function createChildAssessmentAction(
   const clinicalNotes =
     String(formData.get("clinical_notes") ?? "").trim() || null;
 
+  // Novos parâmetros WHO (todos opcionais).
+  const armCircumferenceCm    = parseDec(formData.get("arm_circumference_cm"));
+  const tricepsSkinfoldMm     = parseDec(formData.get("triceps_skinfold_mm"));
+  const subscapularSkinfoldMm = parseDec(formData.get("subscapular_skinfold_mm"));
+  const headCircumferenceCm   = parseDec(formData.get("head_circumference_cm"));
+
   // Recalcula no servidor (não confia em valores vindos do cliente).
-  const assessment = assessChild({ sex, ageMonths, weightKg, heightCm, method });
+  const assessment = assessChild({
+    sex,
+    ageMonths,
+    weightKg,
+    heightCm,
+    method,
+    armCircumferenceCm,
+    tricepsSkinfoldMm,
+    subscapularSkinfoldMm,
+    headCircumferenceCm,
+  });
   const results: ChildResultEntry[] = assessment.indicators;
 
   const { error } = await supabase.from("patient_child_assessments").insert({
@@ -132,6 +148,10 @@ export async function createChildAssessmentAction(
     bmi: assessment.bmi,
     results,
     clinical_notes: clinicalNotes,
+    arm_circumference_cm: armCircumferenceCm,
+    triceps_skinfold_mm: tricepsSkinfoldMm,
+    subscapular_skinfold_mm: subscapularSkinfoldMm,
+    head_circumference_cm: headCircumferenceCm,
   });
 
   if (error) {

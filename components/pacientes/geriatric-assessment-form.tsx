@@ -12,6 +12,11 @@ import {
   type PatientGroup,
   type NutritionalRisk,
 } from "@/lib/types/geriatric-assessments";
+import {
+  calcGeriatricEstimatedWeightKg,
+  calcGeriatricEstimatedHeightM,
+  GERIATRIC_PE_FORMULAS,
+} from "@/lib/nutrition/geriatric-anthropometry";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,23 +38,7 @@ const legendClass =
 const textareaClass =
   "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
-// ── Fórmulas de Peso Estimado (Chumlea et al., 1988) ─────────────────────────
-function calcPeBase(group: PatientGroup, aj: number, cb: number): number {
-  switch (group) {
-    case "mulher_branca": return aj * 1.09 + cb * 2.68 - 65.51;
-    case "mulher_negra":  return aj * 1.50 + cb * 2.58 - 84.22;
-    case "homem_branco":  return aj * 1.10 + cb * 3.07 - 75.81;
-    case "homem_negro":   return aj * 0.44 + cb * 2.86 - 39.21;
-  }
-}
-
-// ── Fórmulas de Altura Estimada (Chumlea et al., 1985) ───────────────────────
-function calcAlturaBase(group: PatientGroup, aj: number, age: number): number {
-  const isMale = group === "homem_branco" || group === "homem_negro";
-  return isMale
-    ? (64.19 + 2.04 * aj - 0.04 * age) / 100
-    : (84.88 + 1.83 * aj - 0.24 * age) / 100;
-}
+// Funções de cálculo importadas de lib/nutrition/geriatric-anthropometry.ts
 
 function toNum(v: string): number | null {
   const n = Number(v.replace(",", "."));
@@ -134,7 +123,7 @@ export function GeriatricAssessmentForm({
 
   const peBase = useMemo<number | null>(() => {
     if (numAj === null || numCb === null) return null;
-    const v = calcPeBase(group, numAj, numCb);
+    const v = calcGeriatricEstimatedWeightKg(group, numAj, numCb);
     return Number.isFinite(v) ? v : null;
   }, [group, numAj, numCb]);
 
@@ -148,7 +137,7 @@ export function GeriatricAssessmentForm({
 
   const altura = useMemo<number | null>(() => {
     if (numAj === null || numAge === null) return null;
-    const v = calcAlturaBase(group, numAj, numAge);
+    const v = calcGeriatricEstimatedHeightM(group, numAj, numAge);
     return Number.isFinite(v) ? v : null;
   }, [group, numAj, numAge]);
 
@@ -171,13 +160,7 @@ export function GeriatricAssessmentForm({
 
   // ── Fórmulas exibidas ────────────────────────────────────────────────────
   const peFormula = (() => {
-    const baseMap: Record<PatientGroup, string> = {
-      mulher_branca: "AJ×1,09 + CB×2,68 − 65,51",
-      mulher_negra:  "AJ×1,50 + CB×2,58 − 84,22",
-      homem_branco:  "AJ×1,10 + CB×3,07 − 75,81",
-      homem_negro:   "AJ×0,44 + CB×2,86 − 39,21",
-    };
-    const base = baseMap[group];
+    const base = GERIATRIC_PE_FORMULAS[group];
     return hasAmputation && ampPctNum > 0
       ? `(${base}) × 100 ÷ (100 − ${ampPctNum}%)`
       : base;

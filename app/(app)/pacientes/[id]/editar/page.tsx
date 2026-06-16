@@ -90,7 +90,8 @@ export default async function EditarPacientePage({
       )
     : undefined;
 
-  const isMinor = defaultAge !== undefined && defaultAge < 18;
+  const childSex =
+    row.sex === "female" || row.sex === "male" ? row.sex : null;
 
   const backHref = `/pacientes/${row.id}`;
   const backLabel = "Prontuário";
@@ -210,7 +211,12 @@ export default async function EditarPacientePage({
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <NutritionAssessmentsSection patientId={row.id} defaultAge={defaultAge} isMinor={isMinor} />
+          <NutritionAssessmentsSection
+            patientId={row.id}
+            defaultAge={defaultAge}
+            defaultSex={childSex}
+            defaultBirthDate={birthSlice || null}
+          />
         </CardContent>
       </Card>
 

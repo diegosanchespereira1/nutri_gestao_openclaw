@@ -6,6 +6,7 @@ import { Camera, Images, Trash2, ZoomIn } from "lucide-react";
 
 import { isNativeApp } from "@/lib/mobile/platform";
 import { openNativeCamera, openNativeGallery } from "@/lib/mobile/camera";
+import { createClient } from "@/lib/supabase/client";
 
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { Button } from "@/components/ui/button";
@@ -292,20 +293,29 @@ export function ChecklistItemPhotos({
           if (lng) fd.append("longitude", lng);
 
           setUploadState({ status: "busy", step: "uploading", percent: 65 });
-          const httpRes = await fetch("/api/checklists/fill-session-photo", {
-            method: "POST",
-            body: fd,
-            credentials: "same-origin",
-          });
-          let uploadJson: ChecklistFillPhotoUploadResult;
-          try {
-            uploadJson = (await httpRes.json()) as ChecklistFillPhotoUploadResult;
-          } catch {
-            batchErrors.push(
-              `"${file.name}": Resposta inválida do servidor (${httpRes.status}).`,
-            );
-            continue;
+
+          /** Envia o FormData para o servidor e devolve o resultado parseado. */
+          async function doUpload(formData: FormData): Promise<ChecklistFillPhotoUploadResult> {
+            const res = await fetch("/api/checklists/fill-session-photo", {
+              method: "POST",
+              body: formData,
+              credentials: "same-origin",
+            });
+            try {
+              return (await res.json()) as ChecklistFillPhotoUploadResult;
+            } catch {
+              return { ok: false, error: `Resposta inválida do servidor (${res.status}).` };
+            }
           }
+
+          let uploadJson = await doUpload(fd);
+
+          // Se expirou, tenta renovar o token e refaz o upload uma única vez.
+          if (!uploadJson.ok && uploadJson.error === "Sessão expirada.") {
+            await createClient().auth.refreshSession();
+            uploadJson = await doUpload(fd);
+          }
+
           if (!uploadJson.ok) {
             batchErrors.push(`"${file.name}": ${uploadJson.error}`);
             continue;

@@ -10,6 +10,10 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { loadPatientById } from "@/lib/actions/patients";
 import type { ChildSex } from "@/lib/nutrition/child/types";
+import {
+  assessmentVisibilityForCategory,
+  patientAgeCategory,
+} from "@/lib/pacientes/age-category";
 
 function calcDefaultAge(isoDate: string): number {
   return Math.floor(
@@ -28,8 +32,9 @@ export default async function NovaAvaliacaoPage({
 
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
   const defaultAge = birthSlice ? calcDefaultAge(birthSlice) : undefined;
-  const isMinor = defaultAge !== undefined && defaultAge < 18;
-  const showChild = defaultAge === undefined || defaultAge < 19;
+  const { showChild, showAdult, showGeriatric } = assessmentVisibilityForCategory(
+    patientAgeCategory(row.birth_date),
+  );
   const childSex: ChildSex | null =
     row.sex === "female" || row.sex === "male" ? row.sex : null;
 
@@ -44,8 +49,9 @@ export default async function NovaAvaliacaoPage({
       <Card>
         <CardContent className="pt-6">
           <NutritionAssessmentsTabs
-            showAdultTabs={!isMinor}
-            showChildTab={showChild}
+            showChild={showChild}
+            showAdult={showAdult}
+            showGeriatric={showGeriatric}
             generalTab={<NutritionAssessmentForm patientId={id} />}
             childTab={
               <ChildAssessmentForm

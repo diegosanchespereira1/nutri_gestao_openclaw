@@ -62,6 +62,7 @@ import {
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { touchMinHeight } from "@/lib/touch-targets";
+import { generateUUID } from "@/lib/utils/uuid";
 
 /** Mesmas cores, borda, altura e foco do componente Input. */
 const fieldSurfaceClassName = cn(

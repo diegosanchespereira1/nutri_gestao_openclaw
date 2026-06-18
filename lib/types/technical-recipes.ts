@@ -33,6 +33,8 @@ export type TechnicalRecipeRow = {
   cmv_percent?: number;
   /** Flag para indicar se é um template reutilizável. */
   is_template: boolean;
+  /** Path no storage da imagem da receita (foto do prato). */
+  image_storage_path?: string | null;
   created_at: string;
   updated_at: string;
 };

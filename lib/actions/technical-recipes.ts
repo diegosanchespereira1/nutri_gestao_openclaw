@@ -5,8 +5,10 @@ import { z } from "zod";
 
 import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
 import { RECIPE_LINE_UNITS } from "@/lib/constants/recipe-line-units";
+import { TECHNICAL_RECIPE_IMAGES_BUCKET } from "@/lib/constants/technical-recipe-images-storage";
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
 import { createClient } from "@/lib/supabase/server";
+import { resolveRecipeImagePathFromForm } from "@/lib/technical-recipes/recipe-image-sync";
 import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-totals";
 import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import type { TacoReferenceFoodRow } from "@/lib/types/taco-reference-foods";
@@ -218,6 +220,10 @@ function mapRecipeHeader(raw: Record<string, unknown>): TechnicalRecipeRow {
       Math.min(100, toNumUnknown(raw.cmv_percent, 25)),
     ),
     is_template: Boolean(raw.is_template ?? false),
+    image_storage_path:
+      typeof raw.image_storage_path === "string" && raw.image_storage_path.length > 0
+        ? raw.image_storage_path
+        : null,
     created_at: String(raw.created_at ?? ""),
     updated_at: String(raw.updated_at ?? ""),
   };
@@ -727,6 +733,68 @@ export async function saveTechnicalRecipeDraftAction(
   };
 }
 
+export type SaveTechnicalRecipeImageResult =
+  | { ok: true; imageStoragePath: string | null }
+  | { ok: false; error: string };
+
+/** Carrega ou remove a imagem da receita (ficha técnica). */
+export async function saveTechnicalRecipeImageAction(
+  recipeId: string,
+  formData: FormData,
+): Promise<SaveTechnicalRecipeImageResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: recipe, error: rErr } = await supabase
+    .from("technical_recipes")
+    .select("id, image_storage_path")
+    .eq("id", recipeId)
+    .maybeSingle();
+
+  if (rErr || !recipe) {
+    return { ok: false, error: "Receita não encontrada." };
+  }
+
+  const previousPath =
+    (recipe as { image_storage_path?: string | null }).image_storage_path ?? null;
+
+  const imageRes = await resolveRecipeImagePathFromForm({
+    supabase,
+    workspaceOwnerId,
+    recipeId,
+    formData,
+    previousPath,
+  });
+
+  if (!imageRes.ok) return { ok: false, error: imageRes.error };
+
+  if (imageRes.path === previousPath) {
+    return { ok: true, imageStoragePath: previousPath };
+  }
+
+  const { error: uErr } = await supabase
+    .from("technical_recipes")
+    .update({ image_storage_path: imageRes.path })
+    .eq("id", recipeId);
+
+  if (uErr) {
+    if (imageRes.path && imageRes.path !== previousPath) {
+      await supabase.storage.from(TECHNICAL_RECIPE_IMAGES_BUCKET).remove([imageRes.path]);
+    }
+    return { ok: false, error: uErr.message || "Erro ao salvar imagem da receita." };
+  }
+
+  revalidatePath("/ficha-tecnica");
+  revalidatePath(`/ficha-tecnica/${recipeId}/editar`);
+
+  return { ok: true, imageStoragePath: imageRes.path };
+}
+
 export async function deleteTechnicalRecipeAction(
   recipeId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -736,6 +804,16 @@ export async function deleteTechnicalRecipeAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
+  const { data: row } = await supabase
+    .from("technical_recipes")
+    .select("image_storage_path")
+    .eq("id", recipeId)
+    .maybeSingle();
+
+  const imagePath =
+    (row as { image_storage_path?: string | null } | null)?.image_storage_path ??
+    null;
+
   const { error } = await supabase
     .from("technical_recipes")
     .delete()
@@ -743,6 +821,10 @@ export async function deleteTechnicalRecipeAction(
 
   if (error) {
     return { ok: false, error: error.message || "Erro ao eliminar." };
+  }
+
+  if (imagePath) {
+    await supabase.storage.from(TECHNICAL_RECIPE_IMAGES_BUCKET).remove([imagePath]);
   }
 
   revalidatePath("/ficha-tecnica");

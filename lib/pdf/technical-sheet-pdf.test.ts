@@ -42,7 +42,11 @@ const minimalRecipe: TechnicalRecipeWithLines = {
 describe("buildTechnicalRecipePdfBytes", () => {
   it("gera PDF não vazio", async () => {
     const bytes = await buildTechnicalRecipePdfBytes(minimalRecipe, {
-      establishmentLabel: "Cliente X — Cozinha A",
+      tenantName: "Clínica Nutri Exemplo",
+      tenantLogoBuffer: null,
+      clientName: "Cliente X",
+      establishmentName: "Cozinha A",
+      recipeImageBuffer: null,
       professionalName: "Nutricionista",
       professionalCrn: "12345",
     });

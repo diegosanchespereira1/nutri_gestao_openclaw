@@ -26,6 +26,7 @@ import { validateRecipeTotals } from "@/lib/technical-recipes/validate-recipe-to
 import {
   loadTemplateDataForNewRecipeAction,
   saveTechnicalRecipeDraftAction,
+  saveTechnicalRecipeImageAction,
 } from "@/lib/actions/technical-recipes";
 import type { RecipeFormDraftV1 } from "@/lib/technical-recipes/recipe-form-draft";
 import {
@@ -42,6 +43,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -49,6 +51,7 @@ import { RecipeFormIntroductionSections } from "@/components/technical-sheets/re
 import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
 import { CostSummaryPanel } from "@/components/technical-sheets/cost-summary-panel";
 import { RecipeTemplatePickerDialog } from "@/components/technical-sheets/recipe-template-picker-dialog";
+import { RecipeImageField } from "@/components/technical-sheets/recipe-image-field";
 import {
   Dialog,
   DialogContent,
@@ -240,6 +243,8 @@ type Props = {
   pjClients: ClientRow[];
   recipe?: TechnicalRecipeWithLines | null;
   rawMaterials?: RawMaterialRow[];
+  /** URL assinada da imagem atual (edição). */
+  defaultImageUrl?: string | null;
 };
 
 export function RecipeForm({
@@ -247,6 +252,7 @@ export function RecipeForm({
   pjClients,
   recipe,
   rawMaterials = [],
+  defaultImageUrl = null,
 }: Props) {
   const router = useRouter();
   const saveIntentRef = useRef<"draft" | "published">("draft");
@@ -295,6 +301,13 @@ export function RecipeForm({
   const [cmvPercentInput, setCmvPercentInput] = useState(() =>
     String(recipe?.cmv_percent ?? 25),
   );
+  const [currentImageUrl, setCurrentImageUrl] = useState(defaultImageUrl);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [pendingImageRemove, setPendingImageRemove] = useState(false);
+
+  useEffect(() => {
+    setCurrentImageUrl(defaultImageUrl);
+  }, [defaultImageUrl]);
 
   const isEdit = Boolean(recipe);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
@@ -635,6 +648,23 @@ export function RecipeForm({
     })();
   }
 
+  async function persistRecipeImage(recipeId: string): Promise<string | null> {
+    if (!pendingImageFile && !pendingImageRemove) return null;
+
+    const formData = new FormData();
+    if (pendingImageRemove) formData.append("remove_image", "1");
+    if (pendingImageFile) formData.append("image", pendingImageFile);
+
+    const imageResult = await saveTechnicalRecipeImageAction(recipeId, formData);
+    if (!imageResult.ok) {
+      throw new Error(imageResult.error);
+    }
+
+    setPendingImageFile(null);
+    setPendingImageRemove(false);
+    return imageResult.imageStoragePath;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (saving) return;
@@ -678,6 +708,7 @@ export function RecipeForm({
 
     setSaving(true);
     let skipSavingReset = false;
+    const imageChanged = Boolean(pendingImageFile || pendingImageRemove);
     try {
       const result = await saveTechnicalRecipeDraftAction({
         recipeId: recipe?.id,
@@ -697,6 +728,23 @@ export function RecipeForm({
 
       if (!result.ok) {
         setError(result.error);
+        return;
+      }
+
+      try {
+        if (imageChanged) {
+          await persistRecipeImage(result.recipeId);
+        }
+      } catch (imageErr) {
+        setError(
+          imageErr instanceof Error
+            ? imageErr.message
+            : "Receita salva, mas não foi possível enviar a imagem.",
+        );
+        if (!isEdit) {
+          skipSavingReset = true;
+          router.replace(`/ficha-tecnica/${result.recipeId}/editar`);
+        }
         return;
       }
 
@@ -725,6 +773,9 @@ export function RecipeForm({
 
       setLocalDraftBanner(false);
       setStoredDraft(null);
+      if (imageChanged) {
+        router.refresh();
+      }
       setLastTotals(
         (result.status === "published"
           ? "Receita publicada. "
@@ -1060,6 +1111,14 @@ export function RecipeForm({
             </div>
           </div>
 
+          <RecipeImageField
+            defaultUrl={currentImageUrl}
+            onChange={({ file, remove }) => {
+              setPendingImageFile(file);
+              setPendingImageRemove(remove);
+            }}
+          />
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label
@@ -1123,30 +1182,17 @@ export function RecipeForm({
         <div className="min-w-0 space-y-6">
           <Card>
             <CardHeader className="pb-2">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <CardTitle className="text-base">Ingredientes</CardTitle>
-                  <CardDescription>
-                    Quantidade e unidade; associe{" "}
-                    <Link
-                      href="/ficha-tecnica/materias-primas"
-                      className="text-primary font-medium underline-offset-4 hover:underline"
-                    >
-                      matéria-prima
-                    </Link>{" "}
-                    para custo e TACO para nutrição.
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={addLine}
+              <CardTitle className="text-base">Ingredientes</CardTitle>
+              <CardDescription>
+                Quantidade e unidade; associe{" "}
+                <Link
+                  href="/ficha-tecnica/materias-primas"
+                  className="text-primary font-medium underline-offset-4 hover:underline"
                 >
-                  <Plus className="size-4" />
-                  Linha
-                </Button>
-              </div>
+                  matéria-prima
+                </Link>{" "}
+                para custo e TACO para nutrição.
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
             <Card className="border-dashed">
@@ -1438,6 +1484,17 @@ export function RecipeForm({
           ))}
             </div>
             </CardContent>
+            <CardFooter className="border-t border-foreground/10 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addLine}
+              >
+                <Plus className="size-4" />
+                Add Ingrediente
+              </Button>
+            </CardFooter>
           </Card>
 
           {error ? (

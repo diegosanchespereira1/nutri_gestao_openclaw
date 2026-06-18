@@ -15,9 +15,9 @@ import { cn } from "@/lib/utils";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
-import {
-  loadTechnicalRecipeById,
-} from "@/lib/actions/technical-recipes";
+import { loadTechnicalRecipeById } from "@/lib/actions/technical-recipes";
+import { TECHNICAL_RECIPE_IMAGES_BUCKET } from "@/lib/constants/technical-recipe-images-storage";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function EditarReceitaPage({
   params,
@@ -34,6 +34,15 @@ export default async function EditarReceitaPage({
     ]);
 
   if (!recipe) notFound();
+
+  const supabase = await createClient();
+  let defaultImageUrl: string | null = null;
+  if (recipe.image_storage_path) {
+    const { data } = await supabase.storage
+      .from(TECHNICAL_RECIPE_IMAGES_BUCKET)
+      .createSignedUrl(recipe.image_storage_path, 60 * 60);
+    defaultImageUrl = data?.signedUrl ?? null;
+  }
 
   return (
     <div className="space-y-8">
@@ -60,6 +69,7 @@ export default async function EditarReceitaPage({
         pjClients={pjClients}
         recipe={recipe}
         rawMaterials={rawMaterials}
+        defaultImageUrl={defaultImageUrl}
       />
     </div>
   );

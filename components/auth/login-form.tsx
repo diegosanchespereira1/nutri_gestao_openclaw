@@ -9,6 +9,8 @@ import { PasswordField } from "@/components/auth/password-field";
 import { navigateAfterAuth } from "@/lib/app-build-navigate";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { mapSupabaseLoginError } from "@/lib/map-supabase-auth-error";
+import { persistNativeClientCookie } from "@/lib/mobile/persist-native-client-cookie";
+import { isNativeApp } from "@/lib/mobile/platform";
 import { createClient } from "@/lib/supabase/client";
 import { generateUUID } from "@/lib/utils/uuid";
 import { Button } from "@/components/ui/button";
@@ -31,6 +33,10 @@ async function withAuthTimeout<T>(promise: Promise<T>, step: string): Promise<T>
       window.setTimeout(() => reject(createTimeoutError(step)), AUTH_STEP_TIMEOUT_MS);
     }),
   ]);
+}
+
+function persistNativeClientIfNeeded(): void {
+  if (isNativeApp()) persistNativeClientCookie();
 }
 
 export function LoginForm() {
@@ -286,6 +292,7 @@ export function LoginForm() {
       setOpeningApp(true);
       // Permite ao React pintar "A abrir…" antes do redirect completo.
       await Promise.resolve();
+      persistNativeClientIfNeeded();
       navigateAfterAuth(next);
       void logAuthTroubleshootingEvent({
         event: "post_signin_session_check",
@@ -383,6 +390,7 @@ export function LoginForm() {
 
       setOpeningApp(true);
       await Promise.resolve();
+      persistNativeClientIfNeeded();
       void logAuthTroubleshootingEvent({
         event: "mfa_verify_success",
         step: "mfa",

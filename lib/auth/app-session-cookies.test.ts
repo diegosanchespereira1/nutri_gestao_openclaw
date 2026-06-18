@@ -30,4 +30,19 @@ describe("app-session-cookies", () => {
     expect(getAppSessionAbsoluteMaxSec()).toBe(8 * 60 * 60);
     expect(getAppSessionIdleTimeoutSec()).toBe(45 * 60);
   });
+
+  it("usa defaults longos para app nativo", () => {
+    vi.stubEnv("AUTH_SESSION_MOBILE_ABSOLUTE_MAX_SEC", "");
+    vi.stubEnv("AUTH_SESSION_MOBILE_IDLE_TIMEOUT_SEC", "");
+    const yearSec = 365 * 24 * 60 * 60;
+    expect(getAppSessionAbsoluteMaxSec({ nativeClient: true })).toBe(yearSec);
+    expect(getAppSessionIdleTimeoutSec({ nativeClient: true })).toBe(yearSec);
+  });
+
+  it("honra env mobile específico", () => {
+    vi.stubEnv("AUTH_SESSION_MOBILE_ABSOLUTE_MAX_SEC", "604800");
+    vi.stubEnv("AUTH_SESSION_MOBILE_IDLE_TIMEOUT_SEC", "86400");
+    expect(getAppSessionAbsoluteMaxSec({ nativeClient: true })).toBe(604_800);
+    expect(getAppSessionIdleTimeoutSec({ nativeClient: true })).toBe(86_400);
+  });
 });

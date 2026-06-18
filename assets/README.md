@@ -39,7 +39,19 @@ Isso gera automaticamente todos os tamanhos para:
 - **Logo:** centralizado, ~400×400px
 - **Fundo:** `#ffffff` (branco) ou a cor de fundo do app
 
-## Screenshots para as stores (criar separadamente)
+## Screenshots para as stores
+
+Gerados automaticamente — ver `assets/store-listing/README.md`.
+
+```bash
+# Ícones + feature graphic (Google Play)
+npm run mobile:store-assets
+
+# Capturas de ecrã (requer npm run dev + E2E_EMAIL/E2E_PASSWORD em .env.test)
+npm run mobile:store-screenshots
+```
+
+### Tamanhos exigidos
 
 ### App Store (iOS)
 | Dispositivo | Tamanho |

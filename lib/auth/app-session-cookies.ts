@@ -9,6 +9,9 @@ export const APP_PROFILE_CTX_COOKIE = "ng_profile_ctx";
 
 const ABS_FALLBACK_SEC = 8 * 60 * 60; // 8 h
 const IDLE_FALLBACK_SEC = 45 * 60; // 45 min
+/** App nativo: sessão longa (estilo apps de consumo — só termina com logout ou revogação Supabase). */
+const MOBILE_ABS_FALLBACK_SEC = 365 * 24 * 60 * 60; // 365 dias
+const MOBILE_IDLE_FALLBACK_SEC = MOBILE_ABS_FALLBACK_SEC;
 const PROFILE_CTX_TTL_FALLBACK_SEC = 5 * 60; // 5 min
 
 function parsePositiveInt(raw: string | undefined, fallback: number, min: number): number {
@@ -22,7 +25,17 @@ function parsePositiveInt(raw: string | undefined, fallback: number, min: number
  * Tempo máximo (segundos) em que o utilizador permanece autenticado na app após o início
  * da sessão local (primeiro pedido autenticado após login), independentemente de renovações JWT.
  */
-export function getAppSessionAbsoluteMaxSec(): number {
+export function getAppSessionAbsoluteMaxSec(options?: {
+  nativeClient?: boolean;
+}): number {
+  if (options?.nativeClient) {
+    return parsePositiveInt(
+      process.env.AUTH_SESSION_MOBILE_ABSOLUTE_MAX_SEC,
+      MOBILE_ABS_FALLBACK_SEC,
+      86_400, // mín. 1 dia
+    );
+  }
+
   return parsePositiveInt(
     process.env.AUTH_SESSION_ABSOLUTE_MAX_SEC,
     ABS_FALLBACK_SEC,
@@ -33,7 +46,17 @@ export function getAppSessionAbsoluteMaxSec(): number {
 /**
  * Inactividade máxima (segundos): sem pedidos à app (middleware), sessão termina.
  */
-export function getAppSessionIdleTimeoutSec(): number {
+export function getAppSessionIdleTimeoutSec(options?: {
+  nativeClient?: boolean;
+}): number {
+  if (options?.nativeClient) {
+    return parsePositiveInt(
+      process.env.AUTH_SESSION_MOBILE_IDLE_TIMEOUT_SEC,
+      MOBILE_IDLE_FALLBACK_SEC,
+      86_400, // mín. 1 dia
+    );
+  }
+
   return parsePositiveInt(
     process.env.AUTH_SESSION_IDLE_TIMEOUT_SEC,
     IDLE_FALLBACK_SEC,

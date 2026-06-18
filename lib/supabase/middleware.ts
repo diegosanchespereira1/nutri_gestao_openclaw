@@ -23,6 +23,7 @@ import {
   isProtectedPath,
 } from "@/lib/auth-paths";
 import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
+import { isNativeClientRequest } from "@/lib/auth/native-client-cookie";
 import { canAccessAdminArea } from "@/lib/roles";
 import {
   countClientsForOwner,
@@ -116,16 +117,17 @@ type MiddlewareProfileContext = ProfileContextCookie;
 function bumpAppSessionLastForServerActionIfEligible(
   request: NextRequest,
 ): NextResponse | null {
+  const nativeClient = isNativeClientRequest(request);
   const startRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
   const startParsed = startRaw ? Number.parseInt(startRaw, 10) : NaN;
   if (!Number.isFinite(startParsed)) return null;
 
   const now = Math.floor(Date.now() / 1000);
-  const absSec = getAppSessionAbsoluteMaxSec();
-  if (now - startParsed > absSec) return null;
+  const absSec = getAppSessionAbsoluteMaxSec({ nativeClient });
+  if (!nativeClient && now - startParsed > absSec) return null;
 
   const baseCookie = getSupabaseCookieOptions();
-  const idleSec = getAppSessionIdleTimeoutSec();
+  const idleSec = getAppSessionIdleTimeoutSec({ nativeClient });
   const res = nextWithPathname(request);
   res.cookies.set(
     APP_SESSION_LAST_COOKIE,
@@ -217,13 +219,14 @@ export async function updateSession(request: NextRequest) {
   });
 
   const baseCookie = getSupabaseCookieOptions();
+  const nativeClient = isNativeClientRequest(request);
 
   if (!user) {
     clearAppSessionCookies(supabaseResponse.cookies);
   } else {
     const now = Math.floor(Date.now() / 1000);
-    const absSec = getAppSessionAbsoluteMaxSec();
-    const idleSec = getAppSessionIdleTimeoutSec();
+    const absSec = getAppSessionAbsoluteMaxSec({ nativeClient });
+    const idleSec = getAppSessionIdleTimeoutSec({ nativeClient });
 
     const startRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
     const lastRaw = request.cookies.get(APP_SESSION_LAST_COOKIE)?.value;
@@ -233,11 +236,13 @@ export async function updateSession(request: NextRequest) {
     const needSetStartCookie = !Number.isFinite(startParsed);
     const anchorStart: number = needSetStartCookie ? now : startParsed;
 
-    let expired = now - anchorStart > absSec;
-
-    const activityRef = Number.isFinite(lastParsed) ? lastParsed : anchorStart;
-    if (!expired && now - activityRef > idleSec) {
-      expired = true;
+    let expired = false;
+    if (!nativeClient) {
+      expired = now - anchorStart > absSec;
+      const activityRef = Number.isFinite(lastParsed) ? lastParsed : anchorStart;
+      if (!expired && now - activityRef > idleSec) {
+        expired = true;
+      }
     }
 
     if (expired) {
@@ -354,7 +359,7 @@ export async function updateSession(request: NextRequest) {
     // layout (app) redirecciona para /login com pedido sem `ng_profile_ctx`.
     const profileCookieMaxAge = Math.max(
       profileCtxTtlSec + 5,
-      getAppSessionAbsoluteMaxSec() + 300,
+      getAppSessionAbsoluteMaxSec({ nativeClient }) + 300,
     );
     supabaseResponse.cookies.set(
       APP_PROFILE_CTX_COOKIE,

@@ -19,19 +19,34 @@ android {
     signingConfigs {
         release {
             def keystorePropsFile = rootProject.file("keystore.properties")
+            def keystoreFile
             if (keystorePropsFile.exists()) {
                 def props = new Properties()
                 props.load(new FileInputStream(keystorePropsFile))
-                storeFile     file(props['storeFile'])
+                def storePath = props['storeFile']?.toString()?.trim()
+                keystoreFile = storePath.startsWith("/")
+                    ? file(storePath)
+                    : rootProject.file(storePath)
                 storePassword props['storePassword']
                 keyAlias      props['keyAlias']
                 keyPassword   props['keyPassword']
             } else {
-                storeFile     file(System.getenv("KEYSTORE_PATH") ?: "nutrigestao-release.keystore")
+                def storePath = System.getenv("KEYSTORE_PATH") ?: "app/nutrigestao-release.keystore"
+                keystoreFile = file(storePath).isAbsolute()
+                    ? file(storePath)
+                    : rootProject.file(storePath)
                 storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
                 keyAlias      System.getenv("KEY_ALIAS")         ?: "nutrigestao"
                 keyPassword   System.getenv("KEY_PASSWORD")      ?: ""
             }
+            if (!keystoreFile.exists()) {
+                throw new GradleException(
+                    "Keystore de release não encontrado: ${keystoreFile.absolutePath}\n" +
+                    "Configure android/keystore.properties (veja keystore.properties.example) " +
+                    "ou defina KEYSTORE_PATH antes de bundleRelease."
+                )
+            }
+            storeFile keystoreFile
         }
     }
 
@@ -41,8 +56,14 @@ android {
         }
         release {
             signingConfig signingConfigs.release
+            // Capacitor/WebView: ofuscação R8 desligada — evita quebra de plugins nativos.
+            // O aviso da Play Store sobre mapping file é esperado enquanto minifyEnabled=false.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            ndk {
+                // Símbolos nativos (.so) para crash/ANR no Play Console (Capacitor, câmera, etc.)
+                debugSymbolLevel 'SYMBOL_TABLE'
+            }
         }
     }
 

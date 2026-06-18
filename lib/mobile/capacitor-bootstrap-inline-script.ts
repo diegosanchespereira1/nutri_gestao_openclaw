@@ -8,6 +8,12 @@ export const CAPACITOR_BOOTSTRAP_INLINE_SCRIPT = `(function () {
   var ANDROID_FALLBACK = ${ANDROID_STATUS_BAR_FALLBACK_PX};
   var STYLE_ID = 'nutrigestao-native-safe-area';
   var PLATFORM_ATTR = 'data-ng-platform';
+  var NATIVE_CLIENT_COOKIE = 'ng_native_client=1; path=/; max-age=31536000; SameSite=Lax';
+
+  function persistNativeClientCookie() {
+    var secure = location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = NATIVE_CLIENT_COOKIE + secure;
+  }
 
   function persistStyle(px) {
     if (!px || px <= 0) return;
@@ -39,6 +45,7 @@ export const CAPACITOR_BOOTSTRAP_INLINE_SCRIPT = `(function () {
 
   if (/Android/i.test(navigator.userAgent) && /; wv\\)/.test(navigator.userAgent)) {
     markAndroid();
+    persistNativeClientCookie();
   }
 
   function isNative() {
@@ -96,6 +103,7 @@ export const CAPACITOR_BOOTSTRAP_INLINE_SCRIPT = `(function () {
   async function bootstrap() {
     if (!isNative()) return;
     applyPlatformClasses();
+    persistNativeClientCookie();
     await hideSplash();
     await configureStatusBar();
   }

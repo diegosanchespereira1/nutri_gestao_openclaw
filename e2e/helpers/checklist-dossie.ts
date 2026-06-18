@@ -162,14 +162,19 @@ export async function runChecklistDossieFlow(
   await approve.click();
 
   const signatureDialog = page.getByRole("dialog");
-  await expect(
-    signatureDialog.getByText("Assinatura da profissional"),
-  ).toBeVisible();
-  await drawSignature(page, signatureDialog.locator("canvas"));
-  await shot(page, screenshotDir, "assinatura-profissional");
-  await signatureDialog.getByRole("button", { name: "Próximo →" }).click();
+  const professionalStep = signatureDialog.getByText("Assinatura da profissional");
+  const clientStep = signatureDialog.getByText("Assinatura do cliente");
 
-  await expect(signatureDialog.getByText("Assinatura do cliente")).toBeVisible();
+  if (await professionalStep.isVisible().catch(() => false)) {
+    await drawSignature(page, signatureDialog.locator("canvas"));
+    await shot(page, screenshotDir, "assinatura-profissional");
+    await signatureDialog.getByRole("button", { name: "Próximo →" }).click();
+  } else {
+    await expect(clientStep).toBeVisible();
+    await shot(page, screenshotDir, "assinatura-perfil-carregada");
+  }
+
+  await expect(clientStep).toBeVisible();
   await signatureDialog
     .getByLabel(/Nome de quem está assinando/)
     .fill(signerName);

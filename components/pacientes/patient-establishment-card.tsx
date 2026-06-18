@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useActionState } from "react";
+import { useEffect, useState, useActionState } from "react";
 import Link from "next/link";
 
 import {
@@ -26,11 +26,18 @@ export function PatientEstablishmentCard({
   establishments: { id: string; name: string }[];
   clientId: string;
 }) {
-  const [selected, setSelected] = useState(currentEstablishmentId ?? "");
+  const originalValue = currentEstablishmentId ?? "";
+  const [selected, setSelected] = useState(originalValue);
   const [state, formAction, isPending] = useActionState<
     PatientFormResult | undefined,
     FormData
   >(updatePatientEstablishmentAction, undefined);
+
+  useEffect(() => {
+    setSelected(originalValue);
+  }, [originalValue]);
+
+  const hasChanges = selected !== originalValue;
 
   const currentName =
     establishments.find((e) => e.id === currentEstablishmentId)?.name ?? null;
@@ -103,8 +110,8 @@ export function PatientEstablishmentCard({
         </p>
       ) : null}
 
-      <Button type="submit" disabled={isPending}>
-        {isPending ? "A guardar…" : "Guardar associação"}
+      <Button type="submit" disabled={isPending || !hasChanges}>
+        {isPending ? "Salvando…" : "Salvar"}
       </Button>
     </form>
   );

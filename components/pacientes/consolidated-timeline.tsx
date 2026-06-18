@@ -22,7 +22,7 @@ export function ConsolidatedTimeline({
       aria-label="Linha do tempo de avaliações"
     >
       {events.map((ev) => (
-        <li key={ev.id} className="pb-8 last:pb-0">
+        <li key={`${ev.assessment_kind}-${ev.id}`} className="relative pb-8 last:pb-0">
           <span
             className="bg-primary absolute -start-[5px] mt-1.5 size-2 rounded-full"
             aria-hidden
@@ -39,9 +39,14 @@ export function ConsolidatedTimeline({
                       {ev.summary_line}
                     </span>
                   </div>
-                  <p className="text-primary text-xs font-medium">
-                    Origem: {ev.origin_label}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                    <span className="text-primary font-medium">
+                      Origem: {ev.origin_label}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {ev.assessment_kind_label}
+                    </span>
+                  </div>
                 </div>
               </summary>
               <div className="border-border space-y-3 border-t px-4 py-3 text-sm">
@@ -52,6 +57,16 @@ export function ConsolidatedTimeline({
                     </span>
                     <p className="text-foreground mt-1 whitespace-pre-wrap">
                       {ev.diet_notes}
+                    </p>
+                  </div>
+                ) : null}
+                {ev.nutritional_diagnosis ? (
+                  <div>
+                    <span className="text-muted-foreground font-medium">
+                      Diagnóstico nutricional
+                    </span>
+                    <p className="text-foreground mt-1 whitespace-pre-wrap">
+                      {ev.nutritional_diagnosis}
                     </p>
                   </div>
                 ) : null}
@@ -75,9 +90,12 @@ export function ConsolidatedTimeline({
                     </p>
                   </div>
                 ) : null}
-                {!ev.diet_notes && !ev.clinical_notes && !ev.goals ? (
+                {!ev.diet_notes &&
+                !ev.nutritional_diagnosis &&
+                !ev.clinical_notes &&
+                !ev.goals ? (
                   <p className="text-muted-foreground">
-                    Apenas dados antropométricos / atividade neste registo.
+                    Apenas dados antropométricos neste registo.
                   </p>
                 ) : null}
               </div>

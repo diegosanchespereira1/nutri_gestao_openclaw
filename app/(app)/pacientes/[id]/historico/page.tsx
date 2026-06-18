@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ConsolidatedTimeline } from "@/components/pacientes/consolidated-timeline";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { loadConsolidatedNutritionHistory } from "@/lib/actions/patient-history";
 import { loadPatientById } from "@/lib/actions/patients";
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
 
 export default async function HistoricoPacientePage({
   params,
@@ -28,48 +27,21 @@ export default async function HistoricoPacientePage({
     notFound();
   }
 
-  const backHref = `/pacientes/${id}`;
+  const contextMessage = mergeByDocument
+    ? `Vista unificada por CPF (${linkedPatientCount} fichas com o mesmo documento). Cada evento indica a origem (estabelecimento ou atendimento particular).`
+    : documentOnFile
+      ? "Só existe uma ficha com este CPF. Se criar outra com o mesmo documento noutro estabelecimento, as avaliações passam a aparecer juntas aqui."
+      : "Sem CPF na ficha: vê apenas avaliações deste registo. Adicione o CPF para unir o histórico entre estabelecimentos (mesmo documento na sua conta).";
 
   return (
-    <div className="space-y-6">
-      <Link
-        href={backHref}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "text-muted-foreground hover:text-foreground -ml-2 h-auto px-2 py-1",
-        )}
-      >
-        ← Prontuário
-      </Link>
-
-      <div>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Histórico consolidado
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">{patientFullName}</p>
-        {mergeByDocument ? (
-          <p className="text-muted-foreground mt-2 text-sm">
-            Vista unificada por <span className="text-foreground">CPF</span>{" "}
-            ({linkedPatientCount} fichas com o mesmo documento). Cada evento
-            indica a <span className="text-foreground">origem</span>{" "}
-            (estabelecimento ou atendimento particular).
-          </p>
-        ) : documentOnFile ? (
-          <p className="text-muted-foreground mt-2 text-sm">
-            Só existe uma ficha com este CPF. Se criar outra com o mesmo
-            documento noutro estabelecimento, as avaliações passam a aparecer
-            juntas aqui.
-          </p>
-        ) : (
-          <p className="text-muted-foreground mt-2 text-sm">
-            Sem CPF na ficha: vê apenas avaliações deste registo. Adicione o CPF
-            para unir o histórico entre estabelecimentos (mesmo documento na sua
-            conta).
-          </p>
-        )}
-      </div>
+    <PageLayout variant="form">
+      <PageHeader
+        title="Histórico consolidado"
+        description={`${patientFullName} · ${contextMessage}`}
+        back={{ href: `/pacientes/${id}`, label: "Prontuário" }}
+      />
 
       <ConsolidatedTimeline events={events} />
-    </div>
+    </PageLayout>
   );
 }

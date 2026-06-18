@@ -360,11 +360,14 @@ export function AdultNutritionAssessmentForm({
               step="0.1"
               min={0}
               inputMode="decimal"
-              placeholder="Opcional — deixe vazio se não mensurável"
-              className="tabular-nums"
+              placeholder="Opcional"
+              className="tabular-nums text-xs placeholder:text-xs md:text-xs"
               value={weightReal}
               onChange={(e) => setWeightReal(e.target.value)}
             />
+            <p className="text-xs text-muted-foreground">
+              Deixe vazio se o peso não for mensurável.
+            </p>
           </div>
         </div>
       </fieldset>

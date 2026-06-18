@@ -1,9 +1,18 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { ConsolidatedNutritionEvent } from "@/lib/types/patient-history";
+import type {
+  ConsolidatedAssessmentKind,
+  ConsolidatedNutritionEvent,
+} from "@/lib/types/patient-history";
+import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
+import type { GeriatricAssessmentRow } from "@/lib/types/geriatric-assessments";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
-import { buildAssessmentSummaryLine } from "@/lib/utils/nutrition-assessment-display";
+import {
+  buildAnthroAssessmentSummaryLine,
+  buildAssessmentSummaryLine,
+  buildChildAssessmentSummaryLine,
+} from "@/lib/utils/nutrition-assessment-display";
 import { onlyDigits } from "@/lib/validators/br-document";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
@@ -14,9 +23,25 @@ type PatientEmbed = {
   establishments: { name: string } | null;
 };
 
-type RawAssessmentRow = NutritionAssessmentRow & {
+type WithPatientEmbed = {
   patients: PatientEmbed | PatientEmbed[] | null;
 };
+
+const ASSESSMENT_KIND_LABELS: Record<ConsolidatedAssessmentKind, string> = {
+  general: "Avaliação geral",
+  adult: "Adultos",
+  geriatric: "Idosos",
+  child: "Infantil",
+};
+
+const PATIENT_EMBED_SELECT = `
+  patients (
+    id,
+    establishment_id,
+    clients ( legal_name ),
+    establishments ( name )
+  )
+`;
 
 function unwrapPatient(
   p: PatientEmbed | PatientEmbed[] | null,
@@ -31,6 +56,17 @@ function originLabelFromPatient(p: PatientEmbed): string {
     return `${p.establishments.name} · ${clientName}`;
   }
   return `Particular · ${clientName}`;
+}
+
+function originLabelFromRow(row: WithPatientEmbed): string {
+  const p = unwrapPatient(row.patients);
+  return p ? originLabelFromPatient(p) : "Contexto desconhecido";
+}
+
+function sortEventsDesc(events: ConsolidatedNutritionEvent[]): ConsolidatedNutritionEvent[] {
+  return [...events].sort(
+    (a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime(),
+  );
 }
 
 export async function loadConsolidatedNutritionHistory(patientId: string): Promise<{
@@ -72,8 +108,6 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
     };
   }
 
-  // Verifica propriedade directamente pelo user_id do paciente,
-  // funciona mesmo quando client_id é null (paciente independente).
   if (anchor.user_id !== workspaceOwnerId) {
     return {
       patientFullName: null,
@@ -84,22 +118,15 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
     };
   }
 
-  const { data: myClients } = await supabase
-    .from("clients")
-    .select("id")
-    .eq("owner_user_id", workspaceOwnerId);
-
-  const clientIds = (myClients ?? []).map((c) => c.id);
-
   const docDigits = onlyDigits(anchor.document_id ?? "");
   const documentOnFile = docDigits.length > 0;
   let patientIds: string[];
 
-  if (docDigits.length > 0 && clientIds.length > 0) {
+  if (docDigits.length > 0) {
     const { data: siblings } = await supabase
       .from("patients")
       .select("id")
-      .in("client_id", clientIds)
+      .eq("user_id", workspaceOwnerId)
       .eq("document_id", docDigits);
 
     patientIds = (siblings ?? []).map((r) => r.id);
@@ -112,37 +139,35 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
 
   const mergeByDocument = docDigits.length > 0 && patientIds.length > 1;
 
-  const { data: rawRows, error: listErr } = await supabase
-    .from("patient_nutrition_assessments")
-    .select(
-      `
-      *,
-      patients (
-        id,
-        establishment_id,
-        clients ( legal_name ),
-        establishments ( name )
-      )
-    `,
-    )
-    .in("patient_id", patientIds)
-    .order("recorded_at", { ascending: false });
+  const [
+    { data: generalRows },
+    { data: adultRows },
+    { data: geriatricRows },
+    { data: childRows },
+  ] = await Promise.all([
+    supabase
+      .from("patient_nutrition_assessments")
+      .select(`*, ${PATIENT_EMBED_SELECT}`)
+      .in("patient_id", patientIds),
+    supabase
+      .from("patient_adult_nutrition_assessments")
+      .select(`*, ${PATIENT_EMBED_SELECT}`)
+      .in("patient_id", patientIds),
+    supabase
+      .from("patient_geriatric_assessments")
+      .select(`*, ${PATIENT_EMBED_SELECT}`)
+      .in("patient_id", patientIds),
+    supabase
+      .from("patient_child_assessments")
+      .select(`*, ${PATIENT_EMBED_SELECT}`)
+      .in("patient_id", patientIds),
+  ]);
 
-  if (listErr || !rawRows) {
-    return {
-      patientFullName: anchor.full_name,
-      mergeByDocument,
-      linkedPatientCount: patientIds.length,
-      documentOnFile,
-      events: [],
-    };
-  }
+  const events: ConsolidatedNutritionEvent[] = [];
 
-  const events: ConsolidatedNutritionEvent[] = (
-    rawRows as RawAssessmentRow[]
-  ).map((row) => {
-    const p = unwrapPatient(row.patients);
-    const origin_label = p ? originLabelFromPatient(p) : "Contexto desconhecido";
+  for (const row of (generalRows ?? []) as Array<
+    NutritionAssessmentRow & WithPatientEmbed
+  >) {
     const assessment: NutritionAssessmentRow = {
       id: row.id,
       patient_id: row.patient_id,
@@ -155,22 +180,77 @@ export async function loadConsolidatedNutritionHistory(patientId: string): Promi
       clinical_notes: row.clinical_notes,
       goals: row.goals,
     };
-    return {
+
+    events.push({
       id: row.id,
       recorded_at: row.recorded_at,
-      origin_label,
+      origin_label: originLabelFromRow(row),
+      assessment_kind: "general",
+      assessment_kind_label: ASSESSMENT_KIND_LABELS.general,
       summary_line: buildAssessmentSummaryLine(assessment),
       diet_notes: row.diet_notes,
       clinical_notes: row.clinical_notes,
       goals: row.goals,
-    };
-  });
+      nutritional_diagnosis: null,
+    });
+  }
+
+  for (const row of (adultRows ?? []) as Array<
+    GeriatricAssessmentRow & WithPatientEmbed
+  >) {
+    events.push({
+      id: row.id,
+      recorded_at: row.recorded_at,
+      origin_label: originLabelFromRow(row),
+      assessment_kind: "adult",
+      assessment_kind_label: ASSESSMENT_KIND_LABELS.adult,
+      summary_line: buildAnthroAssessmentSummaryLine(row),
+      diet_notes: null,
+      clinical_notes: row.clinical_notes,
+      goals: null,
+      nutritional_diagnosis: row.nutritional_diagnosis,
+    });
+  }
+
+  for (const row of (geriatricRows ?? []) as Array<
+    GeriatricAssessmentRow & WithPatientEmbed
+  >) {
+    events.push({
+      id: row.id,
+      recorded_at: row.recorded_at,
+      origin_label: originLabelFromRow(row),
+      assessment_kind: "geriatric",
+      assessment_kind_label: ASSESSMENT_KIND_LABELS.geriatric,
+      summary_line: buildAnthroAssessmentSummaryLine(row),
+      diet_notes: null,
+      clinical_notes: row.clinical_notes,
+      goals: null,
+      nutritional_diagnosis: row.nutritional_diagnosis,
+    });
+  }
+
+  for (const row of (childRows ?? []) as Array<
+    ChildAssessmentRow & WithPatientEmbed
+  >) {
+    events.push({
+      id: row.id,
+      recorded_at: row.recorded_at,
+      origin_label: originLabelFromRow(row),
+      assessment_kind: "child",
+      assessment_kind_label: ASSESSMENT_KIND_LABELS.child,
+      summary_line: buildChildAssessmentSummaryLine(row),
+      diet_notes: null,
+      clinical_notes: row.clinical_notes,
+      goals: null,
+      nutritional_diagnosis: null,
+    });
+  }
 
   return {
     patientFullName: anchor.full_name,
     mergeByDocument,
     linkedPatientCount: patientIds.length,
     documentOnFile,
-    events,
+    events: sortEventsDesc(events),
   };
 }

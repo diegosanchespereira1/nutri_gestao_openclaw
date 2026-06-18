@@ -422,6 +422,8 @@ type Props = {
   professionalCrn?: string;
   /** Assinaturas salvas (para exibir após aprovação). */
   initialProfessionalSignatureDataUrl?: string | null;
+  /** Assinatura do cadastro do profissional responsável (antes da aprovação). */
+  profileProfessionalSignatureDataUrl?: string | null;
   initialClientSignatureDataUrl?: string | null;
   initialClientSignerName?: string | null;
   initialDocumentHash?: string | null;
@@ -451,6 +453,7 @@ export function ChecklistFillWizard({
   professionalName,
   professionalCrn,
   initialProfessionalSignatureDataUrl = null,
+  profileProfessionalSignatureDataUrl = null,
   initialClientSignatureDataUrl = null,
   initialClientSignerName = null,
   initialDocumentHash = null,
@@ -520,6 +523,9 @@ export function ChecklistFillWizard({
   const [savedDocumentHash, setSavedDocumentHash] = useState<string | null>(
     initialDocumentHash ?? null,
   );
+
+  const effectiveProfessionalSignature =
+    savedProfessionalSig ?? profileProfessionalSignatureDataUrl ?? null;
 
   useEffect(() => {
     setSavedDocumentHash(initialDocumentHash ?? null);
@@ -1516,7 +1522,7 @@ export function ChecklistFillWizard({
                   itemResponseSource={itemResponseSource}
                   onPatchResponse={patchDossierResponse}
                   dossierApprovedAt={dossierApprovedAt}
-                  professionalSignatureDataUrl={savedProfessionalSig}
+                  professionalSignatureDataUrl={effectiveProfessionalSignature}
                   clientSignatureDataUrl={savedClientSig}
                   clientSignerName={savedClientSignerName}
                   professionalName={professionalName}
@@ -1861,6 +1867,9 @@ export function ChecklistFillWizard({
         professionalCrn={professionalCrn}
         clientLabel={clientLabel}
         clientSignatureRequired={clientSignatureRequired}
+        initialProfessionalDataUrl={
+          savedProfessionalSig ?? profileProfessionalSignatureDataUrl ?? null
+        }
         onConfirm={(signatures) => {
           setPendingSignatures(signatures);
           setSignatureDialogOpen(false);

@@ -38,6 +38,8 @@ interface SignatureCaptureDialogProps {
   clientLabel?: string;
   /** Quando false, a etapa do cliente continua visível, mas assinatura e nome são opcionais. */
   clientSignatureRequired?: boolean;
+  /** Assinatura já cadastrada no perfil — pula a etapa de desenho da profissional. */
+  initialProfessionalDataUrl?: string | null;
 }
 
 /* ── Utilitário de canvas ────────────────────────────────────────────── */
@@ -185,12 +187,29 @@ export function SignatureCaptureDialog({
   professionalCrn,
   clientLabel,
   clientSignatureRequired = true,
+  initialProfessionalDataUrl = null,
 }: SignatureCaptureDialogProps) {
   const [step, setStep] = useState<Step>("professional");
   const [professionalDataUrl, setProfessionalDataUrl] = useState<string | null>(null);
   const [clientDataUrl, setClientDataUrl] = useState<string | null>(null);
   const [clientSignerName, setClientSignerName] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  const profileSignatureReady = Boolean(initialProfessionalDataUrl?.trim());
+
+  useEffect(() => {
+    if (!open) return;
+    if (profileSignatureReady) {
+      setProfessionalDataUrl(initialProfessionalDataUrl);
+      setStep("client");
+    } else {
+      setProfessionalDataUrl(null);
+      setStep("professional");
+    }
+    setClientDataUrl(null);
+    setClientSignerName("");
+    setError(null);
+  }, [open, initialProfessionalDataUrl, profileSignatureReady]);
 
   function handleOpenChange(nextOpen: boolean) {
     if (!nextOpen) {
@@ -286,7 +305,21 @@ export function SignatureCaptureDialog({
                 )}
               </div>
             )}
-            <SignaturePad key="professional" onDataUrl={setProfessionalDataUrl} />
+            {profileSignatureReady && professionalDataUrl ? (
+              <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+                <p className="text-muted-foreground text-xs">
+                  Assinatura carregada do seu cadastro de profissional.
+                </p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={professionalDataUrl}
+                  alt="Assinatura da profissional"
+                  className="max-h-16 w-auto object-contain"
+                />
+              </div>
+            ) : (
+              <SignaturePad key="professional" onDataUrl={setProfessionalDataUrl} />
+            )}
           </div>
         )}
 
@@ -328,6 +361,21 @@ export function SignatureCaptureDialog({
             </div>
 
             <SignaturePad key="client" onDataUrl={setClientDataUrl} />
+            {profileSignatureReady && professionalDataUrl ? (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="text-muted-foreground h-auto px-0 text-xs"
+                onClick={() => {
+                  setError(null);
+                  setProfessionalDataUrl(null);
+                  setStep("professional");
+                }}
+              >
+                Alterar assinatura da profissional
+              </Button>
+            ) : null}
             {!clientSignatureRequired ? (
               <p className="text-muted-foreground text-xs leading-relaxed">
                 Deixe em branco para aprovar o dossiê apenas com a assinatura da profissional.

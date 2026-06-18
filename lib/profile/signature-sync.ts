@@ -113,3 +113,29 @@ export async function getProfileSignatureBytes(
     return null;
   }
 }
+
+/** Limite do data URL persistido na sessão do checklist (aprovação do dossiê). */
+export const MAX_SESSION_SIGNATURE_DATA_URL_CHARS = 512 * 1024;
+
+function mimeFromStoragePath(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase();
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "webp") return "image/webp";
+  return "image/png";
+}
+
+/**
+ * Converte a assinatura do perfil (storage path) em data URL para uso no checklist.
+ * Retorna null se ausente, inválida ou maior que o limite da sessão.
+ */
+export async function getProfileSignatureDataUrl(
+  supabase: SupabaseClient,
+  path: string | null,
+): Promise<string | null> {
+  const bytes = await getProfileSignatureBytes(supabase, path);
+  if (!bytes || !path?.trim()) return null;
+  const mime = mimeFromStoragePath(path);
+  const dataUrl = `data:${mime};base64,${bytes.toString("base64")}`;
+  if (dataUrl.length > MAX_SESSION_SIGNATURE_DATA_URL_CHARS) return null;
+  return dataUrl;
+}

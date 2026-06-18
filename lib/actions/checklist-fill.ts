@@ -11,6 +11,10 @@ import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-phot
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleByIdDirect } from "@/lib/actions/checklists";
 import {
+  getProfileSignatureDataUrl,
+  MAX_SESSION_SIGNATURE_DATA_URL_CHARS,
+} from "@/lib/profile/signature-sync";
+import {
   loadWorkspaceTemplateBundle,
   startWorkspaceTemplateFillBatch,
 } from "@/lib/actions/checklist-workspace";
@@ -1646,7 +1650,7 @@ export async function approveChecklistFillDossierAction(
 
   const approvedAt = new Date().toISOString();
 
-  const MAX_SIG_BYTES = 512 * 1024;
+  const MAX_SIG_BYTES = MAX_SESSION_SIGNATURE_DATA_URL_CHARS;
   const validateSig = (url: string | undefined | null): string | null => {
     if (!url) return null;
     if (!url.startsWith("data:image/")) return null;
@@ -1657,10 +1661,27 @@ export async function approveChecklistFillDossierAction(
   const hasSignaturePayload = Boolean(
     signatures?.professional || signatures?.client || signatures?.clientSignerName,
   );
-  const professionalSig = hasSignaturePayload ? validateSig(signatures?.professional) : null;
+  let professionalSig = hasSignaturePayload ? validateSig(signatures?.professional) : null;
   const clientSig = hasSignaturePayload ? validateSig(signatures?.client) : null;
   const clientSignerNameForSave =
     (signatures?.clientSignerName ?? "").trim().slice(0, 200) || null;
+
+  if (!professionalSig) {
+    const sessionUserId = String(bundle.session.user_id ?? "");
+    if (sessionUserId) {
+      const { data: creatorProfile } = await supabase
+        .from("profiles")
+        .select("signature_storage_path")
+        .eq("user_id", sessionUserId)
+        .maybeSingle();
+      const profilePath =
+        (creatorProfile as { signature_storage_path?: string | null } | null)
+          ?.signature_storage_path ?? null;
+      professionalSig = validateSig(
+        await getProfileSignatureDataUrl(supabase, profilePath),
+      );
+    }
+  }
 
   if (!professionalSig) {
     return { ok: false, error: "A assinatura da profissional é obrigatória para aprovar o dossiê." };

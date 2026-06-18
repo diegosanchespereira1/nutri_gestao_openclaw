@@ -10,6 +10,7 @@ import {
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
+import { getProfileSignatureDataUrl } from "@/lib/profile/signature-sync";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 
@@ -55,7 +56,7 @@ export default async function ChecklistPreencherPage({
       : getChecklistReopenEligibility(supabase, user.id),
     supabase
       .from("profiles")
-      .select("full_name, crn")
+      .select("full_name, crn, signature_storage_path")
       .eq("user_id", professionalUserId)
       .maybeSingle(),
   ]);
@@ -84,6 +85,14 @@ export default async function ChecklistPreencherPage({
     client_signer_name?: string | null;
     document_hash?: string | null;
   };
+
+  const profileSignaturePath =
+    (professionalProfile?.data as { signature_storage_path?: string | null } | null)
+      ?.signature_storage_path ?? null;
+  const profileProfessionalSignatureDataUrl =
+    !sessionRow.professional_signature_data_url && profileSignaturePath
+      ? await getProfileSignatureDataUrl(supabase, profileSignaturePath)
+      : null;
 
   const createdAt = new Date(bundle.session.created_at);
   const createdAtLabel = createdAt.toLocaleString("pt-BR", {
@@ -170,6 +179,7 @@ export default async function ChecklistPreencherPage({
         professionalName={professionalName}
         professionalCrn={professionalCrn}
         initialProfessionalSignatureDataUrl={sessionRow.professional_signature_data_url ?? null}
+        profileProfessionalSignatureDataUrl={profileProfessionalSignatureDataUrl}
         initialClientSignatureDataUrl={sessionRow.client_signature_data_url ?? null}
         initialClientSignerName={sessionRow.client_signer_name ?? null}
         initialDocumentHash={sessionRow.document_hash ?? null}

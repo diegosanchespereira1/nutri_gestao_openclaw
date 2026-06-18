@@ -68,6 +68,16 @@ function isListPaginationOnly(href: string): boolean {
   }
 }
 
+/** Rotas com `loading.tsx` — evita overlay duplo (logo NutriGestão + skeleton da rota). */
+function hasRouteLoadingSkeleton(pathname: string): boolean {
+  return (
+    pathname === "/checklists" ||
+    pathname === "/clientes" ||
+    pathname === "/pacientes" ||
+    pathname === "/visitas"
+  );
+}
+
 /**
  * Edição de cliente: mesmo pathname (`/clientes/:id/editar`), só mudam query params
  * (`tab`, `formTab`, filtros de checklists, etc.). Não deve mostrar o overlay com logo
@@ -187,6 +197,14 @@ export function AppMainContent({ children }: Props) {
       if (isSameRoute(href)) return;
       if (isClientEditShellOnlyQueryChange(href)) return;
       if (isListPaginationOnly(href)) return;
+
+      let destPath = "";
+      try {
+        destPath = new URL(href, window.location.origin).pathname;
+      } catch {
+        destPath = "";
+      }
+      if (hasRouteLoadingSkeleton(destPath)) return;
 
       beginNavigation();
     }

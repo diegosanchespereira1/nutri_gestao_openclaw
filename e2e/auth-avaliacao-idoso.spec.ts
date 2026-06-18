@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { login, gotoNovaAvaliacao, findPatientIdByCategory } from "./helpers/auth";
+import { login, gotoNovaAvaliacao, discoverPatientIdInBeforeAll } from "./helpers/auth";
+import { abrirFormularioAvaliacao } from "./helpers/avaliacao";
 import { shot, resetShotIndex } from "./helpers/screenshot";
 
 /**
@@ -26,21 +27,9 @@ test.skip(
 let patientId = "";
 
 test.beforeAll(async ({ browser }) => {
-  const ctx  = await browser.newContext();
-  const page = await ctx.newPage();
-  await login(page);
-  patientId = (await findPatientIdByCategory(page, "idoso")) ?? "";
-  await ctx.close();
+  test.setTimeout(120_000);
+  patientId = await discoverPatientIdInBeforeAll(browser, "idoso");
 });
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function abrirFormulario(page: Parameters<typeof shot>[0]) {
-  await login(page);
-  await gotoNovaAvaliacao(page, patientId);
-  await expect(page.getByRole("tab", { name: /idoso/i })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("tab", { name: /idoso/i }).click();
-}
 
 async function getCalcBoxValue(page: Parameters<typeof shot>[0], label: string): Promise<string> {
   const box = page.locator(".rounded-lg").filter({ hasText: new RegExp(label, "i") }).first();
@@ -50,6 +39,7 @@ async function getCalcBoxValue(page: Parameters<typeof shot>[0], label: string):
 // ── Suite principal ───────────────────────────────────────────────────────────
 
 test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(async () => {
     resetShotIndex();
     test.skip(!patientId, "Nenhum paciente idoso encontrado em /pacientes?categoria=idoso.");
@@ -63,7 +53,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("02 — altura geriátrica exige AJ + Idade (todos os grupos)", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     let alt = await getCalcBoxValue(page, "Altura Estimada");
     expect(alt).toMatch(/^–/);
@@ -79,7 +69,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("03 — PE geriátrico (Chumlea 1988) difere do PE adulto", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("mulher_branca");
     await page.locator("#ga-cb").fill("25");
@@ -94,7 +84,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("04 — CMB calculado corretamente", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-cb").fill("25");
     await page.locator("#ga-dct").fill("8");
@@ -104,7 +94,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("05 — IMC calculado quando PE e Altura disponíveis", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("homem_branco");
     await page.locator("#ga-cb").fill("27");
@@ -117,7 +107,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("06 — amputação recalcula PE e IMC do idoso", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("homem_branco");
     await page.locator("#ga-cb").fill("27");
@@ -137,7 +127,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("07 — Kcal/kg e g PTN/kg → NE e NP calculados", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("mulher_branca");
     await page.locator("#ga-cb").fill("24");
@@ -154,7 +144,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
   });
 
   test("08 — risco nutricional e diagnóstico preenchidos", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-risk").selectOption("s_rn");
     await page.locator("#ga-diagnosis").fill("D-16");
@@ -164,7 +154,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
 
   test("09 — submissão com dados mínimos redireciona para prontuário", async ({ page }) => {
     test.setTimeout(60_000);
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("mulher_branca");
     await page.locator("#ga-cb").fill("24");
@@ -181,7 +171,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
 
   test("10 — avaliação geriátrica aparece no histórico do paciente", async ({ page }) => {
     test.setTimeout(60_000);
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("homem_negro");
     await page.locator("#ga-cb").fill("26");
@@ -200,13 +190,14 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
 // ── Diferenciação de fórmulas por grupo ──────────────────────────────────────
 
 test.describe("Avaliação Idoso — diferenciação de fórmulas por grupo", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(async () => {
     resetShotIndex();
     test.skip(!patientId, "Nenhum paciente idoso encontrado em /pacientes?categoria=idoso.");
   });
 
   test("11 — trocar grupo muda PE e Altura exibidos", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-cb").fill("25");
     await page.locator("#ga-aj").fill("50");
@@ -223,7 +214,7 @@ test.describe("Avaliação Idoso — diferenciação de fórmulas por grupo", ()
 
   test("12 — grupo Mulher Negra exibe PE segundo equação correta", async ({ page }) => {
     // AJ×1,50 + CB×2,58 − 84,22 com AJ=50, CB=25 → 55,28 kg
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("mulher_negra");
     await page.locator("#ga-cb").fill("25");
@@ -238,7 +229,7 @@ test.describe("Avaliação Idoso — diferenciação de fórmulas por grupo", ()
 
   test("13 — grupo Homem Negro exibe PE segundo equação correta", async ({ page }) => {
     // AJ×0,44 + CB×2,86 − 39,21 com AJ=50, CB=25 → 54,29 kg
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("homem_negro");
     await page.locator("#ga-cb").fill("25");

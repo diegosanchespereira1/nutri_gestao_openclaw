@@ -35,7 +35,7 @@ export default async function ChecklistsEquipePage({
             Voltar ao catálogo
           </Link>
           <Link
-            href="/checklists/novo"
+            href="/checklists/novo?novo=1"
             className={cn(buttonVariants({ size: "sm" }))}
           >
             + Criar checklist personalizado

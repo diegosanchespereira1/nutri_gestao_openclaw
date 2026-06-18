@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   ArrowDown,
   ArrowUp,
   BookOpen,
   ChevronDown,
   ChevronUp,
+  Cloud,
+  CloudOff,
   Loader2,
   Plus,
   Search,
@@ -21,8 +23,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  createWorkspaceTemplateAction,
   fetchBaseTemplateSectionsAction,
+  publishWorkspaceTemplateAction,
+  saveWorkspaceTemplateDraftAction,
   updateWorkspaceTemplateAction,
   type BaseCandidateTemplate,
   type WorkspaceEditItem,
@@ -38,12 +41,21 @@ type Props = {
   initialSections?: WorkspaceEditSection[];
   /** Disponível apenas em mode="create" — lista de candidatos a base. */
   baseTemplates?: BaseCandidateTemplate[];
+  /** Criação com rascunho persistido no servidor (autosave). */
+  isDraft?: boolean;
 };
 
 type EditableItem = WorkspaceEditItem & { tempId: string };
 type EditableSection = Omit<WorkspaceEditSection, "items"> & {
   tempId: string;
   items: EditableItem[];
+};
+
+type AutosaveState = "idle" | "saving" | "saved" | "error";
+
+type AutosaveSnapshot = {
+  name: string;
+  sections: EditableSection[];
 };
 
 function makeId(): string {
@@ -58,12 +70,49 @@ function defaultSection(): EditableSection {
   };
 }
 
+function buildPayload(
+  name: string,
+  sections: EditableSection[],
+): WorkspaceTemplateInput {
+  return {
+    name,
+    sections: sections.map((sec) => ({
+      id: sec.id,
+      title: sec.title,
+      items: sec.items.map((it) => ({
+        id: it.id,
+        description: it.description,
+        is_required: it.is_required,
+      })),
+    })),
+  };
+}
+
+function mergePersistedSectionIds(
+  prev: EditableSection[],
+  persisted: WorkspaceEditSection[],
+): EditableSection[] {
+  return prev.map((sec, secIdx) => {
+    const serverSec = persisted[secIdx];
+    if (!serverSec) return sec;
+    return {
+      ...sec,
+      id: serverSec.id,
+      items: sec.items.map((it, itemIdx) => ({
+        ...it,
+        id: serverSec.items[itemIdx]?.id ?? it.id,
+      })),
+    };
+  });
+}
+
 export function WorkspaceChecklistBuilder({
   mode,
   templateId,
   initialName = "",
   initialSections,
   baseTemplates = [],
+  isDraft = false,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -86,6 +135,46 @@ export function WorkspaceChecklistBuilder({
     return [defaultSection()];
   });
   const [error, setError] = useState<string | null>(null);
+  const [autosaveState, setAutosaveState] = useState<AutosaveState>("idle");
+  const [autosaveError, setAutosaveError] = useState<string | null>(null);
+
+  const isSavingDraftRef = useRef(false);
+
+  const autosaveEnabled = mode === "create" && isDraft && Boolean(templateId);
+
+  const runAutosave = useCallback(
+    async (snapshot: AutosaveSnapshot) => {
+      if (!autosaveEnabled || !templateId || isSavingDraftRef.current) return;
+
+      isSavingDraftRef.current = true;
+      setAutosaveState("saving");
+      setAutosaveError(null);
+
+      const result = await saveWorkspaceTemplateDraftAction(
+        templateId,
+        buildPayload(snapshot.name, snapshot.sections),
+      );
+
+      isSavingDraftRef.current = false;
+
+      if (!result.ok) {
+        setAutosaveState("error");
+        setAutosaveError(result.error);
+        return;
+      }
+
+      setSections((prev) => mergePersistedSectionIds(prev, result.sections));
+      setAutosaveState("saved");
+    },
+    [autosaveEnabled, templateId],
+  );
+
+  const triggerAutosave = useCallback(
+    (snapshot: AutosaveSnapshot) => {
+      void runAutosave(snapshot);
+    },
+    [runAutosave],
+  );
 
   // ── Base template picker state ──────────────────────────────────────────
   const [pickerOpen, setPickerOpen] = useState(
@@ -113,32 +202,34 @@ export function WorkspaceChecklistBuilder({
       );
       if (!result || result.length === 0) return;
 
-      setSections(
-        result.map((sec) => ({
-          tempId: makeId(),
-          title: sec.title,
-          items:
-            sec.items.length > 0
-              ? sec.items.map((it) => ({
-                  tempId: makeId(),
-                  description: it.description,
-                  is_required: it.is_required,
-                }))
-              : [{ tempId: makeId(), description: "", is_required: false }],
-        })),
-      );
+      const newSections: EditableSection[] = result.map((sec) => ({
+        tempId: makeId(),
+        title: sec.title,
+        items:
+          sec.items.length > 0
+            ? sec.items.map((it) => ({
+                tempId: makeId(),
+                description: it.description,
+                is_required: it.is_required,
+              }))
+            : [{ tempId: makeId(), description: "", is_required: false }],
+      }));
 
-      // Sugere o nome baseado no template selecionado
+      const newName = name.trim()
+        ? name
+        : `${candidate.name} (personalizado)`;
+
+      setSections(newSections);
       if (!name.trim()) {
-        setName(`${candidate.name} (personalizado)`);
+        setName(newName);
       }
 
       setBaseLoadedName(candidate.name);
       setPickerOpen(false);
+      triggerAutosave({ name: newName, sections: newSections });
     });
   }
 
-  // ── Seções ─────────────────────────────────────────────────────────────
   const totalItems = useMemo(
     () => sections.reduce((acc, sec) => acc + sec.items.length, 0),
     [sections],
@@ -151,14 +242,18 @@ export function WorkspaceChecklistBuilder({
   }
 
   function addSection() {
-    setSections((prev) => [
-      ...prev,
-      {
-        tempId: makeId(),
-        title: `Seção ${prev.length + 1}`,
-        items: [{ tempId: makeId(), description: "", is_required: false }],
-      },
-    ]);
+    setSections((prev) => {
+      const next: EditableSection[] = [
+        ...prev,
+        {
+          tempId: makeId(),
+          title: `Seção ${prev.length + 1}`,
+          items: [{ tempId: makeId(), description: "", is_required: false }],
+        },
+      ];
+      triggerAutosave({ name, sections: next });
+      return next;
+    });
   }
 
   function removeSection(tempId: string) {
@@ -181,8 +276,8 @@ export function WorkspaceChecklistBuilder({
   }
 
   function addItem(sectionTempId: string) {
-    setSections((prev) =>
-      prev.map((sec) =>
+    setSections((prev) => {
+      const next = prev.map((sec) =>
         sec.tempId === sectionTempId
           ? {
               ...sec,
@@ -192,8 +287,10 @@ export function WorkspaceChecklistBuilder({
               ],
             }
           : sec,
-      ),
-    );
+      );
+      triggerAutosave({ name, sections: next });
+      return next;
+    });
   }
 
   function updateItem(
@@ -247,7 +344,6 @@ export function WorkspaceChecklistBuilder({
     );
   }
 
-  // ── Submit ─────────────────────────────────────────────────────────────
   function handleSubmit() {
     setError(null);
     const trimmedName = name.trim();
@@ -291,7 +387,9 @@ export function WorkspaceChecklistBuilder({
       const result =
         mode === "edit" && templateId
           ? await updateWorkspaceTemplateAction(templateId, payload)
-          : await createWorkspaceTemplateAction(payload);
+          : isDraft && templateId
+            ? await publishWorkspaceTemplateAction(templateId, payload)
+            : { ok: false as const, error: "Rascunho não encontrado." };
 
       if (!result.ok) {
         setError(result.error);
@@ -302,10 +400,36 @@ export function WorkspaceChecklistBuilder({
     });
   }
 
+  const autosaveLabel = (() => {
+    if (!autosaveEnabled) return null;
+    if (autosaveState === "saving") return "Salvando rascunho…";
+    if (autosaveState === "saved") return "Rascunho salvo no servidor";
+    if (autosaveState === "error") return "Falha ao salvar rascunho";
+    return "Salvo ao adicionar seção ou item";
+  })();
+
   return (
     <div className="space-y-6">
+      {autosaveEnabled && autosaveLabel ? (
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-lg border px-3 py-2 text-xs",
+            autosaveState === "error"
+              ? "border-destructive/40 bg-destructive/5 text-destructive"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800",
+          )}
+        >
+          {autosaveState === "saving" ? (
+            <Loader2 className="size-3.5 shrink-0 animate-spin" />
+          ) : autosaveState === "error" ? (
+            <CloudOff className="size-3.5 shrink-0" />
+          ) : (
+            <Cloud className="size-3.5 shrink-0" />
+          )}
+          <span>{autosaveError ?? autosaveLabel}</span>
+        </div>
+      ) : null}
 
-      {/* ── Picker: partir de um modelo existente (apenas no create) ── */}
       {mode === "create" && baseTemplates.length > 0 && (
         <div className="rounded-xl border border-border bg-card shadow-xs">
           <button
@@ -340,7 +464,6 @@ export function WorkspaceChecklistBuilder({
 
           {pickerOpen && (
             <div className="border-t border-border px-4 pb-4 pt-3 space-y-3">
-              {/* Campo de busca */}
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -362,7 +485,6 @@ export function WorkspaceChecklistBuilder({
                 )}
               </div>
 
-              {/* Lista de resultados */}
               {filteredCandidates.length === 0 ? (
                 <p className="py-4 text-center text-sm text-muted-foreground">
                   Nenhum modelo encontrado para &quot;{searchQuery}&quot;.
@@ -424,7 +546,6 @@ export function WorkspaceChecklistBuilder({
         </div>
       )}
 
-      {/* ── Nome do checklist ── */}
       <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
         <div className="space-y-2">
           <Label htmlFor="workspace-template-name">Nome do checklist</Label>
@@ -432,7 +553,7 @@ export function WorkspaceChecklistBuilder({
             id="workspace-template-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Ex.: Inspeção rápida diária"
+            placeholder="Ex.: La Vieiras Hipica"
             maxLength={200}
           />
           <p className="text-muted-foreground text-xs">
@@ -449,7 +570,6 @@ export function WorkspaceChecklistBuilder({
         preenchimento.
       </div>
 
-      {/* ── Seções ── */}
       <div className="space-y-4">
         {sections.map((sec, secIdx) => (
           <section

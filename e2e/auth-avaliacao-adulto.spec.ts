@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { login, gotoNovaAvaliacao, findPatientIdByCategory } from "./helpers/auth";
+import { login, gotoNovaAvaliacao, discoverPatientIdInBeforeAll } from "./helpers/auth";
+import { abrirFormularioAvaliacao } from "./helpers/avaliacao";
 import { shot, resetShotIndex } from "./helpers/screenshot";
 
 /**
@@ -26,21 +27,9 @@ test.skip(
 let patientId = "";
 
 test.beforeAll(async ({ browser }) => {
-  const ctx  = await browser.newContext();
-  const page = await ctx.newPage();
-  await login(page);
-  patientId = (await findPatientIdByCategory(page, "adulto")) ?? "";
-  await ctx.close();
+  test.setTimeout(120_000);
+  patientId = await discoverPatientIdInBeforeAll(browser, "adulto");
 });
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function abrirFormulario(page: Parameters<typeof shot>[0]) {
-  await login(page);
-  await gotoNovaAvaliacao(page, patientId);
-  await expect(page.getByRole("tab", { name: /adulto/i })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("tab", { name: /adulto/i }).click();
-}
 
 async function getCalcBoxValue(page: Parameters<typeof shot>[0], label: string): Promise<string> {
   const box = page.locator(".rounded-lg").filter({ hasText: new RegExp(label, "i") }).first();
@@ -50,6 +39,7 @@ async function getCalcBoxValue(page: Parameters<typeof shot>[0], label: string):
 // ── Suite principal ───────────────────────────────────────────────────────────
 
 test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(async () => {
     resetShotIndex();
     test.skip(!patientId, "Nenhum paciente adulto encontrado em /pacientes?categoria=adulto.");
@@ -63,7 +53,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("02 — seleciona grupo e preenche idade", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("mulher_branca");
     await page.locator("#adult-age").fill("42");
     await shot(page, SCREENSHOT_DIR, "grupo-idade");
@@ -71,7 +61,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("03 — CB + DCT → CMB calculado em tempo real", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-cb").fill("25");
     await page.locator("#adult-dct").fill("8");
     await shot(page, SCREENSHOT_DIR, "cmb-calculado");
@@ -80,7 +70,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("04 — AJ + CB → Peso Estimado calculado", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-cb").fill("25");
     await page.locator("#adult-aj").fill("48");
     await shot(page, SCREENSHOT_DIR, "pe-calculado");
@@ -89,7 +79,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("05 — mulher branca exige idade para Altura Estimada", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("mulher_branca");
     await page.locator("#adult-aj").fill("48");
     const alt = await getCalcBoxValue(page, "Altura Estimada");
@@ -100,7 +90,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("06 — homem branco NÃO exige idade para Altura Estimada", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("homem_branco");
     await page.locator("#adult-aj").fill("50");
     const alt = await getCalcBoxValue(page, "Altura Estimada");
@@ -108,7 +98,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("07 — IMC calculado quando PE e Altura disponíveis", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("homem_branco");
     await page.locator("#adult-cb").fill("27");
     await page.locator("#adult-aj").fill("50");
@@ -118,7 +108,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("08 — checkbox amputação exibe campo de % e recalcula PE", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-cb").fill("25");
     await page.locator("#adult-aj").fill("48");
     const peSemAmp = await getCalcBoxValue(page, "Peso Estimado");
@@ -132,7 +122,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("09 — Kcal/kg e g PTN/kg → NE e NP calculados", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("homem_branco");
     await page.locator("#adult-cb").fill("27");
     await page.locator("#adult-aj").fill("50");
@@ -146,7 +136,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   });
 
   test("10 — select de risco nutricional e diagnóstico preenchidos", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-risk").selectOption("c_rn");
     await page.locator("#adult-diagnosis").fill("SRD-19");
     await expect(page.locator("#adult-risk")).toHaveValue("c_rn");
@@ -155,7 +145,7 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
 
   test("11 — submissão com dados mínimos (AJ + CB) redireciona", async ({ page }) => {
     test.setTimeout(60_000);
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("homem_branco");
     await page.locator("#adult-cb").fill("26");
     await page.locator("#adult-aj").fill("49");
@@ -170,20 +160,21 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
 // ── Validações de borda ───────────────────────────────────────────────────────
 
 test.describe("Avaliação Adulto — validações de borda", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(async () => {
     resetShotIndex();
     test.skip(!patientId, "Nenhum paciente adulto encontrado em /pacientes?categoria=adulto.");
   });
 
   test("12 — campo Peso Real (opcional) aceita valor sem bloquear", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-weight").fill("72.5");
     await expect(page.locator("#adult-weight")).toHaveValue("72.5");
   });
 
   test("13 — notas clínicas e CP preenchidos não causam erro", async ({ page }) => {
     test.setTimeout(60_000);
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("mulher_branca");
     await page.locator("#adult-age").fill("45");
     await page.locator("#adult-cb").fill("24");

@@ -811,6 +811,40 @@ export function ChecklistFillWizard({
     return () => document.removeEventListener("click", handleClickCapture, true);
   }, [formLocked]);
 
+  /**
+   * Persiste itens dirty via sendBeacon ao fechar aba / recarregar.
+   * sendBeacon garante a entrega mesmo após beforeunload — ao contrário de fetch.
+   * Só dispara se houver itens dirty para não gerar requisições desnecessárias.
+   */
+  useEffect(() => {
+    if (formLocked) return;
+
+    function handleBeforeUnloadBeacon() {
+      const dirty = dirtyItemIdsRef.current;
+      if (dirty.size === 0) return;
+
+      const entries = Array.from(dirty).map((itemId) => {
+        const cur = responsesRef.current[itemId];
+        return {
+          itemId,
+          outcome: cur?.outcome ?? null,
+          note: cur?.note ?? null,
+          annotation: cur?.annotation ?? null,
+          validUntil: cur?.validUntil ?? null,
+        };
+      });
+
+      const payload = JSON.stringify({ sessionId, itemResponseSource, entries });
+      navigator.sendBeacon(
+        "/api/checklists/save-beacon",
+        new Blob([payload], { type: "application/json" }),
+      );
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnloadBeacon);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnloadBeacon);
+  }, [formLocked, sessionId, itemResponseSource]);
+
   const section = sections[sectionIndex];
   const isLast = sectionIndex >= sections.length - 1;
 
@@ -983,12 +1017,17 @@ export function ChecklistFillWizard({
   function handleNext() {
     setAdvanceError(null);
     if (!section || isLast) return;
+    // Persiste itens dirty da seção atual antes de avançar — cobre o caso de
+    // fechar aba / recarregar logo após navegar entre seções.
+    saveProgressBatchRef.current("section", false);
     setSectionNavLoading(true);
     setSectionIndex((i) => i + 1);
   }
 
   function handlePrev() {
     setAdvanceError(null);
+    // Persiste itens dirty da seção atual antes de voltar.
+    saveProgressBatchRef.current("section", false);
     setSectionNavLoading(true);
     setSectionIndex((i) => Math.max(0, i - 1));
   }

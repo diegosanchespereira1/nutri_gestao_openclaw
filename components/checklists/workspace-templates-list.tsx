@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2, Pencil, Archive, Play } from "lucide-react";
+import { Loader2, Pencil, Archive, Play, FilePenLine } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { archiveWorkspaceTemplateAction } from "@/lib/actions/checklist-workspace";
+import {
+  archiveWorkspaceTemplateAction,
+  discardWorkspaceTemplateDraftAction,
+} from "@/lib/actions/checklist-workspace";
 import type { WorkspaceTemplateListRow } from "@/lib/actions/checklist-workspace";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +45,8 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
   const router = useRouter();
   const [archivingTpl, setArchivingTpl] =
     useState<WorkspaceTemplateListRow | null>(null);
+  const [discardingTpl, setDiscardingTpl] =
+    useState<WorkspaceTemplateListRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -59,6 +64,20 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
     });
   }
 
+  function confirmDiscard() {
+    if (!discardingTpl) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await discardWorkspaceTemplateDraftAction(discardingTpl.id);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setDiscardingTpl(null);
+      router.refresh();
+    });
+  }
+
   if (templates.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border p-10 text-center">
@@ -70,7 +89,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
           estabelecimento.
         </p>
         <Link
-          href="/checklists/novo"
+          href="/checklists/novo?novo=1"
           className={cn(buttonVariants({ size: "sm" }), "mt-4")}
         >
           + Criar checklist personalizado
@@ -90,6 +109,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
               className={cn(
                 "min-w-0 rounded-xl border bg-card p-4 shadow-xs transition-colors",
                 highlighted ? "border-primary ring-2 ring-primary/20" : "border-border",
+                tpl.is_draft && "border-dashed border-amber-300 bg-amber-50/40",
               )}
             >
               <div className="min-w-0">
@@ -97,9 +117,15 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
                     Equipe
                   </span>
-                  <Badge variant="outline" className="font-mono text-[10px]">
-                    v{tpl.version}
-                  </Badge>
+                  {tpl.is_draft ? (
+                    <Badge variant="secondary" className="text-[10px]">
+                      Rascunho
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      v{tpl.version}
+                    </Badge>
+                  )}
                 </div>
                 <p className="mt-2 truncate text-sm font-semibold text-foreground">
                   {tpl.name}
@@ -130,37 +156,68 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 </div>
               </div>
 
-              {tpl.has_been_used && (
+              {tpl.is_draft ? (
+                <p className="mt-3 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                  Rascunho salvo ao adicionar seção ou item. Continue a edição ou
+                  publique quando estiver pronto.
+                </p>
+              ) : null}
+
+              {!tpl.is_draft && tpl.has_been_used && (
                 <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
                   Modelo em uso — edições geram nova versão e preservam o histórico.
                 </p>
               )}
 
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <Link
-                  href={`/checklists?workspace_template=${tpl.id}`}
-                  className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
-                >
-                  <Play className="size-3.5" />
-                  Preencher
-                </Link>
-                <Link
-                  href={`/checklists/equipe/${tpl.id}/editar`}
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full sm:w-auto")}
-                >
-                  <Pencil className="size-3.5" />
-                  Editar
-                </Link>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-destructive hover:text-destructive sm:w-auto"
-                  onClick={() => setArchivingTpl(tpl)}
-                >
-                  <Archive className="size-3.5" />
-                  Arquivar
-                </Button>
+                {tpl.is_draft ? (
+                  <>
+                    <Link
+                      href={`/checklists/novo?draft=${tpl.id}`}
+                      className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
+                    >
+                      <FilePenLine className="size-3.5" />
+                      Continuar rascunho
+                    </Link>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-destructive hover:text-destructive sm:w-auto"
+                      onClick={() => setDiscardingTpl(tpl)}
+                    >
+                      <Archive className="size-3.5" />
+                      Descartar
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href={`/checklists?workspace_template=${tpl.id}`}
+                      className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
+                    >
+                      <Play className="size-3.5" />
+                      Preencher
+                    </Link>
+                    <Link
+                      href={`/checklists/equipe/${tpl.id}/editar`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full sm:w-auto")}
+                    >
+                      <Pencil className="size-3.5" />
+                      Editar
+                    </Link>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-destructive hover:text-destructive sm:w-auto"
+                      onClick={() => setArchivingTpl(tpl)}
+                    >
+                      <Archive className="size-3.5" />
+                      Arquivar
+                    </Button>
+                  </>
+                )}
               </div>
             </li>
           );
@@ -217,6 +274,60 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 </>
               ) : (
                 "Arquivar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={discardingTpl !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDiscardingTpl(null);
+            setError(null);
+          }
+        }}
+      >
+        <DialogContent showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Descartar rascunho?</DialogTitle>
+            <DialogDescription>
+              O rascunho &quot;{discardingTpl?.name}&quot; será excluído
+              permanentemente. Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setDiscardingTpl(null)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              onClick={confirmDiscard}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Descartando…
+                </>
+              ) : (
+                "Descartar rascunho"
               )}
             </Button>
           </DialogFooter>

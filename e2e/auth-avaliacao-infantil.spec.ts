@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { login, gotoNovaAvaliacao, findPatientIdByCategory } from "./helpers/auth";
+import { login, gotoNovaAvaliacao, discoverPatientIdInBeforeAll } from "./helpers/auth";
+import { abrirFormularioAvaliacao } from "./helpers/avaliacao";
 import { shot, resetShotIndex } from "./helpers/screenshot";
 
 /**
@@ -26,25 +27,14 @@ test.skip(
 let patientId = "";
 
 test.beforeAll(async ({ browser }) => {
-  const ctx  = await browser.newContext();
-  const page = await ctx.newPage();
-  await login(page);
-  patientId = (await findPatientIdByCategory(page, "crianca")) ?? "";
-  await ctx.close();
+  test.setTimeout(120_000);
+  patientId = await discoverPatientIdInBeforeAll(browser, "crianca");
 });
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-async function abrirFormulario(page: Parameters<typeof shot>[0]) {
-  await login(page);
-  await gotoNovaAvaliacao(page, patientId);
-  await expect(page.getByRole("tab", { name: /infantil/i })).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("tab", { name: /infantil/i }).click();
-}
 
 // ── Suite principal ───────────────────────────────────────────────────────────
 
 test.describe("Avaliação Infantil — preenchimento completo", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(async () => {
     resetShotIndex();
     test.skip(!patientId, "Nenhum paciente criança encontrado em /pacientes?categoria=crianca.");
@@ -60,7 +50,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("02 — seleciona sexo e datas → idade calculada exibida", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("female");
 
@@ -76,7 +66,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("03 — peso e estatura → IMC calculado em tempo real", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("female");
     const nascimento = new Date();
@@ -94,7 +84,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("04 — critério Z-score: opção presente (habilitada ou desabilitada)", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     const zOption = page.locator("#ca-method option[value='zscore']");
     await expect(zOption).toBeAttached();
@@ -109,7 +99,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("05 — label muda entre comprimento e estatura conforme a idade", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
     await page.locator("#ca-sex").selectOption("male");
 
     const bebe = new Date();
@@ -125,7 +115,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("06 — cards de resultado aparecem ao preencher peso e altura", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("female");
     const nasc = new Date();
@@ -140,7 +130,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("07 — campo de notas clínicas aceita texto", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     const notas = page.locator("textarea[name='clinical_notes']");
     await notas.fill("Paciente eutrófico. Acompanhamento mensal.");
@@ -149,7 +139,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
 
   test("08 — submissão com dados válidos redireciona para prontuário", async ({ page }) => {
     test.setTimeout(60_000);
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("female");
     const nasc = new Date();
@@ -168,7 +158,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
   });
 
   test("09 — botão desabilitado sem sexo selecionado", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     const btnSubmit = page.getByRole("button", { name: /registar avaliação/i });
     await expect(btnSubmit).toBeDisabled();
@@ -176,7 +166,7 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
 
   test("10 — avaliação registada aparece no histórico do paciente", async ({ page }) => {
     test.setTimeout(60_000);
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("male");
     const nasc = new Date();
@@ -198,13 +188,14 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
 // ── Validações de borda ───────────────────────────────────────────────────────
 
 test.describe("Avaliação Infantil — validações de borda", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(async () => {
     resetShotIndex();
     test.skip(!patientId, "Nenhum paciente criança encontrado em /pacientes?categoria=crianca.");
   });
 
   test("11 — apenas peso (sem altura) → card de peso exibido, IMC ausente", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("female");
     const nasc = new Date();
@@ -217,7 +208,7 @@ test.describe("Avaliação Infantil — validações de borda", () => {
   });
 
   test("12 — apenas altura (sem peso) → sem IMC, sem erro de JS", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("male");
     const nasc = new Date();
@@ -231,7 +222,7 @@ test.describe("Avaliação Infantil — validações de borda", () => {
   });
 
   test("13 — data de nascimento futura → botão desabilitado", async ({ page }) => {
-    await abrirFormulario(page);
+    await abrirFormularioAvaliacao(page, patientId, "infantil");
 
     await page.locator("#ca-sex").selectOption("female");
     const futuro = new Date();

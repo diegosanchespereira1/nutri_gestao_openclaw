@@ -9,7 +9,7 @@ import styles from "./page-loading-screen.module.css";
 export type PageLoadingScreenMode = "overlay" | "content-overlay" | "inline";
 
 type Props = {
-  /** `overlay` cobre a viewport; `inline` ocupa a área do conteúdo da página. */
+  /** `overlay` cobre a viewport; `content-overlay` cobre só a área principal (respeita sidebar ≥ lg); `inline` no fluxo da página. */
   mode?: PageLoadingScreenMode;
   /** Texto opcional abaixo do subtítulo (ex.: "Carregando checklists…"). */
   hint?: string;

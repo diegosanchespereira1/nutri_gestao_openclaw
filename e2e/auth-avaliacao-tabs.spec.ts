@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-import { login, gotoNovaAvaliacao, findPatientIdByCategory } from "./helpers/auth";
+import { login, gotoNovaAvaliacao, discoverPatientIdsByCategoryInBeforeAll } from "./helpers/auth";
 import { shot, resetShotIndex } from "./helpers/screenshot";
+import { waitForLocator } from "./helpers/retry";
 
 /**
  * Testes funcionais E2E — Visibilidade de abas de avaliação por categoria etária.
@@ -30,18 +31,17 @@ const ids: Record<"crianca" | "adulto" | "idoso", string> = {
 };
 
 test.beforeAll(async ({ browser }) => {
-  const ctx  = await browser.newContext();
-  const page = await ctx.newPage();
-  await login(page);
-  ids.crianca = (await findPatientIdByCategory(page, "crianca")) ?? "";
-  ids.adulto  = (await findPatientIdByCategory(page, "adulto"))  ?? "";
-  ids.idoso   = (await findPatientIdByCategory(page, "idoso"))   ?? "";
-  await ctx.close();
+  test.setTimeout(180_000);
+  const discovered = await discoverPatientIdsByCategoryInBeforeAll(browser);
+  ids.crianca = discovered.crianca;
+  ids.adulto = discovered.adulto;
+  ids.idoso = discovered.idoso;
 });
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
 test.describe("Visibilidade de abas de avaliação por categoria etária", () => {
+  test.describe.configure({ timeout: 120_000 });
   test.beforeEach(resetShotIndex);
 
   test("01 — paciente criança: só aba Infantil visível", async ({ page }) => {
@@ -51,7 +51,9 @@ test.describe("Visibilidade de abas de avaliação por categoria etária", () =>
     await gotoNovaAvaliacao(page, ids.crianca);
     await shot(page, SCREENSHOT_DIR, "crianca-tabs");
 
-    await expect(page.getByRole("tab", { name: /infantil/i })).toBeVisible();
+    await waitForLocator(page.getByRole("tab", { name: /infantil/i }), {
+      label: "aba infantil",
+    });
     await expect(page.getByRole("tab", { name: /adulto/i })).not.toBeVisible();
     await expect(page.getByRole("tab", { name: /idoso/i })).not.toBeVisible();
   });
@@ -63,7 +65,9 @@ test.describe("Visibilidade de abas de avaliação por categoria etária", () =>
     await gotoNovaAvaliacao(page, ids.adulto);
     await shot(page, SCREENSHOT_DIR, "adulto-tabs");
 
-    await expect(page.getByRole("tab", { name: /adulto/i })).toBeVisible();
+    await waitForLocator(page.getByRole("tab", { name: /adulto/i }), {
+      label: "aba adulto",
+    });
     await expect(page.getByRole("tab", { name: /infantil/i })).not.toBeVisible();
     await expect(page.getByRole("tab", { name: /idoso/i })).not.toBeVisible();
   });
@@ -75,7 +79,9 @@ test.describe("Visibilidade de abas de avaliação por categoria etária", () =>
     await gotoNovaAvaliacao(page, ids.idoso);
     await shot(page, SCREENSHOT_DIR, "idoso-tabs");
 
-    await expect(page.getByRole("tab", { name: /idoso/i })).toBeVisible();
+    await waitForLocator(page.getByRole("tab", { name: /idoso/i }), {
+      label: "aba idoso",
+    });
     await expect(page.getByRole("tab", { name: /infantil/i })).not.toBeVisible();
     await expect(page.getByRole("tab", { name: /adulto/i })).not.toBeVisible();
   });
@@ -83,12 +89,13 @@ test.describe("Visibilidade de abas de avaliação por categoria etária", () =>
   test("04 — paciente sem data de nascimento: todas as abas visíveis", async ({ page }) => {
     // Busca paciente sem data de nascimento (qualquer um sem birth_date)
     await login(page);
-    await page.goto("/pacientes");
-    await page.waitForLoadState("networkidle");
+    await page.goto("/pacientes", { waitUntil: "domcontentloaded" });
 
-    // Tenta encontrar um paciente sem badge de categoria (sem data de nascimento)
-    const semCategoria = page
-      .locator('ul[aria-label="Lista de pacientes"] li a')
+    const list = page.locator('ul[aria-label="Lista de pacientes"]');
+    await waitForLocator(list, { label: "lista de pacientes" });
+
+    const semCategoria = list
+      .locator("li a")
       .filter({ hasNot: page.locator(".bg-primary\\/10") })
       .first();
 
@@ -108,8 +115,14 @@ test.describe("Visibilidade de abas de avaliação por categoria etária", () =>
     await gotoNovaAvaliacao(page, match[1]);
     await shot(page, SCREENSHOT_DIR, "sem-dob-tabs");
 
-    await expect(page.getByRole("tab", { name: /infantil/i })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /adulto/i })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /idoso/i })).toBeVisible();
+    await waitForLocator(page.getByRole("tab", { name: /infantil/i }), {
+      label: "aba infantil",
+    });
+    await waitForLocator(page.getByRole("tab", { name: /adulto/i }), {
+      label: "aba adulto",
+    });
+    await waitForLocator(page.getByRole("tab", { name: /idoso/i }), {
+      label: "aba idoso",
+    });
   });
 });

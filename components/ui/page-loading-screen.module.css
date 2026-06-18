@@ -29,9 +29,20 @@
 
 .contentOverlay {
   position: fixed;
-  inset: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  top: calc(var(--safe-area-top, env(safe-area-inset-top, 0px)) + 3.5rem);
   /* Abaixo de Dialog/AlertDialog (z-50) para nunca cobrir confirmações (ex.: sair do checklist). */
   z-index: 45;
+}
+
+@media (min-width: 1024px) {
+  .contentOverlay {
+    top: 0;
+    /* Sidebar fixa w-60 — overlay só na área principal. */
+    left: 15rem;
+  }
 }
 
 .inline {

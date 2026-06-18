@@ -6,24 +6,6 @@ import { PageHelpHint } from "@/components/help/page-help-hint";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 
-function ChecklistCatalogSkeleton() {
-  return (
-    <div
-      className="space-y-4 rounded-xl border border-border bg-card p-6"
-      role="status"
-      aria-live="polite"
-      aria-label="Carregando catálogo"
-    >
-      <div className="h-10 animate-pulse rounded-lg bg-muted" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default async function ChecklistsPage({
   searchParams,
 }: {
@@ -101,8 +83,14 @@ export default async function ChecklistsPage({
           Não foi possível criar o modelo personalizado. Tente novamente.
         </p>
       ) : null}
+      {err === "draft" ? (
+        <p className="text-destructive text-sm" role="alert">
+          Não foi possível iniciar o rascunho do checklist personalizado. Tente
+          novamente em instantes.
+        </p>
+      ) : null}
 
-      <Suspense fallback={<ChecklistCatalogSkeleton />}>
+      <Suspense fallback={null}>
         <ChecklistCatalogSection
           focusTemplateId={focusTemplateId}
           focusWorkspaceTemplateId={focusWorkspaceTemplateId}

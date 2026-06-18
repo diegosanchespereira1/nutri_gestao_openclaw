@@ -11,6 +11,7 @@ import type {
   ChecklistTemplateItemRow,
   ChecklistTemplateRow,
   ChecklistTemplateSectionRow,
+  ChecklistTemplateSectionWithItems,
   ChecklistTemplateWithSections,
 } from "@/lib/types/checklists";
 
@@ -150,16 +151,88 @@ async function queryActiveChecklistCatalog(
   return assembleTemplates(templatesRaw, sectionsRaw, itemsRaw);
 }
 
+/**
+ * Catálogo leve para listagem: metadados + contagens, sem descrições de itens.
+ * Reduz drasticamente o payload em relação ao join aninhado completo.
+ */
+async function queryActiveChecklistCatalogSummary(
+  supabase: SupabaseClient,
+): Promise<ChecklistTemplateWithSections[]> {
+  const { data: rpcRows, error: rpcError } = await supabase.rpc(
+    "list_active_checklist_catalog_summary",
+  );
+
+  if (!rpcError && rpcRows?.length) {
+    return (rpcRows as Record<string, unknown>[]).map((raw) => {
+      const base = mapTemplateRow(raw);
+      return {
+        ...base,
+        sections: [],
+        required_item_count: Number(raw.required_item_count ?? 0),
+        total_item_count: Number(raw.total_item_count ?? 0),
+      };
+    });
+  }
+
+  const { data: templatesRaw, error } = await supabase
+    .from("checklist_templates")
+    .select("*")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error || !templatesRaw?.length) return [];
+
+  const templateIds = templatesRaw.map((t) => String(t.id));
+  const countsByTemplate = new Map<string, { total: number; required: number }>();
+  for (const id of templateIds) countsByTemplate.set(id, { total: 0, required: 0 });
+
+  if (templateIds.length > 0) {
+    const { data: itemRows } = await supabase
+      .from("checklist_template_items")
+      .select(
+        "is_required, is_structure_only, checklist_template_sections!inner(template_id)",
+      )
+      .in("checklist_template_sections.template_id", templateIds);
+
+    for (const row of itemRows ?? []) {
+      const nested = row.checklist_template_sections as
+        | { template_id: string }
+        | { template_id: string }[]
+        | null;
+      const templateId = String(
+        Array.isArray(nested) ? nested[0]?.template_id : nested?.template_id,
+      );
+      if (!templateId) continue;
+      if (row.is_structure_only) continue;
+      const cur = countsByTemplate.get(templateId) ?? { total: 0, required: 0 };
+      cur.total += 1;
+      if (row.is_required) cur.required += 1;
+      countsByTemplate.set(templateId, cur);
+    }
+  }
+
+  return templatesRaw.map((raw) => {
+    const base = mapTemplateRow(raw as Record<string, unknown>);
+    const counts = countsByTemplate.get(base.id) ?? { total: 0, required: 0 };
+    return {
+      ...base,
+      sections: [],
+      required_item_count: counts.required,
+      total_item_count: counts.total,
+    };
+  });
+}
+
 /** Catálogo global — leitura idêntica para todos; service role evita cookies no cache. */
 async function fetchActiveChecklistCatalogCached(): Promise<
   ChecklistTemplateWithSections[]
 > {
-  return queryActiveChecklistCatalog(createServiceRoleClient());
+  return queryActiveChecklistCatalogSummary(createServiceRoleClient());
 }
 
 const getCachedActiveChecklistCatalog = unstable_cache(
   fetchActiveChecklistCatalogCached,
-  ["checklist-catalog-active-v1"],
+  ["checklist-catalog-active-v3"],
   { revalidate: 300, tags: ["checklist-catalog"] },
 );
 
@@ -173,7 +246,7 @@ export async function loadChecklistCatalog(): Promise<{
     const templates = await getCachedActiveChecklistCatalog();
     return { templates };
   } catch {
-    const templates = await queryActiveChecklistCatalog(supabase);
+    const templates = await queryActiveChecklistCatalogSummary(supabase);
     return { templates };
   }
 }
@@ -181,8 +254,45 @@ export async function loadChecklistCatalog(): Promise<{
 export async function getChecklistTemplateWithItems(
   templateId: string,
 ): Promise<ChecklistTemplateWithSections | null> {
-  const { templates } = await loadChecklistCatalog();
-  return templates.find((t) => t.id === templateId) ?? null;
+  const { supabase, user } = await getServerUser();
+  if (!user) return null;
+  return loadChecklistTemplateBundleByIdDirect(supabase, templateId);
+}
+
+/** Seções e itens de um template — para expandir o cartão no catálogo. */
+export async function loadChecklistTemplatePreviewAction(
+  templateId: string,
+): Promise<ChecklistTemplateSectionWithItems[] | null> {
+  const { supabase, user } = await getServerUser();
+  if (!user) return null;
+
+  const id = templateId.trim();
+  if (!id) return null;
+
+  try {
+    const bundle = await getCachedChecklistTemplatePreview(id);
+    return bundle?.sections ?? null;
+  } catch {
+    const bundle = await loadChecklistTemplateBundleByIdDirect(supabase, id);
+    return bundle?.sections ?? null;
+  }
+}
+
+async function fetchChecklistTemplatePreviewCached(
+  templateId: string,
+): Promise<ChecklistTemplateWithSections | null> {
+  return loadChecklistTemplateBundleByIdDirect(
+    createServiceRoleClient(),
+    templateId,
+  );
+}
+
+function getCachedChecklistTemplatePreview(templateId: string) {
+  return unstable_cache(
+    () => fetchChecklistTemplatePreviewCached(templateId),
+    ["checklist-template-preview-v1", templateId],
+    { revalidate: 300, tags: ["checklist-catalog", `checklist-template-${templateId}`] },
+  )();
 }
 
 /** Catálogo por ID (inclui template inativo) — sessões de preenchimento já iniciadas. */

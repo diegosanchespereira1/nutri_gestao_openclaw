@@ -124,6 +124,54 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-dev
 
   # ──────────────────────────────────────────────────────────────────────────
+  # E2E funcional — checklist do cliente Hospital TESTE:
+  # preencher itens como Conforme → finalizar → assinar → aprovar → gerar PDF.
+  # Requer secrets E2E_EMAIL, E2E_PASSWORD e E2E_SUPABASE_URL (ou equivalente).
+  # Sem credenciais E2E o spec é ignorado automaticamente (test.skip).
+  # ──────────────────────────────────────────────────────────────────────────
+  e2e-checklist-hospital:
+    name: E2E — checklist Hospital TESTE
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL || 'https://example.supabase.co' }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.test' }}
+      NEXT_PUBLIC_APP_VERSION: "0.0.0-ci"
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Run checklist Hospital TESTE (E2E)
+        run: npm run test:e2e -- e2e/auth-checklist-hospital-teste.spec.ts
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-checklist-hospital
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Build de verificação Android (APK debug, sem assinatura).
   # Garante que o projeto nativo compila. O app é uma casca Capacitor que
   # aponta para a URL de produção, então não depende do build do Next.js.

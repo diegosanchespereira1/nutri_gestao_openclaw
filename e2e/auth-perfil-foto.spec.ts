@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+import { login } from "./helpers/auth";
 
 /**
  * Testes funcionais autenticados — login e upload de foto de perfil.
@@ -25,14 +27,6 @@ const TINY_JPEG = Buffer.from(
   "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
   "base64",
 );
-
-async function login(page: Page) {
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(E2E_EMAIL);
-  await page.getByLabel("Senha", { exact: true }).fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: "Entrar" }).click();
-  await page.waitForURL(/\/(inicio|onboarding)/, { timeout: 30_000 });
-}
 
 test.describe("Autenticação", () => {
   test("login com credenciais válidas entra na aplicação", async ({ page }) => {

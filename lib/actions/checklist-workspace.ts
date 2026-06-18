@@ -1,16 +1,23 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 
 function invalidateWorkspaceCatalogCache(workspaceOwnerId: string) {
   revalidateTag(`workspace-catalog-${workspaceOwnerId}`, "max");
 }
 import { redirect } from "next/navigation";
 
+import { logApplicationActivityAction } from "@/lib/actions/application-activity";
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
+import {
+  WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME,
+  normalizeDraftTemplateInput,
+} from "@/lib/checklists/workspace-template-draft";
+import { persistWorkspaceTemplateStructure } from "@/lib/checklists/workspace-template-persist";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
@@ -33,6 +40,8 @@ export type WorkspaceTemplateListRow = {
   updated_at: string;
   /** true quando já existe ao menos 1 sessão de preenchimento usando este modelo. */
   has_been_used: boolean;
+  /** Rascunho em criação (autosave) — ainda não publicado no catálogo. */
+  is_draft: boolean;
 };
 
 export type WorkspaceEditItem = {
@@ -58,6 +67,8 @@ export type WorkspaceTemplateLoadResult = {
   version: number;
   fill_session_count: number;
   archived_at: string | null;
+  published_at: string | null;
+  is_draft: boolean;
   sections: Array<{
     id: string;
     title: string;
@@ -75,6 +86,10 @@ export type WorkspaceActionResult =
   | { ok: true; id: string }
   | { ok: false; error: string };
 
+export type WorkspaceDraftSaveResult =
+  | { ok: true; id: string; sections: WorkspaceEditSection[] }
+  | { ok: false; error: string };
+
 /* ─── Carregamento ─────────────────────────────────────────────────────── */
 
 async function fetchWorkspaceTemplatesForCatalogRows(
@@ -83,7 +98,7 @@ async function fetchWorkspaceTemplatesForCatalogRows(
 ): Promise<WorkspaceTemplateListRow[]> {
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, name, created_by_user_id, version, updated_at")
+    .select("id, name, created_by_user_id, version, updated_at, published_at")
     .eq("owner_user_id", workspaceOwnerId)
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
@@ -163,17 +178,113 @@ async function fetchWorkspaceTemplatesForCatalogRows(
     version: Number(t.version ?? 1),
     updated_at: String(t.updated_at),
     has_been_used: usedTemplateIds.has(String(t.id)),
+    is_draft: t.published_at === null,
   }));
+}
+
+/** Variante leve para a página /checklists — sem perfis nem verificação de sessões. */
+async function fetchWorkspaceTemplatesForCatalogLightRows(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
+): Promise<WorkspaceTemplateListRow[]> {
+  const { data: templates, error } = await supabase
+    .from("checklist_workspace_templates")
+    .select("id, name, created_by_user_id, version, updated_at, published_at")
+    .eq("owner_user_id", workspaceOwnerId)
+    .is("archived_at", null)
+    .order("updated_at", { ascending: false });
+
+  if (error || !templates || templates.length === 0) return [];
+
+  const templateIds = templates.map((t) => String(t.id));
+
+  const { data: sectionRows } = await supabase
+    .from("checklist_workspace_sections")
+    .select("id, workspace_template_id")
+    .in("workspace_template_id", templateIds);
+
+  const sectionIds = (sectionRows ?? []).map((s) => String(s.id));
+  const sectionToTemplate = new Map<string, string>();
+  for (const s of sectionRows ?? []) {
+    sectionToTemplate.set(String(s.id), String(s.workspace_template_id));
+  }
+
+  const counts = new Map<string, { total: number; required: number }>();
+  for (const id of templateIds) counts.set(id, { total: 0, required: 0 });
+
+  if (sectionIds.length > 0) {
+    const { data: itemRows } = await supabase
+      .from("checklist_workspace_items")
+      .select("workspace_section_id, is_required")
+      .in("workspace_section_id", sectionIds);
+
+    for (const item of itemRows ?? []) {
+      const tid = sectionToTemplate.get(String(item.workspace_section_id));
+      if (!tid) continue;
+      const cur = counts.get(tid) ?? { total: 0, required: 0 };
+      cur.total += 1;
+      if (item.is_required) cur.required += 1;
+      counts.set(tid, cur);
+    }
+  }
+
+  return templates.map((t) => ({
+    id: String(t.id),
+    name: String(t.name),
+    created_by_user_id: String(t.created_by_user_id),
+    created_by_name: null,
+    total_item_count: counts.get(String(t.id))?.total ?? 0,
+    required_item_count: counts.get(String(t.id))?.required ?? 0,
+    version: Number(t.version ?? 1),
+    updated_at: String(t.updated_at),
+    has_been_used: false,
+    is_draft: t.published_at === null,
+  }));
+}
+
+function getCachedWorkspaceCatalogRows(workspaceOwnerId: string) {
+  return unstable_cache(
+    () =>
+      fetchWorkspaceTemplatesForCatalogRows(
+        createServiceRoleClient(),
+        workspaceOwnerId,
+      ),
+    ["workspace-catalog-v1", workspaceOwnerId],
+    {
+      revalidate: 120,
+      tags: [`workspace-catalog-${workspaceOwnerId}`],
+    },
+  )();
 }
 
 /** Lista todos os modelos do workspace (não arquivados). */
 export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   rows: WorkspaceTemplateListRow[];
 }> {
+  const { user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return { rows: [] };
+
+  try {
+    const rows = await getCachedWorkspaceCatalogRows(workspaceOwnerId);
+    return { rows };
+  } catch {
+    const { supabase } = await getServerContext();
+    const rows = await fetchWorkspaceTemplatesForCatalogRows(
+      supabase,
+      workspaceOwnerId,
+    );
+    return { rows };
+  }
+}
+
+/** Lista modelos da equipe para o catálogo principal (sem metadados extras). */
+export async function loadWorkspaceTemplatesForCatalogLight(): Promise<{
+  rows: WorkspaceTemplateListRow[];
+}> {
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user || !workspaceOwnerId) return { rows: [] };
 
-  const rows = await fetchWorkspaceTemplatesForCatalogRows(
+  const rows = await fetchWorkspaceTemplatesForCatalogLightRows(
     supabase,
     workspaceOwnerId,
   );
@@ -181,21 +292,15 @@ export async function loadWorkspaceTemplatesForCatalog(): Promise<{
 }
 
 /** Estrutura para o builder de edição. */
-export async function loadWorkspaceTemplateForEdit(
+async function loadWorkspaceTemplateForEditWithClient(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
   id: string,
 ): Promise<WorkspaceTemplateLoadResult | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-
   const [{ data: template }, { count: fillSessionCount }] = await Promise.all([
     supabase
       .from("checklist_workspace_templates")
-      .select("id, name, version, archived_at, owner_user_id")
+      .select("id, name, version, archived_at, published_at, owner_user_id")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -244,6 +349,8 @@ export async function loadWorkspaceTemplateForEdit(
     version: Number(template.version ?? 1),
     fill_session_count: fillSessionCount ?? 0,
     archived_at: template.archived_at as string | null,
+    published_at: (template.published_at as string | null) ?? null,
+    is_draft: template.published_at === null,
     sections: (sections ?? []).map((sec) => ({
       id: String(sec.id),
       title: String(sec.title),
@@ -251,6 +358,14 @@ export async function loadWorkspaceTemplateForEdit(
       items: itemsBySection.get(String(sec.id)) ?? [],
     })),
   };
+}
+
+export async function loadWorkspaceTemplateForEdit(
+  id: string,
+): Promise<WorkspaceTemplateLoadResult | null> {
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return null;
+  return loadWorkspaceTemplateForEditWithClient(supabase, workspaceOwnerId, id);
 }
 
 /** Carrega no formato unificado para reusar o wizard de preenchimento. */
@@ -347,29 +462,6 @@ export async function loadWorkspaceTemplateBundle(
 
 /* ─── Mutations ────────────────────────────────────────────────────────── */
 
-async function bumpWorkspaceVersionIfApplied(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  templateId: string,
-): Promise<void> {
-  const { count } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_template_id", templateId);
-
-  if (!count || count <= 0) return;
-
-  const { data: template } = await supabase
-    .from("checklist_workspace_templates")
-    .select("version")
-    .eq("id", templateId)
-    .maybeSingle();
-
-  await supabase
-    .from("checklist_workspace_templates")
-    .update({ version: Number(template?.version ?? 1) + 1 })
-    .eq("id", templateId);
-}
-
 function sanitizeInput(input: WorkspaceTemplateInput): {
   ok: true;
   name: string;
@@ -415,6 +507,285 @@ function sanitizeInput(input: WorkspaceTemplateInput): {
   return { ok: true, name, sections };
 }
 
+async function assertWorkspaceTemplateDraft(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  templateId: string,
+  workspaceOwnerId: string,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: existing } = await supabase
+    .from("checklist_workspace_templates")
+    .select("id, owner_user_id, archived_at, published_at, created_by_user_id")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!existing || existing.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Rascunho não encontrado." };
+  }
+  if (existing.archived_at) {
+    return { ok: false, error: "Rascunho arquivado não pode ser editado." };
+  }
+  if (existing.published_at !== null) {
+    return { ok: false, error: "Este modelo já foi publicado." };
+  }
+  if (existing.created_by_user_id !== userId) {
+    return { ok: false, error: "Sem permissão para editar este rascunho." };
+  }
+  return { ok: true };
+}
+
+async function createEmptyWorkspaceTemplateDraft(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceOwnerId: string,
+  userId: string,
+): Promise<WorkspaceActionResult> {
+  const { data: tpl, error: tErr } = await supabase
+    .from("checklist_workspace_templates")
+    .insert({
+      owner_user_id: workspaceOwnerId,
+      created_by_user_id: userId,
+      name: WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME,
+      published_at: null,
+    })
+    .select("id")
+    .single();
+
+  if (tErr || !tpl) {
+    return { ok: false, error: "Não foi possível iniciar o rascunho." };
+  }
+
+  const templateId = String(tpl.id);
+  const { data: secRow, error: sErr } = await supabase
+    .from("checklist_workspace_sections")
+    .insert({
+      workspace_template_id: templateId,
+      title: "Geral",
+      position: 0,
+    })
+    .select("id")
+    .single();
+
+  if (sErr || !secRow) {
+    await supabase.from("checklist_workspace_templates").delete().eq("id", templateId);
+    return { ok: false, error: "Não foi possível iniciar o rascunho." };
+  }
+
+  const { error: iErr } = await supabase.from("checklist_workspace_items").insert({
+    workspace_section_id: secRow.id as string,
+    description: "",
+    is_required: false,
+    position: 0,
+  });
+
+  if (iErr) {
+    await supabase.from("checklist_workspace_templates").delete().eq("id", templateId);
+    return { ok: false, error: "Não foi possível iniciar o rascunho." };
+  }
+
+  await logApplicationActivityAction({
+    eventType: "checklist_workspace_draft_started",
+    entityType: "checklist_workspace_templates",
+    entityId: templateId,
+    metadata: { name: WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME },
+  });
+
+  return { ok: true, id: templateId };
+}
+
+/** Garante um rascunho ativo para a página de criação. */
+export async function ensureWorkspaceTemplateDraftForPage(
+  preferredDraftId?: string,
+  options?: { forceNew?: boolean },
+): Promise<WorkspaceTemplateLoadResult | null> {
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return null;
+
+  let templateId: string | null = null;
+
+  if (!options?.forceNew && preferredDraftId) {
+    const allowed = await assertWorkspaceTemplateDraft(
+      supabase,
+      preferredDraftId,
+      workspaceOwnerId,
+      user.id,
+    );
+    if (allowed.ok) templateId = preferredDraftId;
+  }
+
+  if (!options?.forceNew && !templateId) {
+    const { data: existing } = await supabase
+      .from("checklist_workspace_templates")
+      .select("id")
+      .eq("owner_user_id", workspaceOwnerId)
+      .eq("created_by_user_id", user.id)
+      .is("published_at", null)
+      .is("archived_at", null)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (existing) templateId = String(existing.id);
+  }
+
+  if (!templateId) {
+    const created = await createEmptyWorkspaceTemplateDraft(
+      supabase,
+      workspaceOwnerId,
+      user.id,
+    );
+    if (!created.ok) return null;
+    templateId = created.id;
+  }
+
+  return loadWorkspaceTemplateForEditWithClient(supabase, workspaceOwnerId, templateId);
+}
+
+/** Autosave do rascunho durante a criação (validação relaxada). */
+export async function saveWorkspaceTemplateDraftAction(
+  templateId: string,
+  input: WorkspaceTemplateInput,
+): Promise<WorkspaceDraftSaveResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await assertWorkspaceTemplateDraft(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    user.id,
+  );
+  if (!allowed.ok) return allowed;
+
+  const normalized = normalizeDraftTemplateInput(input);
+  const persisted = await persistWorkspaceTemplateStructure(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    normalized,
+    { isDraft: true, bumpVersionIfUsed: false },
+  );
+  if (!persisted.ok) return persisted;
+
+  await logApplicationActivityAction({
+    eventType: "checklist_workspace_draft_autosaved",
+    entityType: "checklist_workspace_templates",
+    entityId: templateId,
+    metadata: {
+      name: normalized.name,
+      section_count: normalized.sections.length,
+      item_count: normalized.sections.reduce(
+        (acc, sec) => acc + sec.items.length,
+        0,
+      ),
+    },
+  });
+
+  return { ok: true, id: templateId, sections: persisted.sections };
+}
+
+/** Publica um rascunho como modelo definitivo da equipe. */
+export async function publishWorkspaceTemplateAction(
+  templateId: string,
+  input: WorkspaceTemplateInput,
+): Promise<WorkspaceActionResult> {
+  const sanitized = sanitizeInput(input);
+  if (!sanitized.ok) return sanitized;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await assertWorkspaceTemplateDraft(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    user.id,
+  );
+  if (!allowed.ok) return allowed;
+
+  const persisted = await persistWorkspaceTemplateStructure(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    sanitized,
+    { isDraft: true, bumpVersionIfUsed: false },
+  );
+  if (!persisted.ok) return persisted;
+
+  const { error: publishErr } = await supabase
+    .from("checklist_workspace_templates")
+    .update({ published_at: new Date().toISOString() })
+    .eq("id", templateId)
+    .eq("owner_user_id", workspaceOwnerId)
+    .is("published_at", null);
+
+  if (publishErr) {
+    return { ok: false, error: "Não foi possível publicar o modelo." };
+  }
+
+  await logApplicationActivityAction({
+    eventType: "checklist_workspace_draft_published",
+    entityType: "checklist_workspace_templates",
+    entityId: templateId,
+    metadata: { name: sanitized.name },
+  });
+
+  revalidatePath("/checklists");
+  revalidatePath("/checklists/equipe");
+  revalidatePath("/checklists/novo");
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
+
+  return { ok: true, id: templateId };
+}
+
+export async function discardWorkspaceTemplateDraftAction(
+  templateId: string,
+): Promise<WorkspaceActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await assertWorkspaceTemplateDraft(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    user.id,
+  );
+  if (!allowed.ok) return allowed;
+
+  const { error } = await supabase
+    .from("checklist_workspace_templates")
+    .delete()
+    .eq("id", templateId)
+    .eq("owner_user_id", workspaceOwnerId)
+    .is("published_at", null);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível descartar o rascunho." };
+  }
+
+  await logApplicationActivityAction({
+    eventType: "checklist_workspace_draft_discarded",
+    entityType: "checklist_workspace_templates",
+    entityId: templateId,
+  });
+
+  revalidatePath("/checklists/equipe");
+  revalidatePath("/checklists/novo");
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
+
+  return { ok: true, id: templateId };
+}
+
 export async function createWorkspaceTemplateAction(
   input: WorkspaceTemplateInput,
 ): Promise<WorkspaceActionResult> {
@@ -435,6 +806,7 @@ export async function createWorkspaceTemplateAction(
       owner_user_id: workspaceOwnerId,
       created_by_user_id: user.id,
       name: sanitized.name,
+      published_at: new Date().toISOString(),
     })
     .select("id")
     .single();
@@ -518,152 +890,14 @@ export async function updateWorkspaceTemplateAction(
     return { ok: false, error: "Modelo arquivado não pode ser editado." };
   }
 
-  const { error: nameErr } = await supabase
-    .from("checklist_workspace_templates")
-    .update({ name: sanitized.name })
-    .eq("id", templateId);
-  if (nameErr) return { ok: false, error: "Não foi possível salvar o nome." };
-
-  const { count: openSessionsCount } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_template_id", templateId)
-    .is("dossier_approved_at", null);
-
-  if ((openSessionsCount ?? 0) > 0) {
-    return {
-      ok: false,
-      error:
-        "Existem rascunhos em aberto usando este modelo. Aprove-os ou exclua-os antes de editar.",
-    };
-  }
-
-  const { data: oldSections } = await supabase
-    .from("checklist_workspace_sections")
-    .select("id")
-    .eq("workspace_template_id", templateId);
-
-  const oldSectionIds = (oldSections ?? []).map((s) => String(s.id));
-  const { data: oldItems } =
-    oldSectionIds.length > 0
-      ? await supabase
-          .from("checklist_workspace_items")
-          .select("id")
-          .in("workspace_section_id", oldSectionIds)
-      : { data: [] as { id: string }[] };
-
-  const oldItemIds = (oldItems ?? []).map((i) => String(i.id));
-  const usedItemIds = new Set<string>();
-  if (oldItemIds.length > 0) {
-    const { data: usedRefs } = await supabase
-      .from("checklist_fill_item_responses")
-      .select("workspace_item_id")
-      .in("workspace_item_id", oldItemIds);
-    for (const ref of usedRefs ?? []) {
-      const itemId = ref.workspace_item_id as string | null;
-      if (itemId) usedItemIds.add(itemId);
-    }
-  }
-
-  const payloadSectionIds = new Set(
-    sanitized.sections.map((sec) => sec.id).filter((id): id is string => Boolean(id)),
+  const persisted = await persistWorkspaceTemplateStructure(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    sanitized,
+    { isDraft: false, bumpVersionIfUsed: true },
   );
-  const payloadItemIds = new Set(
-    sanitized.sections
-      .flatMap((sec) => sec.items.map((it) => it.id))
-      .filter((id): id is string => Boolean(id)),
-  );
-
-  let sectionPos = 0;
-  for (const sec of sanitized.sections) {
-    let sectionId: string;
-
-    if (sec.id && payloadSectionIds.has(sec.id)) {
-      const { error: secErr } = await supabase
-        .from("checklist_workspace_sections")
-        .update({ title: sec.title, position: sectionPos })
-        .eq("id", sec.id)
-        .eq("workspace_template_id", templateId);
-      if (secErr) {
-        return { ok: false, error: "Não foi possível salvar as seções." };
-      }
-      sectionId = sec.id;
-    } else {
-      const { data: secRow, error: secErr } = await supabase
-        .from("checklist_workspace_sections")
-        .insert({
-          workspace_template_id: templateId,
-          title: sec.title,
-          position: sectionPos,
-        })
-        .select("id")
-        .single();
-      if (secErr || !secRow) {
-        return { ok: false, error: "Não foi possível salvar as seções." };
-      }
-      sectionId = String(secRow.id);
-    }
-
-    let itemPos = 0;
-    for (const it of sec.items) {
-      if (it.id && payloadItemIds.has(it.id)) {
-        const { error: itemErr } = await supabase
-          .from("checklist_workspace_items")
-          .update({
-            workspace_section_id: sectionId,
-            description: it.description,
-            is_required: it.is_required,
-            position: itemPos,
-          })
-          .eq("id", it.id);
-        if (itemErr) {
-          return { ok: false, error: "Não foi possível salvar os itens." };
-        }
-      } else {
-        const { error: itemErr } = await supabase
-          .from("checklist_workspace_items")
-          .insert({
-            workspace_section_id: sectionId,
-            description: it.description,
-            is_required: it.is_required,
-            position: itemPos,
-          });
-        if (itemErr) {
-          return { ok: false, error: "Não foi possível salvar os itens." };
-        }
-      }
-      itemPos += 1;
-    }
-
-    sectionPos += 1;
-  }
-
-  const removableItemIds = oldItemIds.filter(
-    (id) => !payloadItemIds.has(id) && !usedItemIds.has(id),
-  );
-  if (removableItemIds.length > 0) {
-    await supabase
-      .from("checklist_workspace_items")
-      .delete()
-      .in("id", removableItemIds);
-  }
-
-  for (const sectionId of oldSectionIds) {
-    if (payloadSectionIds.has(sectionId)) continue;
-    const { count: itemCount } = await supabase
-      .from("checklist_workspace_items")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_section_id", sectionId);
-    if ((itemCount ?? 0) === 0) {
-      await supabase
-        .from("checklist_workspace_sections")
-        .delete()
-        .eq("id", sectionId)
-        .eq("workspace_template_id", templateId);
-    }
-  }
-
-  await bumpWorkspaceVersionIfApplied(supabase, templateId);
+  if (!persisted.ok) return persisted;
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");
@@ -747,13 +981,14 @@ export async function startWorkspaceTemplateFill(formData: FormData): Promise<vo
 
   const { data: tpl } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, owner_user_id, archived_at")
+    .select("id, owner_user_id, archived_at, published_at")
     .eq("id", workspaceTemplateId)
     .maybeSingle();
   if (
     !tpl ||
     tpl.owner_user_id !== workspaceOwnerId ||
-    tpl.archived_at !== null
+    tpl.archived_at !== null ||
+    tpl.published_at === null
   ) {
     redirect("/checklists?err=template");
   }
@@ -827,13 +1062,14 @@ export async function startWorkspaceTemplateFillBatch(input: {
 
   const { data: tpl } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, owner_user_id, archived_at")
+    .select("id, owner_user_id, archived_at, published_at")
     .eq("id", workspaceTemplateId)
     .maybeSingle();
   if (
     !tpl ||
     tpl.owner_user_id !== workspaceOwnerId ||
-    tpl.archived_at !== null
+    tpl.archived_at !== null ||
+    tpl.published_at === null
   ) {
     return { ok: false, error: "template_not_found" };
   }
@@ -908,6 +1144,7 @@ export async function loadBaseTemplateCandidates(): Promise<
       .select("id, name, created_by_user_id")
       .eq("owner_user_id", workspaceOwnerId)
       .is("archived_at", null)
+      .not("published_at", "is", null)
       .order("name"),
   ]);
 

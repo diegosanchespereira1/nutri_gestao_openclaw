@@ -49,8 +49,12 @@ import {
 } from "@/lib/actions/establishments";
 import { saveChecklistFillBatch } from "@/lib/checklist-fill-batch-storage";
 import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
+import { loadChecklistTemplatePreviewAction } from "@/lib/actions/checklists";
 import type { EstablishmentAreaOption } from "@/lib/types/establishment-areas";
-import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
+import type {
+  ChecklistTemplateSectionWithItems,
+  ChecklistTemplateWithSections,
+} from "@/lib/types/checklists";
 import type {
   EstablishmentPickerOption,
   EstablishmentType,
@@ -215,7 +219,8 @@ export function ChecklistCatalog({
   const [isEstablishmentSearchOpen, setIsEstablishmentSearchOpen] = useState(false);
   const [alphabeticalDropdownOptions, setAlphabeticalDropdownOptions] = useState<
     EstablishmentPickerOption[]
-  >([]);
+  >(() => recentEstablishments);
+  const fullDropdownLoadedRef = useRef(false);
   const [dropdownTotal, setDropdownTotal] = useState(0);
   const [dropdownOffset, setDropdownOffset] = useState(0);
   const [isLoadingDropdownOptions, setIsLoadingDropdownOptions] = useState(false);
@@ -241,6 +246,12 @@ export function ChecklistCatalog({
   const ufFilterPanelRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
     focusTemplateId ? { [focusTemplateId]: true } : {},
+  );
+  const [sectionPreviews, setSectionPreviews] = useState<
+    Record<string, ChecklistTemplateSectionWithItems[]>
+  >({});
+  const [loadingPreview, setLoadingPreview] = useState<Record<string, boolean>>(
+    {},
   );
 
   /* Task C.3: estado de verificação de sessão em aberto */
@@ -390,11 +401,6 @@ export function ChecklistCatalog({
     }, 100);
   }, [focusWorkspaceTemplateId]);
 
-  useEffect(() => {
-    void loadDropdownOptions(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Pré-selecionar estabelecimento quando vindo de outra página via URL (?est=)
   useEffect(() => {
     if (!initialEstablishmentId) return;
@@ -513,10 +519,31 @@ export function ChecklistCatalog({
   }, [establishmentSearchTerm, selectedEstablishment]);
 
   /* ── handlers ── */
+  async function ensureTemplatePreview(templateId: string) {
+    if (sectionPreviews[templateId]) return;
+    setLoadingPreview((prev) => ({ ...prev, [templateId]: true }));
+    try {
+      const sections = await loadChecklistTemplatePreviewAction(templateId);
+      if (sections) {
+        setSectionPreviews((prev) => ({ ...prev, [templateId]: sections }));
+      }
+    } finally {
+      setLoadingPreview((prev) => ({ ...prev, [templateId]: false }));
+    }
+  }
+
   function toggleExpanded(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+    const willOpen = !expanded[id];
+    setExpanded((prev) => ({ ...prev, [id]: willOpen }));
+    if (willOpen) void ensureTemplatePreview(id);
   }
+
+  useEffect(() => {
+    if (!focusTemplateId) return;
+    void ensureTemplatePreview(focusTemplateId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTemplateId]);
 
   function selectTemplate(id: string) {
     setSelectedTemplateId((prev) => (prev === id ? null : id));
@@ -567,6 +594,7 @@ export function ChecklistCatalog({
   }
 
   function openEstablishmentSearch() {
+    void ensureDropdownOptions();
     setIsEstablishmentSearchOpen(true);
     if (selectedEstablishment) {
       setEstablishmentSearchTerm("");
@@ -613,11 +641,17 @@ export function ChecklistCatalog({
           a.label.localeCompare(b.label, "pt-BR", { sensitivity: "base" }),
         );
       });
+      fullDropdownLoadedRef.current = true;
     } catch {
       setDropdownLoadError("Não foi possível carregar a lista de empresas.");
     } finally {
       setIsLoadingDropdownOptions(false);
     }
+  }
+
+  function ensureDropdownOptions() {
+    if (fullDropdownLoadedRef.current || isLoadingDropdownOptions) return;
+    void loadDropdownOptions(true);
   }
 
   async function registerEstablishmentOpen() {
@@ -811,6 +845,7 @@ export function ChecklistCatalog({
               <div className="flex w-full min-w-0 items-center gap-2">
                 <select
                   value={establishmentId}
+                  onFocus={ensureDropdownOptions}
                   onChange={(e) => {
                     const nextId = e.target.value;
                     if (!nextId) {
@@ -1596,22 +1631,33 @@ export function ChecklistCatalog({
                         className="space-y-3 border-t border-border/50 p-4"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {t.sections.map((sec) => (
-                          <div key={sec.id}>
-                            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
-                              {sec.title}
-                            </h3>
-                            <ul className="divide-y divide-border/30 rounded-lg border border-border/50 px-3">
-                              {sec.items.map((it) => (
-                                <TemplateItemRow
-                                  key={it.id}
-                                  description={it.description}
-                                  isRequired={it.is_required}
-                                />
-                              ))}
-                            </ul>
+                        {loadingPreview[t.id] ? (
+                          <div
+                            className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground"
+                            role="status"
+                            aria-live="polite"
+                          >
+                            <Loader2 className="size-4 animate-spin" />
+                            Carregando seções e itens…
                           </div>
-                        ))}
+                        ) : (
+                          (sectionPreviews[t.id] ?? t.sections).map((sec) => (
+                            <div key={sec.id}>
+                              <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-foreground">
+                                {sec.title}
+                              </h3>
+                              <ul className="divide-y divide-border/30 rounded-lg border border-border/50 px-3">
+                                {sec.items.map((it) => (
+                                  <TemplateItemRow
+                                    key={it.id}
+                                    description={it.description}
+                                    isRequired={it.is_required}
+                                  />
+                                ))}
+                              </ul>
+                            </div>
+                          ))
+                        )}
                       </div>
                     )}
                   </div>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { WorkspaceChecklistBuilder } from "@/components/checklists/workspace-checklist-builder";
 import { loadWorkspaceTemplateForEdit } from "@/lib/actions/checklist-workspace";
@@ -21,6 +21,9 @@ export default async function EditWorkspaceChecklistPage({
   }
   if (template.archived_at) {
     notFound();
+  }
+  if (template.is_draft) {
+    redirect(`/checklists/novo?draft=${template.id}`);
   }
 
   const initialSections: WorkspaceEditSection[] = template.sections.map((sec) => ({

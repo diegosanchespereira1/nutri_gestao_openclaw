@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import {
   deleteTechnicalRecipeAction,
@@ -12,7 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
-import { FileDown, LayoutTemplate, Pencil, Star, X } from "lucide-react";
+import {
+  FileDown,
+  LayoutTemplate,
+  MoreVertical,
+  Pencil,
+  Star,
+  X,
+} from "lucide-react";
 
 type Props = {
   recipeId: string;
@@ -20,6 +28,8 @@ type Props = {
   clientId?: string | null;
   isTemplateFavorite?: boolean;
 };
+
+type ActionsLayout = "inline" | "menu";
 
 export function RecipeListRowActions({
   recipeId,
@@ -33,7 +43,11 @@ export function RecipeListRowActions({
   const [deletePending, setDeletePending] = useState(false);
   const [favorite, setFavorite] = useState(isTemplateFavorite);
   const [notice, setNotice] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setFavorite(isTemplateFavorite);
@@ -45,6 +59,56 @@ export function RecipeListRowActions({
     };
   }, []);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (triggerRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenuOpen(false);
+    }
+
+    function handleScroll() {
+      setMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
+  }, [menuOpen]);
+
+  function updateMenuPosition() {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = trigger.getBoundingClientRect();
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.right,
+      transform: "translateX(-100%)",
+      zIndex: 50,
+    });
+  }
+
+  function toggleMenu() {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    updateMenuPosition();
+    setMenuOpen(true);
+  }
+
   function showFavoriteAddedNotice() {
     setNotice("Adicionado a lista de templates favoritos");
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
@@ -54,6 +118,10 @@ export function RecipeListRowActions({
   function closeNotice() {
     if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
     setNotice(null);
+  }
+
+  function closeMenu() {
+    setMenuOpen(false);
   }
 
   function onToggleTemplate() {
@@ -128,6 +196,131 @@ export function RecipeListRowActions({
 
   const busy = templatePending || favoritePending || deletePending;
 
+  const menuItemClassName =
+    "text-foreground hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm transition-colors";
+
+  function renderActions(layout: ActionsLayout) {
+    const isMenu = layout === "menu";
+    const linkClass = isMenu
+      ? menuItemClassName
+      : cn(buttonVariants({ variant: "outline", size: "sm" }));
+    const templateClass = isMenu
+      ? cn(
+          menuItemClassName,
+          isTemplate && "bg-primary/10 text-primary font-medium",
+        )
+      : cn(buttonVariants({ variant: isTemplate ? "default" : "outline", size: "sm" }));
+    const favoriteClass = isMenu
+      ? cn(
+          menuItemClassName,
+          favorite && "bg-primary/10 text-primary font-medium",
+        )
+      : cn(buttonVariants({ variant: favorite ? "default" : "outline", size: "sm" }));
+    const deleteClass = isMenu
+      ? cn(menuItemClassName, "text-destructive hover:bg-destructive/10")
+      : cn(
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "text-destructive hover:bg-destructive/10 hover:text-destructive",
+        );
+
+    return (
+      <>
+        <Link
+          href={`/ficha-tecnica/${recipeId}/editar`}
+          className={linkClass}
+          onClick={isMenu ? closeMenu : undefined}
+          role={isMenu ? "menuitem" : undefined}
+        >
+          <Pencil className="size-3.5 shrink-0" aria-hidden />
+          Editar
+        </Link>
+        <Link
+          href={`/ficha-tecnica/${recipeId}/pdf`}
+          className={linkClass}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={isMenu ? closeMenu : undefined}
+          role={isMenu ? "menuitem" : undefined}
+        >
+          <FileDown className="size-3.5 shrink-0" aria-hidden />
+          PDF
+        </Link>
+        <button
+          type="button"
+          className={templateClass}
+          disabled={busy}
+          onClick={() => {
+            if (isMenu) closeMenu();
+            onToggleTemplate();
+          }}
+          title={isTemplate ? "Remover de templates" : "Marcar como template"}
+          aria-label={
+            isTemplate ? "Remover de templates" : "Marcar como template"
+          }
+          aria-pressed={isTemplate}
+          role={isMenu ? "menuitem" : undefined}
+        >
+          <LayoutTemplate
+            className={cn(
+              "size-3.5 shrink-0",
+              isTemplate
+                ? isMenu
+                  ? "text-primary"
+                  : "fill-primary-foreground text-primary-foreground"
+                : "text-muted-foreground",
+            )}
+            aria-hidden
+          />
+          Template
+        </button>
+        {isTemplate && clientId ? (
+          <button
+            type="button"
+            className={favoriteClass}
+            disabled={busy}
+            onClick={() => {
+              if (isMenu) closeMenu();
+              onToggleFavorite();
+            }}
+            title={
+              favorite
+                ? "Remover dos favoritos do cliente"
+                : "Adicionar aos favoritos do cliente"
+            }
+            aria-label={
+              favorite
+                ? "Remover dos favoritos do cliente"
+                : "Adicionar aos favoritos do cliente"
+            }
+            aria-pressed={favorite}
+            role={isMenu ? "menuitem" : undefined}
+          >
+            <Star
+              className={cn(
+                "size-3.5 shrink-0",
+                favorite && "fill-amber-400 text-amber-600 dark:text-amber-300",
+              )}
+              aria-hidden
+            />
+            Favorito
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={deleteClass}
+          disabled={busy}
+          onClick={() => {
+            if (isMenu) closeMenu();
+            onDelete();
+          }}
+          role={isMenu ? "menuitem" : undefined}
+        >
+          {deletePending ? "A eliminar…" : "Eliminar"}
+        </button>
+      </>
+    );
+  }
+
   return (
     <>
       {notice ? (
@@ -147,91 +340,46 @@ export function RecipeListRowActions({
           </button>
         </div>
       ) : null}
-      <div
-        className="flex flex-wrap items-center justify-end gap-1.5"
-        role="group"
-        aria-label="Ações da receita"
-      >
-        <Link
-          href={`/ficha-tecnica/${recipeId}/editar`}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+
+      <div className="relative flex justify-end">
+        <div
+          className="hidden flex-wrap items-center justify-end gap-1.5 xl:flex"
+          role="group"
+          aria-label="Ações da receita"
         >
-          <Pencil data-icon="inline-start" className="size-3.5" aria-hidden />
-          Editar
-        </Link>
-        <Link
-          href={`/ficha-tecnica/${recipeId}/pdf`}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <FileDown data-icon="inline-start" className="size-3.5" aria-hidden />
-          PDF
-        </Link>
-        <Button
-          type="button"
-          variant={isTemplate ? "default" : "outline"}
-          size="sm"
-          disabled={busy}
-          onClick={onToggleTemplate}
-          title={isTemplate ? "Remover de templates" : "Marcar como template"}
-          aria-label={
-            isTemplate ? "Remover de templates" : "Marcar como template"
-          }
-          aria-pressed={isTemplate}
-        >
-          <LayoutTemplate
-            data-icon="inline-start"
-            className={cn(
-              "size-3.5",
-              isTemplate
-                ? "fill-primary-foreground text-primary-foreground"
-                : "text-muted-foreground",
-            )}
-            aria-hidden
-          />
-          Template
-        </Button>
-        {isTemplate && clientId ? (
+          {renderActions("inline")}
+        </div>
+
+        <div className="xl:hidden">
           <Button
+            ref={triggerRef}
             type="button"
-            variant={favorite ? "default" : "outline"}
-            size="sm"
+            variant="outline"
+            size="icon-sm"
             disabled={busy}
-            onClick={onToggleFavorite}
-            title={
-              favorite
-                ? "Remover dos favoritos do cliente"
-                : "Adicionar aos favoritos do cliente"
-            }
-            aria-label={
-              favorite
-                ? "Remover dos favoritos do cliente"
-                : "Adicionar aos favoritos do cliente"
-            }
-            aria-pressed={favorite}
+            onClick={toggleMenu}
+            aria-label="Abrir menu de ações"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
           >
-            <Star
-              data-icon="inline-start"
-              className={cn(
-                "size-3.5",
-                favorite && "fill-amber-400 text-amber-600 dark:text-amber-300",
-              )}
-              aria-hidden
-            />
-            Favorito
+            <MoreVertical className="size-4" aria-hidden />
           </Button>
-        ) : null}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-          disabled={busy}
-          onClick={onDelete}
-        >
-          {deletePending ? "A eliminar…" : "Eliminar"}
-        </Button>
+
+          {menuOpen && menuStyle
+            ? createPortal(
+                <div
+                  ref={menuRef}
+                  role="menu"
+                  aria-label="Ações da receita"
+                  style={menuStyle}
+                  className="border-border bg-popover text-popover-foreground min-w-[11rem] rounded-md border p-1 shadow-md"
+                >
+                  {renderActions("menu")}
+                </div>,
+                document.body,
+              )
+            : null}
+        </div>
       </div>
     </>
   );

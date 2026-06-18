@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
+import {
+  RECIPE_LIST_PAGE_SIZE,
+  type TechnicalRecipeListToggleFilter,
+} from "@/lib/constants/recipe-list";
 import { RECIPE_LINE_UNITS } from "@/lib/constants/recipe-line-units";
 import { TECHNICAL_RECIPE_IMAGES_BUCKET } from "@/lib/constants/technical-recipe-images-storage";
 import type { RecipeLineUnit } from "@/lib/constants/recipe-line-units";
@@ -330,6 +333,7 @@ export async function loadTechnicalRecipesForOwner(opts?: {
   q?: string;
   page?: number;
   pageSize?: number;
+  filtros?: TechnicalRecipeListToggleFilter[];
 }): Promise<LoadTechnicalRecipesResult> {
   const supabase = await createClient();
   const {
@@ -348,9 +352,27 @@ export async function loadTechnicalRecipesForOwner(opts?: {
   const pageSize = Math.max(1, opts?.pageSize ?? RECIPE_LIST_PAGE_SIZE);
   const page = Math.max(1, opts?.page ?? 1);
   const q = opts?.q?.trim() ?? "";
+  const filtros = opts?.filtros ?? [];
+  const filterFavoritos = filtros.includes("favoritos");
+  const filterTemplates = filtros.includes("templates");
 
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+
+  let favoriteRecipeIds: string[] | null = null;
+  if (filterFavoritos) {
+    const { data: favRows } = await supabase
+      .from("technical_recipe_template_favorites")
+      .select("recipe_id");
+    favoriteRecipeIds = [
+      ...new Set(
+        (favRows ?? []).map((row) => (row as { recipe_id: string }).recipe_id),
+      ),
+    ];
+    if (favoriteRecipeIds.length === 0) {
+      return { ...empty, page, pageSize };
+    }
+  }
 
   let query = supabase
     .from("technical_recipes")
@@ -371,6 +393,14 @@ export async function loadTechnicalRecipesForOwner(opts?: {
     )
     .order("updated_at", { ascending: false })
     .range(from, to);
+
+  if (filterTemplates) {
+    query = query.eq("contexto", "REPOSITORIO");
+  }
+
+  if (filterFavoritos && favoriteRecipeIds) {
+    query = query.in("id", favoriteRecipeIds);
+  }
 
   if (q.length > 0) {
     query = query.ilike("name", `%${q}%`);

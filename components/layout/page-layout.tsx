@@ -4,25 +4,25 @@ import { cn } from "@/lib/utils";
 interface PageLayoutProps {
   children: ReactNode;
   /**
-   * "default"  → max-w-7xl, para páginas de listagem e dashboard
+   * "default"  → largura total da área de conteúdo (listagens e dashboard)
    * "form"     → max-w-3xl, para formulários e páginas de configuração
-   * "wide"     → sem max-w, para páginas com tabelas muito largas
+   * "wide"     → alias de default (compatibilidade)
    */
   variant?: "default" | "form" | "wide";
   className?: string;
 }
 
 const variantClass = {
-  default: "max-w-7xl",
+  default: "w-full",
   form: "max-w-3xl",
-  wide: "",
+  wide: "w-full",
 };
 
 /**
  * Wrapper de conteúdo de página.
  *
  * Garante:
- * - max-width consistente por tipo de página
+ * - largura total (default/wide) ou max-width em formulários (form)
  * - espaçamento vertical entre seções (space-y-6)
  */
 export function PageLayout({

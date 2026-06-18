@@ -8,18 +8,45 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { FichaTecnicaToolbar } from "@/components/technical-sheets/ficha-tecnica-toolbar";
+import { RecipeListFilters } from "@/components/technical-sheets/recipe-list-filters";
 import { RecipePagination } from "@/components/technical-sheets/recipe-pagination";
 import { RecipeSearchInput } from "@/components/technical-sheets/recipe-search-input";
 import { RecipeListTable } from "@/components/technical-sheets/recipe-list-table";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
-import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
+import {
+  RECIPE_LIST_PAGE_SIZE,
+  hasTechnicalRecipeListFilters,
+  parseTechnicalRecipeListFilters,
+  type TechnicalRecipeListToggleFilter,
+} from "@/lib/constants/recipe-list";
 import { loadTechnicalRecipesForOwner } from "@/lib/actions/technical-recipes";
 import { cn } from "@/lib/utils";
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
-type SearchParams = Promise<{ q?: string; page?: string }>;
+type SearchParams = Promise<{ q?: string; page?: string; filtro?: string }>;
+
+function emptyListMessage(
+  q: string,
+  filtros: TechnicalRecipeListToggleFilter[],
+): string {
+  if (q.length > 0) {
+    return `Nenhuma ficha técnica encontrada para “${q}”.`;
+  }
+  const hasFavoritos = filtros.includes("favoritos");
+  const hasTemplates = filtros.includes("templates");
+  if (hasFavoritos && hasTemplates) {
+    return "Nenhum template favorito encontrado.";
+  }
+  if (hasFavoritos) {
+    return "Nenhuma receita favorita. Marque templates com a estrela para vê-los aqui.";
+  }
+  if (hasTemplates) {
+    return "Nenhum template no repositório.";
+  }
+  return "";
+}
 
 export default async function FichaTecnicaPage({
   searchParams,
@@ -29,13 +56,19 @@ export default async function FichaTecnicaPage({
   const params = await searchParams;
   const q = (params.q ?? "").trim();
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const filtros = parseTechnicalRecipeListFilters(params.filtro);
 
   const [
     { rows: recipes, total, totalPages },
     { rows: establishments },
     { rows: pjClients },
   ] = await Promise.all([
-    loadTechnicalRecipesForOwner({ q, page, pageSize: RECIPE_LIST_PAGE_SIZE }),
+    loadTechnicalRecipesForOwner({
+      q,
+      page,
+      pageSize: RECIPE_LIST_PAGE_SIZE,
+      filtros,
+    }),
     loadEstablishmentsForOwner(),
     loadClientsForOwner({ kind: "pj" }),
   ]);
@@ -70,21 +103,22 @@ export default async function FichaTecnicaPage({
         </Alert>
       )}
 
-      {/* ── Barra de busca ── */}
-      <Suspense fallback={null}>
-        <RecipeSearchInput />
-      </Suspense>
+      {/* ── Busca e filtros ── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <Suspense fallback={null}>
+          <RecipeSearchInput />
+        </Suspense>
+        <Suspense fallback={null}>
+          <RecipeListFilters />
+        </Suspense>
+      </div>
 
       {/* ── Lista vazia ── */}
       {recipes.length === 0 ? (
-        q.length > 0 ? (
+        q.length > 0 || hasTechnicalRecipeListFilters(filtros) ? (
           <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
             <p className="text-muted-foreground text-sm">
-              Nenhuma ficha técnica encontrada para{" "}
-              <span className="text-foreground font-medium">
-                &ldquo;{q}&rdquo;
-              </span>
-              .
+              {emptyListMessage(q, filtros)}
             </p>
           </div>
         ) : (

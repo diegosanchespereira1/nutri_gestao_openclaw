@@ -65,7 +65,7 @@ export function RecipeSearchInput() {
       />
       <Input
         type="search"
-        placeholder="Buscar template por nome…"
+        placeholder="Buscar receita por nome…"
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}

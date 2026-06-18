@@ -20,3 +20,18 @@ export function safeNextPath(raw: string | null | undefined): string {
 
   return trimmed;
 }
+
+export type LoginRedirectReason = "session_expired";
+
+/** URL de login que devolve o utilizador à página actual após autenticação. */
+export function buildLoginRedirectPath(
+  returnPath: string,
+  options?: { reason?: LoginRedirectReason },
+): string {
+  const params = new URLSearchParams();
+  params.set("next", safeNextPath(returnPath));
+  if (options?.reason) {
+    params.set("reason", options.reason);
+  }
+  return `/login?${params.toString()}`;
+}

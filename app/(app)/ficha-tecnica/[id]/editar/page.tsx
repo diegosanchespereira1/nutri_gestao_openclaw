@@ -58,8 +58,6 @@ export default async function EditarReceitaPage({
         <Link
           href={`/ficha-tecnica/${id}/pdf`}
           className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
-          target="_blank"
-          rel="noopener noreferrer"
         >
           Exportar PDF
         </Link>

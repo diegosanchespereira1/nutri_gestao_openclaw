@@ -75,6 +75,10 @@ const nextConfig: NextConfig = {
           "/((?!_next/static|_next/image|favicon.ico|runtime-env.js|.*\\.(?:ico|png|jpg|jpeg|gif|webp|svg|woff2?)$).*)",
         headers: [noStoreHtml, pragmaNoCache, expires],
       },
+      {
+        source: "/api/ficha-tecnica/:id/pdf",
+        headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+      },
     ];
   },
 };

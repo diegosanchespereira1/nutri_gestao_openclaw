@@ -7,6 +7,7 @@ import { AppVersionGuard } from "@/components/app-version-guard";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
 import { parseProfileShellContextCookie } from "@/lib/auth/profile-context-cookie";
+import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
 import { canAccessAdminArea } from "@/lib/roles";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
@@ -20,8 +21,9 @@ export default async function AppAreaLayout({
   const profileCtx = parseProfileShellContextCookie(
     cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
   );
+  const pathname = headersList.get("x-pathname") ?? "";
   if (!profileCtx?.userId) {
-    redirect("/login");
+    redirect(buildLoginRedirectPath(pathname || "/inicio"));
   }
 
   const role = profileCtx.role;
@@ -30,7 +32,6 @@ export default async function AppAreaLayout({
   const userFirstName = fullName ? fullName.split(" ")[0] ?? null : null;
   const showAdminNav = canAccessAdminArea(role);
   const enabledModules = profileCtx.enabledModules ?? DEFAULT_ENABLED_MODULES;
-  const pathname = headersList.get("x-pathname") ?? "";
   const onboardingOnly =
     pathname === "/onboarding" || pathname.startsWith("/onboarding/");
 

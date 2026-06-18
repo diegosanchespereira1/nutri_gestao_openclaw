@@ -1,5 +1,3 @@
-import { NextResponse } from "next/server";
-
 import { loadTechnicalRecipeById } from "@/lib/actions/technical-recipes";
 import { TECHNICAL_RECIPE_IMAGES_BUCKET } from "@/lib/constants/technical-recipe-images-storage";
 import { TENANT_LOGOS_BUCKET } from "@/lib/constants/tenant-logos-storage";
@@ -8,7 +6,7 @@ import { buildTechnicalRecipePdfBytes } from "@/lib/pdf/technical-sheet-pdf";
 import { fetchTenantLogoStoragePath } from "@/lib/tenant/logo-sync";
 import { createClient } from "@/lib/supabase/server";
 
-function safePdfFileSlug(name: string): string {
+export function safeTechnicalRecipePdfFilename(name: string): string {
   const base = foldTextForPdf(name)
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
@@ -48,27 +46,23 @@ function clientDisplayName(client: {
   return client.trade_name?.trim() || client.legal_name?.trim() || "Cliente";
 }
 
-export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> },
-) {
-  const { id } = await ctx.params;
-  const origin = new URL(req.url).origin;
+export type TechnicalRecipePdfExportResult = {
+  bytes: Uint8Array;
+  filename: string;
+  recipeName: string;
+};
 
+export async function buildTechnicalRecipePdfExport(
+  recipeId: string,
+): Promise<TechnicalRecipePdfExportResult | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.redirect(
-      `${origin}/login?next=${encodeURIComponent(`/ficha-tecnica/${id}/pdf`)}`,
-    );
-  }
+  if (!user) return null;
 
-  const { recipe } = await loadTechnicalRecipeById(id);
-  if (!recipe) {
-    return new NextResponse("Não encontrado", { status: 404 });
-  }
+  const { recipe } = await loadTechnicalRecipeById(recipeId);
+  if (!recipe) return null;
 
   const [
     { data: est },
@@ -138,13 +132,11 @@ export async function GET(
     professionalCrn: String(profile?.crn ?? ""),
   });
 
-  const filename = `ficha-tecnica-${safePdfFileSlug(recipe.name)}.pdf`;
-  return new NextResponse(Buffer.from(bytes), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-      "Cache-Control": "private, no-store",
-    },
-  });
+  const filename = `ficha-tecnica-${safeTechnicalRecipePdfFilename(recipe.name)}.pdf`;
+
+  return {
+    bytes,
+    filename,
+    recipeName: recipe.name,
+  };
 }

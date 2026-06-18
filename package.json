@@ -18,7 +18,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed --workers=1",
-    "mobile:sync": "npx cap sync",
+    "mobile:sync": "npx cap sync && node scripts/mobile/ensure-android-package-id.mjs",
     "mobile:ios": "npx cap open ios",
     "mobile:android": "npx cap open android",
     "mobile:run:ios": "npx cap run ios",
@@ -67,16 +67,18 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
-    "husky": "^9.1.7",
     "@capacitor/assets": "^3.0.5",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/papaparse": "^5.5.2",
+    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "husky": "^9.1.7",
+    "pdf-parse": "^2.4.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^3.2.4"

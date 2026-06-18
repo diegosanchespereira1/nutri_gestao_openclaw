@@ -17,12 +17,31 @@ import { computeRecipePricingBreakdown } from "@/lib/technical-recipes/recipe-pr
 import type { TechnicalRecipeWithLines } from "@/lib/types/technical-recipes";
 
 import { foldTextForPdf } from "./dossier-pdf";
+import { getDefaultTechnicalRecipeImageBuffer } from "./default-technical-recipe-image";
 import { redactSupabaseUrlsForPdf } from "@/lib/pdf/redact-storage-urls";
 
+const RECIPE_HERO_IMAGE_W = 110;
+const RECIPE_HERO_IMAGE_H = 82;
+const RECIPE_HERO_IMAGE_GAP = 10;
 const PAGE_W = 595.28;
 const PAGE_H = 841.89;
 const MX = 40;
-const MY = 40;
+const MY = 32;
+const CONTENT_W = PAGE_W - MX * 2;
+
+/** Ritmo vertical compacto — prioriza caber numa página A4. */
+const SP = {
+  /** Espaço entre a faixa do cabeçalho (incl. linha verde) e o conteúdo. */
+  headerAfter: 28,
+  sectionTop: 12,
+  titleToTable: 6,
+  sectionBottom: 8,
+  heroAfter: 10,
+  kvRowH: 14,
+  tableHeaderH: 16,
+  tableRowH: 15,
+  lineLeading: 10,
+} as const;
 
 const COL = {
   ink: rgb(0.12, 0.12, 0.12),
@@ -151,6 +170,18 @@ async function embedImageBuffer(
   }
 }
 
+/** Foto do utilizador ou imagem padrão do sistema (mantém o layout da ficha). */
+async function resolveRecipeHeroImage(
+  pdf: PDFDocument,
+  userBuffer: Buffer | null,
+): Promise<PDFImage | null> {
+  if (userBuffer) {
+    const userImage = await embedImageBuffer(pdf, userBuffer);
+    if (userImage) return userImage;
+  }
+  return embedImageBuffer(pdf, getDefaultTechnicalRecipeImageBuffer());
+}
+
 function ensureSpace(ctx: PdfCtx, needed: number): PdfCtx {
   if (ctx.y - needed >= MY) return ctx;
   const page = ctx.pdf.addPage([PAGE_W, PAGE_H]);
@@ -175,18 +206,38 @@ function drawText(
   });
 }
 
-function drawSectionTitle(ctx: PdfCtx, title: string): PdfCtx {
-  let next = ensureSpace(ctx, 36);
-  const lineY = next.y - 4;
-  next.page.drawLine({
-    start: { x: MX, y: lineY },
-    end: { x: PAGE_W - MX, y: lineY },
-    thickness: 0.8,
-    color: COL.border,
+function drawCellText(
+  ctx: PdfCtx,
+  text: string,
+  cellX: number,
+  cellW: number,
+  baselineY: number,
+  size: number,
+  align: "left" | "right",
+  bold = false,
+  color = COL.ink,
+  pad = 4,
+): void {
+  const font = bold ? ctx.fontBold : ctx.font;
+  const clipped =
+    wrapText(text, font, size, cellW - pad * 2)[0] ?? "—";
+  const folded = foldTextForPdf(redactSupabaseUrlsForPdf(clipped));
+  const tw = font.widthOfTextAtSize(folded, size);
+  const x = align === "right" ? cellX + cellW - pad - tw : cellX + pad;
+  ctx.page.drawText(folded, {
+    x,
+    y: baselineY,
+    size,
+    font,
+    color,
   });
-  const labelW = textWidth(next.fontBold, title, 10);
-  drawText(next, title, PAGE_W - MX - labelW, next.y, 10, true, COL.muted);
-  return { ...next, y: lineY - 18 };
+}
+
+function drawSectionTitle(ctx: PdfCtx, title: string): PdfCtx {
+  let next = ensureSpace(ctx, SP.sectionTop + SP.titleToTable + 24);
+  next = { ...next, y: next.y - SP.sectionTop };
+  drawText(next, title, MX, next.y, 10, true, COL.ink);
+  return { ...next, y: next.y - SP.titleToTable };
 }
 
 function drawTenantHeader(
@@ -194,7 +245,7 @@ function drawTenantHeader(
   tenantName: string,
   logo: PDFImage | null,
 ): PdfCtx {
-  const bandH = 56;
+  const bandH = 46;
   let next = ctx;
   next.page.drawRectangle({
     x: 0,
@@ -211,7 +262,7 @@ function drawTenantHeader(
     color: COL.brand,
   });
 
-  const logoBox = 40;
+  const logoBox = 34;
   const logoX = MX;
   const logoY = PAGE_H - bandH + (bandH - logoBox) / 2;
   next.page.drawRectangle({
@@ -251,157 +302,150 @@ function drawTenantHeader(
   }
 
   const textX = logoX + logoBox + 12;
-  drawText(next, tenantName, textX, PAGE_H - bandH + 34, 14, true, COL.ink);
-  drawText(next, "Ficha técnica de preparação", textX, PAGE_H - bandH + 18, 9, false, COL.muted);
+  drawText(next, tenantName, textX, PAGE_H - bandH + 30, 12, true, COL.ink);
+  drawText(next, "Ficha técnica de preparação", textX, PAGE_H - bandH + 16, 8, false, COL.muted);
 
-  return { ...next, y: PAGE_H - bandH - 20 };
+  const headerBottomY = PAGE_H - bandH - 2;
+  return { ...next, y: headerBottomY - SP.headerAfter };
 }
 
-function drawDocumentTitle(ctx: PdfCtx): PdfCtx {
-  let next = ensureSpace(ctx, 50);
-  const title = "FICHA TÉCNICA";
-  const tw = textWidth(next.fontBold, title, 12);
-  const centerX = (PAGE_W - tw) / 2;
-  next.page.drawLine({
-    start: { x: MX, y: next.y },
-    end: { x: PAGE_W - MX, y: next.y },
-    thickness: 0.8,
-    color: COL.border,
-  });
-  drawText(next, title, centerX, next.y - 16, 12, true, COL.ink);
-  next = { ...next, y: next.y - 22 };
-  next.page.drawLine({
-    start: { x: MX, y: next.y },
-    end: { x: PAGE_W - MX, y: next.y },
-    thickness: 0.8,
-    color: COL.border,
-  });
-  return { ...next, y: next.y - 20 };
-}
+type KeyValueRow = { label: string; value: string };
 
-function drawMetaBlock(
+function drawKeyValueTableAt(
   ctx: PdfCtx,
-  rows: Array<{ label: string; value: string }>,
-  x: number,
+  rows: KeyValueRow[],
+  tableX: number,
   yTop: number,
-  width: number,
+  labelColW: number,
+  valueColW: number,
 ): number {
-  const labelW = 108;
-  const rowH = 16;
+  const colWidths = [labelColW, valueColW];
+  const rowH = SP.kvRowH;
   let y = yTop;
-  for (const row of rows) {
-    ctx.page.drawRectangle({
-      x,
-      y: y - rowH,
-      width,
-      height: rowH,
-      borderColor: COL.border,
-      borderWidth: 0.5,
-      color: COL.white,
-    });
-    drawText(ctx, row.label, x + 6, y - 11, 8, true, COL.muted);
-    const valueLines = wrapText(row.value, ctx.font, 8.5, width - labelW - 10);
-    drawText(ctx, valueLines[0] ?? "—", x + labelW, y - 11, 8.5, false, COL.ink);
+
+  for (const [index, row] of rows.entries()) {
+    const fill = index % 2 === 1 ? COL.rowAlt : COL.white;
+    let cx = tableX;
+    for (let col = 0; col < 2; col++) {
+      ctx.page.drawRectangle({
+        x: cx,
+        y: y - rowH,
+        width: colWidths[col]!,
+        height: rowH,
+        color: fill,
+        borderColor: COL.border,
+        borderWidth: 0.5,
+      });
+      drawCellText(
+        ctx,
+        col === 0 ? row.label : row.value,
+        cx,
+        colWidths[col]!,
+        y - 9,
+        col === 0 ? 7.5 : 8,
+        "left",
+        col === 0,
+        col === 0 ? COL.muted : COL.ink,
+      );
+      cx += colWidths[col]!;
+    }
     y -= rowH;
   }
+
   return y;
 }
 
-function drawHeroSection(
+function drawKeyValueTable(
   ctx: PdfCtx,
-  meta: TechnicalSheetPdfMeta,
-  recipe: TechnicalRecipeWithLines,
-  recipeImage: PDFImage | null,
+  title: string | null,
+  rows: KeyValueRow[],
+  labelColW: number,
+  valueColW: number,
+  origin?: { x: number; yTop: number },
 ): PdfCtx {
-  let next = ensureSpace(ctx, 220);
-  drawText(next, `Cliente: ${meta.clientName}`, MX, next.y, 11, true, COL.ink);
-  next = { ...next, y: next.y - 18 };
-  if (meta.establishmentName) {
-    drawText(
+  const tableX = origin?.x ?? MX;
+
+  let next = title ? drawSectionTitle(ctx, title) : ctx;
+  if (title) {
+    next = ensureSpaceForSection(
       next,
-      `Estabelecimento: ${meta.establishmentName}`,
-      MX,
-      next.y,
-      9,
-      false,
-      COL.muted,
+      kvTableHeight(rows.length),
     );
-    next = { ...next, y: next.y - 14 };
-  }
-  drawText(next, recipe.name, MX, next.y, 16, true, COL.ink);
-  next = { ...next, y: next.y - 24 };
-
-  const blockTop = next.y;
-  const contentW = PAGE_W - MX * 2;
-  const imageW = recipeImage ? 200 : 0;
-  const gap = recipeImage ? 14 : 0;
-  const metaX = MX + imageW + gap;
-  const metaW = contentW - imageW - gap;
-  const imageH = 150;
-
-  if (recipeImage) {
-    next.page.drawRectangle({
-      x: MX,
-      y: blockTop - imageH,
-      width: imageW,
-      height: imageH,
-      borderColor: COL.border,
-      borderWidth: 0.8,
-      color: COL.white,
-    });
-    const ratio = recipeImage.width / recipeImage.height;
-    let w = imageW - 8;
-    let h = imageH - 8;
-    if (ratio > w / h) h = w / ratio;
-    else w = h * ratio;
-    next.page.drawImage(recipeImage, {
-      x: MX + (imageW - w) / 2,
-      y: blockTop - imageH + (imageH - h) / 2,
-      width: w,
-      height: h,
-    });
   }
 
-  const observationNotes = recipe.lines
-    .map((l) => l.notes?.trim())
-    .filter(Boolean)
-    .join(" | ");
-
-  const metaRows = [
-    { label: "Tipo", value: statusLabel(recipe.status) },
-    { label: "Categoria", value: classificationLabel(recipe.classification) },
-    { label: "Setor", value: recipe.sector?.trim() || "—" },
-    {
-      label: "Rendimento",
-      value: `${recipe.portions_yield} porção(ões)`,
-    },
-    { label: "Data de criação", value: formatDatePt(recipe.created_at) },
-    { label: "Última atualização", value: formatDatePt(recipe.updated_at) },
-    { label: "CMV", value: `${(recipe.cmv_percent ?? 25).toFixed(1)}%` },
-    {
-      label: "Observações",
-      value: observationNotes || "—",
-    },
-  ];
-
-  const metaBottom = drawMetaBlock(next, metaRows, metaX, blockTop, metaW);
-  const blockBottom = Math.min(blockTop - imageH, metaBottom);
-  return { ...next, y: blockBottom - 18 };
+  let y = origin?.yTop ?? next.y;
+  y = drawKeyValueTableAt(next, rows, tableX, y, labelColW, valueColW);
+  return { ...next, y: y - (title ? SP.sectionBottom : 0) };
 }
 
-function drawItemsTable(
+function drawCellTextBlock(
   ctx: PdfCtx,
-  recipe: TechnicalRecipeWithLines,
-): PdfCtx {
-  let next = drawSectionTitle(ctx, "Itens do preparo");
-  const headers = ["Tipo", "Nome", "Medida", "Quantidade total"];
-  const colWidths = [90, 190, 70, 125];
-  const tableW = colWidths.reduce((a, b) => a + b, 0);
-  const tableX = PAGE_W - MX - tableW;
-  const headerH = 18;
-  const rowH = 18;
+  text: string,
+  cellX: number,
+  cellW: number,
+  rowTop: number,
+  rowH: number,
+  size: number,
+  align: "left" | "right",
+  bold = false,
+  color = COL.ink,
+): void {
+  const font = bold ? ctx.fontBold : ctx.font;
+  const lines = wrapText(text, font, size, cellW - 8);
+  const blockH = lines.length * SP.lineLeading;
+  let y = rowTop - 8 - Math.max(0, (rowH - blockH) / 2);
+  for (const line of lines) {
+    drawCellText(ctx, line, cellX, cellW, y, size, align, bold, color);
+    y -= SP.lineLeading;
+  }
+}
 
-  next = ensureSpace(next, headerH + rowH * Math.max(recipe.lines.length, 1) + 10);
+function kvTableHeight(rowCount: number): number {
+  return rowCount * SP.kvRowH;
+}
+
+function sectionBlockHeight(title: boolean, bodyH: number): number {
+  return (title ? SP.sectionTop + SP.titleToTable : 0) + bodyH + SP.sectionBottom;
+}
+
+/** Mantém secões pequenas inteiras na mesma página quando possível. */
+function ensureSpaceForSection(ctx: PdfCtx, blockH: number): PdfCtx {
+  return ensureSpace(ctx, blockH);
+}
+
+function drawGridTable(
+  ctx: PdfCtx,
+  title: string,
+  headers: string[],
+  rows: string[][],
+  colWidths: number[],
+  options?: {
+    rowHeights?: number[];
+    emptyMessage?: string;
+  },
+): PdfCtx {
+  const tableW = colWidths.reduce((a, b) => a + b, 0);
+  const tableX = MX;
+  const headerH = SP.tableHeaderH;
+  const defaultRowH = SP.tableRowH;
+
+  let next = drawSectionTitle(ctx, title);
+  const hasRows = rows.length > 0;
+  const emptyRowH = 28;
+
+  const totalBodyH = hasRows
+    ? rows.reduce(
+        (sum, _, i) => sum + (options?.rowHeights?.[i] ?? defaultRowH),
+        0,
+      )
+    : options?.emptyMessage
+      ? emptyRowH
+      : 0;
+
+  next = ensureSpaceForSection(
+    next,
+    sectionBlockHeight(true, headerH + totalBodyH),
+  );
 
   let x = tableX;
   for (let i = 0; i < headers.length; i++) {
@@ -414,22 +458,43 @@ function drawItemsTable(
       borderColor: COL.border,
       borderWidth: 0.5,
     });
-    drawText(next, headers[i]!, x + 4, next.y - 12, 8.5, true, COL.ink);
+    drawCellText(next, headers[i]!, x, colWidths[i]!, next.y - 12, 8.5, "left", true);
     x += colWidths[i]!;
   }
   next = { ...next, y: next.y - headerH };
 
-  recipe.lines.forEach((line, index) => {
+  if (!hasRows && options?.emptyMessage) {
+    next = ensureSpace(next, emptyRowH + 4);
+    next.page.drawRectangle({
+      x: tableX,
+      y: next.y - emptyRowH,
+      width: tableW,
+      height: emptyRowH,
+      color: COL.white,
+      borderColor: COL.border,
+      borderWidth: 0.5,
+    });
+    drawCellTextBlock(
+      next,
+      options.emptyMessage,
+      tableX,
+      tableW,
+      next.y,
+      emptyRowH,
+      8.5,
+      "left",
+      false,
+      COL.muted,
+    );
+    return { ...next, y: next.y - emptyRowH - SP.sectionBottom };
+  }
+
+  rows.forEach((cells, index) => {
+    const rowH = options?.rowHeights?.[index] ?? defaultRowH;
     next = ensureSpace(next, rowH + 4);
-    const unit = line.unit as RecipeLineUnit;
-    const tipo = line.raw_material?.name?.trim() || "Ingrediente";
-    const nome = line.ingredient_name.trim() || "—";
-    const medida = SHORT_UNIT[unit] ?? unit;
-    const qty = `${line.quantity} ${medida}`;
-    const cells = [tipo, nome, medida, qty];
     let cx = tableX;
     const fill = index % 2 === 1 ? COL.rowAlt : COL.white;
-    for (let i = 0; i < cells.length; i++) {
+    for (let i = 0; i < headers.length; i++) {
       next.page.drawRectangle({
         x: cx,
         y: next.y - rowH,
@@ -439,66 +504,148 @@ function drawItemsTable(
         borderColor: COL.border,
         borderWidth: 0.5,
       });
-      const clipped = wrapText(cells[i]!, next.font, 8, colWidths[i]! - 8)[0] ?? "—";
-      drawText(next, clipped, cx + 4, next.y - 12, 8, false, COL.ink);
+      drawCellTextBlock(
+        next,
+        cells[i] ?? "—",
+        cx,
+        colWidths[i]!,
+        next.y,
+        rowH,
+        8,
+        "left",
+        false,
+      );
       cx += colWidths[i]!;
     }
     next = { ...next, y: next.y - rowH };
   });
 
-  return { ...next, y: next.y - 14 };
+  return { ...next, y: next.y - SP.sectionBottom };
+}
+
+function drawHeroSection(
+  ctx: PdfCtx,
+  meta: TechnicalSheetPdfMeta,
+  recipe: TechnicalRecipeWithLines,
+  recipeImage: PDFImage | null,
+): PdfCtx {
+  let next = ensureSpace(ctx, 160);
+  const establishmentLabel =
+    meta.establishmentName?.trim() || meta.clientName.trim() || "—";
+  drawText(next, establishmentLabel, MX, next.y, 10, true, COL.ink);
+  next = { ...next, y: next.y - 14 };
+  drawText(next, recipe.name, MX, next.y, 14, true, COL.ink);
+  next = { ...next, y: next.y - 16 };
+
+  const blockTop = next.y;
+  const labelColW = 108;
+  const valueColW = CONTENT_W - RECIPE_HERO_IMAGE_W - RECIPE_HERO_IMAGE_GAP - labelColW;
+  const imageW = RECIPE_HERO_IMAGE_W;
+  const imageH = RECIPE_HERO_IMAGE_H;
+  const imageX = MX;
+  const metaX = MX + imageW + RECIPE_HERO_IMAGE_GAP;
+
+  next.page.drawRectangle({
+    x: imageX,
+    y: blockTop - imageH,
+    width: imageW,
+    height: imageH,
+    borderColor: COL.border,
+    borderWidth: 0.8,
+    color: COL.white,
+  });
+
+  if (recipeImage) {
+    const ratio = recipeImage.width / recipeImage.height;
+    let w = imageW - 8;
+    let h = imageH - 8;
+    if (ratio > w / h) h = w / ratio;
+    else w = h * ratio;
+    next.page.drawImage(recipeImage, {
+      x: imageX + (imageW - w) / 2,
+      y: blockTop - imageH + (imageH - h) / 2,
+      width: w,
+      height: h,
+    });
+  }
+
+  const observationNotes = recipe.lines
+    .map((l) => l.notes?.trim())
+    .filter(Boolean)
+    .join(" | ");
+
+  const metaRows: KeyValueRow[] = [
+    { label: "Tipo", value: statusLabel(recipe.status) },
+    { label: "Categoria", value: classificationLabel(recipe.classification) },
+    { label: "Setor", value: recipe.sector?.trim() || "—" },
+    {
+      label: "Rendimento",
+      value: `${recipe.portions_yield} porção(ões)`,
+    },
+    {
+      label: "Última modificação",
+      value: formatDatePt(recipe.updated_at),
+    },
+  ];
+
+  if (observationNotes) {
+    metaRows.push({ label: "Observações", value: observationNotes });
+  }
+
+  const metaBottom = drawKeyValueTable(
+    next,
+    null,
+    metaRows,
+    labelColW,
+    valueColW,
+    { x: metaX, yTop: blockTop },
+  ).y;
+  const blockBottom = Math.min(blockTop - imageH, metaBottom);
+  return { ...next, y: blockBottom - SP.heroAfter };
+}
+
+function drawItemsTable(
+  ctx: PdfCtx,
+  recipe: TechnicalRecipeWithLines,
+): PdfCtx {
+  const headers = ["Tipo", "Nome", "Medida", "Qtd."];
+  const colWidths = [78, 210, 58, 109];
+  const rows = recipe.lines.map((line) => {
+    const unit = line.unit as RecipeLineUnit;
+    const tipo = line.raw_material?.name?.trim() || "Ingrediente";
+    const nome = line.ingredient_name.trim() || "—";
+    const medida = SHORT_UNIT[unit] ?? unit;
+    const qty = `${line.quantity} ${medida}`;
+    return [tipo, nome, medida, qty];
+  });
+
+  return drawGridTable(ctx, "Itens do preparo", headers, rows, colWidths);
 }
 
 function drawPreparationSection(ctx: PdfCtx, recipe: TechnicalRecipeWithLines): PdfCtx {
-  let next = drawSectionTitle(ctx, "Modo de preparo");
   const steps = recipe.lines
     .map((l) => l.notes?.trim())
     .filter((n): n is string => Boolean(n));
 
-  if (steps.length === 0) {
-    next = ensureSpace(next, 24);
-    drawText(
-      next,
-      "Registre as etapas nas observações de cada ingrediente no formulário da receita.",
-      MX,
-      next.y,
-      8.5,
-      false,
-      COL.muted,
-    );
-    return { ...next, y: next.y - 20 };
-  }
-
-  const rowH = 22;
-  steps.forEach((step, index) => {
-    const lines = wrapText(step, next.font, 8.5, PAGE_W - MX * 2 - 28);
-    const blockH = Math.max(rowH, lines.length * 11 + 10);
-    next = ensureSpace(next, blockH + 4);
-    const fill = index % 2 === 1 ? COL.rowAlt : COL.white;
-    next.page.drawRectangle({
-      x: MX,
-      y: next.y - blockH,
-      width: PAGE_W - MX * 2,
-      height: blockH,
-      color: fill,
-      borderColor: COL.border,
-      borderWidth: 0.5,
-    });
-    drawText(next, String(index + 1), MX + 6, next.y - 14, 9, true, COL.brand);
-    lines.forEach((ln, li) => {
-      drawText(next, ln, MX + 24, next.y - 14 - li * 11, 8.5, false, COL.ink);
-    });
-    next = { ...next, y: next.y - blockH };
+  const colWidths = [32, CONTENT_W - 32];
+  const headers = ["Etapa", "Descrição"];
+  const rows = steps.map((step, index) => [String(index + 1), step]);
+  const rowHeights = steps.map((step) => {
+    const lines = wrapText(step, ctx.font, 8, colWidths[1]! - 8);
+    return Math.max(SP.tableRowH + 2, lines.length * SP.lineLeading + 6);
   });
 
-  return { ...next, y: next.y - 14 };
+  return drawGridTable(ctx, "Modo de preparo", headers, rows, colWidths, {
+    rowHeights,
+    emptyMessage:
+      "Registre etapas nas observações de cada ingrediente.",
+  });
 }
 
-function drawSummaryFooter(
-  ctx: PdfCtx,
+function buildSummaryRows(
   recipe: TechnicalRecipeWithLines,
   meta: TechnicalSheetPdfMeta,
-): PdfCtx {
+): KeyValueRow[] {
   const costAgg = recipe.lines.reduce(
     (acc, l) => {
       if (!l.raw_material) return acc;
@@ -528,33 +675,45 @@ function drawSummaryFooter(
     taxPercent: recipe.tax_percent,
   });
 
-  let next = drawSectionTitle(ctx, "Resumo técnico");
-  const rows = [
-    `Custo total de matéria-prima: ${formatBrl(costAgg.total)}`,
-    `Preço sugerido por porção (c/ impostos): ${formatBrl(pricing.suggestedPriceWithTaxPerPortionBrl)}`,
-    `Margem: ${recipe.margin_percent}% | Imposto: ${recipe.tax_percent}%`,
-    `Nutrição total (TACO): ${nutrition.kcal} kcal; P ${nutrition.proteinG} g; CHO ${nutrition.carbG} g; L ${nutrition.lipidG} g`,
-    `Por porção: ${perPortion.kcal} kcal; P ${perPortion.proteinG} g; CHO ${perPortion.carbG} g; L ${perPortion.lipidG} g`,
-    `Profissional: ${meta.professionalName} — CRN ${meta.professionalCrn || "—"}`,
+  return [
+    { label: "Custo total da preparação", value: formatBrl(costAgg.total) },
+    { label: "Custo por porção", value: formatBrl(pricing.costPerPortionBrl) },
+    {
+      label: "Preço sugerido (c/ imposto)",
+      value: formatBrl(pricing.suggestedPriceWithTaxPerPortionBrl),
+    },
+    {
+      label: "Nutrição total (TACO)",
+      value: `${nutrition.kcal} kcal · P ${nutrition.proteinG}g · CHO ${nutrition.carbG}g · L ${nutrition.lipidG}g`,
+    },
+    {
+      label: "Nutrição por porção",
+      value: `${perPortion.kcal} kcal · P ${perPortion.proteinG}g · CHO ${perPortion.carbG}g · L ${perPortion.lipidG}g`,
+    },
+    { label: "Profissional", value: meta.professionalName },
+    { label: "CRN", value: meta.professionalCrn || "—" },
   ];
+}
 
-  for (const row of rows) {
-    next = ensureSpace(next, 14);
-    drawText(next, row, MX, next.y, 8, false, COL.muted);
-    next = { ...next, y: next.y - 12 };
-  }
+function drawSummaryFooter(
+  ctx: PdfCtx,
+  recipe: TechnicalRecipeWithLines,
+  meta: TechnicalSheetPdfMeta,
+): PdfCtx {
+  const rows = buildSummaryRows(recipe, meta);
+  let next = drawKeyValueTable(ctx, "Resumo técnico", rows, 200, CONTENT_W - 200);
 
-  next = ensureSpace(next, 16);
+  next = ensureSpace(next, SP.lineLeading + 4);
   drawText(
     next,
-    "Valores nutricionais indicativos com base na tabela TACO e nas quantidades informadas.",
+    "Valores nutricionais indicativos (TACO).",
     MX,
     next.y,
-    7.5,
+    7,
     false,
     COL.muted,
   );
-  return { ...next, y: next.y - 12 };
+  return { ...next, y: next.y - SP.lineLeading };
 }
 
 export async function buildTechnicalRecipePdfBytes(
@@ -568,9 +727,7 @@ export async function buildTechnicalRecipePdfBytes(
   const tenantLogo = meta.tenantLogoBuffer
     ? await embedImageBuffer(pdf, meta.tenantLogoBuffer)
     : null;
-  const recipeImage = meta.recipeImageBuffer
-    ? await embedImageBuffer(pdf, meta.recipeImageBuffer)
-    : null;
+  const recipeImage = await resolveRecipeHeroImage(pdf, meta.recipeImageBuffer);
 
   let ctx: PdfCtx = {
     pdf,
@@ -581,7 +738,6 @@ export async function buildTechnicalRecipePdfBytes(
   };
 
   ctx = drawTenantHeader(ctx, meta.tenantName, tenantLogo);
-  ctx = drawDocumentTitle(ctx);
   ctx = drawHeroSection(ctx, meta, recipe, recipeImage);
   ctx = drawItemsTable(ctx, recipe);
   ctx = drawPreparationSection(ctx, recipe);

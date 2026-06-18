@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import {
-  FileDown,
+  Eye,
   LayoutTemplate,
   MoreVertical,
   Pencil,
@@ -237,12 +237,10 @@ export function RecipeListRowActions({
         <Link
           href={`/ficha-tecnica/${recipeId}/pdf`}
           className={linkClass}
-          target="_blank"
-          rel="noopener noreferrer"
           onClick={isMenu ? closeMenu : undefined}
           role={isMenu ? "menuitem" : undefined}
         >
-          <FileDown className="size-3.5 shrink-0" aria-hidden />
+          <Eye className="size-3.5 shrink-0" aria-hidden />
           PDF
         </Link>
         <button

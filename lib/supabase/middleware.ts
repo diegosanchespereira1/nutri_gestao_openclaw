@@ -22,6 +22,7 @@ import {
   isPathAllowedWhenLgpdBlocked,
   isProtectedPath,
 } from "@/lib/auth-paths";
+import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
 import { canAccessAdminArea } from "@/lib/roles";
 import {
   countClientsForOwner,
@@ -241,8 +242,11 @@ export async function updateSession(request: NextRequest) {
 
     if (expired) {
       await supabase.auth.signOut();
-      const loginUrl = new URL("/login", request.url);
-      loginUrl.searchParams.set("reason", "session_expired");
+      const returnTo = `${pathname}${request.nextUrl.search}`;
+      const loginUrl = new URL(
+        buildLoginRedirectPath(returnTo, { reason: "session_expired" }),
+        request.url,
+      );
       const redirectRes = NextResponse.redirect(loginUrl);
       copyCookies(supabaseResponse, redirectRes);
       clearAppSessionCookies(redirectRes.cookies);
@@ -280,11 +284,8 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (!user && isProtectedPath(pathname)) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set(
-      "next",
-      `${pathname}${request.nextUrl.search}`,
-    );
+    const returnTo = `${pathname}${request.nextUrl.search}`;
+    const loginUrl = new URL(buildLoginRedirectPath(returnTo), request.url);
     const redirectRes = NextResponse.redirect(loginUrl);
     copyCookies(supabaseResponse, redirectRes);
     return redirectRes;

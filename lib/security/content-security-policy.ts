@@ -70,6 +70,8 @@ export function buildContentSecurityPolicyValue(): string {
     "img-src 'self' data: blob: https:",
     "font-src 'self'",
     `connect-src ${connect}`,
+    "frame-src 'self' blob:",
+    "object-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

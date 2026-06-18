@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LayoutTemplate, Plus, Trash2 } from "lucide-react";
+import { LayoutTemplate, Plus, Trash2, ChevronDownIcon } from "lucide-react";
 
 import {
   RECIPE_LINE_UNIT_LABELS,
@@ -61,13 +61,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { generateUUID } from "@/lib/utils/uuid";
+import { touchMinHeight } from "@/lib/touch-targets";
 
-const selectClassName =
-  "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+/** Mesmas cores, borda, altura e foco do componente Input. */
+const fieldSurfaceClassName = cn(
+  "h-9 w-full min-w-0 touch-manipulation rounded-lg border border-input bg-background px-2.5 py-1 text-[16px] text-foreground transition-colors outline-none md:text-sm",
+  "placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
+  "dark:bg-input/30",
+  touchMinHeight,
+  "[@media(pointer:coarse)]:py-2 max-lg:py-2",
+);
 
-/** Labels mais subtis que o valor preenchido (design system — hierarquia). */
-const fieldLabelClassName = "text-muted-foreground";
+const selectClassName = fieldSurfaceClassName;
+
+/** Rótulos de métricas em listas (dt). */
+const metricLabelClassName = "text-foreground text-sm";
 
 function formatBrl(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -1001,7 +1009,7 @@ export function RecipeForm({
           establishments.length > 0 &&
           pjClients.length > 0 ? (
             <fieldset className="space-y-2">
-              <legend className={cn("text-sm font-medium", fieldLabelClassName)}>
+              <legend className="text-sm font-medium">
                 Onde fica esta receita?
               </legend>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -1048,7 +1056,6 @@ export function RecipeForm({
             <div className="space-y-2">
               <Label
                 htmlFor="recipe-name"
-                className={fieldLabelClassName}
               >
                 Nome da receita
               </Label>
@@ -1073,7 +1080,6 @@ export function RecipeForm({
                 <>
                   <Label
                     htmlFor="recipe-establishment"
-                    className={fieldLabelClassName}
                   >
                     Estabelecimento
                   </Label>
@@ -1119,61 +1125,68 @@ export function RecipeForm({
             }}
           />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-[minmax(10rem,1fr)_minmax(0,2fr)_5.5rem] gap-4">
         <div className="space-y-2">
-          <Label
-            htmlFor="recipe-classification"
-            className={fieldLabelClassName}
-          >
-            Classificação
-          </Label>
-          <select
-            id="recipe-classification"
-            className={selectClassName}
-            value={classification}
-            onChange={(e) => setClassification(e.target.value)}
-          >
-            <option value="">— Selecione —</option>
-            <option value="bebida">Bebida</option>
-            <option value="entrada">Entrada</option>
-            <option value="prato-principal">Prato principal</option>
-            <option value="sobremesa">Sobremesa</option>
-          </select>
+          <Label htmlFor="recipe-classification">Classificação</Label>
+          <div className="relative min-w-0">
+            <select
+              id="recipe-classification"
+              className={cn(fieldSurfaceClassName, "appearance-none pr-8")}
+              value={classification}
+              onChange={(e) => setClassification(e.target.value)}
+            >
+              <option value="">— Selecione —</option>
+              <option value="bebida">Bebida</option>
+              <option value="entrada">Entrada</option>
+              <option value="prato-principal">Prato principal</option>
+              <option value="sobremesa">Sobremesa</option>
+            </select>
+            <ChevronDownIcon
+              aria-hidden
+              className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 opacity-50"
+            />
+          </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="recipe-sector" className={fieldLabelClassName}>
-            Setor
-          </Label>
+          <Label htmlFor="recipe-sector">Setor</Label>
           <Input
             id="recipe-sector"
             value={sector}
             onChange={(e) => setSector(e.target.value)}
             placeholder="Ex.: Cozinha fria, Cozinha quente"
             maxLength={100}
+            className={fieldSurfaceClassName}
           />
         </div>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="recipe-cmv" className={fieldLabelClassName}>
-            CMV% (Custo dos Materiais Vendidos)
+          <Label
+            htmlFor="recipe-cmv"
+            title="Custo dos Materiais Vendidos"
+          >
+            CMV%
           </Label>
-          <div className="flex items-center gap-2">
+          <div className="relative min-w-0">
             <Input
               id="recipe-cmv"
               inputMode="decimal"
               value={cmvPercentInput}
               onChange={(e) => setCmvPercentInput(e.target.value)}
               placeholder="25"
-              className="flex-1"
+              className={cn(fieldSurfaceClassName, "pr-7")}
+              aria-describedby="recipe-cmv-hint"
             />
-            <span className="text-muted-foreground">%</span>
+            <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-sm">
+              %
+            </span>
           </div>
-          <p className="text-muted-foreground text-xs">
-            Padrão: 25%. Ajuste conforme sua margem desejada (20%, 30%, etc).
-          </p>
         </div>
+        <p
+          id="recipe-cmv-hint"
+          className="text-muted-foreground col-span-full text-xs"
+        >
+          CMV — Custo dos Materiais Vendidos. Padrão: 25%. Ajuste conforme sua
+          margem desejada (20%, 30%, etc).
+        </p>
       </div>
         </CardContent>
       </Card>
@@ -1213,7 +1226,7 @@ export function RecipeForm({
                 <div className="space-y-1.5 sm:max-w-[12rem]">
                   <Label
                     htmlFor="recipe-scale-target"
-                    className={fieldLabelClassName}
+                    className="text-xs"
                   >
                     Novo rendimento (porções)
                   </Label>
@@ -1244,7 +1257,7 @@ export function RecipeForm({
             >
               <div className="space-y-1.5 sm:col-span-1">
                 <Label
-                  className={cn("text-xs", fieldLabelClassName)}
+                  className="text-xs"
                   htmlFor={`ing-${line.key}`}
                 >
                   Ingrediente {index + 1}
@@ -1257,11 +1270,12 @@ export function RecipeForm({
                   }
                   placeholder="Nome do ingrediente"
                   required
+                  className={fieldSurfaceClassName}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label
-                  className={cn("text-xs", fieldLabelClassName)}
+                  className="text-xs"
                   htmlFor={`qty-${line.key}`}
                 >
                   Quantidade
@@ -1275,31 +1289,38 @@ export function RecipeForm({
                   }
                   placeholder="0"
                   required
+                  className={fieldSurfaceClassName}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label
-                  className={cn("text-xs", fieldLabelClassName)}
+                  className="text-xs"
                   htmlFor={`unit-${line.key}`}
                 >
                   Unidade
                 </Label>
-                <select
-                  id={`unit-${line.key}`}
-                  className={selectClassName}
-                  value={line.unit}
-                  onChange={(e) =>
-                    updateLine(line.key, {
-                      unit: e.target.value as RecipeLineUnit,
-                    })
-                  }
-                >
-                  {RECIPE_LINE_UNITS.map((u) => (
-                    <option key={u} value={u}>
-                      {RECIPE_LINE_UNIT_LABELS[u]}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative min-w-0">
+                  <select
+                    id={`unit-${line.key}`}
+                    className={cn(fieldSurfaceClassName, "appearance-none pr-8")}
+                    value={line.unit}
+                    onChange={(e) =>
+                      updateLine(line.key, {
+                        unit: e.target.value as RecipeLineUnit,
+                      })
+                    }
+                  >
+                    {RECIPE_LINE_UNITS.map((u) => (
+                      <option key={u} value={u}>
+                        {RECIPE_LINE_UNIT_LABELS[u]}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDownIcon
+                    aria-hidden
+                    className="text-muted-foreground pointer-events-none absolute top-1/2 right-2.5 h-4 w-4 -translate-y-1/2 opacity-50"
+                  />
+                </div>
               </div>
               <div className="flex justify-end pb-0.5">
                 <Button
@@ -1317,7 +1338,7 @@ export function RecipeForm({
               <div className="flex flex-wrap items-end gap-4 sm:col-span-full">
                 <div className="w-full min-w-[7rem] space-y-1.5 sm:w-36">
                   <Label
-                    className={cn("text-xs", fieldLabelClassName)}
+                    className="text-xs"
                     htmlFor={`corr-${line.key}`}
                   >
                     Correção (custo)
@@ -1337,7 +1358,7 @@ export function RecipeForm({
                 </div>
                 <div className="w-full min-w-[7rem] space-y-1.5 sm:w-36">
                   <Label
-                    className={cn("text-xs", fieldLabelClassName)}
+                    className="text-xs"
                     htmlFor={`cook-${line.key}`}
                   >
                     Cocção (TACO)
@@ -1365,7 +1386,7 @@ export function RecipeForm({
               </p>
               <div className="space-y-1.5 sm:col-span-full">
                 <Label
-                  className={cn("text-xs", fieldLabelClassName)}
+                  className="text-xs"
                   htmlFor={`notes-${line.key}`}
                 >
                   Notas (opcional)
@@ -1383,7 +1404,7 @@ export function RecipeForm({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                   <div className="min-w-0 flex-1 space-y-1.5">
                     <Label
-                      className={cn("text-xs", fieldLabelClassName)}
+                      className="text-xs"
                       htmlFor={`rm-${line.key}`}
                     >
                       Matéria-prima (custo)
@@ -1594,31 +1615,31 @@ export function RecipeForm({
             <CardContent className="space-y-2 text-sm">
               <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3">
                 <div>
-                  <dt className="text-muted-foreground">Energia</dt>
+                  <dt className={metricLabelClassName}>Energia</dt>
                   <dd className="text-foreground font-medium tabular-nums">
                     {nutritionPreview.kcal} kcal
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Proteína</dt>
+                  <dt className={metricLabelClassName}>Proteína</dt>
                   <dd className="text-foreground font-medium tabular-nums">
                     {nutritionPreview.proteinG} g
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">H. de carbono</dt>
+                  <dt className={metricLabelClassName}>H. de carbono</dt>
                   <dd className="text-foreground font-medium tabular-nums">
                     {nutritionPreview.carbG} g
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Lípidos</dt>
+                  <dt className={metricLabelClassName}>Lípidos</dt>
                   <dd className="text-foreground font-medium tabular-nums">
                     {nutritionPreview.lipidG} g
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">Fibra</dt>
+                  <dt className={metricLabelClassName}>Fibra</dt>
                   <dd className="text-foreground font-medium tabular-nums">
                     {nutritionPreview.fiberG} g
                   </dd>

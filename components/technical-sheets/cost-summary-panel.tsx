@@ -50,6 +50,13 @@ function parsePercentLoose(s: string): number {
   return n;
 }
 
+const panelSectionTitleClassName =
+  "text-foreground text-xs font-semibold uppercase tracking-wide";
+
+const metricLabelClassName = "text-foreground text-sm";
+
+const shortNumericInputClassName = "w-[5.5rem]";
+
 export function CostSummaryPanel({
   totalMaterialCostBrl,
   linesWithCost,
@@ -99,7 +106,7 @@ export function CostSummaryPanel({
       </CardHeader>
       <CardContent className="space-y-6 text-sm">
         <div className="space-y-2">
-          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <p className={panelSectionTitleClassName}>
             Custo de matéria-prima
           </p>
           <p className="text-foreground text-2xl font-semibold tabular-nums">
@@ -122,7 +129,7 @@ export function CostSummaryPanel({
           ) : null}
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="recipe-portions-yield">Rendimento (porções)</Label>
             <Input
@@ -131,6 +138,7 @@ export function CostSummaryPanel({
               value={portionsYieldInput}
               onChange={(e) => onPortionsYieldInputChange(e.target.value)}
               min={1}
+              className={shortNumericInputClassName}
             />
           </div>
           <div className="space-y-2">
@@ -141,6 +149,7 @@ export function CostSummaryPanel({
               value={marginPercentInput}
               onChange={(e) => onMarginPercentInputChange(e.target.value)}
               placeholder="0"
+              className={shortNumericInputClassName}
             />
           </div>
           <div className="space-y-2">
@@ -151,6 +160,7 @@ export function CostSummaryPanel({
               value={taxPercentInput}
               onChange={(e) => onTaxPercentInputChange(e.target.value)}
               placeholder="0"
+              className={shortNumericInputClassName}
             />
           </div>
           <div className="space-y-2">
@@ -161,29 +171,30 @@ export function CostSummaryPanel({
               value={cmvPercentInput}
               onChange={(e) => onCmvPercentInputChange(e.target.value)}
               placeholder="25"
+              className={shortNumericInputClassName}
             />
           </div>
         </div>
 
         <div className="bg-muted/40 space-y-2 rounded-lg p-3">
-          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <p className={panelSectionTitleClassName}>
             Por porção (Margem + Impostos)
           </p>
           <dl className="grid gap-2 sm:grid-cols-2">
             <div className="flex justify-between gap-2 sm:block">
-              <dt className="text-muted-foreground">Custo</dt>
+              <dt className={metricLabelClassName}>Custo</dt>
               <dd className="text-foreground font-medium tabular-nums sm:mt-0.5">
                 {formatBrl(pricing.costPerPortionBrl)}
               </dd>
             </div>
             <div className="flex justify-between gap-2 sm:block">
-              <dt className="text-muted-foreground">Preço sugerido (s/ imposto)</dt>
+              <dt className={metricLabelClassName}>Preço sugerido (s/ imposto)</dt>
               <dd className="text-foreground font-medium tabular-nums sm:mt-0.5">
                 {formatBrl(pricing.suggestedBasePricePerPortionBrl)}
               </dd>
             </div>
             <div className="flex justify-between gap-2 sm:col-span-2 sm:block">
-              <dt className="text-muted-foreground">Preço sugerido (c/ impostos)</dt>
+              <dt className={metricLabelClassName}>Preço sugerido (c/ impostos)</dt>
               <dd className="text-foreground text-lg font-semibold tabular-nums sm:mt-0.5">
                 {formatBrl(pricing.suggestedPriceWithTaxPerPortionBrl)}
               </dd>
@@ -192,18 +203,18 @@ export function CostSummaryPanel({
         </div>
 
         <div className="bg-blue-50 dark:bg-blue-950/30 space-y-2 rounded-lg p-3">
-          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <p className={panelSectionTitleClassName}>
             Por porção (CMV%)
           </p>
           <dl className="grid gap-2 sm:grid-cols-2">
             <div className="flex justify-between gap-2 sm:block">
-              <dt className="text-muted-foreground">Custo</dt>
+              <dt className={metricLabelClassName}>Custo</dt>
               <dd className="text-foreground font-medium tabular-nums sm:mt-0.5">
                 {formatBrl(cmvPricing.costPerPortionBrl)}
               </dd>
             </div>
             <div className="flex justify-between gap-2 sm:col-span-2 sm:block">
-              <dt className="text-muted-foreground">Preço venda (baseado em {cmvPct}% CMV)</dt>
+              <dt className={metricLabelClassName}>Preço venda (baseado em {cmvPct}% CMV)</dt>
               <dd className="text-foreground text-lg font-semibold tabular-nums sm:mt-0.5">
                 {formatBrl(cmvPricing.salesPricePerPortionBrl)}
               </dd>
@@ -215,36 +226,36 @@ export function CostSummaryPanel({
         </div>
 
         <div className="space-y-2 border-t pt-4">
-          <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+          <p className={panelSectionTitleClassName}>
             Nutrição estimada por porção (TACO)
           </p>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
             <div>
-              <dt className="text-muted-foreground">Energia</dt>
+              <dt className={metricLabelClassName}>Energia</dt>
               <dd className="text-foreground font-medium tabular-nums">
                 {perPortionNutrition.kcal} kcal
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Proteína</dt>
+              <dt className={metricLabelClassName}>Proteína</dt>
               <dd className="text-foreground font-medium tabular-nums">
                 {perPortionNutrition.proteinG} g
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">H. de carbono</dt>
+              <dt className={metricLabelClassName}>H. de carbono</dt>
               <dd className="text-foreground font-medium tabular-nums">
                 {perPortionNutrition.carbG} g
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Lípidos</dt>
+              <dt className={metricLabelClassName}>Lípidos</dt>
               <dd className="text-foreground font-medium tabular-nums">
                 {perPortionNutrition.lipidG} g
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Fibra</dt>
+              <dt className={metricLabelClassName}>Fibra</dt>
               <dd className="text-foreground font-medium tabular-nums">
                 {perPortionNutrition.fiberG} g
               </dd>

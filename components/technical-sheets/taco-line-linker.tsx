@@ -48,7 +48,7 @@ export function TacoLineLinker({
   if (linked) {
     return (
       <div className="space-y-1.5 sm:col-span-full">
-        <Label className="text-muted-foreground text-xs">TACO (referência)</Label>
+        <Label className="text-xs">TACO (referência)</Label>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-foreground">
             {linked.taco_code} — {linked.name}
@@ -68,7 +68,7 @@ export function TacoLineLinker({
 
   return (
     <div className="space-y-1.5 sm:col-span-full">
-      <Label className="text-muted-foreground text-xs" htmlFor={inputId}>
+      <Label className="text-xs" htmlFor={inputId}>
         Ligar à TACO (pesquisar, mín. 2 caracteres)
       </Label>
       <Input

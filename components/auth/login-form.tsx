@@ -432,7 +432,7 @@ export function LoginForm() {
           Entrar
         </h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Acesse com o email e a senha da sua conta.
+          Acesse com seu e-mail e senha.
         </p>
       </div>
 
@@ -593,6 +593,19 @@ export function LoginForm() {
         >
           Recuperar senha
         </Link>
+      </p>
+
+      <p className="text-muted-foreground text-center text-xs leading-relaxed">
+        Ao entrar, você concorda com nossa{" "}
+        <Link
+          href="/politica-de-privacidade"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline underline-offset-2 hover:text-foreground transition-colors"
+        >
+          Política de Privacidade
+        </Link>
+        .
       </p>
 
       <AppBuildLabel className="mt-4" />

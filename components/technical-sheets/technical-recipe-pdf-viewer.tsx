@@ -1,12 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { ArrowLeft, Download, Loader2, Printer } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
+import { navigateBack } from "@/lib/navigation/navigate-back";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -20,6 +21,7 @@ export function TechnicalRecipePdfViewer({
   recipeName,
   suggestedFilename,
 }: Props) {
+  const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const blobRef = useRef<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -137,16 +139,17 @@ export function TechnicalRecipePdfViewer({
     <div className="flex min-h-[calc(100dvh-4rem)] flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <Link
-            href={`/ficha-tecnica/${recipeId}/editar`}
+          <button
+            type="button"
+            onClick={() => navigateBack(router, "/ficha-tecnica")}
             className={cn(
               buttonVariants({ variant: "ghost", size: "sm" }),
               "text-muted-foreground hover:text-foreground -ml-2 gap-1.5 px-2",
             )}
           >
             <ArrowLeft className="size-4 shrink-0" aria-hidden />
-            Voltar à receita
-          </Link>
+            Voltar
+          </button>
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
             Ficha técnica em PDF
           </h1>

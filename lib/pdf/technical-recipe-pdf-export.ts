@@ -1,3 +1,4 @@
+import { buildTechnicalRecipePdfFilename } from "@/lib/pdf/technical-recipe-pdf-filename";
 import { loadTechnicalRecipeById } from "@/lib/actions/technical-recipes";
 import { TECHNICAL_RECIPE_IMAGES_BUCKET } from "@/lib/constants/technical-recipe-images-storage";
 import { TENANT_LOGOS_BUCKET } from "@/lib/constants/tenant-logos-storage";
@@ -132,7 +133,10 @@ export async function buildTechnicalRecipePdfExport(
     professionalCrn: String(profile?.crn ?? ""),
   });
 
-  const filename = `ficha-tecnica-${safeTechnicalRecipePdfFilename(recipe.name)}.pdf`;
+  const filename = buildTechnicalRecipePdfFilename({
+    recipeName: recipe.name,
+    updatedAtIso: recipe.updated_at,
+  });
 
   return {
     bytes,

@@ -182,6 +182,14 @@ export function AppShell({
         <div className="p-2">
           <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
           <AppBuildLabel className="text-sidebar-foreground/45" />
+          <Link
+            href="/politica-de-privacidade"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sidebar-foreground/35 hover:text-sidebar-foreground/60 mt-1 block px-3 text-[10px] transition-colors"
+          >
+            Política de Privacidade
+          </Link>
         </div>
       </aside>
 
@@ -249,6 +257,15 @@ export function AppShell({
             <div className="p-2">
               <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
               <AppBuildLabel className="text-sidebar-foreground/45" />
+              <Link
+                href="/politica-de-privacidade"
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setMenuOpen(false)}
+                className="text-sidebar-foreground/35 hover:text-sidebar-foreground/60 mt-1 block px-3 text-[10px] transition-colors"
+              >
+                Política de Privacidade
+              </Link>
             </div>
           </SheetContent>
         </Sheet>

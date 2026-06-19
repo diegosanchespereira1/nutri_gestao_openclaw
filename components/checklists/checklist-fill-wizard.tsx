@@ -1858,6 +1858,13 @@ export function ChecklistFillWizard({
 
       {/* Dialog de captura de assinaturas — exibido antes de aprovar o dossiê */}
       <SignatureCaptureDialog
+        key={
+          signatureDialogOpen
+            ? (savedProfessionalSig ??
+              profileProfessionalSignatureDataUrl ??
+              "no-prof-sig")
+            : "closed"
+        }
         open={signatureDialogOpen}
         onOpenChange={(open) => {
           setSignatureDialogOpen(open);

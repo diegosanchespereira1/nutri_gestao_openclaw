@@ -246,7 +246,7 @@ function drawTenantHeader(
   logo: PDFImage | null,
 ): PdfCtx {
   const bandH = 46;
-  let next = ctx;
+  const next = ctx;
   next.page.drawRectangle({
     x: 0,
     y: PAGE_H - bandH,

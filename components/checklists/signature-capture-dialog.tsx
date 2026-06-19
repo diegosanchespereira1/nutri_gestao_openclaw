@@ -189,16 +189,19 @@ export function SignatureCaptureDialog({
   clientSignatureRequired = true,
   initialProfessionalDataUrl = null,
 }: SignatureCaptureDialogProps) {
-  const [step, setStep] = useState<Step>("professional");
-  const [professionalDataUrl, setProfessionalDataUrl] = useState<string | null>(null);
+  const profileSignatureReady = Boolean(initialProfessionalDataUrl?.trim());
+
+  const [step, setStep] = useState<Step>(() =>
+    profileSignatureReady ? "client" : "professional",
+  );
+  const [professionalDataUrl, setProfessionalDataUrl] = useState<string | null>(() =>
+    profileSignatureReady ? initialProfessionalDataUrl : null,
+  );
   const [clientDataUrl, setClientDataUrl] = useState<string | null>(null);
   const [clientSignerName, setClientSignerName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const profileSignatureReady = Boolean(initialProfessionalDataUrl?.trim());
-
-  useEffect(() => {
-    if (!open) return;
+  function resetForOpen() {
     if (profileSignatureReady) {
       setProfessionalDataUrl(initialProfessionalDataUrl);
       setStep("client");
@@ -209,10 +212,12 @@ export function SignatureCaptureDialog({
     setClientDataUrl(null);
     setClientSignerName("");
     setError(null);
-  }, [open, initialProfessionalDataUrl, profileSignatureReady]);
+  }
 
   function handleOpenChange(nextOpen: boolean) {
-    if (!nextOpen) {
+    if (nextOpen) {
+      resetForOpen();
+    } else {
       setStep("professional");
       setProfessionalDataUrl(null);
       setClientDataUrl(null);

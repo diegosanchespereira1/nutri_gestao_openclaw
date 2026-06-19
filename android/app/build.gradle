@@ -1,5 +1,55 @@
 apply plugin: 'com.android.application'
 
+def loadReleaseKeystoreCredentials = {
+    def keystorePropsFile = rootProject.file("keystore.properties")
+    def keystoreFile
+    def storePassword
+    def keyAlias
+    def keyPassword
+
+    if (keystorePropsFile.exists()) {
+        def props = new Properties()
+        props.load(new FileInputStream(keystorePropsFile))
+        def storePath = props['storeFile']?.toString()?.trim()
+        if (!storePath) {
+            return null
+        }
+        keystoreFile = storePath.startsWith("/")
+            ? file(storePath)
+            : rootProject.file(storePath)
+        storePassword = props['storePassword']
+        keyAlias = props['keyAlias']
+        keyPassword = props['keyPassword']
+    } else {
+        def storePath = System.getenv("KEYSTORE_PATH") ?: "app/nutrigestao-release.keystore"
+        keystoreFile = file(storePath).isAbsolute()
+            ? file(storePath)
+            : rootProject.file(storePath)
+        storePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
+        keyAlias = System.getenv("KEY_ALIAS") ?: "nutrigestao"
+        keyPassword = System.getenv("KEY_PASSWORD") ?: ""
+    }
+
+    if (!keystoreFile.exists()) {
+        return null
+    }
+
+    return [
+        file: keystoreFile,
+        storePassword: storePassword,
+        keyAlias: keyAlias,
+        keyPassword: keyPassword,
+    ]
+}
+
+def isReleaseBuildTask = {
+    gradle.startParameter.taskNames.any { name ->
+        def lower = name.toLowerCase()
+        lower.contains("release") &&
+            (lower.contains("bundle") || lower.contains("assemble") || lower.contains("package"))
+    }
+}
+
 android {
     namespace = "br.com.nutrigestao.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -18,35 +68,13 @@ android {
     }
     signingConfigs {
         release {
-            def keystorePropsFile = rootProject.file("keystore.properties")
-            def keystoreFile
-            if (keystorePropsFile.exists()) {
-                def props = new Properties()
-                props.load(new FileInputStream(keystorePropsFile))
-                def storePath = props['storeFile']?.toString()?.trim()
-                keystoreFile = storePath.startsWith("/")
-                    ? file(storePath)
-                    : rootProject.file(storePath)
-                storePassword props['storePassword']
-                keyAlias      props['keyAlias']
-                keyPassword   props['keyPassword']
-            } else {
-                def storePath = System.getenv("KEYSTORE_PATH") ?: "app/nutrigestao-release.keystore"
-                keystoreFile = file(storePath).isAbsolute()
-                    ? file(storePath)
-                    : rootProject.file(storePath)
-                storePassword System.getenv("KEYSTORE_PASSWORD") ?: ""
-                keyAlias      System.getenv("KEY_ALIAS")         ?: "nutrigestao"
-                keyPassword   System.getenv("KEY_PASSWORD")      ?: ""
+            def creds = loadReleaseKeystoreCredentials()
+            if (creds != null) {
+                storeFile creds.file
+                storePassword creds.storePassword
+                keyAlias creds.keyAlias
+                keyPassword creds.keyPassword
             }
-            if (!keystoreFile.exists()) {
-                throw new GradleException(
-                    "Keystore de release não encontrado: ${keystoreFile.absolutePath}\n" +
-                    "Configure android/keystore.properties (veja keystore.properties.example) " +
-                    "ou defina KEYSTORE_PATH antes de bundleRelease."
-                )
-            }
-            storeFile keystoreFile
         }
     }
 
@@ -55,7 +83,10 @@ android {
             // webContentsDebuggingEnabled habilitado via MainActivity ou capacitor.config.ts
         }
         release {
-            signingConfig signingConfigs.release
+            def creds = loadReleaseKeystoreCredentials()
+            if (creds != null) {
+                signingConfig signingConfigs.release
+            }
             // Capacitor/WebView: ofuscação R8 desligada — evita quebra de plugins nativos.
             // O aviso da Play Store sobre mapping file é esperado enquanto minifyEnabled=false.
             minifyEnabled false
@@ -75,6 +106,20 @@ android {
         jniLibs {
             useLegacyPackaging = false
         }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if (!isReleaseBuildTask()) {
+        return
+    }
+    def creds = loadReleaseKeystoreCredentials()
+    if (creds == null) {
+        throw new GradleException(
+            "Keystore de release não encontrado.\n" +
+            "Configure android/keystore.properties (veja keystore.properties.example) " +
+            "ou defina KEYSTORE_PATH antes de bundleRelease."
+        )
     }
 }
 

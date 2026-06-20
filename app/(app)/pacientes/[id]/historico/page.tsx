@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
 
 import { ConsolidatedTimeline } from "@/components/pacientes/consolidated-timeline";
+import { PatientResponsibleHistorySection } from "@/components/pacientes/patient-responsible-history-section";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadConsolidatedNutritionHistory } from "@/lib/actions/patient-history";
+import { loadPatientResponsibleHistory } from "@/lib/actions/patient-responsible-history";
 import { loadPatientById } from "@/lib/actions/patients";
 
 export default async function HistoricoPacientePage({
@@ -15,13 +17,19 @@ export default async function HistoricoPacientePage({
   const { row } = await loadPatientById(id);
   if (!row) notFound();
 
-  const {
-    patientFullName,
-    mergeByDocument,
-    linkedPatientCount,
-    documentOnFile,
-    events,
-  } = await loadConsolidatedNutritionHistory(id);
+  const [
+    {
+      patientFullName,
+      mergeByDocument,
+      linkedPatientCount,
+      documentOnFile,
+      events,
+    },
+    { currentResponsibleName, events: responsibleEvents },
+  ] = await Promise.all([
+    loadConsolidatedNutritionHistory(id),
+    loadPatientResponsibleHistory(id),
+  ]);
 
   if (!patientFullName) {
     notFound();
@@ -41,7 +49,25 @@ export default async function HistoricoPacientePage({
         back={{ href: `/pacientes/${id}`, label: "Prontuário" }}
       />
 
-      <ConsolidatedTimeline events={events} />
+      <PatientResponsibleHistorySection
+        currentResponsibleName={currentResponsibleName}
+        events={responsibleEvents}
+      />
+
+      <section className="space-y-4" aria-labelledby="nutrition-history-heading">
+        <div>
+          <h2
+            id="nutrition-history-heading"
+            className="text-foreground text-lg font-semibold tracking-tight"
+          >
+            Avaliações nutricionais
+          </h2>
+          <p className="text-muted-foreground text-sm">
+            Registos clínicos consolidados por CPF, quando aplicável.
+          </p>
+        </div>
+        <ConsolidatedTimeline events={events} />
+      </section>
     </PageLayout>
   );
 }

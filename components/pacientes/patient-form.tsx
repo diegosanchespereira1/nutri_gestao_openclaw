@@ -1,6 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+
+import {
+  PatientPhotoField,
+  type PatientPhotoFieldChange,
+} from "@/components/pacientes/patient-photo-field";
 
 import {
   type PatientFormResult,
@@ -41,6 +46,7 @@ export function PatientForm({
   /** Lista de clientes PJ disponíveis para o seletor (só relevante em create sem clientId fixo). */
   clients,
   teamMembers = [],
+  defaultPhotoUrl = null,
   defaults,
 }: {
   mode: "create" | "edit";
@@ -51,6 +57,7 @@ export function PatientForm({
   establishmentsByClient?: Record<string, { id: string; name: string }[]>;
   clients?: Pick<ClientRow, "id" | "legal_name" | "trade_name">[];
   teamMembers?: TeamMemberSelectOption[];
+  defaultPhotoUrl?: string | null;
   defaults: {
     full_name: string;
     birth_date: string;
@@ -64,10 +71,36 @@ export function PatientForm({
 }) {
   const action =
     mode === "create" ? createPatientAction : updatePatientAction;
-  const [state, formAction] = useActionState(action, initial);
+
+  const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+
+  const [state, formAction] = useActionState(
+    async (prev: PatientFormResult | undefined, formData: FormData) => {
+      if (removePhoto) {
+        formData.set("remove_photo", "1");
+      } else if (pendingPhoto) {
+        formData.set("photo", pendingPhoto);
+      }
+      return action(prev, formData);
+    },
+    initial,
+  );
 
   const sexDefault = defaults.sex ?? "";
   const [sex, setSex] = useState<string>(sexDefault);
+  const [fullNameValue, setFullNameValue] = useState(defaults.full_name);
+
+  function handlePhotoChange({ file, remove }: PatientPhotoFieldChange) {
+    setPendingPhoto(file);
+    setRemovePhoto(remove);
+  }
+
+  useEffect(() => {
+    if (state?.ok !== true) return;
+    setPendingPhoto(null);
+    setRemovePhoto(false);
+  }, [state]);
 
   // Para o seletor de cliente no modo "independente"
   const showClientSelector = mode === "create" && clientId == null;
@@ -116,15 +149,25 @@ export function PatientForm({
           Identificação
         </legend>
 
+        <PatientPhotoField
+          patientName={fullNameValue}
+          defaultPhotoUrl={defaultPhotoUrl}
+          onChange={handlePhotoChange}
+        />
+
         <div className="space-y-2">
           <Label htmlFor="patient-name">Nome completo</Label>
           <Input
             id="patient-name"
             name="full_name"
             required
-            defaultValue={defaults.full_name}
+            value={fullNameValue}
+            onChange={(event) => setFullNameValue(event.target.value)}
             autoComplete="name"
-            aria-invalid={state?.ok === false}
+            aria-invalid={
+              state?.ok === false &&
+              state.error === "Indique o nome do paciente."
+            }
             aria-describedby={
               state?.ok === false ? "patient-form-err" : undefined
             }
@@ -193,8 +236,7 @@ export function PatientForm({
               ))}
             </select>
             <p className="text-muted-foreground text-xs">
-              Se outro colega fizer o acompanhamento ou checklist, actualize para
-              o nome de quem está a tratar o paciente.
+              Atualize o nome de quem está fazendo acompanhamento do paciente.
             </p>
           </div>
         ) : (

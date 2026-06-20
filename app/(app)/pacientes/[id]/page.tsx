@@ -4,6 +4,7 @@ import { Pencil, User, Phone, Building2, Lock, ClipboardList } from "lucide-reac
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { ClientAvatar } from "@/components/clientes/client-avatar";
 import {
   Card,
   CardContent,
@@ -13,8 +14,9 @@ import {
 import { buttonVariants } from "@/components/ui/button-variants";
 import { PatientAssessmentsBlock } from "@/components/pacientes/patient-assessments-block";
 import { loadPatientById } from "@/lib/actions/patients";
-import { createClient } from "@/lib/supabase/server";
 import { formatCpfDisplay } from "@/lib/format/br-document";
+import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
+import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 const SEX_LABEL: Record<string, string> = {
@@ -90,6 +92,10 @@ export default async function ProntuarioPacientePage({
 
   const avaliacaoOk = sp.avaliacao === "ok";
 
+  const photoUrl = row.photo_storage_path
+    ? await getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
+    : null;
+
   const [clientResult, estResult, teamMemberResult] = await Promise.all([
     row.client_id
       ? supabase
@@ -145,6 +151,14 @@ export default async function ProntuarioPacientePage({
   return (
     <PageLayout variant="form">
       <PageHeader
+        leading={
+          <ClientAvatar
+            name={row.full_name}
+            imageUrl={photoUrl}
+            size="lg"
+            className="rounded-full"
+          />
+        }
         title={row.full_name}
         description={descriptionParts.join(" · ")}
         back={{ href: backHref, label: backLabel }}

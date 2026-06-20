@@ -6,6 +6,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
+import {
+  deletePatientPhotoAtPathIfAny,
+  mapPatientPhotoUpdateError,
+  resolvePatientPhotoPathFromForm,
+} from "@/lib/patients/photo-sync";
+import { emitPatientResponsibleActivityLog } from "@/lib/patients/responsible-audit";
 import type { ClientKind } from "@/lib/types/clients";
 import type {
   PatientRow,
@@ -367,6 +373,7 @@ const PATIENT_LIST_SELECT = `
   full_name,
   birth_date,
   document_id,
+  photo_storage_path,
   clients ( legal_name ),
   establishments ( name )
 `.trim();
@@ -549,6 +556,35 @@ export async function createPatientAction(
     return { ok: false, error: "Não foi possível criar o paciente." };
   }
 
+  const photoRes = await resolvePatientPhotoPathFromForm({
+    supabase,
+    workspaceOwnerId,
+    patientId: data.id,
+    formData,
+    previousPath: null,
+  });
+  if (!photoRes.ok) {
+    return { ok: false, error: photoRes.error };
+  }
+  if (photoRes.path) {
+    const { error: photoUpdateError } = await supabase
+      .from("patients")
+      .update({ photo_storage_path: photoRes.path })
+      .eq("id", data.id);
+    if (photoUpdateError) {
+      await deletePatientPhotoAtPathIfAny(supabase, photoRes.path);
+      return { ok: false, error: "Paciente criado, mas não foi possível guardar a foto." };
+    }
+  }
+
+  await emitPatientResponsibleActivityLog({
+    supabase,
+    patientId: data.id,
+    previousTeamMemberId: null,
+    nextTeamMemberId: responsibleRes.value,
+    isCreate: true,
+  });
+
   revalidatePatientPaths(client_id, establishment_id, data.id);
   redirect(`/pacientes/${data.id}/editar`);
 }
@@ -574,11 +610,22 @@ export async function updatePatientAction(
     return { ok: false, error: "Identificador em falta." };
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: selectError } = await supabase
     .from("patients")
-    .select("client_id, establishment_id")
+    .select("client_id, establishment_id, photo_storage_path, responsible_team_member_id")
     .eq("id", id)
     .maybeSingle();
+
+  if (selectError) {
+    if (selectError.message?.includes("photo_storage_path")) {
+      return {
+        ok: false,
+        error:
+          "A base de dados ainda não suporta fotos de paciente. Aplique a migration 20260821120000_patient_photo.sql no Supabase.",
+      };
+    }
+    return { ok: false, error: "Paciente não encontrado." };
+  }
 
   if (!existing) {
     return { ok: false, error: "Paciente não encontrado." };
@@ -644,6 +691,20 @@ export async function updatePatientAction(
   const notesRaw = String(formData.get("notes") ?? "").trim();
   const notes = notesRaw.length > 0 ? notesRaw : null;
 
+  const photoRes = await resolvePatientPhotoPathFromForm({
+    supabase,
+    workspaceOwnerId,
+    patientId: id,
+    formData,
+    previousPath:
+      typeof existing.photo_storage_path === "string"
+        ? existing.photo_storage_path
+        : null,
+  });
+  if (!photoRes.ok) {
+    return { ok: false, error: photoRes.error };
+  }
+
   const { error } = await supabase
     .from("patients")
     .update({
@@ -656,12 +717,46 @@ export async function updatePatientAction(
       notes,
       establishment_id,
       responsible_team_member_id: responsibleRes.value,
+      photo_storage_path: photoRes.path,
     })
     .eq("id", id);
 
   if (error) {
+    console.error("[updatePatientAction] patients update failed", {
+      id,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    });
+    const mapped = mapPatientPhotoUpdateError(error);
+    if (mapped) return { ok: false, error: mapped };
+    if (
+      photoRes.path &&
+      photoRes.path !==
+        (typeof existing.photo_storage_path === "string"
+          ? existing.photo_storage_path
+          : null)
+    ) {
+      await deletePatientPhotoAtPathIfAny(supabase, photoRes.path);
+      return {
+        ok: false,
+        error:
+          "A foto foi enviada, mas não foi possível associá-la ao paciente. Tente novamente.",
+      };
+    }
     return { ok: false, error: "Não foi possível salvar as alterações." };
   }
+
+  const previousResponsibleId =
+    typeof existing.responsible_team_member_id === "string"
+      ? existing.responsible_team_member_id
+      : null;
+  await emitPatientResponsibleActivityLog({
+    supabase,
+    patientId: id,
+    previousTeamMemberId: previousResponsibleId,
+    nextTeamMemberId: responsibleRes.value,
+  });
 
   // Revalidate both old and new establishment paths if the establishment changed
   revalidatePatientPaths(clientId, existing.establishment_id as string | null, id);
@@ -686,11 +781,15 @@ export async function deletePatientAction(formData: FormData) {
 
   const { data: row } = await supabase
     .from("patients")
-    .select("client_id, establishment_id")
+    .select("client_id, establishment_id, photo_storage_path")
     .eq("id", id)
     .maybeSingle();
 
   if (!row) redirect("/pacientes");
+
+  if (typeof row.photo_storage_path === "string" && row.photo_storage_path) {
+    await deletePatientPhotoAtPathIfAny(supabase, row.photo_storage_path);
+  }
 
   await supabase.from("patients").delete().eq("id", id);
 

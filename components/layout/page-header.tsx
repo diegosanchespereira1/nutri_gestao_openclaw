@@ -10,6 +10,8 @@ interface PageHeaderProps {
   title: string;
   /** Descrição curta abaixo do título */
   description?: string;
+  /** Elemento à esquerda do título (ex.: avatar) */
+  leading?: ReactNode;
   /** Link de volta: { href, label } */
   back?: { href: string; label: string };
   /** Ações no canto direito (botões, links) */
@@ -27,6 +29,7 @@ interface PageHeaderProps {
 export function PageHeader({
   title,
   description,
+  leading,
   back,
   actions,
   className,
@@ -46,9 +49,12 @@ export function PageHeader({
         </Link>
       )}
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <h1 className="min-w-0 text-2xl font-bold tracking-tight text-foreground">
-          {title}
-        </h1>
+        <div className="flex min-w-0 items-center gap-3">
+          {leading}
+          <h1 className="min-w-0 text-2xl font-bold tracking-tight text-foreground">
+            {title}
+          </h1>
+        </div>
         {actions && (
           <div className="flex shrink-0 items-center gap-2">{actions}</div>
         )}

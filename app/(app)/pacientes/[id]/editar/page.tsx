@@ -20,6 +20,7 @@ import { loadPatientById } from "@/lib/actions/patients";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
 import { loadClientsForOwner } from "@/lib/actions/clients";
+import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
 
@@ -93,6 +94,10 @@ export default async function EditarPacientePage({
   const childSex =
     row.sex === "female" || row.sex === "male" ? row.sex : null;
 
+  const defaultPhotoUrl = row.photo_storage_path
+    ? await getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
+    : null;
+
   const backHref = `/pacientes/${row.id}`;
   const backLabel = "Prontuário";
 
@@ -150,6 +155,7 @@ export default async function EditarPacientePage({
             clientId={row.client_id}
             establishmentId={row.establishment_id}
             teamMembers={teamMembers}
+            defaultPhotoUrl={defaultPhotoUrl}
             defaults={{
               full_name: row.full_name,
               birth_date: birthSlice,

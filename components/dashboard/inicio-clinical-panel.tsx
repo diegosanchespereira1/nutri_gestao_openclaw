@@ -160,17 +160,6 @@ export async function InicioClinicalPanel() {
       <DashboardClinicalSubsection
         id="regulatory-alerts-heading"
         title="Alertas regulatórios"
-        actions={
-          <Link
-            href="/clientes"
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "text-muted-foreground w-full justify-center sm:w-auto",
-            )}
-          >
-            Gerir estabelecimentos
-          </Link>
-        }
       >
         {complianceAlerts.length === 0 ? (
           <p className="text-muted-foreground text-sm">

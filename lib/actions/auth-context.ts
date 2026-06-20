@@ -25,3 +25,10 @@ export async function requireWorkspaceAuthContext(
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
   return { ok: true, userId: user.id, workspaceOwnerId };
 }
+
+/** Confirma que o servidor reconhece a sessão (cookies propagados após login no browser). */
+export async function pingWorkspaceAuthAction(): Promise<{ ok: boolean }> {
+  const supabase = await createClient();
+  const auth = await requireWorkspaceAuthContext(supabase);
+  return { ok: auth.ok };
+}

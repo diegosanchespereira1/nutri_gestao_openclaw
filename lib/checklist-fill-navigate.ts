@@ -1,5 +1,6 @@
 "use client";
 
+import { suspendNavigationGuardOnce } from "@/lib/client/suspend-navigation-guard";
 import { signalNavigationStart } from "@/lib/navigation-pending";
 
 /**
@@ -19,5 +20,6 @@ export function navigateToChecklistFill(
   if (options?.returnTo) {
     url.searchParams.set("returnTo", options.returnTo);
   }
+  suspendNavigationGuardOnce();
   window.location.assign(`${url.pathname}${url.search}`);
 }

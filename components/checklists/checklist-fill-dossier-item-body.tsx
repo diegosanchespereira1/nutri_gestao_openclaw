@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { AlertTriangle, X, ZoomIn } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ChevronDown, X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
 import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
@@ -17,7 +17,79 @@ import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import type { ChecklistTemplateSectionWithItems } from "@/lib/types/checklists";
 
 const textareaClass =
-  "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+  "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
+
+function DossierEditableAnnotation({
+  itemId,
+  annotation,
+  onPatch,
+}: {
+  itemId: string;
+  annotation: string;
+  onPatch: (annotation: string) => void;
+}) {
+  const hasAnnotation = annotation.trim().length > 0;
+  const [annotationOpen, setAnnotationOpen] = useState(hasAnnotation);
+
+  useEffect(() => {
+    if (hasAnnotation) setAnnotationOpen(true);
+  }, [hasAnnotation]);
+
+  return (
+    <div className="mt-2 rounded-lg border border-border/60 bg-muted/15">
+      <button
+        type="button"
+        onClick={() => setAnnotationOpen((open) => !open)}
+        className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/35"
+        aria-expanded={annotationOpen}
+        aria-controls={`dossier-ann-panel-${itemId}`}
+      >
+        <span className="text-sm font-medium text-foreground">
+          Anotação{" "}
+          <span className="text-muted-foreground font-normal">(opcional)</span>
+          {hasAnnotation && !annotationOpen ? (
+            <span className="text-primary ml-1.5 text-xs font-normal">· com texto</span>
+          ) : null}
+        </span>
+        <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
+          {annotationOpen ? "Ocultar" : "Expandir"}
+          <ChevronDown
+            className={cn(
+              "size-4 transition-transform duration-200",
+              annotationOpen && "rotate-180",
+            )}
+            aria-hidden
+          />
+        </span>
+      </button>
+      {annotationOpen ? (
+        <div
+          id={`dossier-ann-panel-${itemId}`}
+          className="space-y-1 border-t border-border/50 px-3 pb-3 pt-2"
+        >
+          <Label htmlFor={`dossier-ann-${itemId}`} className="sr-only">
+            Anotação (opcional)
+          </Label>
+          <textarea
+            id={`dossier-ann-${itemId}`}
+            rows={3}
+            maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
+            value={annotation}
+            onChange={(e) => onPatch(e.target.value)}
+            className={textareaClass}
+            aria-describedby={`dossier-ann-hint-${itemId}`}
+          />
+          <p
+            id={`dossier-ann-hint-${itemId}`}
+            className="text-muted-foreground text-xs"
+          >
+            {annotation.length}/{MAX_CHECKLIST_ITEM_ANNOTATION_CHARS} caracteres
+          </p>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type Props = {
   section: ChecklistTemplateSectionWithItems;
@@ -137,45 +209,22 @@ export function ChecklistFillDossierItemBody({
 
             {r.outcome !== null &&
             (canEdit || (r.annotation ?? "").trim().length > 0) ? (
-              <div className="mt-2">
-                {canEdit ? (
-                  <>
-                    <Label
-                      htmlFor={`dossier-ann-${item.id}`}
-                      className="text-muted-foreground"
-                    >
-                      Anotação (opcional)
-                    </Label>
-                    <textarea
-                      id={`dossier-ann-${item.id}`}
-                      rows={3}
-                      maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
-                      value={r.annotation ?? ""}
-                      onChange={(e) =>
-                        onPatchResponse?.(item.id, {
-                          annotation: e.target.value,
-                        })
-                      }
-                      className={textareaClass}
-                      aria-describedby={`dossier-ann-hint-${item.id}`}
-                    />
-                    <p
-                      id={`dossier-ann-hint-${item.id}`}
-                      className="text-muted-foreground mt-1 text-xs"
-                    >
-                      {(r.annotation ?? "").length}/{MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}{" "}
-                      caracteres
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-muted-foreground text-xs font-medium">Anotação</p>
-                    <p className="text-foreground mt-0.5 whitespace-pre-wrap">
-                      {(r.annotation ?? "").trim()}
-                    </p>
-                  </>
-                )}
-              </div>
+              canEdit ? (
+                <DossierEditableAnnotation
+                  itemId={item.id}
+                  annotation={r.annotation ?? ""}
+                  onPatch={(annotation) =>
+                    onPatchResponse?.(item.id, { annotation })
+                  }
+                />
+              ) : (
+                <div className="mt-2">
+                  <p className="text-muted-foreground text-xs font-medium">Anotação</p>
+                  <p className="text-foreground mt-0.5 whitespace-pre-wrap">
+                    {(r.annotation ?? "").trim()}
+                  </p>
+                </div>
+              )
             ) : null}
 
             {r.outcome !== null &&

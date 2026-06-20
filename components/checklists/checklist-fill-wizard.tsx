@@ -1,10 +1,22 @@
 "use client";
 
-import { ChevronDown, Eye, MapPin, X } from "lucide-react";
+import { ChevronDown, Eye, MapPin, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
+import { executeWithSessionRecovery } from "@/lib/client/execute-with-session-recovery";
+import { confirmAuthLost } from "@/lib/client/confirm-auth-lost";
+import { redirectToLogin, suppressLoginRedirectFor } from "@/lib/client/redirect-to-login";
+import { isStaleServerActionError, STALE_SERVER_ACTION_MESSAGE } from "@/lib/client/server-action-errors";
+import { suspendNavigationGuardOnce } from "@/lib/client/suspend-navigation-guard";
+import { scrollPageToTop } from "@/lib/client/scroll-page-to-top";
+import { isSessionExpiredError } from "@/lib/auth/session-errors";
+import {
+  clearFillSessionDraft,
+  loadFillSessionDraft,
+  persistFillSessionDraft,
+} from "@/lib/checklists/fill-session-draft-storage";
 import { pushWithLoading, signalNavigationCancel } from "@/lib/navigation-pending";
 import { resolveDeviceIpForDossierApproval } from "@/lib/client/resolve-device-ip";
 import { toast } from "sonner";
@@ -107,6 +119,8 @@ const sectionSelectClassName =
 const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
 /** Reagendar save em lote quando já há um em curso (evita corridas). */
 const SAVE_BATCH_RESCHEDULE_MS = 500;
+/** Limite de re-tentativas automáticas por falha de rede (sem redirecionar para login). */
+const MAX_SAVE_RESCHEDULE_ATTEMPTS = 5;
 
 /* ── Visualização de assinaturas após aprovação ─────────────────────── */
 /** Cabeçalho de subseção (sem avaliação nem fotos). */
@@ -382,6 +396,25 @@ const emptyItemState = (): FillItemResponseState => ({
   validUntil: null,
 });
 
+function mergeFillResponses(
+  base: FillResponsesMap,
+  overlay: FillResponsesMap,
+): FillResponsesMap {
+  const out = { ...base };
+  for (const [itemId, overlayRow] of Object.entries(overlay)) {
+    if (!overlayRow) continue;
+    const hasData =
+      overlayRow.outcome !== null ||
+      (overlayRow.note ?? "").trim().length > 0 ||
+      (overlayRow.annotation ?? "").trim().length > 0 ||
+      (overlayRow.validUntil ?? "").trim().length > 0;
+    if (!hasData) continue;
+    const cur = out[itemId] ?? emptyItemState();
+    out[itemId] = { ...cur, ...overlayRow };
+  }
+  return out;
+}
+
 function buildIssueMessageWithSectionAndItem(
   sections: ChecklistTemplateWithSections["sections"],
   issue: SectionValidationIssue,
@@ -506,9 +539,9 @@ export function ChecklistFillWizard({
       : 0,
   );
   const [sectionNavLoading, setSectionNavLoading] = useState(false);
-  const [responses, setResponses] = useState<FillResponsesMap>(() => ({
-    ...initialResponses,
-  }));
+  const [responses, setResponses] = useState<FillResponsesMap>(
+    () => ({ ...initialResponses }),
+  );
   const responsesRef = useRef<FillResponsesMap>(responses);
   const sectionIndexRef = useRef(sectionIndex);
 
@@ -524,7 +557,7 @@ export function ChecklistFillWizard({
   useEffect(() => {
     if (prevSectionIndexForScrollRef.current === sectionIndex) return;
     prevSectionIndexForScrollRef.current = sectionIndex;
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollPageToTop({ behavior: "smooth" });
     const doneTimer = setTimeout(() => setSectionNavLoading(false), 180);
     return () => clearTimeout(doneTimer);
   }, [sectionIndex]);
@@ -541,6 +574,27 @@ export function ChecklistFillWizard({
   const [dossierApprovedAt, setDossierApprovedAt] = useState<string | null>(
     () => initialDossierApprovedAt ?? null,
   );
+
+  const prevDossierPreviewRef = useRef(dossierPreviewConfirmed);
+  const prevDossierApprovedRef = useRef(dossierApprovedAt);
+  useEffect(() => {
+    const enteredPreview =
+      !prevDossierPreviewRef.current && dossierPreviewConfirmed;
+    const enteredApproved =
+      !prevDossierApprovedRef.current && Boolean(dossierApprovedAt);
+    prevDossierPreviewRef.current = dossierPreviewConfirmed;
+    prevDossierApprovedRef.current = dossierApprovedAt;
+
+    if (!enteredPreview && !enteredApproved) return;
+
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollPageToTop({ behavior: "auto" });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [dossierPreviewConfirmed, dossierApprovedAt]);
+
   const [approveError, setApproveError] = useState<string | null>(null);
   const [dossierPeekOpen, setDossierPeekOpen] = useState(false);
   const [multiAreaNextDialog, setMultiAreaNextDialog] =
@@ -593,6 +647,12 @@ export function ChecklistFillWizard({
     setSectionIndex(0);
   }, []);
 
+  const handleResumeEditing = useCallback(() => {
+    setDossierPreviewConfirmed(false);
+    setAdvanceError(null);
+    setApproveError(null);
+  }, []);
+
   /* ── Task D: indicador de auto-save ── */
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveErrorMsg, setSaveErrorMsg] = useState<string | null>(null);
@@ -600,6 +660,9 @@ export function ChecklistFillWizard({
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyItemIdsRef = useRef<Set<string>>(new Set());
   const saveBatchInFlightRef = useRef(false);
+  const saveRescheduleAttemptsRef = useRef(0);
+  const saveOpEpochRef = useRef(0);
+  const mountedRef = useRef(true);
   /** Ref para o próprio saveProgressBatch — permite reagendar saves concorrentes sem dependência circular. */
   const saveProgressBatchRef = useRef<(scope: "section" | "all", forceAll: boolean) => void>(
     () => {},
@@ -607,9 +670,11 @@ export function ChecklistFillWizard({
 
   /** Reagenda um ciclo de save (itens continuam dirty) em vez de o descartar. */
   const rescheduleSave = useCallback((scope: "section" | "all", forceAll: boolean, delayMs: number) => {
+    if (!mountedRef.current) return;
     if (autosaveTimerRef.current !== null) clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = setTimeout(() => {
       autosaveTimerRef.current = null;
+      if (!mountedRef.current) return;
       saveProgressBatchRef.current(scope, forceAll);
     }, delayMs);
   }, []);
@@ -625,18 +690,47 @@ export function ChecklistFillWizard({
     setSaveErrorMsg(null);
     savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
   }
-  function reportSaveError(error?: string) {
+  function reportSaveError(error?: string, options?: { log?: boolean }) {
     setSaveStatus("error");
     setSaveErrorMsg(error || "Erro desconhecido ao salvar");
-    if (error) {
+    if (error && options?.log !== false) {
       console.error("Erro ao salvar:", error);
     }
   }
 
+  const intentionalLeaveRef = useRef(false);
+
+  const forceLoginRedirect = useCallback(() => {
+    if (!mountedRef.current || intentionalLeaveRef.current) return;
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    persistFillSessionDraft(sessionId, responsesRef.current);
+    redirectToLogin(`/checklists/preencher/${sessionId}`);
+  }, [sessionId]);
+
+  const redirectIfSessionExpired = useCallback(
+    (error?: string) => isSessionExpiredError(error),
+    [],
+  );
+
   useEffect(() => {
+    const draft = loadFillSessionDraft(sessionId);
+    if (!draft) return;
+    for (const itemId of Object.keys(draft.responses)) {
+      dirtyItemIdsRef.current.add(itemId);
+    }
+    setResponses((prev) => mergeFillResponses(prev, draft.responses));
+  }, [sessionId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (savedTimerRef.current !== null) clearTimeout(savedTimerRef.current);
       if (autosaveTimerRef.current !== null) clearTimeout(autosaveTimerRef.current);
+      saveBatchInFlightRef.current = false;
     };
   }, []);
 
@@ -651,6 +745,10 @@ export function ChecklistFillWizard({
   }, []);
 
   const formLocked = dossierPreviewConfirmed || Boolean(dossierApprovedAt);
+  const formLockedRef = useRef(formLocked);
+  useEffect(() => {
+    formLockedRef.current = formLocked;
+  }, [formLocked]);
 
   const [leaveLinkTarget, setLeaveLinkTarget] = useState<string | null>(null);
   const leaveLinkTargetRef = useRef<string | null>(null);
@@ -664,7 +762,7 @@ export function ChecklistFillWizard({
 
   /* ── Task B: guarda de navegação (Voltar do browser + links internos) ── */
   const { guardTriggered, cancelLeave, completeBrowserBack } = useNavigationGuard({
-    active: !formLocked,
+    active: !formLocked && multiAreaNextDialog === null,
     fallbackHref: backHref,
   });
 
@@ -711,13 +809,38 @@ export function ChecklistFillWizard({
         annotation: cur?.annotation ?? null,
         validUntil: cur?.validUntil ?? null,
       }));
-      return saveFillResponsesBatch({
-        sessionId,
-        itemResponseSource,
-        entries,
-        persistMode,
-        withRevalidate: false,
-      });
+      const { result, needsReauth } = await executeWithSessionRecovery(() =>
+        saveFillResponsesBatch({
+          sessionId,
+          itemResponseSource,
+          entries,
+          persistMode,
+          withRevalidate: false,
+        }),
+      );
+      if (needsReauth) {
+        if (intentionalLeaveRef.current) {
+          return { ok: false, error: "Sessão expirada." };
+        }
+        return {
+          ok: false,
+          error: "Não foi possível gravar agora. Toque em Salvar agora para tentar de novo.",
+        };
+      }
+      if (!result.ok && isSessionExpiredError(result.error)) {
+        if (intentionalLeaveRef.current) {
+          return { ok: false, error: "Sessão expirada." };
+        }
+        return {
+          ok: false,
+          error: "Não foi possível gravar agora. Toque em Salvar agora para tentar de novo.",
+        };
+      }
+      if (result.ok) {
+        clearFillSessionDraft(sessionId);
+        saveRescheduleAttemptsRef.current = 0;
+      }
+      return result;
     },
     [sessionId, itemResponseSource],
   );
@@ -725,7 +848,15 @@ export function ChecklistFillWizard({
   /** Reconcilia com BD, grava com modo merge e valida o que ficou persistido. */
   const runReconcileThenSync = useCallback(async (): Promise<FillActionResult> => {
     const remote = await loadFillResponsesMapForSession(sessionId);
-    if (!remote.ok) return remote;
+    if (!remote.ok) {
+      if (redirectIfSessionExpired(remote.error)) {
+        return {
+          ok: false,
+          error: "Não foi possível sincronizar. Toque em Salvar agora e tente de novo.",
+        };
+      }
+      return remote;
+    }
     const merged = mergeClientResponsesWithServer(
       responsesRef.current,
       remote.responses,
@@ -738,18 +869,37 @@ export function ChecklistFillWizard({
     if (!synced.ok) return synced;
 
     const verify = await loadFillResponsesMapForSession(sessionId);
-    if (!verify.ok) return verify;
+    if (!verify.ok) {
+      if (redirectIfSessionExpired(verify.error)) {
+        return {
+          ok: false,
+          error: "Não foi possível validar as respostas. Toque em Salvar agora e tente de novo.",
+        };
+      }
+      return verify;
+    }
     const postIssues = validateChecklistTemplate(sections, verify.responses);
     if (postIssues.length > 0) {
       return { ok: false, error: postIssues[0].message };
     }
     return { ok: true };
-  }, [sessionId, template, sections, syncAllResponsesToServer]);
+  }, [sessionId, template, sections, syncAllResponsesToServer, redirectIfSessionExpired]);
 
   /** Grava rascunho completo no servidor sem exigir validação do template (saída segura). */
   const persistDraftForLeave = useCallback(async (): Promise<FillActionResult> => {
+    if (dossierApprovedAt) {
+      return { ok: true };
+    }
     const remote = await loadFillResponsesMapForSession(sessionId);
-    if (!remote.ok) return remote;
+    if (!remote.ok) {
+      if (redirectIfSessionExpired(remote.error)) {
+        return {
+          ok: false,
+          error: "Não foi possível gravar o rascunho. Tente novamente.",
+        };
+      }
+      return remote;
+    }
     const merged = mergeClientResponsesWithServer(
       responsesRef.current,
       remote.responses,
@@ -758,7 +908,7 @@ export function ChecklistFillWizard({
     setResponses(merged);
     responsesRef.current = merged;
     return syncAllResponsesToServer(merged, "merge");
-  }, [sessionId, template, syncAllResponsesToServer]);
+  }, [sessionId, template, syncAllResponsesToServer, redirectIfSessionExpired, dossierApprovedAt]);
 
   const clearLeaveLinkTarget = useCallback(() => {
     leaveLinkTargetRef.current = null;
@@ -872,6 +1022,7 @@ export function ChecklistFillWizard({
     if (formLocked) return;
 
     function handleBeforeUnloadBeacon() {
+      if (intentionalLeaveRef.current) return;
       const dirty = dirtyItemIdsRef.current;
       if (dirty.size === 0) return;
 
@@ -952,9 +1103,39 @@ export function ChecklistFillWizard({
     });
   }, [sections, responses]);
 
+  const navigateToNextBatchSession = useCallback(
+    async (next: ChecklistFillBatchItem) => {
+      intentionalLeaveRef.current = true;
+      saveOpEpochRef.current += 1;
+      saveBatchInFlightRef.current = false;
+      suppressLoginRedirectFor(15_000);
+      if (autosaveTimerRef.current !== null) {
+        clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+      setMultiAreaNextDialog(null);
+      suspendNavigationGuardOnce();
+      try {
+        await fetch("/api/auth/session-activity", {
+          credentials: "include",
+          cache: "no-store",
+        });
+      } catch {
+        // Segue navegação mesmo se o bump falhar pontualmente.
+      }
+      const params = new URLSearchParams();
+      if (backHref) params.set("returnTo", backHref);
+      const path = `/checklists/preencher/${next.sessionId}${
+        params.size > 0 ? `?${params.toString()}` : ""
+      }`;
+      pushWithLoading(router, path);
+    },
+    [backHref, router],
+  );
+
   const saveProgressBatch = useCallback(
     (scope: "section" | "all", forceAll: boolean) => {
-      if (!section) return;
+      if (!mountedRef.current || !section || formLockedRef.current) return;
       if (saveBatchInFlightRef.current) {
         // Save em curso — reagenda em vez de descartar (itens continuam dirty).
         rescheduleSave(scope, forceAll, SAVE_BATCH_RESCHEDULE_MS);
@@ -971,6 +1152,7 @@ export function ChecklistFillWizard({
       if (itemIds.length === 0) return;
 
       saveBatchInFlightRef.current = true;
+      const opEpoch = saveOpEpochRef.current;
       startTransition(async () => {
         reportSaving();
         const entries = itemIds.map((itemId) => {
@@ -984,22 +1166,58 @@ export function ChecklistFillWizard({
           };
         });
         try {
-          const result = await saveFillResponsesBatch({
-            sessionId,
-            itemResponseSource,
-            entries,
-            persistMode: "full",
-            withRevalidate: false,
-          });
+          const { result, needsReauth } = await executeWithSessionRecovery(() =>
+            saveFillResponsesBatch({
+              sessionId,
+              itemResponseSource,
+              entries,
+              persistMode: "full",
+              withRevalidate: false,
+            }),
+          );
+          if (opEpoch !== saveOpEpochRef.current || intentionalLeaveRef.current) {
+            return;
+          }
+          if (needsReauth) {
+            reportSaveError(
+              "Não foi possível gravar agora. Toque em Salvar agora para tentar de novo.",
+            );
+            return;
+          }
           if (!result.ok) {
+            if (result.error === STALE_SERVER_ACTION_MESSAGE) {
+              suspendNavigationGuardOnce();
+              window.location.reload();
+              return;
+            }
+            if (isSessionExpiredError(result.error)) {
+              reportSaveError(
+                "Não foi possível gravar agora. Toque em Salvar agora para tentar de novo.",
+              );
+              return;
+            }
             reportSaveError(result.error);
             return;
           }
+          saveRescheduleAttemptsRef.current = 0;
           clearDirtyItems(itemIds);
+          clearFillSessionDraft(sessionId);
           reportSaved();
         } catch (err) {
-          // Falha de rede / deploy a meio do save: não deixar a flag in-flight presa.
+          if (!mountedRef.current) return;
+          if (isStaleServerActionError(err)) {
+            suspendNavigationGuardOnce();
+            window.location.reload();
+            return;
+          }
           console.error("[saveProgressBatch] falha de conexão", err);
+          saveRescheduleAttemptsRef.current += 1;
+          if (saveRescheduleAttemptsRef.current > MAX_SAVE_RESCHEDULE_ATTEMPTS) {
+            reportSaveError(
+              "Não foi possível gravar agora. Use Salvar agora ou recarregue a página.",
+            );
+            return;
+          }
           reportSaveError("Falha de conexão ao salvar. Tentando novamente…");
           rescheduleSave(scope, forceAll, 4000);
         } finally {
@@ -1256,90 +1474,114 @@ export function ChecklistFillWizard({
               📍 {areaName}
             </span>
           ) : null}
-          <div className="mt-2 border-l-2 border-primary pl-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Seção {sectionIndex + 1} de {sections.length}
-            </p>
-            <p className="text-[15px] font-bold text-foreground leading-snug uppercase">
-              {section.title}
-            </p>
-          </div>
-          {sectionNavLoading ? (
-            <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
-              <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              Carregando seção...
-            </span>
-          ) : null}
-          {/* Indicador de gravação explícita (Salvar agora / finalizar) */}
-          {saveStatus === "saving" && (
-            <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
-              <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              Salvando…
-            </span>
-          )}
-          {saveStatus === "saved" && (
-            <span className="mt-1 flex items-center gap-1.5 text-xs text-green-600" role="status" aria-live="polite">
-              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Salvo
-            </span>
-          )}
-          {saveStatus === "error" && (
-            <span className="mt-1 flex items-center gap-1.5 text-xs text-destructive" role="alert" aria-live="assertive">
-              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-              {saveErrorMsg || "Erro ao salvar — verifique a conexão"}
-            </span>
-          )}
-          {/* Score global + score da seção atual */}
-          {(liveScore !== null || sectionScores[sectionIndex] !== null) && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              {liveScore !== null && (() => {
-                const { label, colorClass } = scoreClassification(liveScore);
-                return (
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
-                      colorClass,
-                    )}
-                    role="status"
-                    aria-live="polite"
-                    aria-label={`Pontuação geral: ${liveScore}% — ${label}`}
-                  >
-                    Geral: {liveScore}% · {label}
-                  </span>
-                );
-              })()}
-              {sectionScores[sectionIndex] !== null && (() => {
-                const sc = sectionScores[sectionIndex]!;
-                const { label, colorClass } = scoreClassification(sc);
-                return (
-                  <span
-                    className={cn(
-                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium tabular-nums",
-                      colorClass,
-                    )}
-                    aria-label={`Pontuação desta seção: ${sc}% — ${label}`}
-                  >
-                    Seção: {sc}%
-                  </span>
-                );
-              })()}
+          {formLocked ? (
+            <div className="mt-2 space-y-1">
+              <p className="text-foreground text-sm font-medium">Dossiê em revisão</p>
+              <p className="text-muted-foreground text-sm">
+                Revise o relatório compilado abaixo. Ajuste textos se necessário e aprove
+                para concluir. Para alterar respostas dos itens, use{" "}
+                <span className="text-foreground font-medium">Editar respostas</span>.
+              </p>
             </div>
+          ) : (
+            <>
+              <div className="mt-2 border-l-2 border-primary pl-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Seção {sectionIndex + 1} de {sections.length}
+                </p>
+                <p className="text-[15px] font-bold text-foreground leading-snug uppercase">
+                  {section.title}
+                </p>
+              </div>
+              {sectionNavLoading ? (
+                <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
+                  <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Carregando seção...
+                </span>
+              ) : null}
+              {/* Indicador de gravação explícita (Salvar agora / finalizar) */}
+              {saveStatus === "saving" && (
+                <span className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground" role="status" aria-live="polite">
+                  <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  </svg>
+                  Salvando…
+                </span>
+              )}
+              {saveStatus === "saved" && (
+                <span className="mt-1 flex items-center gap-1.5 text-xs text-green-600" role="status" aria-live="polite">
+                  <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Salvo
+                </span>
+              )}
+              {saveStatus === "error" && (
+                <span className="mt-1 flex items-center gap-1.5 text-xs text-destructive" role="alert" aria-live="assertive">
+                  <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  {saveErrorMsg || "Erro ao salvar — verifique a conexão"}
+                </span>
+              )}
+              {/* Score global + score da seção atual */}
+              {(liveScore !== null || sectionScores[sectionIndex] !== null) && (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  {liveScore !== null && (() => {
+                    const { label, colorClass } = scoreClassification(liveScore);
+                    return (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold tabular-nums",
+                          colorClass,
+                        )}
+                        role="status"
+                        aria-live="polite"
+                        aria-label={`Pontuação geral: ${liveScore}% — ${label}`}
+                      >
+                        Geral: {liveScore}% · {label}
+                      </span>
+                    );
+                  })()}
+                  {sectionScores[sectionIndex] !== null && (() => {
+                    const sc = sectionScores[sectionIndex]!;
+                    const { label, colorClass } = scoreClassification(sc);
+                    return (
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium tabular-nums",
+                          colorClass,
+                        )}
+                        aria-label={`Pontuação desta seção: ${sc}% — ${label}`}
+                      >
+                        Seção: {sc}%
+                      </span>
+                    );
+                  })()}
+                </div>
+              )}
+            </>
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {showDossierPeekButton ? (
+          {formLocked ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleResumeEditing}
+            >
+              <Pencil className="size-4 shrink-0" aria-hidden />
+              Editar respostas
+            </Button>
+          ) : showDossierPeekButton ? (
             <Button
               type="button"
               variant="default"
@@ -1360,54 +1602,122 @@ export function ChecklistFillWizard({
         </div>
       </div>
 
-      {advanceError ? (
+      {!formLocked && advanceError ? (
         <p className="text-destructive text-sm" role="alert">
           {advanceError}
         </p>
       ) : null}
 
-      <fieldset
-        disabled={formLocked}
-        className="relative space-y-6"
-        aria-busy={isPending}
-      >
-        {sectionNavLoading ? (
-          <div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-background/65 pt-6 backdrop-blur-[1px]">
-            <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
-              <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              Atualizando seção...
+      {!formLocked ? (
+        <fieldset
+          disabled={formLocked}
+          className="relative space-y-6"
+          aria-busy={isPending}
+        >
+          {sectionNavLoading ? (
+            <div className="absolute inset-0 z-10 flex items-start justify-center rounded-xl bg-background/65 pt-6 backdrop-blur-[1px]">
+              <div className="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-sm">
+                <svg className="size-3 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                Atualizando seção...
+              </div>
             </div>
-          </div>
-        ) : null}
-        <legend className="sr-only">{section.title}</legend>
-        {section.items.map((item) =>
-          isStructureOnlyItem(item) ? (
-            <ChecklistFillStructureHeading key={item.id} description={item.description} />
-          ) : (
-          <ChecklistFillItem
-            key={item.id}
-            item={item}
-            response={responses[item.id]}
-            err={issueByItemId[item.id]}
-            recurringNcSessions={recurringNcSessionCountByItemId[item.id] ?? 0}
+          ) : null}
+          <legend className="sr-only">{section.title}</legend>
+          {section.items.map((item) =>
+            isStructureOnlyItem(item) ? (
+              <ChecklistFillStructureHeading key={item.id} description={item.description} />
+            ) : (
+            <ChecklistFillItem
+              key={item.id}
+              item={item}
+              response={responses[item.id]}
+              err={issueByItemId[item.id]}
+              recurringNcSessions={recurringNcSessionCountByItemId[item.id] ?? 0}
+              sessionId={sessionId}
+              itemResponseSource={itemResponseSource}
+              photos={livePhotos[item.id] ?? EMPTY_ITEM_PHOTOS}
+              formLocked={formLocked}
+              onSetOutcome={setOutcome}
+              onSetNote={setNote}
+              onSetValidUntil={setValidUntil}
+              onSetAnnotation={setAnnotation}
+              onPhotosChange={handlePhotosChange}
+            />
+            ))}
+        </fieldset>
+      ) : null}
+
+      {formLocked && dossierPreviewConfirmed ? (
+        <div className="space-y-4">
+          {initialReopenEvents.length > 0 ? (
+            <div className="bg-muted/30 rounded-lg border p-4 text-sm">
+              <p className="text-foreground font-medium">Histórico de reaberturas</p>
+              <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
+                {initialReopenEvents.map((ev) => (
+                  <li key={ev.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
+                    <p>
+                      {formatDossierApprovedLabel(ev.created_at)} — {ev.reopened_by_label} (
+                      {ev.reopened_by_role === "owner"
+                        ? "Titular"
+                        : ev.reopened_by_role === "gestao"
+                          ? "Gestão"
+                          : "Administrador"})
+                    </p>
+                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
+                      Justificativa: {ev.justification}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <ChecklistFillDossierPreview
+            template={template}
+            responses={responses}
+            itemPhotos={livePhotos}
+            reviewEditable
             sessionId={sessionId}
             itemResponseSource={itemResponseSource}
-            photos={livePhotos[item.id] ?? EMPTY_ITEM_PHOTOS}
-            formLocked={formLocked}
-            onSetOutcome={setOutcome}
-            onSetNote={setNote}
-            onSetValidUntil={setValidUntil}
-            onSetAnnotation={setAnnotation}
-            onPhotosChange={handlePhotosChange}
+            onPatchResponse={patchDossierResponse}
+            dossierApprovedAt={dossierApprovedAt}
+            professionalSignatureDataUrl={effectiveProfessionalSignature}
+            clientSignatureDataUrl={savedClientSig}
+            clientSignerName={savedClientSignerName}
+            professionalName={professionalName}
+            professionalCrn={professionalCrn}
+            clientLabel={clientLabel}
+            documentHash={savedDocumentHash}
+            dossierApprovedClientIp={savedApprovedClientIp}
+            reopenEvents={initialReopenEvents}
           />
-          ))}
-      </fieldset>
-
-      <div className="flex flex-col gap-4 border-t pt-4">
-        {!formLocked ? (
+          <div className="border-border space-y-3 rounded-lg border bg-muted/20 p-4">
+            <p className="text-muted-foreground text-xs">
+              Após aprovar, o relatório fica registrado e deixa de ser editável. Novas
+              alterações no produto seguirão o fluxo de nova versão do relatório
+              (FR70).
+            </p>
+            {approveError ? (
+              <p className="text-destructive text-sm" role="alert">
+                {approveError}
+              </p>
+            ) : null}
+            <Button
+              type="button"
+              disabled={isApprovePending}
+              onClick={() => {
+                setApproveError(null);
+                setSignatureDialogOpen(true);
+              }}
+            >
+              {isApprovePending ? "Aprovando…" : "Aprovar dossiê"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4 border-t pt-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
             <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-xl">
               <Label htmlFor="checklist-section-jump" className="text-xs">
@@ -1438,38 +1748,34 @@ export function ChecklistFillWizard({
               </select>
             </div>
           </div>
-        ) : null}
-        <div className="flex flex-wrap items-center gap-2">
-          {!formLocked ? (
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => saveProgressBatch("all", true)}
-              disabled={formLocked || sectionNavLoading}
+              disabled={sectionNavLoading}
             >
               {isPending ? "Salvando..." : "Salvar agora"}
             </Button>
-          ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handlePrev}
-            disabled={sectionIndex === 0 || formLocked || sectionNavLoading}
-          >
-            {sectionNavLoading ? "Carregando..." : "Seção anterior"}
-          </Button>
-          <Button
-            type="button"
-            onClick={handleNext}
-            disabled={formLocked || isLast || sectionNavLoading}
-          >
-            {sectionNavLoading ? "Carregando..." : "Próxima seção"}
-          </Button>
-          {!formLocked ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePrev}
+              disabled={sectionIndex === 0 || sectionNavLoading}
+            >
+              {sectionNavLoading ? "Carregando..." : "Seção anterior"}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleNext}
+              disabled={isLast || sectionNavLoading}
+            >
+              {sectionNavLoading ? "Carregando..." : "Próxima seção"}
+            </Button>
             <Button
               type="button"
               variant={isLast ? "default" : "secondary"}
-              disabled={formLocked || sectionNavLoading}
+              disabled={sectionNavLoading}
               onClick={() => {
                 setAdvanceError(null);
                 setFinalizeDialogError(null);
@@ -1479,9 +1785,7 @@ export function ChecklistFillWizard({
             >
               Finalizar e ver dossiê
             </Button>
-          ) : null}
-        </div>
-        {!formLocked ? (
+          </div>
           <p className="text-muted-foreground max-w-xl text-xs">
             As respostas só são gravadas no servidor ao usar{" "}
             <span className="text-foreground font-medium">Salvar agora</span>, ao
@@ -1489,139 +1793,8 @@ export function ChecklistFillWizard({
             <span className="text-foreground font-medium">Finalizar e ver dossiê</span>, ao
             aprovar o dossiê ou ao sair da página escolhendo gravar o rascunho.
           </p>
-        ) : null}
-        {dossierPreviewConfirmed || dossierApprovedAt ? (
-          <div className="space-y-4">
-            <div className="bg-muted/50 rounded-lg border p-4 text-sm">
-              <p className="text-foreground font-medium">
-                {dossierApprovedAt
-                  ? "Dossiê aprovado"
-                  : "Dossiê em revisão"}
-              </p>
-              <p className="text-muted-foreground mt-1">
-                {dossierApprovedAt
-                  ? "Dossiê aprovado e registrado. Se esta sessão estiver ligada a uma visita, a visita foi marcada como concluída."
-                  : "Dossiê compilado abaixo. Ajuste textos se necessário; ao aprovar, as alterações são gravadas no servidor e o ciclo fecha."}
-              </p>
-              {dossierApprovedAt ? (
-                <p
-                  className="text-primary mt-2 text-xs font-medium"
-                  role="status"
-                >
-                  Aprovado em {formatDossierApprovedLabel(dossierApprovedAt)}. Respostas e
-                  anexos ficam imutáveis (FR70).
-                </p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {dossierApprovedAt ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => setDossierPeekOpen(true)}
-                  >
-                    <Eye className="size-4 shrink-0" aria-hidden />
-                    Ver dossiê
-                  </Button>
-                ) : null}
-                <ChecklistReopenDialog
-                  sessionId={sessionId}
-                  canReopen={canReopenDossier && Boolean(dossierApprovedAt)}
-                  onReopened={handleDossierReopened}
-                />
-                <Link
-                  href={backHref}
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex")}
-                >
-                  {backLabel}
-                </Link>
-              </div>
-            </div>
-            {initialReopenEvents.length > 0 ? (
-              <div className="bg-muted/30 rounded-lg border p-4 text-sm">
-                <p className="text-foreground font-medium">Histórico de reaberturas</p>
-                <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
-                  {initialReopenEvents.map((ev) => (
-                    <li key={ev.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
-                      <p>
-                        {formatDossierApprovedLabel(ev.created_at)} — {ev.reopened_by_label} (
-                        {ev.reopened_by_role === "owner"
-                          ? "Titular"
-                          : ev.reopened_by_role === "gestao"
-                            ? "Gestão"
-                            : "Administrador"})
-                      </p>
-                      <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
-                        Justificativa: {ev.justification}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {dossierPreviewConfirmed ? (
-              <>
-                <ChecklistFillDossierPreview
-                  template={template}
-                  responses={responses}
-                  itemPhotos={livePhotos}
-                  reviewEditable={Boolean(
-                    dossierPreviewConfirmed && !dossierApprovedAt,
-                  )}
-                  sessionId={sessionId}
-                  itemResponseSource={itemResponseSource}
-                  onPatchResponse={patchDossierResponse}
-                  dossierApprovedAt={dossierApprovedAt}
-                  professionalSignatureDataUrl={effectiveProfessionalSignature}
-                  clientSignatureDataUrl={savedClientSig}
-                  clientSignerName={savedClientSignerName}
-                  professionalName={professionalName}
-                  professionalCrn={professionalCrn}
-                  clientLabel={clientLabel}
-                  documentHash={savedDocumentHash}
-                  dossierApprovedClientIp={savedApprovedClientIp}
-                  reopenEvents={initialReopenEvents}
-                />
-                {dossierPreviewConfirmed && !dossierApprovedAt ? (
-                  <div className="border-border space-y-3 rounded-lg border bg-muted/20 p-4">
-                    <p className="text-muted-foreground text-xs">
-                      Após aprovar, o relatório fica registrado e deixa de ser editável. Novas
-                      alterações no produto seguirão o fluxo de nova versão do relatório
-                      (FR70).
-                    </p>
-                    {approveError ? (
-                      <p className="text-destructive text-sm" role="alert">
-                        {approveError}
-                      </p>
-                    ) : null}
-                    <Button
-                      type="button"
-                      disabled={isApprovePending}
-                      onClick={() => {
-                        setApproveError(null);
-                        // Abre o dialog de assinatura antes de aprovar
-                        setSignatureDialogOpen(true);
-                      }}
-                    >
-                      {isApprovePending ? "Aprovando…" : "Aprovar dossiê"}
-                    </Button>
-                  </div>
-                ) : null}
-                {dossierApprovedAt ? (
-                  <ChecklistFillDossierPdfCard
-                    sessionId={sessionId}
-                    dossierApprovedAt={dossierApprovedAt}
-                    initialJob={initialPdfExport ?? null}
-                    pdfExportHistory={pdfExportHistory}
-                    dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
-                  />
-                ) : null}
-              </>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
+        </div>
+      )}
 
       {/* Dialog de finalização */}
       <Dialog
@@ -1810,8 +1983,9 @@ export function ChecklistFillWizard({
                   "Relatório aprovado e imutável."
                 ) : dossierPreviewConfirmed ? (
                   <>
-                    Leitura do dossiê compilado. Para ajustar textos antes de aprovar, use
-                    os campos na área abaixo desta página.
+                    Leitura do dossiê compilado. Para ajustar textos antes de aprovar, edite
+                    diretamente no dossiê. Para alterar respostas dos itens, use{" "}
+                    <span className="text-foreground font-medium">Editar respostas</span>.
                   </>
                 ) : (
                   <>
@@ -1893,17 +2067,9 @@ export function ChecklistFillWizard({
             <Button
               type="button"
               onClick={() => {
-                void (async () => {
-                  const next = multiAreaNextDialog;
-                  if (!next) return;
-                  const r = await persistDraftForLeave();
-                  if (!r.ok) {
-                    toast.error(r.error);
-                    return;
-                  }
-                  setMultiAreaNextDialog(null);
-                  pushWithLoading(router, `/checklists/preencher/${next.sessionId}`);
-                })();
+                const next = multiAreaNextDialog;
+                if (!next) return;
+                navigateToNextBatchSession(next);
               }}
             >
               Iniciar checklist
@@ -1954,6 +2120,19 @@ export function ChecklistFillWizard({
                 },
               );
               if (!r.ok) {
+                if (isSessionExpiredError(r.error)) {
+                  void confirmAuthLost().then((lost) => {
+                    if (lost && mountedRef.current && !intentionalLeaveRef.current) {
+                      forceLoginRedirect();
+                    } else if (mountedRef.current) {
+                      setApproveError(
+                        "Não foi possível confirmar a sessão. Toque em Salvar agora e tente aprovar de novo.",
+                      );
+                      setPendingSignatures(null);
+                    }
+                  });
+                  return;
+                }
                 setApproveError(r.error);
                 setPendingSignatures(null);
                 return;
@@ -1972,7 +2151,6 @@ export function ChecklistFillWizard({
               } else {
                 clearChecklistFillBatch();
               }
-              router.refresh();
             } catch (err) {
               console.error("[checklist-fill-wizard] aprovar dossiê", err);
               setApproveError(

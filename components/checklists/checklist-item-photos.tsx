@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Camera, Images, Trash2, ZoomIn } from "lucide-react";
 
+import { tryRefreshSupabaseSession } from "@/lib/client/refresh-supabase-session";
 import { isNativeApp } from "@/lib/mobile/platform";
 import { openNativeCamera, openNativeGallery } from "@/lib/mobile/camera";
 import { createClient } from "@/lib/supabase/client";
@@ -310,9 +311,8 @@ export function ChecklistItemPhotos({
 
           let uploadJson = await doUpload(fd);
 
-          // Se expirou, tenta renovar o token e refaz o upload uma única vez.
           if (!uploadJson.ok && uploadJson.error === "Sessão expirada.") {
-            await createClient().auth.refreshSession();
+            await tryRefreshSupabaseSession();
             uploadJson = await doUpload(fd);
           }
 

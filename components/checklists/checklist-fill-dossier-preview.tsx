@@ -291,9 +291,6 @@ export function ChecklistFillDossierPreview({
                 {professionalCrn && (
                   <p className="text-[10px] text-muted-foreground">CRN {professionalCrn}</p>
                 )}
-                {approvalAuditLine ? (
-                  <p className="text-[10px] text-muted-foreground/80">{approvalAuditLine}</p>
-                ) : null}
               </div>
             </div>
 

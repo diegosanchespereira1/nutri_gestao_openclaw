@@ -58,9 +58,11 @@ function isCanvasEmpty(canvas: HTMLCanvasElement): boolean {
 
 interface SignaturePadProps {
   onDataUrl: (url: string | null) => void;
+  /** Centraliza o texto de ajuda dentro da área de assinatura (ex.: etapa do cliente). */
+  centerHint?: boolean;
 }
 
-function SignaturePad({ onDataUrl }: SignaturePadProps) {
+function SignaturePad({ onDataUrl, centerHint = false }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
@@ -153,9 +155,21 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
           onPointerLeave={stopDrawing}
         />
         {isEmpty && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="text-muted-foreground flex items-center gap-2 text-sm select-none">
-              <Pen className="h-4 w-4" />
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-0 flex items-center justify-center px-4",
+              centerHint && "text-center",
+            )}
+          >
+            <span
+              className={cn(
+                "text-muted-foreground text-sm select-none",
+                centerHint
+                  ? "flex flex-col items-center justify-center gap-1.5 text-center"
+                  : "flex items-center gap-2",
+              )}
+            >
+              <Pen className="h-4 w-4 shrink-0" />
               Assine aqui com o mouse, toque ou caneta
             </span>
           </div>
@@ -167,7 +181,10 @@ function SignaturePad({ onDataUrl }: SignaturePadProps) {
           variant="ghost"
           size="sm"
           onClick={clearCanvas}
-          className="text-muted-foreground h-7 text-xs"
+          className={cn(
+            "text-muted-foreground h-7 text-xs",
+            centerHint && "mx-auto flex",
+          )}
         >
           <Eraser className="mr-1.5 h-3.5 w-3.5" />
           Limpar
@@ -365,7 +382,7 @@ export function SignatureCaptureDialog({
               )}
             </div>
 
-            <SignaturePad key="client" onDataUrl={setClientDataUrl} />
+            <SignaturePad key="client" centerHint onDataUrl={setClientDataUrl} />
             {profileSignatureReady && professionalDataUrl ? (
               <Button
                 type="button"

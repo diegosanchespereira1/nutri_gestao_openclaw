@@ -937,12 +937,7 @@ function formatValidUntilForPdf(value: string | null): string {
  *   nome do signatário (9pt bold)
  *   gap (3px)
  *   subtítulo CRN / organização (7.5pt muted)
- *   gap (3px)
- *   data/hora (7pt faint, se disponível)
  *   PAD_BOTTOM (8px)
- *
- * CARD_H = 8 + 7 + 5 + 60 + 5 + 1 + 5 + 9 + 3 + 7.5 + 3 + 7 + 8 = 128.5
- * (com timestamp; sem timestamp remove 3+7 = 10 → 118.5)
  */
 
 async function drawSignaturesSection(
@@ -962,13 +957,11 @@ async function drawSignaturesSection(
   const LINE_GAP  = 5;
   const NAME_SIZE = 9;
   const SUB_SIZE  = 7.5;
-  const DATE_SIZE = 7;
-  const hasDate   = !!input.signedAtAuditLine || !!input.signedAtLabel;
-  const dateLine  = input.signedAtAuditLine ?? input.signedAtLabel ?? "";
+  const hasSectionDate = !!input.signedAtAuditLine || !!input.signedAtLabel;
+  const sectionDateLine = input.signedAtAuditLine ?? input.signedAtLabel ?? "";
 
-  // Altura total do card
   const CARD_H = PAD_TOP + ROLE_SIZE + 5 + SIG_IMG_H + LINE_GAP + 1 + LINE_GAP
-    + NAME_SIZE + 3 + SUB_SIZE + (hasDate ? 3 + DATE_SIZE : 0) + PAD_BOT;
+    + NAME_SIZE + 3 + SUB_SIZE + PAD_BOT;
 
   ensureVerticalSpace(ctx, SECTION_LABEL_H + CARD_H + 20);
 
@@ -981,9 +974,9 @@ async function drawSignaturesSection(
   });
   drawTextLine(ctx, "ASSINATURAS", MARGIN_X + 10, secTop - 7, 9, ctx.fontBold, rgb(1, 1, 1));
 
-  // Data/hora alinhada à direita no cabeçalho
-  if (hasDate) {
-    const dateStr = foldTextForPdf(`Coletado em: ${dateLine}`);
+  // Data/hora alinhada à direita no cabeçalho da seção (fora dos cards)
+  if (hasSectionDate) {
+    const dateStr = foldTextForPdf(`Coletado em: ${sectionDateLine}`);
     const dw = ctx.font.widthOfTextAtSize(dateStr, 7.5);
     drawTextLine(ctx, dateStr,
       MARGIN_X + CONTENT_W - dw - 10, secTop - 9,
@@ -1075,13 +1068,6 @@ async function drawSignaturesSection(
     if (subTrunc) {
       drawTextLine(ctx, subTrunc, x + PAD_X, subY, SUB_SIZE, ctx.font, C.textMuted);
     }
-
-    // ── Data/hora e IP (apenas se disponível) ──
-    if (hasDate) {
-      const dateY = subY - SUB_SIZE - 3;
-      const dateFolded = foldTextForPdf(dateLine);
-      drawTextLine(ctx, dateFolded, x + PAD_X, dateY, DATE_SIZE, ctx.font, C.textFaint);
-    }
   };
 
   // Dados dos signatários
@@ -1110,9 +1096,9 @@ async function drawSignaturesSection(
     const hashY = cardBot - 10;
     const hashLine = `SHA-256: ${input.documentHash}`;
     drawTextLine(ctx, hashLine, MARGIN_X, hashY, 6.5, ctx.font, C.textFaint);
-    if (hasDate) {
+    if (hasSectionDate) {
       const auditY = hashY - 6.5 - 4;
-      drawTextLine(ctx, foldTextForPdf(dateLine), MARGIN_X, auditY, 6.5, ctx.font, C.textFaint);
+      drawTextLine(ctx, foldTextForPdf(sectionDateLine), MARGIN_X, auditY, 6.5, ctx.font, C.textFaint);
       ctx.y = auditY - 6.5 - 8;
     } else {
       ctx.y = hashY - 6.5 - 8;

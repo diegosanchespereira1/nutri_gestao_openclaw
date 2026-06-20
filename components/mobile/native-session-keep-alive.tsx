@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-import { useSessionKeepAlive, refreshSessionIfNeeded } from "@/hooks/use-session-keep-alive";
+import { useSessionKeepAlive, refreshSessionIfNeeded, bumpAppSessionActivity } from "@/hooks/use-session-keep-alive";
 import { persistNativeClientCookie } from "@/lib/mobile/persist-native-client-cookie";
 import { isNativeApp } from "@/lib/mobile/platform";
 
@@ -25,7 +25,7 @@ export function NativeSessionKeepAlive() {
       void App.addListener("appStateChange", ({ isActive }) => {
         if (isActive) {
           persistNativeClientCookie();
-          void refreshSessionIfNeeded(true);
+          void Promise.all([refreshSessionIfNeeded(true), bumpAppSessionActivity()]);
         }
       }).then((handle) => {
         removeAppListener = () => void handle.remove();

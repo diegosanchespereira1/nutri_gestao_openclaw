@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { isNavigationGuardSuspended } from "@/lib/client/suspend-navigation-guard";
+
 type UseNavigationGuardOptions = {
   /** Ativar o guard. Passar false quando o dossiê estiver aprovado. */
   active: boolean;
@@ -53,14 +55,20 @@ export function useNavigationGuard(
     }
 
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (!activeRef.current || completingRef.current) return;
+      if (
+        !activeRef.current ||
+        completingRef.current ||
+        isNavigationGuardSuspended()
+      ) {
+        return;
+      }
       e.preventDefault();
       e.returnValue = "";
       return "";
     }
 
     function handlePopState() {
-      if (completingRef.current) return;
+      if (completingRef.current || isNavigationGuardSuspended()) return;
       if (!activeRef.current) return;
       // Repõe sempre a entrada sentinel para não perder o estado da página.
       history.pushState({ navGuard: 1 }, "", window.location.href);

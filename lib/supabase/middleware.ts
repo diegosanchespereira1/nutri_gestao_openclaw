@@ -12,6 +12,7 @@ import {
   getAppSessionIdleTimeoutSec,
   getProfileCtxTtlSec,
 } from "@/lib/auth/app-session-cookies";
+import { bumpAppSessionActivityCookies } from "@/lib/auth/bump-app-session-activity";
 import {
   parseProfileContextCookie,
   type ProfileContextCookie,
@@ -120,21 +121,13 @@ function bumpAppSessionLastForServerActionIfEligible(
   const nativeClient = isNativeClientRequest(request);
   const startRaw = request.cookies.get(APP_SESSION_START_COOKIE)?.value;
   const startParsed = startRaw ? Number.parseInt(startRaw, 10) : NaN;
-  if (!Number.isFinite(startParsed)) return null;
 
-  const now = Math.floor(Date.now() / 1000);
-  const absSec = getAppSessionAbsoluteMaxSec({ nativeClient });
-  if (!nativeClient && now - startParsed > absSec) return null;
-
-  const baseCookie = getSupabaseCookieOptions();
-  const idleSec = getAppSessionIdleTimeoutSec({ nativeClient });
   const res = nextWithPathname(request);
-  res.cookies.set(
-    APP_SESSION_LAST_COOKIE,
-    String(now),
-    appSessionCookieOptions(baseCookie, idleSec + 300),
-  );
-  return res;
+  const bumped = bumpAppSessionActivityCookies(res.cookies, {
+    nativeClient,
+    sessionStartSec: Number.isFinite(startParsed) ? startParsed : null,
+  });
+  return bumped ? res : null;
 }
 
 function parseProfileContextCookieFromRequest(

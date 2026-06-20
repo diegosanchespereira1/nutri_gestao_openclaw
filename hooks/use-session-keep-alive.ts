@@ -28,6 +28,18 @@ function getRefreshAheadSec(): number {
   return isNativeApp() ? NATIVE_REFRESH_AHEAD_SEC : WEB_REFRESH_AHEAD_SEC;
 }
 
+/** Renova cookies de atividade da app (`ng_sess_*`) — evita idle timeout durante trabalho só via Server Actions. */
+export async function bumpAppSessionActivity(): Promise<void> {
+  try {
+    await fetch("/api/auth/session-activity", {
+      credentials: "include",
+      cache: "no-store",
+    });
+  } catch {
+    // Falha pontual de rede — o próximo ciclo tenta de novo.
+  }
+}
+
 /** Renova sessão Supabase se o access token expira em breve. */
 export async function refreshSessionIfNeeded(force = false): Promise<void> {
   const supabase = createClient();
@@ -46,19 +58,23 @@ export async function refreshSessionIfNeeded(force = false): Promise<void> {
   }
 }
 
+async function refreshSessionAndActivity(force = false): Promise<void> {
+  await Promise.all([refreshSessionIfNeeded(force), bumpAppSessionActivity()]);
+}
+
 export function useSessionKeepAlive(): void {
   useEffect(() => {
-    void refreshSessionIfNeeded();
+    void refreshSessionAndActivity();
 
     const interval = setInterval(() => {
       if (document.visibilityState === "visible") {
-        void refreshSessionIfNeeded();
+        void refreshSessionAndActivity();
       }
     }, getRefreshIntervalMs());
 
     function onVisibilityChange() {
       if (document.visibilityState === "visible") {
-        void refreshSessionIfNeeded(isNativeApp());
+        void refreshSessionAndActivity(isNativeApp());
       }
     }
     document.addEventListener("visibilitychange", onVisibilityChange);

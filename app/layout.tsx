@@ -8,7 +8,7 @@ import { CapacitorNativeHtml } from "@/components/mobile/capacitor-native-html";
 import { CapacitorStatusBar } from "@/components/mobile/capacitor-status-bar";
 import { NativeSessionKeepAlive } from "@/components/mobile/native-session-keep-alive";
 import { PullToRefresh } from "@/components/mobile/pull-to-refresh";
-import { getAppVersion } from "@/lib/app-version";
+import { getServerAppVersion } from "@/lib/app-version-server";
 import { CAPACITOR_BOOTSTRAP_INLINE_SCRIPT } from "@/lib/mobile/capacitor-bootstrap-inline-script";
 import { getPublicRuntimeEnv } from "@/lib/env/public-runtime";
 
@@ -70,7 +70,7 @@ export default function RootLayout({
       style={{ backgroundColor: '#F4F9F8' }}
     >
       <head>
-        <meta name="app-version" content={getAppVersion()} />
+        <meta name="app-version" content={getServerAppVersion()} />
         {/* Fundo imediato antes do CSS carregar — evita flash preto no Capacitor */}
         <style
           dangerouslySetInnerHTML={{

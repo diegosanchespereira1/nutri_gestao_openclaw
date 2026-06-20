@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { getAppVersion } from "@/lib/app-version";
+import { getServerAppVersion } from "@/lib/app-version-server";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export function GET() {
-  const version = getAppVersion();
+  const version = getServerAppVersion();
   return NextResponse.json(
     { version },
     {

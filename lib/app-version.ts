@@ -4,6 +4,7 @@ export const DEV_APP_VERSION = "0.0.0-dev";
 
 export const APP_VERSION_SESSION_STORAGE_KEY = "ng_app_version";
 
+/** Seguro para cliente e servidor (usa env inlined pelo Next). */
 export function getAppVersion(): string {
   const fromEnv = process.env.NEXT_PUBLIC_APP_VERSION?.trim();
   if (fromEnv) return fromEnv;

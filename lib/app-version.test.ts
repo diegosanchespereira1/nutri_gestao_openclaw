@@ -6,6 +6,8 @@ import {
   getAppVersion,
   parseSemver,
 } from "@/lib/app-version";
+import { readPackageVersion } from "@/lib/app-version-package";
+import { getServerAppVersion } from "@/lib/app-version-server";
 
 describe("app-version", () => {
   it("parseSemver aceita semver básico", () => {
@@ -21,7 +23,22 @@ describe("app-version", () => {
     expect(formatAppVersionTitle("1.0.3")).toBe("Versão 1.0.3");
   });
 
-  it("getAppVersion devolve string não vazia", () => {
-    expect(getAppVersion().length).toBeGreaterThan(0);
+  it("readPackageVersion devolve semver do package.json", () => {
+    expect(readPackageVersion()).toBe("1.2.11");
+  });
+
+  it("getServerAppVersion devolve semver do package.json em ambiente de teste", () => {
+    expect(getServerAppVersion()).toBe("1.2.11");
+  });
+
+  it("getAppVersion usa NEXT_PUBLIC_APP_VERSION quando definida", () => {
+    const prev = process.env.NEXT_PUBLIC_APP_VERSION;
+    process.env.NEXT_PUBLIC_APP_VERSION = "9.8.7";
+    try {
+      expect(getAppVersion()).toBe("9.8.7");
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_APP_VERSION;
+      else process.env.NEXT_PUBLIC_APP_VERSION = prev;
+    }
   });
 });

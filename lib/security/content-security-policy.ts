@@ -44,6 +44,8 @@ function connectSrcParts(): string[] {
   }
   parts.add("https://*.supabase.co");
   parts.add("wss://*.supabase.co");
+  // IP público do dispositivo na aprovação do dossiê (fallback quando headers = loopback)
+  parts.add("https://api.ipify.org");
 
   // Capacitor WebView (iOS usa scheme capacitor://, Android usa https://)
   // Necessário para que o app nativo consiga fazer fetch para o servidor.

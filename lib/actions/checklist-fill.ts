@@ -3,10 +3,12 @@
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
+import { headers } from "next/headers";
 
 import { requireWorkspaceAuthContext } from "@/lib/actions/auth-context";
 import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { generateDocumentHash } from "@/lib/checklists/document-hash";
+import { resolveApprovalClientIp } from "@/lib/server/client-ip";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadChecklistTemplateBundleByIdDirect } from "@/lib/actions/checklists";
@@ -1389,6 +1391,71 @@ export async function startChecklistFillBatch(input: {
   };
 }
 
+/**
+ * Cria sessão(ões) a partir de um modelo personalizado (cópia por estabelecimento).
+ */
+export async function startCustomTemplateFillBatch(input: {
+  customTemplateId: string;
+  areaIds: string[];
+}): Promise<
+  | { ok: true; sessionIds: string[]; firstSessionId: string; totalSessions: number }
+  | { ok: false; error: string }
+> {
+  const supabase = await createClient();
+  const auth = await requireWorkspaceAuthContext(supabase);
+  if (!auth.ok) return { ok: false, error: "not_authenticated" };
+
+  const { data: ct } = await supabase
+    .from("checklist_custom_templates")
+    .select("id, establishment_id")
+    .eq("id", input.customTemplateId)
+    .maybeSingle();
+  if (!ct) return { ok: false, error: "template_not_found" };
+
+  const establishmentId = String(ct.establishment_id);
+  const owned = await assertEstablishmentOwned(supabase, auth.workspaceOwnerId, establishmentId);
+  if (!owned) return { ok: false, error: "forbidden" };
+
+  const resolvedAreas: (string | null)[] = input.areaIds.length > 0 ? input.areaIds : [null];
+  for (const areaId of resolvedAreas) {
+    if (areaId) {
+      const { data: area } = await supabase
+        .from("establishment_areas")
+        .select("id")
+        .eq("id", areaId)
+        .eq("establishment_id", establishmentId)
+        .maybeSingle();
+      if (!area) return { ok: false, error: `area_not_found:${areaId}` };
+    }
+  }
+
+  const sessionIds: string[] = [];
+  for (const areaId of resolvedAreas) {
+    const { data: session, error } = await supabase
+      .from("checklist_fill_sessions")
+      .insert({
+        user_id: auth.userId,
+        establishment_id: establishmentId,
+        template_id: null,
+        custom_template_id: input.customTemplateId,
+        area_id: areaId,
+      })
+      .select("id")
+      .single();
+    if (error || !session) return { ok: false, error: "session_create_failed" };
+    sessionIds.push(session.id);
+  }
+
+  const first = sessionIds[0];
+  if (!first) return { ok: false, error: "session_create_failed" };
+  return {
+    ok: true,
+    sessionIds,
+    firstSessionId: first,
+    totalSessions: sessionIds.length,
+  };
+}
+
 /** Resultado de «Usar template» no catálogo: conflito com rascunho existente ou sessão criada. */
 export type CatalogTemplateFillPrepareResult =
   | { ok: true; kind: "conflict"; existing: ExistingOpenSession }
@@ -1449,6 +1516,42 @@ export async function startWorkspaceTemplateFillOrGetConflict(input: {
     return { ok: true, kind: "conflict", existing };
   }
   const started = await startWorkspaceTemplateFillBatch(input);
+  if (!started.ok) {
+    return { ok: false, error: started.error };
+  }
+  return {
+    ok: true,
+    kind: "started",
+    sessionIds: started.sessionIds,
+    firstSessionId: started.firstSessionId,
+    totalSessions: started.totalSessions,
+  };
+}
+
+/**
+ * Uma única chamada ao servidor para o fluxo «Usar template» (modelo personalizado).
+ */
+export async function startCustomTemplateFillOrGetConflict(input: {
+  customTemplateId: string;
+  areaIds: string[];
+}): Promise<CatalogTemplateFillPrepareResult> {
+  const { data: ct } = await (await createClient())
+    .from("checklist_custom_templates")
+    .select("establishment_id")
+    .eq("id", input.customTemplateId)
+    .maybeSingle();
+  if (!ct) return { ok: false, error: "template_not_found" };
+
+  const establishmentId = String(ct.establishment_id);
+  const existing = await checkExistingOpenFillSession({
+    establishmentId,
+    templateId: null,
+    customTemplateId: input.customTemplateId,
+  });
+  if (existing) {
+    return { ok: true, kind: "conflict", existing };
+  }
+  const started = await startCustomTemplateFillBatch(input);
   if (!started.ok) {
     return { ok: false, error: started.error };
   }
@@ -1530,7 +1633,7 @@ export async function deleteChecklistFillSessionAction(
 }
 
 export type ApproveDossierResult =
-  | { ok: true; approvedAt: string; documentHash: string | null }
+  | { ok: true; approvedAt: string; documentHash: string | null; approvedClientIp: string | null }
   | { ok: false; error: string };
 
 function formatIssueWithSectionAndItem(
@@ -1611,7 +1714,12 @@ async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
 /** Aprova o dossiê: valida todo o modelo, regista data e bloqueia edições (FR23); visita ligada → concluída. */
 export async function approveChecklistFillDossierAction(
   sessionId: string,
-  signatures?: { professional: string; client: string; clientSignerName?: string } | null,
+  signatures?: {
+    professional: string;
+    client: string;
+    clientSignerName?: string;
+    deviceIp?: string | null;
+  } | null,
 ): Promise<ApproveDossierResult> {
   const _t0 = Date.now();
 
@@ -1735,9 +1843,16 @@ export async function approveChecklistFillDossierAction(
   if (clientSig) sigPatch.client_signature_data_url = clientSig;
   if (clientSignerNameForSave) sigPatch.client_signer_name = clientSignerNameForSave;
 
+  const headersList = await headers();
+  const approvedClientIp = resolveApprovalClientIp(
+    headersList,
+    signatures?.deviceIp ?? null,
+  );
+
   // ── Aprovação + assinaturas + hash num único update (evita aprovação sem hash no BD / race com refresh)
   const approvalPayload: Record<string, unknown> = {
     dossier_approved_at: approvedAt,
+    dossier_approved_client_ip: approvedClientIp,
     ...sigPatch,
     document_hash: documentHash,
   };
@@ -1747,34 +1862,50 @@ export async function approveChecklistFillDossierAction(
     .update(approvalPayload)
     .eq("id", sessionId)
     .is("dossier_approved_at", null)
-    .select("dossier_approved_at, document_hash")
+    .select("dossier_approved_at, document_hash, dossier_approved_client_ip")
     .maybeSingle();
 
   let finalUpdated = updated;
   let finalDocumentHash = documentHash;
+  let finalApprovedClientIp: string | null = approvedClientIp;
 
-  if (error && documentHash) {
+  if (error) {
     const errText = `${(error as { message?: string }).message ?? ""} ${JSON.stringify(error)}`.toLowerCase();
-    if (
-      errText.includes("document_hash") ||
+    const missingColumn =
       errText.includes("42703") ||
-      (errText.includes("column") && errText.includes("does not exist"))
-    ) {
-      const { document_hash, ...withoutHash } = approvalPayload;
-      void document_hash;
+      (errText.includes("column") && errText.includes("does not exist"));
+
+    if (missingColumn) {
+      const retryPayload = { ...approvalPayload };
+      if (errText.includes("document_hash")) {
+        delete retryPayload.document_hash;
+        finalDocumentHash = null;
+      }
+      if (errText.includes("dossier_approved_client_ip")) {
+        delete retryPayload.dossier_approved_client_ip;
+        finalApprovedClientIp = null;
+      }
+
       const retry = await supabase
         .from("checklist_fill_sessions")
-        .update(withoutHash)
+        .update(retryPayload)
         .eq("id", sessionId)
         .is("dossier_approved_at", null)
-        .select("dossier_approved_at, document_hash")
+        .select("dossier_approved_at, document_hash, dossier_approved_client_ip")
         .maybeSingle();
+
       if (!retry.error && retry.data?.dossier_approved_at) {
         finalUpdated = retry.data;
-        finalDocumentHash = null;
-        console.warn(
-          "[approveChecklistFillDossierAction] Coluna document_hash ausente no BD — aprovação concluída sem persistir hash. Aplique migration 20260724100002.",
-        );
+        if (errText.includes("document_hash")) {
+          console.warn(
+            "[approveChecklistFillDossierAction] Coluna document_hash ausente no BD — aprovação concluída sem persistir hash. Aplique migration 20260724100002.",
+          );
+        }
+        if (errText.includes("dossier_approved_client_ip")) {
+          console.warn(
+            "[approveChecklistFillDossierAction] Coluna dossier_approved_client_ip ausente no BD — aprovação concluída sem persistir IP. Aplique migration 20260820120000.",
+          );
+        }
       }
     }
   }
@@ -1791,6 +1922,9 @@ export async function approveChecklistFillDossierAction(
 
   const persistedHash =
     (finalUpdated as { document_hash?: string | null }).document_hash ?? finalDocumentHash;
+  const persistedClientIp =
+    (finalUpdated as { dossier_approved_client_ip?: string | null }).dossier_approved_client_ip
+    ?? finalApprovedClientIp;
   const _tUpdate = Date.now();
 
   // ── 2. Pontuação (best-effort) ──────────────────────────────────────────
@@ -1839,6 +1973,11 @@ export async function approveChecklistFillDossierAction(
       ` | TOTAL=${_tScore - _t0}ms`,
   );
 
-  return { ok: true, approvedAt: at, documentHash: persistedHash };
+  return {
+    ok: true,
+    approvedAt: at,
+    documentHash: persistedHash,
+    approvedClientIp: persistedClientIp,
+  };
 }
 

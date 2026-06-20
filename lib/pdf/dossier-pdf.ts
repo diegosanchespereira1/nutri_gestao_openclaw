@@ -112,7 +112,7 @@ function wrapByWidth(text: string, font: PDFFont, size: number, maxWidth: number
   for (const w of words) {
     const candidate = cur.length === 0 ? w : `${cur} ${w}`;
     if (width(candidate) <= maxWidth) { cur = candidate; continue; }
-    if (cur.length > 0) lines.push(cur);
+      if (cur.length > 0) lines.push(cur);
     if (width(w) > maxWidth) {
       let acc = "";
       for (const ch of w) {
@@ -129,12 +129,12 @@ function wrapByWidth(text: string, font: PDFFont, size: number, maxWidth: number
 /* ── Tipos públicos (API imutável) ─────────────────────────────────────── */
 
 export type DossierPdfItemInput = {
-  description: string;
-  outcome: ChecklistFillOutcome | null;
-  note: string | null;
-  annotation: string | null;
+    description: string;
+    outcome: ChecklistFillOutcome | null;
+    note: string | null;
+    annotation: string | null;
   validUntil?: string | null;
-  photoBuffers?: Buffer[];
+    photoBuffers?: Buffer[];
   /** Agrupador de subseção (sem avaliação no PDF). */
   isStructureOnly?: boolean;
 };
@@ -173,6 +173,8 @@ export type DossierPdfBuildInput = {
   clientSignerName?: string | null;
   /** Data/hora da coleta das assinaturas, já formatada (ex: "14/05/2026 às 10:32"). */
   signedAtLabel?: string | null;
+  /** Linha de auditoria com data/hora e IP do dispositivo. */
+  signedAtAuditLine?: string | null;
   /** Hash SHA-256 hex único desta versão aprovada do dossiê. */
   documentHash?: string | null;
   /** Cor de fundo do cabeçalho em hex (#RRGGBB). Padrão: #1B2A4A (navy). */
@@ -961,7 +963,8 @@ async function drawSignaturesSection(
   const NAME_SIZE = 9;
   const SUB_SIZE  = 7.5;
   const DATE_SIZE = 7;
-  const hasDate   = !!input.signedAtLabel;
+  const hasDate   = !!input.signedAtAuditLine || !!input.signedAtLabel;
+  const dateLine  = input.signedAtAuditLine ?? input.signedAtLabel ?? "";
 
   // Altura total do card
   const CARD_H = PAD_TOP + ROLE_SIZE + 5 + SIG_IMG_H + LINE_GAP + 1 + LINE_GAP
@@ -980,7 +983,7 @@ async function drawSignaturesSection(
 
   // Data/hora alinhada à direita no cabeçalho
   if (hasDate) {
-    const dateStr = foldTextForPdf(`Coletado em: ${input.signedAtLabel!}`);
+    const dateStr = foldTextForPdf(`Coletado em: ${dateLine}`);
     const dw = ctx.font.widthOfTextAtSize(dateStr, 7.5);
     drawTextLine(ctx, dateStr,
       MARGIN_X + CONTENT_W - dw - 10, secTop - 9,
@@ -1073,10 +1076,10 @@ async function drawSignaturesSection(
       drawTextLine(ctx, subTrunc, x + PAD_X, subY, SUB_SIZE, ctx.font, C.textMuted);
     }
 
-    // ── Data/hora (apenas se disponível) ──
+    // ── Data/hora e IP (apenas se disponível) ──
     if (hasDate) {
       const dateY = subY - SUB_SIZE - 3;
-      const dateFolded = foldTextForPdf(input.signedAtLabel!);
+      const dateFolded = foldTextForPdf(dateLine);
       drawTextLine(ctx, dateFolded, x + PAD_X, dateY, DATE_SIZE, ctx.font, C.textFaint);
     }
   };
@@ -1107,7 +1110,13 @@ async function drawSignaturesSection(
     const hashY = cardBot - 10;
     const hashLine = `SHA-256: ${input.documentHash}`;
     drawTextLine(ctx, hashLine, MARGIN_X, hashY, 6.5, ctx.font, C.textFaint);
-    ctx.y = hashY - 6.5 - 8;
+    if (hasDate) {
+      const auditY = hashY - 6.5 - 4;
+      drawTextLine(ctx, foldTextForPdf(dateLine), MARGIN_X, auditY, 6.5, ctx.font, C.textFaint);
+      ctx.y = auditY - 6.5 - 8;
+    } else {
+      ctx.y = hashY - 6.5 - 8;
+    }
   } else {
     ctx.y = cardBot - 16;
   }

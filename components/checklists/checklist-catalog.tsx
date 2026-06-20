@@ -36,13 +36,17 @@ import { touchMinHeight, touchMinTarget } from "@/lib/touch-targets";
 import { cn } from "@/lib/utils";
 import {
   startChecklistFillBatch,
+  startCustomTemplateFillBatch,
+  startCustomTemplateFillOrGetConflict,
   startSystemTemplateFillOrGetConflict,
   startWorkspaceTemplateFillOrGetConflict,
   type ExistingOpenSession,
 } from "@/lib/actions/checklist-fill";
 import { startWorkspaceTemplateFillBatch } from "@/lib/actions/checklist-workspace";
+import type { CustomTemplateListRow } from "@/lib/actions/checklist-custom";
 import type { WorkspaceTemplateListRow } from "@/lib/actions/checklist-workspace";
 import {
+  loadEstablishmentPickerOptionById,
   loadOwnerChecklistEstablishmentsDropdownAction,
   registerChecklistEstablishmentOpenAction,
   searchOwnerEstablishmentsAction,
@@ -69,6 +73,8 @@ type Props = {
   templates: ChecklistTemplateWithSections[];
   /** Modelos 100% customizáveis criados pelo workspace (tag "Equipe"). */
   workspaceTemplates?: WorkspaceTemplateListRow[];
+  /** Cópias personalizadas do catálogo por estabelecimento. */
+  customTemplates?: CustomTemplateListRow[];
   /** Mantido para compatibilidade com páginas RSC; o catálogo usa fluxo batch interno. */
   startFillAction?: (formData: FormData) => Promise<void>;
   duplicateTemplateAction: (formData: FormData) => Promise<void>;
@@ -80,7 +86,16 @@ type Props = {
   initialEstablishmentId?: string | null;
 };
 
-type SelectedTemplateSource = "system" | "workspace";
+type SelectedTemplateSource = "system" | "workspace" | "custom";
+
+type TemplateSourceFilter = "all" | "system" | "workspace" | "custom";
+
+const TEMPLATE_SOURCE_FILTERS: Array<{ id: TemplateSourceFilter; label: string }> = [
+  { id: "all", label: "Todos" },
+  { id: "system", label: "Sistema" },
+  { id: "workspace", label: "Equipe" },
+  { id: "custom", label: "Personalizados" },
+];
 
 const DROPDOWN_PAGE_SIZE = 80;
 
@@ -200,6 +215,7 @@ export function ChecklistCatalog({
   recentEstablishments,
   templates,
   workspaceTemplates = [],
+  customTemplates = [],
   duplicateTemplateAction,
   focusTemplateId = null,
   focusWorkspaceTemplateId = null,
@@ -230,11 +246,18 @@ export function ChecklistCatalog({
   const [selectedWorkspaceTemplateId, setSelectedWorkspaceTemplateId] = useState<
     string | null
   >(focusWorkspaceTemplateId ?? null);
+  const [selectedCustomTemplateId, setSelectedCustomTemplateId] = useState<string | null>(
+    null,
+  );
   const selectedSource: SelectedTemplateSource | null = selectedWorkspaceTemplateId
     ? "workspace"
-    : selectedTemplateId
-      ? "system"
-      : null;
+    : selectedCustomTemplateId
+      ? "custom"
+      : selectedTemplateId
+        ? "system"
+        : null;
+  const [templateSourceFilter, setTemplateSourceFilter] =
+    useState<TemplateSourceFilter>("all");
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<EstablishmentType[]>([]);
   const [typeFilterDropdownOpen, setTypeFilterDropdownOpen] = useState(false);
@@ -333,8 +356,61 @@ export function ChecklistCatalog({
     [selectedWorkspaceTemplateId, workspaceTemplates],
   );
 
+  const selectedCustomTemplate = useMemo(
+    () =>
+      selectedCustomTemplateId
+        ? (customTemplates.find((t) => t.id === selectedCustomTemplateId) ?? null)
+        : null,
+    [selectedCustomTemplateId, customTemplates],
+  );
+
   const selectedTemplateLabel =
-    selectedTemplate?.name ?? selectedWorkspaceTemplate?.name ?? "";
+    selectedTemplate?.name ??
+    selectedWorkspaceTemplate?.name ??
+    selectedCustomTemplate?.name ??
+    "";
+
+  const filteredWorkspaceTemplates = useMemo(() => {
+    let result = workspaceTemplates;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (wt) =>
+          wt.name.toLowerCase().includes(q) ||
+          (wt.created_by_name?.toLowerCase().includes(q) ?? false),
+      );
+    }
+    return result;
+  }, [workspaceTemplates, search]);
+
+  const filteredCustomTemplates = useMemo(() => {
+    let result = customTemplates;
+    if (filterEstablishmentId) {
+      result = result.filter((ct) => ct.establishment_id === filterEstablishmentId);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter(
+        (ct) =>
+          ct.name.toLowerCase().includes(q) ||
+          ct.establishment_label.toLowerCase().includes(q) ||
+          (ct.created_by_name?.toLowerCase().includes(q) ?? false),
+      );
+    }
+    return result;
+  }, [customTemplates, filterEstablishmentId, search]);
+
+  const showWorkspaceTemplates =
+    templateSourceFilter === "all" || templateSourceFilter === "workspace";
+  const showSystemTemplates =
+    templateSourceFilter === "all" || templateSourceFilter === "system";
+  const showCustomTemplates =
+    templateSourceFilter === "all" || templateSourceFilter === "custom";
+
+  const visibleTemplateCount =
+    (showWorkspaceTemplates ? filteredWorkspaceTemplates.length : 0) +
+    (showSystemTemplates ? filteredTemplates.length : 0) +
+    (showCustomTemplates ? filteredCustomTemplates.length : 0);
 
   const establishmentDropdownOptions = useMemo(() => {
     const map = new Map<string, EstablishmentPickerOption>();
@@ -355,9 +431,11 @@ export function ChecklistCatalog({
   const hasMoreDropdownOptions = dropdownOffset < dropdownTotal;
 
   const step1Done = Boolean(establishmentId);
-  const step2Done = Boolean(selectedTemplateId || selectedWorkspaceTemplateId);
+  const step2Done = Boolean(
+    selectedTemplateId || selectedWorkspaceTemplateId || selectedCustomTemplateId,
+  );
   const hasActiveFilters = Boolean(
-    search || typeFilter.length > 0 || ufFilter.length > 0,
+    search || typeFilter.length > 0 || ufFilter.length > 0 || templateSourceFilter !== "all",
   );
 
   const typeFilterLabel = useMemo(() => {
@@ -428,6 +506,14 @@ export function ChecklistCatalog({
     });
     return () => { cancelled = true; };
   }, [establishmentId]);
+
+  useEffect(() => {
+    if (!selectedCustomTemplateId) return;
+    const stillVisible = filteredCustomTemplates.some(
+      (ct) => ct.id === selectedCustomTemplateId,
+    );
+    if (!stillVisible) setSelectedCustomTemplateId(null);
+  }, [filteredCustomTemplates, selectedCustomTemplateId]);
 
   // Fechar dropdown de áreas ao clicar fora
   useEffect(() => {
@@ -548,19 +634,61 @@ export function ChecklistCatalog({
   function selectTemplate(id: string) {
     setSelectedTemplateId((prev) => (prev === id ? null : id));
     setSelectedWorkspaceTemplateId(null);
+    setSelectedCustomTemplateId(null);
   }
 
   function selectWorkspaceTemplate(id: string) {
     setSelectedWorkspaceTemplateId((prev) => (prev === id ? null : id));
     setSelectedTemplateId(null);
+    setSelectedCustomTemplateId(null);
+  }
+
+  function selectCustomTemplate(id: string) {
+    const willSelect = selectedCustomTemplateId !== id ? id : null;
+    setSelectedCustomTemplateId(willSelect);
+    setSelectedTemplateId(null);
+    setSelectedWorkspaceTemplateId(null);
+    if (!willSelect) return;
+    const ct = customTemplates.find((t) => t.id === willSelect);
+    if (!ct || establishmentId === ct.establishment_id) return;
+    void syncEstablishmentForCustom(ct);
+  }
+
+  async function syncEstablishmentForCustom(ct: CustomTemplateListRow) {
+    const fromRecent = recentOptions.find((r) => r.id === ct.establishment_id);
+    if (fromRecent) {
+      selectEstablishment(fromRecent);
+      return;
+    }
+    const fromDropdown = alphabeticalDropdownOptions.find(
+      (r) => r.id === ct.establishment_id,
+    );
+    if (fromDropdown) {
+      selectEstablishment(fromDropdown);
+      return;
+    }
+    try {
+      const option = await loadEstablishmentPickerOptionById(ct.establishment_id);
+      if (option) selectEstablishment(option);
+    } catch {
+      // usuário pode selecionar o estabelecimento manualmente na etapa 1
+    }
   }
 
   function clearFilters() {
     setSearch("");
     setTypeFilter([]);
     setUfFilter([]);
+    setTemplateSourceFilter("all");
     setTypeFilterDropdownOpen(false);
     setUfFilterDropdownOpen(false);
+  }
+
+  function setTemplateSourceFilterAndResetSelection(next: TemplateSourceFilter) {
+    setTemplateSourceFilter(next);
+    setSelectedTemplateId(null);
+    setSelectedWorkspaceTemplateId(null);
+    setSelectedCustomTemplateId(null);
   }
 
   function toggleTypeFilter(type: EstablishmentType) {
@@ -673,7 +801,12 @@ export function ChecklistCatalog({
     templateId: string,
     source: SelectedTemplateSource,
   ) {
-    void registerChecklistEstablishmentOpenAction(establishmentId);
+    const effectiveEstablishmentId =
+      source === "custom" && selectedCustomTemplate
+        ? selectedCustomTemplate.establishment_id
+        : establishmentId;
+
+    void registerChecklistEstablishmentOpenAction(effectiveEstablishmentId);
     if (result.sessionIds.length >= 2) {
       const items = result.sessionIds.map((sid, i) => {
         const areaId =
@@ -689,12 +822,14 @@ export function ChecklistCatalog({
       });
       saveChecklistFillBatch({
         templateId,
-        establishmentId,
+        establishmentId: effectiveEstablishmentId,
         items,
       });
     }
     navigateToChecklistFill(result.firstSessionId, {
-      returnTo: checklistCatalogReturnTo(),
+      returnTo: effectiveEstablishmentId
+        ? `/checklists?est=${encodeURIComponent(effectiveEstablishmentId)}`
+        : "/checklists",
     });
   }
 
@@ -710,11 +845,16 @@ export function ChecklistCatalog({
             establishmentId,
             areaIds: selectedAreaIds,
           })
-        : await startChecklistFillBatch({
-            templateId,
-            establishmentId,
-            areaIds: selectedAreaIds,
-          });
+        : source === "custom"
+          ? await startCustomTemplateFillBatch({
+              customTemplateId: templateId,
+              areaIds: selectedAreaIds,
+            })
+          : await startChecklistFillBatch({
+              templateId,
+              establishmentId,
+              areaIds: selectedAreaIds,
+            });
     if (result.ok) {
       await finalizeAfterStart(result, templateId, source);
     } else {
@@ -726,7 +866,7 @@ export function ChecklistCatalog({
   async function handleUsarTemplate() {
     if (!establishmentId) return;
     if (availableAreas.length > 0 && selectedAreaIds.length === 0) return;
-    if (!selectedTemplate && !selectedWorkspaceTemplate) return;
+    if (!selectedTemplate && !selectedWorkspaceTemplate && !selectedCustomTemplate) return;
 
     setCheckingSession(true);
     try {
@@ -767,6 +907,22 @@ export function ChecklistCatalog({
           setConflictSession(prep.existing);
         } else {
           await finalizeAfterStart(prep, selectedTemplate.id, "system");
+        }
+      } else if (selectedCustomTemplate) {
+        const prep = await startCustomTemplateFillOrGetConflict({
+          customTemplateId: selectedCustomTemplate.id,
+          areaIds: selectedAreaIds,
+        });
+        if (!prep.ok) {
+          setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
+          return;
+        }
+        if (prep.kind === "conflict") {
+          setPendingTemplateId(selectedCustomTemplate.id);
+          setPendingTemplateSource("custom");
+          setConflictSession(prep.existing);
+        } else {
+          await finalizeAfterStart(prep, selectedCustomTemplate.id, "custom");
         }
       }
     } finally {
@@ -821,18 +977,7 @@ export function ChecklistCatalog({
             : "border-border bg-card shadow-sm",
         )}
       >
-        <div className="flex min-w-0 items-start gap-3">
-          <div
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full font-bold text-sm transition-all",
-              step1Done
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            {step1Done ? <CheckCircle2 className="size-4" /> : "1"}
-          </div>
-          <div className="min-w-0 flex-1 space-y-2.5">
+        <div className="min-w-0 space-y-2.5">
             <div>
               <p className="text-sm font-semibold text-foreground">
                 Selecione o estabelecimento
@@ -1057,7 +1202,6 @@ export function ChecklistCatalog({
                 Filtrando por UF e tipo do estabelecimento selecionado
               </p>
             )}
-          </div>
         </div>
       </div>
 
@@ -1070,72 +1214,83 @@ export function ChecklistCatalog({
             : "border-border bg-card shadow-sm",
         )}
       >
-        <div className="flex min-w-0 items-start gap-3">
-          <div
-            className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full font-bold text-sm transition-all",
-              step2Done
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            {step2Done ? <CheckCircle2 className="size-4" /> : "2"}
-          </div>
-          <div className="min-w-0 flex-1 space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
+        <div className="min-w-0 space-y-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
                 <p className="text-sm font-semibold text-foreground">
                   Escolha um template de checklist
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Selecione um modelo regulatório ou da equipe para iniciar o preenchimento
+                  Filtre por origem, tipo ou UF
                 </p>
               </div>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {filteredTemplates.length + workspaceTemplates.length} template
-                {filteredTemplates.length + workspaceTemplates.length !== 1 ? "s" : ""}
+              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                {visibleTemplateCount} template
+                {visibleTemplateCount !== 1 ? "s" : ""}
               </span>
             </div>
 
-        {/* Busca e filtros */}
-        <div className="space-y-3">
-          {/* Campo de busca */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Buscar por nome, portaria, descrição…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className={cn(
-                "h-9 w-full rounded-lg border pl-9 pr-9 text-sm shadow-xs outline-none",
-                "border-input bg-background text-foreground placeholder:text-muted-foreground",
-                "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2",
-                touchMinHeight,
-              )}
-              aria-label="Buscar template de checklist"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch("")}
-                className={cn(
-                  "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
-                  touchMinTarget,
-                )}
-                aria-label="Limpar busca"
-              >
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
+            <div
+              className="flex flex-wrap gap-1.5"
+              role="tablist"
+              aria-label="Origem do modelo"
+            >
+              {TEMPLATE_SOURCE_FILTERS.map((option) => {
+                const active = templateSourceFilter === option.id;
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTemplateSourceFilterAndResetSelection(option.id)}
+                    className={cn(
+                      "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors touch-manipulation",
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground",
+                    )}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
 
-          {/* Filtros */}
-          <div className="min-w-0 space-y-2">
-            <div className="grid min-w-0 grid-cols-[minmax(0,1.85fr)_minmax(0,1fr)] gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className="text-xs font-medium text-muted-foreground">Tipo</span>
-                <div ref={typeFilterDropdownRef} className="relative min-w-0 w-full">
+            {/* Busca e filtros — toolbar compacta */}
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome, portaria…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className={cn(
+                    "h-9 w-full rounded-md border pl-8 pr-8 text-sm shadow-xs outline-none",
+                    "border-input bg-background text-foreground placeholder:text-muted-foreground",
+                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
+                    touchMinHeight,
+                  )}
+                  aria-label="Buscar template de checklist"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className={cn(
+                      "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
+                      touchMinTarget,
+                    )}
+                    aria-label="Limpar busca"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex min-w-0 items-center gap-2 sm:shrink-0">
+                <div ref={typeFilterDropdownRef} className="relative min-w-0 flex-1 sm:w-[11rem] sm:flex-none">
                   <button
                     type="button"
                     onClick={() => {
@@ -1143,7 +1298,7 @@ export function ChecklistCatalog({
                       setTypeFilterDropdownOpen((open) => !open);
                     }}
                     className={cn(
-                      "flex h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border px-2.5 py-1.5 text-sm shadow-xs outline-none transition-colors touch-manipulation sm:px-3",
+                      "flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-md border px-2.5 text-sm shadow-xs outline-none transition-colors touch-manipulation",
                       "bg-background text-foreground",
                       "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
                       touchMinHeight,
@@ -1157,27 +1312,24 @@ export function ChecklistCatalog({
                   >
                     <span
                       className={cn(
-                        "truncate text-left",
+                        "truncate text-left text-xs sm:text-sm",
                         typeFilter.length === 0 && "text-muted-foreground",
                       )}
                     >
-                      {typeFilterLabel}
+                      {typeFilter.length === 0 ? "Tipo" : typeFilterLabel}
                     </span>
                     <ChevronDown
                       className={cn(
-                        "size-4 shrink-0 text-muted-foreground transition-transform",
+                        "size-3.5 shrink-0 text-muted-foreground transition-transform",
                         typeFilterDropdownOpen && "rotate-180",
                       )}
                       aria-hidden
                     />
                   </button>
                 </div>
-              </div>
 
-              {ufOptions.length > 0 ? (
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className="text-xs font-medium text-muted-foreground">UF</span>
-                  <div ref={ufFilterDropdownRef} className="relative min-w-0 w-full max-w-[9.5rem]">
+                {ufOptions.length > 0 ? (
+                  <div ref={ufFilterDropdownRef} className="relative min-w-0 w-[5.5rem] shrink-0 sm:w-[6.5rem]">
                     <button
                       type="button"
                       onClick={() => {
@@ -1185,7 +1337,7 @@ export function ChecklistCatalog({
                         setUfFilterDropdownOpen((open) => !open);
                       }}
                       className={cn(
-                        "flex h-9 w-full min-w-0 items-center justify-between gap-1.5 rounded-md border px-2 py-1.5 text-sm shadow-xs outline-none transition-colors touch-manipulation",
+                        "flex h-9 w-full min-w-0 items-center justify-between gap-1 rounded-md border px-2 text-sm shadow-xs outline-none transition-colors touch-manipulation",
                         "bg-background text-foreground",
                         "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
                         touchMinHeight,
@@ -1199,25 +1351,38 @@ export function ChecklistCatalog({
                     >
                       <span
                         className={cn(
-                          "truncate text-left",
+                          "truncate text-left text-xs sm:text-sm",
                           ufFilter.length === 0 && "text-muted-foreground",
                         )}
                       >
-                        {ufFilterLabel}
+                        {ufFilter.length === 0 ? "UF" : ufFilterLabel}
                       </span>
                       <ChevronDown
                         className={cn(
-                          "size-4 shrink-0 text-muted-foreground transition-transform",
+                          "size-3.5 shrink-0 text-muted-foreground transition-transform",
                           ufFilterDropdownOpen && "rotate-180",
                         )}
                         aria-hidden
                       />
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div aria-hidden />
-              )}
+                ) : null}
+
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    onClick={clearFilters}
+                    className={cn(
+                      "flex h-9 shrink-0 items-center gap-1 rounded-md border border-transparent px-2 text-xs text-muted-foreground transition-colors hover:border-border hover:bg-muted/50 hover:text-foreground touch-manipulation",
+                      touchMinHeight,
+                    )}
+                    title="Limpar filtros"
+                  >
+                    <X className="size-3.5" />
+                    <span className="hidden sm:inline">Limpar</span>
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {typeFilterDropdownOpen && typeFilterPanelPosition
@@ -1344,52 +1509,44 @@ export function ChecklistCatalog({
                 )
               : null}
 
-            {hasActiveFilters ? (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className={cn(
-                  "flex items-center gap-1 rounded-md px-1 text-xs text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
-                  touchMinHeight,
-                )}
-              >
-                <X className="size-3" />
-                Limpar filtros
-              </button>
-            ) : null}
-          </div>
-        </div>
-
             {step2Done && (
               <p className="text-xs font-medium text-primary flex items-center gap-1">
                 <ListChecks className="size-3 shrink-0" />
                 Template selecionado: {selectedTemplateLabel}
               </p>
             )}
-          </div>
         </div>
       </div>
 
       {/* Lista de templates (separada do bloco de escolha) */}
       <div className="space-y-4">
         {/* Modelos da equipe (workspace) */}
-        {workspaceTemplates.length > 0 ? (
+        {showWorkspaceTemplates ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Modelos da equipe
               </p>
               <span className="text-[11px] text-muted-foreground">
-                {workspaceTemplates.length} modelo
-                {workspaceTemplates.length !== 1 ? "s" : ""}
+                {filteredWorkspaceTemplates.length} modelo
+                {filteredWorkspaceTemplates.length !== 1 ? "s" : ""}
               </span>
             </div>
+            {filteredWorkspaceTemplates.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {hasActiveFilters
+                    ? "Nenhum modelo da equipe com esses filtros."
+                    : "Ainda não há modelos da equipe publicados."}
+                </p>
+              </div>
+            ) : (
             <ul
               className="grid gap-3 sm:grid-cols-2"
               aria-label="Modelos da equipe"
               role="radiogroup"
             >
-              {workspaceTemplates.map((wt) => {
+              {filteredWorkspaceTemplates.map((wt) => {
                 const isSelected = selectedWorkspaceTemplateId === wt.id;
                 return (
                   <li key={wt.id} id={`workspace-template-${wt.id}`}>
@@ -1411,25 +1568,15 @@ export function ChecklistCatalog({
                           : "border-border shadow-xs hover:border-primary/30 hover:shadow-md",
                       )}
                     >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={cn(
-                            "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
-                            isSelected ? "border-primary bg-primary" : "border-border",
-                          )}
-                        >
-                          {isSelected && (
-                            <div className="size-2 rounded-full bg-primary-foreground" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                            Equipe
-                          </span>
-                          <p className="mt-1.5 text-sm font-semibold leading-snug text-foreground">
-                            {wt.name}
-                          </p>
+                      <div className="min-w-0">
+                          <div className="flex items-start gap-2">
+                            <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
+                              {wt.name}
+                            </p>
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                              Equipe
+                            </span>
+                          </div>
                           <p className="mt-1 text-xs text-foreground/85">
                             Criado por:{" "}
                             <span className="text-foreground/95">
@@ -1437,7 +1584,7 @@ export function ChecklistCatalog({
                             </span>
                           </p>
 
-                          <div className="mt-2 flex items-center gap-3 rounded-lg bg-muted/50 px-2.5 py-1.5">
+                          <div className="mt-2 inline-flex w-fit max-w-full self-start items-center gap-2 rounded-md bg-muted/50 px-2 py-1">
                             <span className="text-xs text-muted-foreground">
                               <span className="font-semibold text-foreground">
                                 {wt.required_item_count}
@@ -1452,18 +1599,98 @@ export function ChecklistCatalog({
                               {wt.total_item_count === 1 ? "item" : "itens"}
                             </span>
                           </div>
-                        </div>
                       </div>
                     </div>
                   </li>
                 );
               })}
             </ul>
+            )}
           </div>
         ) : null}
 
-        {/* Cabeçalho dos modelos do sistema (apenas quando há workspace) */}
-        {workspaceTemplates.length > 0 ? (
+        {/* Modelos personalizados */}
+        {showCustomTemplates ? (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Modelos personalizados
+              </p>
+              <span className="text-[11px] text-muted-foreground">
+                {filteredCustomTemplates.length} modelo
+                {filteredCustomTemplates.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            {filteredCustomTemplates.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {establishmentId
+                    ? hasActiveFilters
+                      ? "Nenhum modelo personalizado para este estabelecimento com esses filtros."
+                      : "Nenhum modelo personalizado para este estabelecimento. Use Personalizar num template do sistema."
+                    : hasActiveFilters
+                      ? "Nenhum modelo personalizado com esses filtros."
+                      : "Ainda não há modelos personalizados."}
+                </p>
+              </div>
+            ) : (
+              <ul
+                className="grid gap-3 sm:grid-cols-2"
+                aria-label="Modelos personalizados"
+                role="radiogroup"
+              >
+                {filteredCustomTemplates.map((ct) => {
+                  const isSelected = selectedCustomTemplateId === ct.id;
+                  return (
+                    <li key={ct.id} id={`custom-template-${ct.id}`}>
+                      <div
+                        role="radio"
+                        aria-checked={isSelected}
+                        tabIndex={0}
+                        onClick={() => selectCustomTemplate(ct.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            selectCustomTemplate(ct.id);
+                          }
+                        }}
+                        className={cn(
+                          "cursor-pointer select-none rounded-xl border bg-card p-4 transition-all duration-150",
+                          isSelected
+                            ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+                            : "border-border shadow-xs hover:border-primary/30 hover:shadow-md",
+                        )}
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-start gap-2">
+                            <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
+                              {ct.name}
+                            </p>
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                              Personalizado
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-foreground/85">
+                            {ct.establishment_label}
+                          </p>
+                          {ct.created_by_name ? (
+                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                              Criado por:{" "}
+                              <span className="text-foreground/90">{ct.created_by_name}</span>
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : null}
+
+        {/* Cabeçalho dos modelos do sistema */}
+        {showSystemTemplates && (showWorkspaceTemplates || showCustomTemplates) ? (
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Modelos do sistema
@@ -1475,8 +1702,10 @@ export function ChecklistCatalog({
           </div>
         ) : null}
 
-        {/* Lista de templates */}
-        {filteredTemplates.length === 0 ? (
+        {/* Lista de templates do sistema */}
+        {showSystemTemplates ? (
+          <div className="space-y-2">
+            {filteredTemplates.length === 0 ? (
           <div className="rounded-xl border border-dashed p-10 text-center">
             <ListChecks className="mx-auto mb-3 size-8 text-muted-foreground/40" />
             <p className="text-sm font-medium text-muted-foreground">
@@ -1528,30 +1757,15 @@ export function ChecklistCatalog({
                   >
                     {/* Corpo do card */}
                     <div className="p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Indicador de seleção */}
-                        <div
-                          className={cn(
-                            "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150",
-                            isSelected
-                              ? "border-primary bg-primary"
-                              : "border-border",
-                          )}
-                        >
-                          {isSelected && (
-                            <div className="size-2 rounded-full bg-primary-foreground" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          {/* Tag de origem */}
-                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
-                            Sistema
-                          </span>
-                          {/* Nome */}
-                          <p className="mt-1.5 text-sm font-semibold leading-snug text-foreground">
-                            {t.name}
-                          </p>
+                      <div className="min-w-0">
+                          <div className="flex items-start gap-2">
+                            <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
+                              {t.name}
+                            </p>
+                            <span className="inline-flex shrink-0 items-center rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-800">
+                              Sistema
+                            </span>
+                          </div>
 
                           {/* Portaria e UF */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1580,7 +1794,7 @@ export function ChecklistCatalog({
                           </div>
 
                           {/* Estatísticas */}
-                          <div className="mt-2.5 flex items-center gap-3 rounded-lg bg-muted/50 px-2.5 py-1.5">
+                          <div className="mt-2.5 inline-flex w-fit max-w-full self-start items-center gap-2 rounded-md bg-muted/50 px-2 py-1">
                             <span className="text-xs text-muted-foreground">
                               <span className="font-semibold text-foreground">
                                 {t.required_item_count}
@@ -1602,7 +1816,6 @@ export function ChecklistCatalog({
                               {t.description}
                             </p>
                           )}
-                        </div>
                       </div>
                     </div>
 
@@ -1665,11 +1878,13 @@ export function ChecklistCatalog({
               );
             })}
           </ul>
-        )}
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* ─── Etapa 3: Barra de ação flutuante ────────────────────────────── */}
-      {(selectedTemplate || selectedWorkspaceTemplate) && (
+      {(selectedTemplate || selectedWorkspaceTemplate || selectedCustomTemplate) && (
         <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2">
           <div className="rounded-xl border bg-background p-3 shadow-2xl ring-1 ring-black/10 sm:p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -1682,7 +1897,9 @@ export function ChecklistCatalog({
                   <p className="text-xs text-muted-foreground">
                     {selectedSource === "workspace"
                       ? "Modelo da equipe selecionado"
-                      : "Template selecionado"}
+                      : selectedSource === "custom"
+                        ? "Modelo personalizado selecionado"
+                        : "Template selecionado"}
                   </p>
                   <p className="truncate text-sm font-semibold text-foreground">
                     {selectedTemplateLabel}

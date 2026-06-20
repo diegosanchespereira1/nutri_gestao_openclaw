@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { ChecklistFillDossierItemBody } from "@/components/checklists/checklist-fill-dossier-item-body";
 import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { formatDocumentHash } from "@/lib/checklists/document-hash";
+import { formatDossierApprovalAuditLine } from "@/lib/checklists/dossier-approval-metadata";
 import { cn } from "@/lib/utils";
 import type { FillItemResponseState, FillResponsesMap } from "@/lib/types/checklist-fill";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
@@ -77,6 +78,8 @@ type Props = {
   clientLabel?: string;
   /** Hash SHA-256 hex único desta versão aprovada do dossiê. */
   documentHash?: string | null;
+  /** IP do dispositivo no momento da aprovação. */
+  dossierApprovedClientIp?: string | null;
   /** Eventos de reabertura anteriores — usados para exibir hashes cancelados. */
   reopenEvents?: ChecklistFillSessionReopenEventRow[];
 };
@@ -101,6 +104,7 @@ export function ChecklistFillDossierPreview({
   professionalCrn,
   clientLabel,
   documentHash = null,
+  dossierApprovedClientIp = null,
   reopenEvents = [],
 }: Props) {
   const initialOpen = useMemo(() => {
@@ -128,6 +132,10 @@ export function ChecklistFillDossierPreview({
   const showApprovedFooter =
     Boolean(dossierApprovedAt) &&
     (hasSigImages || Boolean(documentHash) || hasReopenHashes);
+
+  const approvalAuditLine = dossierApprovedAt
+    ? formatDossierApprovalAuditLine(dossierApprovedAt, dossierApprovedClientIp)
+    : null;
 
   return (
     <div
@@ -254,15 +262,7 @@ export function ChecklistFillDossierPreview({
               {hasSigImages ? "Assinaturas" : "Documento"}
             </span>
             <span className="text-[10px] text-muted-foreground/70">
-              Coletado em{" "}
-              {new Intl.DateTimeFormat("pt-BR", {
-                timeZone: "America/Sao_Paulo",
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-              }).format(new Date(dossierApprovedAt!))}
+              Coletado em {approvalAuditLine}
               {" · "}Documento assinado eletronicamente
             </span>
           </div>
@@ -291,6 +291,9 @@ export function ChecklistFillDossierPreview({
                 {professionalCrn && (
                   <p className="text-[10px] text-muted-foreground">CRN {professionalCrn}</p>
                 )}
+                {approvalAuditLine ? (
+                  <p className="text-[10px] text-muted-foreground/80">{approvalAuditLine}</p>
+                ) : null}
               </div>
             </div>
 
@@ -330,6 +333,9 @@ export function ChecklistFillDossierPreview({
               <p className="font-mono text-[10px] leading-relaxed text-muted-foreground/80">
                 {formatDocumentHash(documentHash)}
               </p>
+              {approvalAuditLine ? (
+                <p className="mt-1 text-[10px] text-muted-foreground/70">{approvalAuditLine}</p>
+              ) : null}
             </div>
           ) : null}
 

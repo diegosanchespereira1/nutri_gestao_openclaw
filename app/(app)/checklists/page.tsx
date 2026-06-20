@@ -44,20 +44,6 @@ export default async function ChecklistsPage({
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
-            href="/checklists/equipe"
-            prefetch
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            Modelos da equipe
-          </Link>
-          <Link
-            href="/checklists/personalizados"
-            prefetch
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            Modelos personalizados
-          </Link>
-          <Link
             href="/checklists/novo"
             prefetch
             className={cn(buttonVariants({ size: "sm" }))}

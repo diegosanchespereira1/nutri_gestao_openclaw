@@ -84,6 +84,7 @@ export default async function ChecklistPreencherPage({
     client_signature_data_url?: string | null;
     client_signer_name?: string | null;
     document_hash?: string | null;
+    dossier_approved_client_ip?: string | null;
   };
 
   const profileSignaturePath =
@@ -183,6 +184,7 @@ export default async function ChecklistPreencherPage({
         initialClientSignatureDataUrl={sessionRow.client_signature_data_url ?? null}
         initialClientSignerName={sessionRow.client_signer_name ?? null}
         initialDocumentHash={sessionRow.document_hash ?? null}
+        initialApprovedClientIp={sessionRow.dossier_approved_client_ip ?? null}
         clientSignatureRequired={clientSignatureRequired}
       />
     </div>

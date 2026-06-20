@@ -88,6 +88,9 @@ export async function trySendDossierEmailAfterApprove(
       clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
       clientSignerName: (bundle.session as { client_signer_name?: string | null }).client_signer_name ?? null,
       documentHash: (bundle.session as { document_hash?: string | null }).document_hash ?? null,
+      dossierApprovedClientIp:
+        (bundle.session as { dossier_approved_client_ip?: string | null }).dossier_approved_client_ip
+        ?? null,
       },
     );
 
@@ -185,6 +188,9 @@ export async function resendDossierEmailAction(
       clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
       clientSignerName: (bundle.session as { client_signer_name?: string | null }).client_signer_name ?? null,
       documentHash: (bundle.session as { document_hash?: string | null }).document_hash ?? null,
+      dossierApprovedClientIp:
+        (bundle.session as { dossier_approved_client_ip?: string | null }).dossier_approved_client_ip
+        ?? null,
       },
     );
 
@@ -365,6 +371,9 @@ export async function sendDossierPdfToClientFromSessionAction(
       clientSignatureDataUrl: (bundle.session as { client_signature_data_url?: string | null }).client_signature_data_url ?? null,
       clientSignerName: (bundle.session as { client_signer_name?: string | null }).client_signer_name ?? null,
       documentHash: (bundle.session as { document_hash?: string | null }).document_hash ?? null,
+      dossierApprovedClientIp:
+        (bundle.session as { dossier_approved_client_ip?: string | null }).dossier_approved_client_ip
+        ?? null,
       },
     );
 

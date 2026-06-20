@@ -14,7 +14,7 @@ export async function ChecklistCatalogSection({
   focusWorkspaceTemplateId,
   initialEstablishmentId,
 }: Props) {
-  const { templates, workspaceTemplates, recentEstablishments } =
+  const { templates, workspaceTemplates, customTemplates, recentEstablishments } =
     await loadChecklistPageData({ initialEstablishmentId });
 
   return (
@@ -28,6 +28,7 @@ export async function ChecklistCatalogSection({
       recentEstablishments={recentEstablishments}
       templates={templates}
       workspaceTemplates={workspaceTemplates}
+      customTemplates={customTemplates}
       startFillAction={startChecklistFill}
       duplicateTemplateAction={duplicateGlobalTemplateAction}
       focusTemplateId={focusTemplateId}

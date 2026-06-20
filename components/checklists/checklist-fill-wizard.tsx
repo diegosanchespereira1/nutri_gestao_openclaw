@@ -1,11 +1,12 @@
 "use client";
 
-import { Eye, MapPin, X } from "lucide-react";
+import { ChevronDown, Eye, MapPin, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { pushWithLoading, signalNavigationCancel } from "@/lib/navigation-pending";
+import { resolveDeviceIpForDossierApproval } from "@/lib/client/resolve-device-ip";
 import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
@@ -165,6 +166,13 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
   const requiredInvalid = item.is_required && Boolean(err);
   const showRecurringNc = recurringNcSessions > 0;
   const empty = r ?? { outcome: null, note: null, annotation: null, validUntil: null };
+  const annotationText = empty.annotation ?? "";
+  const hasAnnotation = annotationText.trim().length > 0;
+  const [annotationOpen, setAnnotationOpen] = useState(hasAnnotation);
+
+  useEffect(() => {
+    if (hasAnnotation) setAnnotationOpen(true);
+  }, [hasAnnotation]);
 
   return (
     <div
@@ -211,23 +219,12 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
       ) : null}
 
       <div
-        className="mt-3 space-y-2"
+        className="mt-3"
         role="radiogroup"
         aria-label={item.description}
         aria-invalid={requiredInvalid && empty.outcome === null ? true : undefined}
       >
-        <Label
-          className={cn(
-            "text-xs",
-            requiredInvalid && empty.outcome === null
-              ? "text-destructive font-medium"
-              : "text-muted-foreground",
-          )}
-        >
-          Avaliação
-          {item.is_required ? <span className="sr-only"> (obrigatório)</span> : null}
-        </Label>
-        <div className="flex flex-wrap gap-4">
+        <div className="flex flex-nowrap items-center gap-x-2 gap-y-2 max-[359px]:flex-wrap sm:gap-x-3">
           {(
             [
               ["conforme", "Conforme"],
@@ -235,7 +232,10 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
               ["na", "Não aplicável"],
             ] as const
           ).map(([value, label]) => (
-            <label key={value} className="flex cursor-pointer items-center gap-2 text-sm">
+            <label
+              key={value}
+              className="flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs sm:gap-2 sm:text-sm"
+            >
               <input
                 type="radio"
                 name={`outcome-${item.id}`}
@@ -275,7 +275,7 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
       ) : null}
 
       {empty.outcome !== null ? (
-        <div className="mt-3">
+        <div className="mt-3 w-full max-w-sm">
           <Label htmlFor={`valid-until-${item.id}`}>
             Válido até{" "}
             <span className="text-muted-foreground font-normal">(opcional)</span>
@@ -287,7 +287,7 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
               value={empty.validUntil ?? ""}
               onChange={(e) => onSetValidUntil(item.id, e.target.value)}
               disabled={formLocked}
-              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex h-10 min-w-[10rem] flex-1 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+              className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring h-10 w-[11rem] shrink-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             />
             {(empty.validUntil ?? "").trim() ? (
               <Button
@@ -309,23 +309,60 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
       ) : null}
 
       {empty.outcome !== null ? (
-        <div className="mt-3">
-          <Label htmlFor={`annotation-${item.id}`}>
-            Anotação{" "}
-            <span className="text-muted-foreground font-normal">(opcional)</span>
-          </Label>
-          <textarea
-            id={`annotation-${item.id}`}
-            rows={3}
-            maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
-            value={empty.annotation ?? ""}
-            onChange={(e) => onSetAnnotation(item.id, e.target.value)}
-            className={textareaClass}
-            aria-describedby={`annotation-hint-${item.id}`}
-          />
-          <p id={`annotation-hint-${item.id}`} className="text-muted-foreground mt-1 text-xs">
-            {(empty.annotation ?? "").length}/{MAX_CHECKLIST_ITEM_ANNOTATION_CHARS} caracteres
-          </p>
+        <div className="mt-3 rounded-lg border border-border/60 bg-muted/15">
+          <button
+            type="button"
+            onClick={() => setAnnotationOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/35"
+            aria-expanded={annotationOpen}
+            aria-controls={`annotation-panel-${item.id}`}
+          >
+            <span className="text-sm font-medium text-foreground">
+              Anotação{" "}
+              <span className="text-muted-foreground font-normal">(opcional)</span>
+              {hasAnnotation && !annotationOpen ? (
+                <span className="text-primary ml-1.5 text-xs font-normal">
+                  · com texto
+                </span>
+              ) : null}
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs">
+              {annotationOpen ? "Ocultar" : "Expandir"}
+              <ChevronDown
+                className={cn(
+                  "size-4 transition-transform duration-200",
+                  annotationOpen && "rotate-180",
+                )}
+                aria-hidden
+              />
+            </span>
+          </button>
+          {annotationOpen ? (
+            <div
+              id={`annotation-panel-${item.id}`}
+              className="space-y-1 border-t border-border/50 px-3 pb-3 pt-2"
+            >
+              <Label htmlFor={`annotation-${item.id}`} className="sr-only">
+                Anotação (opcional)
+              </Label>
+              <textarea
+                id={`annotation-${item.id}`}
+                rows={3}
+                maxLength={MAX_CHECKLIST_ITEM_ANNOTATION_CHARS}
+                value={annotationText}
+                onChange={(e) => onSetAnnotation(item.id, e.target.value)}
+                disabled={formLocked}
+                className={textareaClass}
+                aria-describedby={`annotation-hint-${item.id}`}
+              />
+              <p
+                id={`annotation-hint-${item.id}`}
+                className="text-muted-foreground text-xs"
+              >
+                {annotationText.length}/{MAX_CHECKLIST_ITEM_ANNOTATION_CHARS} caracteres
+              </p>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -427,6 +464,7 @@ type Props = {
   initialClientSignatureDataUrl?: string | null;
   initialClientSignerName?: string | null;
   initialDocumentHash?: string | null;
+  initialApprovedClientIp?: string | null;
   /** Quando false, a assinatura do cliente não é exigida na aprovação. */
   clientSignatureRequired?: boolean;
 };
@@ -457,6 +495,7 @@ export function ChecklistFillWizard({
   initialClientSignatureDataUrl = null,
   initialClientSignerName = null,
   initialDocumentHash = null,
+  initialApprovedClientIp = null,
   clientSignatureRequired = true,
 }: Props) {
   const router = useRouter();
@@ -491,6 +530,8 @@ export function ChecklistFillWizard({
   }, [sectionIndex]);
 
   const [advanceError, setAdvanceError] = useState<string | null>(null);
+  /** Só exibe erros de validação nos itens após tentativa de finalizar/salvar o checklist. */
+  const [fieldValidationActive, setFieldValidationActive] = useState(false);
   const [finalizeDialogError, setFinalizeDialogError] = useState<string | null>(null);
   const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
@@ -523,13 +564,17 @@ export function ChecklistFillWizard({
   const [savedDocumentHash, setSavedDocumentHash] = useState<string | null>(
     initialDocumentHash ?? null,
   );
+  const [savedApprovedClientIp, setSavedApprovedClientIp] = useState<string | null>(
+    initialApprovedClientIp ?? null,
+  );
 
   const effectiveProfessionalSignature =
     savedProfessionalSig ?? profileProfessionalSignatureDataUrl ?? null;
 
   useEffect(() => {
     setSavedDocumentHash(initialDocumentHash ?? null);
-  }, [initialDocumentHash]);
+    setSavedApprovedClientIp(initialApprovedClientIp ?? null);
+  }, [initialDocumentHash, initialApprovedClientIp]);
 
   useEffect(() => {
     setSavedProfessionalSig(initialProfessionalSignatureDataUrl ?? null);
@@ -544,6 +589,7 @@ export function ChecklistFillWizard({
   const handleDossierReopened = useCallback(() => {
     setDossierApprovedAt(null);
     setDossierPreviewConfirmed(false);
+    setSavedApprovedClientIp(null);
     setSectionIndex(0);
   }, []);
 
@@ -855,8 +901,11 @@ export function ChecklistFillWizard({
   const isLast = sectionIndex >= sections.length - 1;
 
   const clientIssues = useMemo(
-    () => (section ? validateChecklistSection(section, responses) : []),
-    [section, responses],
+    () =>
+      fieldValidationActive && section
+        ? validateChecklistSection(section, responses)
+        : [],
+    [fieldValidationActive, section, responses],
   );
 
   const issueByItemId = useMemo(() => {
@@ -1116,6 +1165,7 @@ export function ChecklistFillWizard({
           professionalCrn={professionalCrn}
           clientLabel={clientLabel}
           documentHash={savedDocumentHash}
+          dossierApprovedClientIp={savedApprovedClientIp}
           reopenEvents={initialReopenEvents}
         />
 
@@ -1186,6 +1236,7 @@ export function ChecklistFillWizard({
           professionalCrn={professionalCrn}
           clientLabel={clientLabel}
           documentHash={savedDocumentHash}
+          dossierApprovedClientIp={savedApprovedClientIp}
           reopenEvents={initialReopenEvents}
         />
       </div>
@@ -1529,6 +1580,7 @@ export function ChecklistFillWizard({
                   professionalCrn={professionalCrn}
                   clientLabel={clientLabel}
                   documentHash={savedDocumentHash}
+                  dossierApprovedClientIp={savedApprovedClientIp}
                   reopenEvents={initialReopenEvents}
                 />
                 {dossierPreviewConfirmed && !dossierApprovedAt ? (
@@ -1619,9 +1671,11 @@ export function ChecklistFillWizard({
                     sec.items.some((it) => it.id === first.item_id),
                   );
                   if (idx >= 0) setSectionIndex(idx);
-                  setFinalizeDialogError(
-                    buildIssueMessageWithSectionAndItem(sections, first),
-                  );
+                  setFieldValidationActive(true);
+                  const issueMsg = buildIssueMessageWithSectionAndItem(sections, first);
+                  setAdvanceError(issueMsg);
+                  setFinalizeDialogError(issueMsg);
+                  setFinalizeDialogOpen(false);
                   return;
                 }
                 setFinalizeDialogError(null);
@@ -1630,6 +1684,8 @@ export function ChecklistFillWizard({
                   try {
                     const synced = await runReconcileThenSync();
                     if (!synced.ok) {
+                      setFieldValidationActive(true);
+                      setAdvanceError(synced.error);
                       setFinalizeDialogError(synced.error);
                       return;
                     }
@@ -1889,9 +1945,13 @@ export function ChecklistFillWizard({
                 setPendingSignatures(null);
                 return;
               }
+              const deviceIp = await resolveDeviceIpForDossierApproval();
               const r = await approveChecklistFillDossierAction(
                 sessionId,
-                signatures,
+                {
+                  ...signatures,
+                  deviceIp,
+                },
               );
               if (!r.ok) {
                 setApproveError(r.error);
@@ -1903,6 +1963,7 @@ export function ChecklistFillWizard({
               setSavedClientSig(signatures.client || null);
               setSavedClientSignerName(signatures.clientSignerName || null);
               setSavedDocumentHash(r.documentHash ?? null);
+              setSavedApprovedClientIp(r.approvedClientIp ?? null);
               setPendingSignatures(null);
               setDossierApprovedAt(r.approvedAt);
               const nextInBatch = getNextBatchItemAfterSession(sessionId);

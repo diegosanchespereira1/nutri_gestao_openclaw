@@ -88,6 +88,7 @@ export async function generateDossierPdfAction(
       client_signature_data_url?: string | null;
       client_signer_name?: string | null;
       document_hash?: string | null;
+      dossier_approved_client_ip?: string | null;
     };
 
     const bytes = await buildApprovedDossierPdfBytes(
@@ -106,6 +107,7 @@ export async function generateDossierPdfAction(
       clientSignatureDataUrl: sig.client_signature_data_url ?? null,
       clientSignerName: sig.client_signer_name ?? null,
       documentHash: sig.document_hash ?? null,
+      dossierApprovedClientIp: sig.dossier_approved_client_ip ?? null,
       },
     );
 

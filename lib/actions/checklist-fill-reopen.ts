@@ -289,6 +289,7 @@ export async function reopenChecklistFillDossierAction(
       score_points_earned: null,
       score_points_total: null,
       document_hash: null,
+      dossier_approved_client_ip: null,
     })
     .eq("id", sessionId)
     .not("dossier_approved_at", "is", null)

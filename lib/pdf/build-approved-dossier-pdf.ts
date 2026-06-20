@@ -9,6 +9,7 @@ import {
   normalizeCrnForPdf,
 } from "@/lib/pdf/dossier-pdf";
 import { DEFAULT_PDF_SETTINGS } from "@/lib/constants/checklist-pdf-settings";
+import { formatDossierApprovalAuditLine } from "@/lib/checklists/dossier-approval-metadata";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import type { FillResponsesMap } from "@/lib/types/checklist-fill";
@@ -19,7 +20,7 @@ export function formatApprovedAtForDossierPdf(iso: string): string {
     return new Intl.DateTimeFormat("pt-BR", {
       timeZone: "America/Sao_Paulo",
       dateStyle: "long",
-      timeStyle: "short",
+      timeStyle: "medium",
     }).format(new Date(iso));
   } catch {
     return iso;
@@ -44,6 +45,8 @@ export type ApprovedDossierPdfBundleInput = {
   clientSignerName?: string | null;
   /** Hash SHA-256 hex único desta versão aprovada do dossiê. */
   documentHash?: string | null;
+  /** IP do dispositivo no momento da aprovação. */
+  dossierApprovedClientIp?: string | null;
 };
 
 async function loadProfessionalIdentity(
@@ -242,6 +245,10 @@ export async function buildApprovedDossierPdfBytes(
 
   // Data/hora da aprovação formatada para exibir nas assinaturas do PDF
   const signedAtLabel = formatApprovedAtForDossierPdf(input.dossierApprovedAtIso);
+  const signedAtAuditLine = formatDossierApprovalAuditLine(
+    input.dossierApprovedAtIso,
+    input.dossierApprovedClientIp,
+  );
 
   const pdfInput = {
     templateName: input.template.name,
@@ -257,6 +264,7 @@ export async function buildApprovedDossierPdfBytes(
     clientSignatureBuffer,
     clientSignerName,
     signedAtLabel,
+    signedAtAuditLine,
     documentHash: input.documentHash ?? null,
     // Cores personalizadas do cabeçalho
     headerBgColor:   pdfSettings.headerBgColor,

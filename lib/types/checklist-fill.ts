@@ -23,6 +23,8 @@ export type ChecklistFillSessionRow = {
   dossier_approved_at?: string | null;
   /** SHA-256 hex da versão aprovada do dossiê (nulo após reabertura até nova aprovação). */
   document_hash?: string | null;
+  /** IP do dispositivo no momento da aprovação do dossiê. */
+  dossier_approved_client_ip?: string | null;
   professional_signature_data_url?: string | null;
   client_signature_data_url?: string | null;
   client_signer_name?: string | null;

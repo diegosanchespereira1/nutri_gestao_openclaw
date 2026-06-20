@@ -48,6 +48,26 @@ export const CAPACITOR_BOOTSTRAP_INLINE_SCRIPT = `(function () {
     persistNativeClientCookie();
   }
 
+  function isLikelyCapacitorIos() {
+    return /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+      !!(window.webkit && window.webkit.messageHandlers);
+  }
+
+  function markIosEarly() {
+    document.documentElement.classList.add('native-app', 'native-ios');
+    document.documentElement.setAttribute(PLATFORM_ATTR, 'ios');
+    document.documentElement.style.backgroundColor = '#F4F9F8';
+    if (document.body) document.body.style.backgroundColor = '#F4F9F8';
+  }
+
+  if (isLikelyCapacitorIos()) {
+    markIosEarly();
+    persistNativeClientCookie();
+    document.addEventListener('DOMContentLoaded', function () {
+      if (document.body) document.body.style.backgroundColor = '#F4F9F8';
+    });
+  }
+
   function isNative() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   }
@@ -104,8 +124,24 @@ export const CAPACITOR_BOOTSTRAP_INLINE_SCRIPT = `(function () {
     if (!isNative()) return;
     applyPlatformClasses();
     persistNativeClientCookie();
-    await hideSplash();
     await configureStatusBar();
+    if (platform() === 'ios') {
+      await new Promise(function (resolve) {
+        var done = false;
+        function finish() {
+          if (done) return;
+          done = true;
+          resolve(undefined);
+        }
+        if (document.readyState === 'complete') {
+          finish();
+        } else {
+          window.addEventListener('load', finish, { once: true });
+          setTimeout(finish, 5000);
+        }
+      });
+    }
+    await hideSplash();
   }
 
   function whenReady(cb, left) {

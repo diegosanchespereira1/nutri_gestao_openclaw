@@ -20,7 +20,13 @@ function isCanvasEmpty(canvas: HTMLCanvasElement): boolean {
  * Desenho no canvas → grava o PNG (data URL) no hidden input `signature_data`.
  * Mostra a assinatura atual e permite removê-la (hidden `remove_signature`).
  */
-export function SignatureField({ defaultUrl }: { defaultUrl: string | null }) {
+export function SignatureField({
+  defaultUrl,
+  showLabel = true,
+}: {
+  defaultUrl: string | null;
+  showLabel?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawing = useRef(false);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -101,7 +107,7 @@ export function SignatureField({ defaultUrl }: { defaultUrl: string | null }) {
 
   return (
     <div className="space-y-2">
-      <Label>Assinatura do profissional</Label>
+      {showLabel ? <Label>Assinatura do profissional</Label> : null}
       <input type="hidden" name="signature_data" value={dataUrl} />
       <input type="hidden" name="remove_signature" value={removed ? "1" : ""} />
 

@@ -7,6 +7,7 @@ import { CapacitorLinkInterceptor } from "@/components/mobile/capacitor-link-int
 import { CapacitorNativeHtml } from "@/components/mobile/capacitor-native-html";
 import { CapacitorStatusBar } from "@/components/mobile/capacitor-status-bar";
 import { NativeSessionKeepAlive } from "@/components/mobile/native-session-keep-alive";
+import { PullToRefresh } from "@/components/mobile/pull-to-refresh";
 import { getAppVersion } from "@/lib/app-version";
 import { CAPACITOR_BOOTSTRAP_INLINE_SCRIPT } from "@/lib/mobile/capacitor-bootstrap-inline-script";
 import { getPublicRuntimeEnv } from "@/lib/env/public-runtime";
@@ -93,6 +94,7 @@ html[data-ng-platform="android"]{--status-bar-height:28px;--safe-area-top:max(en
         <AppLoadingScreen />
         <NativeSessionKeepAlive />
         <CapacitorStatusBar />
+        <PullToRefresh />
         <CapacitorLinkInterceptor />
         <SupabaseHashAuthRedirect />
         {children}

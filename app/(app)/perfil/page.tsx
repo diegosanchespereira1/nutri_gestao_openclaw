@@ -63,11 +63,13 @@ export default async function PerfilPage() {
     defaultSignatureUrl = data?.signedUrl ?? null;
   }
 
+  const roleLabel = profileRoleLabel(profile?.role);
+
   return (
-    <PageLayout variant="form">
+    <PageLayout>
       <PageHeader
         title="Perfil profissional"
-        description={`Nome e CRN usados em documentos e identificação. Papel: ${profileRoleLabel(profile?.role)}.`}
+        description="Gerencie seus dados de identificação, foto, assinatura e segurança da conta."
         back={{ href: "/definicoes", label: "Definições" }}
       />
       <PerfilForm
@@ -78,6 +80,7 @@ export default async function PerfilPage() {
         defaultCrn={effectiveCrn}
         defaultPhotoUrl={defaultPhotoUrl}
         defaultSignatureUrl={defaultSignatureUrl}
+        roleLabel={roleLabel}
       />
     </PageLayout>
   );

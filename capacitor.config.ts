@@ -27,8 +27,8 @@ const config: CapacitorConfig = {
 
   plugins: {
     SplashScreen: {
-      launchShowDuration: 800,   // fallback curto — o JS esconde antes quando possível
-      launchAutoHide: true,
+      launchShowDuration: 0,
+      launchAutoHide: false,
       backgroundColor: '#F4F9F8', // mesma cor do loading web — transição suave
       androidSplashResourceName: 'splash',
       showSpinner: false,

@@ -1,5 +1,6 @@
-import Link from "next/link";
+"use client";
 
+import { ModuleGatedLink } from "@/components/modules/module-gated-link";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +14,9 @@ type Props = {
  */
 export function FinancialPendingCard({ overdueCount, overdueTotalLabel }: Props) {
   const hasOverdue = overdueCount > 0;
+  const href = hasOverdue
+    ? "/financeiro?tab=operacoes&status=overdue"
+    : "/financeiro?tab=resumo";
 
   return (
     <div
@@ -27,9 +31,7 @@ export function FinancialPendingCard({ overdueCount, overdueTotalLabel }: Props)
     >
       {hasOverdue ? (
         <>
-          <p className="text-foreground font-medium">
-            Pendências em atraso
-          </p>
+          <p className="text-foreground font-medium">Pendências em atraso</p>
           <p className="text-foreground mt-2 text-lg font-semibold tabular-nums">
             {overdueTotalLabel}
           </p>
@@ -41,9 +43,7 @@ export function FinancialPendingCard({ overdueCount, overdueTotalLabel }: Props)
         </>
       ) : (
         <>
-          <p className="text-foreground font-medium">
-            Sem valores em atraso
-          </p>
+          <p className="text-foreground font-medium">Sem valores em atraso</p>
           <p className="text-muted-foreground mt-2">
             Registe cobranças e vencimentos na área financeira para acompanhar
             inadimplência.
@@ -51,19 +51,19 @@ export function FinancialPendingCard({ overdueCount, overdueTotalLabel }: Props)
         </>
       )}
       <div className="mt-4">
-        <Link
-          href={
-            hasOverdue
-              ? "/financeiro?tab=operacoes&status=overdue"
-              : "/financeiro?tab=resumo"
-          }
+        <ModuleGatedLink
+          moduleKey="financeiro"
+          href={href}
           className={cn(
-            buttonVariants({ variant: hasOverdue ? "default" : "outline", size: "sm" }),
+            buttonVariants({
+              variant: hasOverdue ? "default" : "outline",
+              size: "sm",
+            }),
             "w-full justify-center sm:w-auto",
           )}
         >
           {hasOverdue ? "Ver pendências" : "Área financeira"}
-        </Link>
+        </ModuleGatedLink>
       </div>
     </div>
   );

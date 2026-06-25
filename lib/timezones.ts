@@ -51,8 +51,8 @@ export const ALLOWED_APP_TIME_ZONES = new Set(
   APP_TIME_ZONE_OPTIONS.flatMap((g) => g.zones.map((z) => z.value)),
 );
 
-/** Alinhado ao default da coluna em `profiles` (comportamento anterior). */
-export const DEFAULT_PROFILE_TIME_ZONE = "Europe/Lisbon";
+/** Alinhado ao default da coluna em `profiles` (novos tenants). */
+export const DEFAULT_PROFILE_TIME_ZONE = "America/Sao_Paulo";
 
 export function normalizeAppTimeZone(raw: string | null | undefined): string {
   if (raw && ALLOWED_APP_TIME_ZONES.has(raw)) return raw;

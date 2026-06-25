@@ -7,6 +7,11 @@ export function parseAppliesTo(raw: unknown): EstablishmentType[] {
     "hospital",
     "clinica",
     "lar_idosos",
+    "restaurante",
+    "frigorifico",
+    "mercado",
+    "cozinha_industrial",
+    "hotel",
     "empresa",
   ];
   return raw.filter(

@@ -431,50 +431,42 @@ export async function sendDsarByEmail(
 </html>
     `;
 
-    // Enviar email via Resend (se disponível)
-    try {
-      const resendModule = await import('resend');
-      const { Resend } = resendModule;
-      const apiKey = process.env.RESEND_API_KEY;
+    const { sendEmailViaSmtp } = await import("@/lib/email/send-via-smtp");
+    const { isSmtpConfigured } = await import("@/lib/email/smtp-config");
 
-      if (!apiKey) {
-        return { success: false, error: 'Email não configurado (RESEND_API_KEY ausente)' };
-      }
-
-      const resend = new Resend(apiKey);
-
-      await resend.emails.send({
-        from: process.env.DOSSIER_EMAIL_FROM || 'noreply@nutrigestao.app',
-        to: userEmail,
-        subject: `DSAR - Relatório de Dados Pessoais: ${patient.full_name}`,
-        html: emailTemplate,
-        attachments: [
-          {
-            filename: exportResponse.filename || `DSAR_${patientId}.${format}`,
-            content: Buffer.from(exportResponse.content || '').toString('base64'),
-          },
-        ],
-      });
-
-      // Registar envio
-      await supabase
-        .from('audit_log')
-        .insert({
-          user_id: user.id,
-          table_name: 'patients',
-          operation: 'SELECT',
-          record_id: patientId,
-          new_values: { event: 'DSAR_EMAIL_SENT', format, sent_to: userEmail },
-          created_at: new Date().toISOString(),
-        });
-
-      return { success: true };
-    } catch (emailError) {
-      console.error('[sendDsarByEmail] Resend error:', emailError);
-      return { success: false, error: 'Erro ao enviar email' };
+    if (!isSmtpConfigured()) {
+      return { success: false, error: "Email não configurado (SMTP ausente)" };
     }
+
+    const sent = await sendEmailViaSmtp({
+      to: userEmail,
+      subject: `DSAR - Relatório de Dados Pessoais: ${patient.full_name}`,
+      html: emailTemplate,
+      attachments: [
+        {
+          filename: exportResponse.filename || `DSAR_${patientId}.${format}`,
+          content: Buffer.from(exportResponse.content || ""),
+          contentType: format === "csv" ? "text/csv" : "application/json",
+        },
+      ],
+    });
+
+    if (!sent.ok) {
+      return { success: false, error: sent.error };
+    }
+
+    await supabase.from("audit_log").insert({
+      user_id: user.id,
+      table_name: "patients",
+      operation: "SELECT",
+      record_id: patientId,
+      new_values: { event: "DSAR_EMAIL_SENT", format, sent_to: userEmail },
+      created_at: new Date().toISOString(),
+    });
+
+    return { success: true };
   } catch (error) {
-    console.error('[sendDsarByEmail] Error:', error);
+    console.error("[sendDsarByEmail] Error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Erro ao enviar email',

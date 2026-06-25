@@ -53,9 +53,10 @@ type Props = {
   users: ExternalPortalUser[];
   portalErr?: string;
   portalOk?: string;
+  emailErr?: string;
 };
 
-export function ExternalPortalSection({ users, portalErr, portalOk }: Props) {
+export function ExternalPortalSection({ users, portalErr, portalOk, emailErr }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [pending, setPending] = useState(false);
 
@@ -106,7 +107,11 @@ export function ExternalPortalSection({ users, portalErr, portalOk }: Props) {
             className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-200"
             role="status"
           >
-            Convite enviado com sucesso.
+            {emailErr === "config"
+              ? "Convite registado, mas email não enviado: configure SMTP no servidor da app (SMTP_HOST, SMTP_FROM, etc.)."
+              : emailErr === "send"
+                ? "Convite registado, mas falhou o envio do email (veja logs do servidor)."
+                : "Convite enviado por email com sucesso."}
           </p>
         )}
         {portalOk === "permissions" && (

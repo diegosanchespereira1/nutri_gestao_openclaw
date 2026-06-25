@@ -7,6 +7,10 @@ import {
   buildFinancialReceivedByMonthSeries,
   buildTopClientsByOverdueAmount,
   expandMonthKeysInclusive,
+  financialIssuedPaidSeriesHasData,
+  financialReceivedSeriesHasData,
+  oldestMonthFirstDayKeyInWindow,
+  topOverdueDateBounds,
 } from "./financial-chart-series";
 
 const tz = "Europe/Lisbon";
@@ -182,6 +186,68 @@ describe("expandMonthKeysInclusive", () => {
       "2026-02",
       "2026-03",
     ]);
+  });
+
+  it("inverte se start > end", () => {
+    expect(expandMonthKeysInclusive("2026-03", "2026-01")).toEqual([
+      "2026-01",
+      "2026-02",
+      "2026-03",
+    ]);
+  });
+});
+
+describe("oldestMonthFirstDayKeyInWindow", () => {
+  it("primeiro dia do mês mais antigo", () => {
+    const ref = new Date("2026-04-15T12:00:00.000Z");
+    const key = oldestMonthFirstDayKeyInWindow(3, tz, ref);
+    expect(key).toMatch(/^\d{4}-\d{2}-01$/);
+  });
+});
+
+describe("buildFinancialIssuedVsPaidSeries (range)", () => {
+  it("modo range filtra meses", () => {
+    const ref = new Date("2026-04-15T12:00:00.000Z");
+    const charges: FinancialChargeListRow[] = [
+      ch({
+        id: "1",
+        client_id: "c1",
+        amount_cents: 1000,
+        due_date: "2026-02-01",
+        status: "open",
+        created_at: "2026-02-01T10:00:00.000Z",
+        paid_at: null,
+      }),
+    ];
+    const s = buildFinancialIssuedVsPaidSeries(
+      charges,
+      tz,
+      { mode: "range", fromDayKey: "2026-02-01", toDayKey: "2026-03-31" },
+      ref,
+    );
+    expect(s.some((b) => b.monthKey === "2026-02")).toBe(true);
+  });
+});
+
+describe("topOverdueDateBounds e helpers", () => {
+  it("bounds para modo months", () => {
+    const ref = new Date("2026-04-15T12:00:00.000Z");
+    const b = topOverdueDateBounds({ mode: "months", months: 6 }, tz, ref);
+    expect(b.minDueDateKey).toMatch(/-01$/);
+    expect(b.maxDueDateKey).toBeNull();
+  });
+
+  it("seriesHasData", () => {
+    expect(
+      financialReceivedSeriesHasData([
+        { monthKey: "2026-01", label: "jan", receivedCents: 0 },
+      ]),
+    ).toBe(false);
+    expect(
+      financialIssuedPaidSeriesHasData([
+        { monthKey: "2026-01", label: "jan", issuedCents: 1, paidCents: 0 },
+      ]),
+    ).toBe(true);
   });
 });
 

@@ -10,6 +10,7 @@
 import { NextResponse } from "next/server";
 import { env as nodeEnv } from "node:process";
 import { createClient } from "@/lib/supabase/server";
+import { isSmtpConfigured } from "@/lib/email/smtp-config";
 import { readSupabaseAnonKey, readSupabaseUrl } from "@/lib/supabase/runtime-env";
 
 export async function GET() {
@@ -42,11 +43,10 @@ export async function GET() {
     SUPABASE_ANON_KEY: readSupabaseAnonKey()
       ? "✅ presente (runtime/fallback)"
       : "❌ AUSENTE",
-    RESEND_API_KEY:
-      typeof nodeEnv["RESEND_API_KEY"] === "string" &&
-      nodeEnv["RESEND_API_KEY"].trim().length > 0
-        ? "✅ presente"
-        : "⚠️ ausente (email opcional)",
+    SMTP_APP:
+      isSmtpConfigured()
+        ? "✅ configurado (dossiê / portal / LGPD)"
+        : "⚠️ ausente (SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM)",
     NODE_ENV: process.env.NODE_ENV ?? "desconhecido",
     // Lista apenas os nomes (não valores) das vars que contêm "SUPABASE".
     supabase_keys_found: Object.keys(nodeEnv).filter((k) =>

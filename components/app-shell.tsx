@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Leaf, Menu } from "lucide-react";
 
-import { adminNavItem, appNavGroups, type AppNavGroup } from "@/lib/app-nav";
-import type { EnabledModules } from "@/lib/types/modules";
-import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
+import type { AppNavGroup, AppNavItem } from "@/lib/app-nav";
+import { adminNavItem, appNavGroups } from "@/lib/app-nav";
+import { useModuleGate } from "@/components/modules/module-gate-provider";
+import type { EnabledModuleKey } from "@/lib/types/modules";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -19,17 +20,19 @@ import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
 
-/** Filtra os grupos de acordo com os módulos habilitados e role de admin. */
+/** Resolve o módulo que controla um item de navegação. */
+function resolveNavItemModuleGate(
+  item: AppNavItem,
+  group: AppNavGroup,
+): EnabledModuleKey | null {
+  return item.moduleItemGate ?? group.moduleGate ?? null;
+}
+
+/** Mantém todos os grupos/itens visíveis; o gate só afeta o clique. */
 function buildVisibleGroups(
-  enabledModules: EnabledModules,
   showAdminNav: boolean,
 ): AppNavGroup[] {
-  const filtered = appNavGroups
-    .filter(
-      (group) =>
-        !group.moduleGate || enabledModules[group.moduleGate] === true,
-    )
-    .filter((group) => group.items.length > 0);
+  const filtered = appNavGroups.filter((group) => group.items.length > 0);
 
   if (showAdminNav) {
     const sistemaIdx = filtered.findIndex((g) => g.label === "Sistema");
@@ -55,15 +58,14 @@ function NavGroups({
   onNavigate,
   className,
   showAdminNav,
-  enabledModules,
 }: {
   onNavigate?: () => void;
   className?: string;
   showAdminNav?: boolean;
-  enabledModules: EnabledModules;
 }) {
   const pathname = usePathname();
-  const groups = buildVisibleGroups(enabledModules, showAdminNav ?? false);
+  const { isModuleEnabled, openDisabledModule } = useModuleGate();
+  const groups = buildVisibleGroups(showAdminNav ?? false);
 
   return (
     <nav
@@ -86,10 +88,46 @@ function NavGroups({
           <div className="min-w-0 px-2">
             {group.items.map((item) => {
               const Icon = item.icon;
+              const moduleGate = resolveNavItemModuleGate(item, group);
+              const isLocked =
+                moduleGate !== null && !isModuleEnabled(moduleGate);
               const active =
-                pathname === item.href ||
-                (item.href !== "/inicio" &&
-                  pathname.startsWith(`${item.href}/`));
+                !isLocked &&
+                (pathname === item.href ||
+                  (item.href !== "/inicio" &&
+                    pathname.startsWith(`${item.href}/`)));
+
+              const itemClassName = cn(
+                "flex min-h-9 min-w-0 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors duration-150",
+                "max-lg:min-h-10 max-lg:py-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:py-2",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                isLocked
+                  ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/40 cursor-pointer"
+                  : active
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+              );
+
+              if (isLocked && moduleGate) {
+                return (
+                  <button
+                    key={item.href}
+                    type="button"
+                    onClick={() => {
+                      openDisabledModule(moduleGate);
+                      onNavigate?.();
+                    }}
+                    className={itemClassName}
+                    aria-disabled="true"
+                  >
+                    <Icon
+                      className="size-4 shrink-0 opacity-60"
+                      aria-hidden
+                    />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              }
 
               return (
                 <Link
@@ -97,14 +135,7 @@ function NavGroups({
                   href={item.href}
                   prefetch
                   onClick={onNavigate}
-                  className={cn(
-                    "flex min-h-9 min-w-0 items-center gap-3 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150",
-                    "max-lg:min-h-10 max-lg:py-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:py-2",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-                    active
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
-                  )}
+                  className={itemClassName}
                   aria-current={active ? "page" : undefined}
                 >
                   <Icon
@@ -129,12 +160,10 @@ export function AppShell({
   children,
   showAdminNav = false,
   userFirstName = null,
-  enabledModules = DEFAULT_ENABLED_MODULES,
 }: {
   children: React.ReactNode;
   showAdminNav?: boolean;
   userFirstName?: string | null;
-  enabledModules?: EnabledModules;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -174,7 +203,6 @@ export function AppShell({
         <NavGroups
           className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
           showAdminNav={showAdminNav}
-          enabledModules={enabledModules}
         />
 
         <Separator className="bg-sidebar-border opacity-40" />
@@ -248,7 +276,6 @@ export function AppShell({
             <NavGroups
               className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
               showAdminNav={showAdminNav}
-              enabledModules={enabledModules}
               onNavigate={() => setMenuOpen(false)}
             />
 

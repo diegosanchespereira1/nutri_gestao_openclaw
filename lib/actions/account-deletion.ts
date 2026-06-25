@@ -23,7 +23,7 @@ import {
   ConfirmClosureResponse,
   DeleteAccountResponse,
 } from "@/lib/types/account-deletion";
-import { sendAccountDeletionRequestEmailResend } from "@/lib/email/send-account-deletion-email-resend";
+import { sendAccountDeletionRequestEmailSmtp } from "@/lib/email/send-account-deletion-email-smtp";
 
 const DELETION_CONFIRMATION_HOURS = 24;
 
@@ -191,7 +191,7 @@ export async function requestAccountDeletion(
       user.email?.split("@")[0] ||
       "Utilizador";
 
-    const emailResult = await sendAccountDeletionRequestEmailResend({
+    const emailResult = await sendAccountDeletionRequestEmailSmtp({
       to: user.email!,
       recipientName: displayName,
       token: rawToken,

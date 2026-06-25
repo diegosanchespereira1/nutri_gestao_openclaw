@@ -58,6 +58,10 @@ function SelectContent({
       <SelectPrimitive.Positioner
         data-slot="select-positioner"
         className="z-50"
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        alignItemWithTrigger={false}
         {...props}
       >
         <SelectPrimitive.Popup

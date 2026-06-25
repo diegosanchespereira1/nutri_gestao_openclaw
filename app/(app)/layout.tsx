@@ -1,12 +1,15 @@
-import { cookies, headers } from "next/headers";
+import { headers } from "next/headers";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { ModuleBlockedUrlHandler } from "@/components/modules/module-blocked-url-handler";
+import { ModuleGateProvider } from "@/components/modules/module-gate-provider";
+import { EnabledModulesProvider } from "@/components/providers/enabled-modules-provider";
 import { AppTimeZoneProvider } from "@/components/app-timezone-provider";
 import { AppVersionGuard } from "@/components/app-version-guard";
 import { Toaster } from "@/components/ui/sonner";
-import { APP_PROFILE_CTX_COOKIE } from "@/lib/auth/app-session-cookies";
-import { parseProfileShellContextCookie } from "@/lib/auth/profile-context-cookie";
+import { resolveAppShellContext } from "@/lib/auth/resolve-app-shell-context";
 import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
 import { canAccessAdminArea } from "@/lib/roles";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
@@ -17,10 +20,10 @@ export default async function AppAreaLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [cookieStore, headersList] = await Promise.all([cookies(), headers()]);
-  const profileCtx = parseProfileShellContextCookie(
-    cookieStore.get(APP_PROFILE_CTX_COOKIE)?.value,
-  );
+  const [profileCtx, headersList] = await Promise.all([
+    resolveAppShellContext(),
+    headers(),
+  ]);
   const pathname = headersList.get("x-pathname") ?? "";
   if (!profileCtx?.userId) {
     redirect(buildLoginRedirectPath(pathname || "/inicio"));
@@ -37,19 +40,25 @@ export default async function AppAreaLayout({
 
   return (
     <AppTimeZoneProvider timeZone={timeZone}>
-      <AppVersionGuard />
-      <Toaster />
-      {onboardingOnly ? (
-        <div className="bg-background safe-top min-h-screen">{children}</div>
-      ) : (
-        <AppShell
-          showAdminNav={showAdminNav}
-          userFirstName={userFirstName}
-          enabledModules={enabledModules}
-        >
-          {children}
-        </AppShell>
-      )}
+      <EnabledModulesProvider value={enabledModules}>
+        <ModuleGateProvider enabledModules={enabledModules}>
+          <AppVersionGuard />
+          <Toaster />
+          <Suspense fallback={null}>
+            <ModuleBlockedUrlHandler />
+          </Suspense>
+          {onboardingOnly ? (
+            <div className="bg-background safe-top min-h-screen">{children}</div>
+          ) : (
+            <AppShell
+              showAdminNav={showAdminNav}
+              userFirstName={userFirstName}
+            >
+              {children}
+            </AppShell>
+          )}
+        </ModuleGateProvider>
+      </EnabledModulesProvider>
     </AppTimeZoneProvider>
   );
 }

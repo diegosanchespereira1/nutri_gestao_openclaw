@@ -5,6 +5,9 @@ import {
   type EnabledModules,
 } from "@/lib/types/modules";
 
+/** Header interno (middleware → layout) para o mesmo pedido HTTP em que o cookie ainda não chegou ao RSC. */
+export const PROFILE_CTX_REQUEST_HEADER = "x-ng-profile-ctx";
+
 /** Payload em `ng_profile_ctx` — preenchido pelo middleware após validar a sessão. */
 export type ProfileContextCookie = {
   userId: string;
@@ -65,6 +68,12 @@ export function parseProfileShellContextCookie(
 ): ProfileShellContextCookie | null {
   const ctx = parseProfileContextCookie(raw);
   if (!ctx) return null;
+  return toProfileShellContext(ctx);
+}
+
+export function toProfileShellContext(
+  ctx: ProfileContextCookie,
+): ProfileShellContextCookie {
   return {
     userId: ctx.userId,
     role: ctx.role,
@@ -72,4 +81,21 @@ export function parseProfileShellContextCookie(
     fullName: ctx.fullName,
     enabledModules: ctx.enabledModules ?? DEFAULT_ENABLED_MODULES,
   };
+}
+
+export function encodeProfileContextForHeader(ctx: ProfileContextCookie): string {
+  return Buffer.from(JSON.stringify(ctx), "utf8").toString("base64url");
+}
+
+export function decodeProfileContextFromRequestHeader(
+  raw: string | null | undefined,
+): ProfileShellContextCookie | null {
+  if (!raw) return null;
+  try {
+    const json = Buffer.from(raw, "base64url").toString("utf8");
+    const ctx = parseProfileContextCookie(json);
+    return ctx ? toProfileShellContext(ctx) : null;
+  } catch {
+    return null;
+  }
 }

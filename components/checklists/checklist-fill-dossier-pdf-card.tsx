@@ -18,7 +18,7 @@ type Props = {
   initialJob: ChecklistFillPdfExportRow | null;
   /** Todos os PDFs `ready` da sessão (inclui obsoletos), ordenados por versão descendente. */
   pdfExportHistory?: ChecklistFillPdfExportRow[];
-  /** true quando RESEND e remetente estão definidos no servidor. */
+  /** true quando SMTP está definido no servidor. */
   dossierEmailDeliveryConfigured?: boolean;
 };
 
@@ -297,7 +297,7 @@ export function ChecklistFillDossierPdfCard({
         </div>
       ) : (
         <p className="text-muted-foreground mt-3 border-t pt-3 text-xs">
-          Envio por email para o cliente não está disponível (configure Resend no
+          Envio por email para o cliente não está disponível (configure SMTP no
           servidor).
         </p>
       )}

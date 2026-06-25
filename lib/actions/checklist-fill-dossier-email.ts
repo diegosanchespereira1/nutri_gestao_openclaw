@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
 import { buildChecklistDossierPdfFilename } from "@/lib/checklist-dossier-pdf-filename";
 import { buildApprovedDossierPdfBytes } from "@/lib/pdf/build-approved-dossier-pdf";
-import { sendDossierPdfViaResend } from "@/lib/email/send-dossier-email-resend";
+import { sendDossierPdfViaSmtp } from "@/lib/email/send-dossier-email-smtp";
+import { isSmtpConfigured } from "@/lib/email/smtp-config";
 import { createClient } from "@/lib/supabase/server";
 import { getLatestFillSessionIdForVisit } from "@/lib/actions/visit-checklist";
 import type { ChecklistFillSessionRow } from "@/lib/types/checklist-fill";
@@ -53,7 +54,7 @@ export async function trySendDossierEmailAfterApprove(
   } = await supabase.auth.getUser();
   if (!user) return;
 
-  if (!process.env.RESEND_API_KEY?.trim()) return;
+  if (!isSmtpConfigured()) return;
 
   const { data: visit } = await supabase
     .from("scheduled_visits")
@@ -101,7 +102,7 @@ export async function trySendDossierEmailAfterApprove(
       duplicateIndex: 0,
     });
 
-    const sent = await sendDossierPdfViaResend({
+    const sent = await sendDossierPdfViaSmtp({
       to: recipients,
       subjectEstablishmentLine: bundle.establishmentLabel,
       pdfBytes: bytes,
@@ -152,10 +153,10 @@ export async function resendDossierEmailAction(
     return { ok: false, error: "Indique pelo menos um email na visita." };
   }
 
-  if (!process.env.RESEND_API_KEY?.trim()) {
+  if (!isSmtpConfigured()) {
     return {
       ok: false,
-      error: "Envio por email não está configurado no servidor (RESEND_API_KEY).",
+      error: "Envio por email não está configurado no servidor (SMTP).",
     };
   }
 
@@ -201,7 +202,7 @@ export async function resendDossierEmailAction(
       duplicateIndex: 0,
     });
 
-    const sent = await sendDossierPdfViaResend({
+    const sent = await sendDossierPdfViaSmtp({
       to: recipients,
       subjectEstablishmentLine: bundle.establishmentLabel,
       pdfBytes: bytes,
@@ -315,20 +316,10 @@ export async function sendDossierPdfToClientFromSessionAction(
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
-  if (!process.env.RESEND_API_KEY?.trim()) {
+  if (!isSmtpConfigured()) {
     return {
       ok: false,
-      error: "Envio por email não está configurado no servidor (RESEND_API_KEY).",
-    };
-  }
-  if (
-    !process.env.DOSSIER_EMAIL_FROM?.trim() &&
-    !process.env.RESEND_FROM_EMAIL?.trim()
-  ) {
-    return {
-      ok: false,
-      error:
-        "Remetente de email não configurado (DOSSIER_EMAIL_FROM ou RESEND_FROM_EMAIL).",
+      error: "Envio por email não está configurado no servidor (SMTP).",
     };
   }
 
@@ -384,7 +375,7 @@ export async function sendDossierPdfToClientFromSessionAction(
       duplicateIndex: 0,
     });
 
-    const sent = await sendDossierPdfViaResend({
+    const sent = await sendDossierPdfViaSmtp({
       to: rec.to,
       subjectEstablishmentLine: bundle.establishmentLabel,
       pdfBytes: bytes,

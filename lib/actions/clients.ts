@@ -26,6 +26,11 @@ import {
   parseEstablishmentType,
 } from "@/lib/constants/establishment-types";
 import {
+  establishmentTypeDisabledMessage,
+  isEstablishmentTypeAllowedForModules,
+} from "@/lib/modules/establishment-category-access";
+import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
+import {
   isValidCnpj,
   isValidCpf,
   onlyDigits,
@@ -468,6 +473,21 @@ export async function createClientAction(
           "Selecione a categoria e o tipo do estabelecimento antes de guardar. Acesse a aba Estabelecimento e preencha esses campos.",
       };
     }
+    const enabledModules = await loadWorkspaceEnabledModules(
+      supabase,
+      workspaceOwnerId,
+    );
+    if (
+      !isEstablishmentTypeAllowedForModules(
+        estCheck.establishment_type,
+        enabledModules,
+      )
+    ) {
+      return {
+        ok: false,
+        error: establishmentTypeDisabledMessage(estCheck.establishment_type),
+      };
+    }
   }
 
   // Run team-member lookup and logo upload in parallel (both need only workspaceOwnerId)
@@ -687,6 +707,29 @@ export async function updateClientAction(
 
   if (kind === "pj") {
     const estPayload = parseEstablishmentInlineFields(formData, legal_name);
+    if (!estPayload.establishment_type) {
+      return {
+        ok: false,
+        error:
+          "Selecione a categoria e o tipo do estabelecimento antes de guardar.",
+      };
+    }
+    const enabledModules = await loadWorkspaceEnabledModules(
+      supabase,
+      workspaceOwnerId,
+    );
+    if (
+      !isEstablishmentTypeAllowedForModules(
+        estPayload.establishment_type,
+        enabledModules,
+      )
+    ) {
+      return {
+        ok: false,
+        error: establishmentTypeDisabledMessage(estPayload.establishment_type),
+      };
+    }
+
     const { data: existingEst } = await supabase
       .from("establishments")
       .select("id")

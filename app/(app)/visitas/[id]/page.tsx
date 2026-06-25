@@ -18,6 +18,7 @@ import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import type { VisitKind } from "@/lib/types/visits";
 import { visitDisplayTitle, visitProfessionalLabel } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
+import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { VisitDossierEmailPanel } from "@/components/visits/visit-dossier-email-panel";
 import type { DossierEmailSendStatus } from "@/lib/types/visits";
 
@@ -87,11 +88,7 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
       ? sendStatusRaw
       : undefined;
 
-  const resendConfigured =
-    Boolean(process.env.RESEND_API_KEY?.trim()) &&
-    Boolean(
-      (process.env.DOSSIER_EMAIL_FROM ?? process.env.RESEND_FROM_EMAIL)?.trim(),
-    );
+  const emailDeliveryConfigured = isDossierEmailDeliveryConfigured();
 
   const sentAtLabel = row.dossier_email_sent_at
     ? formatDateTimeShort(row.dossier_email_sent_at, tz)
@@ -197,7 +194,7 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
         lastError={row.dossier_email_last_error}
         sentAtLabel={sentAtLabel}
         hasApprovedDossier={hasApprovedDossier}
-        resendConfigured={resendConfigured}
+        emailDeliveryConfigured={emailDeliveryConfigured}
       />
 
       {row.notes ? (

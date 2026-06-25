@@ -9,6 +9,7 @@ export type EstablishmentType =
   | "frigorifico"
   | "mercado"
   | "cozinha_industrial"
+  | "hotel"
   | "empresa";
 
 export type EstablishmentCategory =

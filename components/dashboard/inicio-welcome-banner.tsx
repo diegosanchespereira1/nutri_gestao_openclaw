@@ -10,6 +10,15 @@ type Props = {
   onboardingMinimal: boolean;
 };
 
+type WorkContext = "institutional" | "clinical" | "both";
+
+function parseWorkContext(raw: string | null | undefined): WorkContext | null {
+  if (raw === "institutional" || raw === "clinical" || raw === "both") {
+    return raw;
+  }
+  return null;
+}
+
 export async function InicioWelcomeBanner({
   bemvindo,
   onboardingMinimal,
@@ -23,51 +32,112 @@ export async function InicioWelcomeBanner({
       : 0;
   const hasClients = clientCount > 0;
 
+  const { data: profile } = workspaceOwnerId
+    ? await supabase
+        .from("profiles")
+        .select("work_context")
+        .eq("user_id", workspaceOwnerId)
+        .maybeSingle()
+    : { data: null };
+
+  const workContext = parseWorkContext(profile?.work_context);
+
+  const { data: firstClient } =
+    hasClients && workspaceOwnerId
+      ? await supabase
+          .from("clients")
+          .select("legal_name, kind")
+          .eq("owner_user_id", workspaceOwnerId)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle()
+      : { data: null };
+
+  const clientName = firstClient?.legal_name?.trim() || null;
+  const isClinicalContext =
+    workContext === "clinical" ||
+    (workContext === null && firstClient?.kind === "pf");
+
+  if (onboardingMinimal || !hasClients) {
+    return (
+      <div
+        className="border-primary/40 bg-primary/5 rounded-xl border p-4"
+        role="status"
+      >
+        <p className="text-foreground text-sm font-medium">
+          Bem-vindo(a) ao NutriGestão!
+        </p>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Sua conta está configurada. Cadastre seu primeiro cliente quando
+          estiver pronto(a) — não há pressa.
+        </p>
+        <Link
+          href="/clientes/novo"
+          className={cn(
+            buttonVariants({ size: "sm" }),
+            "mt-4 inline-flex w-full justify-center sm:w-auto",
+          )}
+        >
+          Novo cliente
+        </Link>
+      </div>
+    );
+  }
+
+  if (isClinicalContext) {
+    return (
+      <div
+        className="border-primary/40 bg-primary/5 rounded-xl border p-4"
+        role="status"
+      >
+        <p className="text-foreground text-sm font-medium">
+          Bem-vindo(a) ao NutriGestão!
+        </p>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Sua conta está ativa.
+          {clientName
+            ? ` O cliente ${clientName} foi cadastrado`
+            : " Seu primeiro cliente foi cadastrado"}
+          — explore o painel clínico e registre consultas quando quiser.
+        </p>
+        <Link
+          href="/clientes"
+          className={cn(
+            buttonVariants({ size: "sm" }),
+            "mt-4 inline-flex w-full justify-center sm:w-auto",
+          )}
+        >
+          Ver clientes
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div
       className="border-primary/40 bg-primary/5 rounded-xl border p-4"
       role="status"
     >
-      {onboardingMinimal || !hasClients ? (
-        <>
-          <p className="text-foreground text-sm font-medium">Conta configurada</p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {hasClients
-              ? "Podes explorar a app à vontade."
-              : "Ainda não há clientes na carteira — adiciona o primeiro quando for conveniente."}
-          </p>
-          {!hasClients ? (
-            <Link
-              href="/clientes/novo"
-              className={cn(
-                buttonVariants({ size: "sm" }),
-                "mt-4 inline-flex w-full justify-center sm:w-auto",
-              )}
-            >
-              Novo cliente
-            </Link>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <p className="text-foreground text-sm font-medium">
-            Está tudo pronto para agendar a primeira visita
-          </p>
-          <p className="text-muted-foreground mt-1 text-sm">
-            O primeiro cliente já está na tua carteira. Usa o fluxo de visitas
-            para marcar quando fores ao terreno.
-          </p>
-          <Link
-            href="/visitas/nova"
-            className={cn(
-              buttonVariants({ size: "sm" }),
-              "mt-4 inline-flex w-full justify-center sm:w-auto",
-            )}
-          >
-            Agendar visita
-          </Link>
-        </>
-      )}
+      <p className="text-foreground text-sm font-medium">
+        Bem-vindo(a) ao NutriGestão!
+      </p>
+      <p className="text-muted-foreground mt-1 text-sm">
+        Sua conta está ativa.
+        {clientName
+          ? ` O cliente ${clientName} já está na sua carteira`
+          : " Seu primeiro cliente já está na carteira"}
+        — agora você pode agendar visitas, preencher checklists e acompanhar
+        tudo pelo painel.
+      </p>
+      <Link
+        href="/visitas/nova"
+        className={cn(
+          buttonVariants({ size: "sm" }),
+          "mt-4 inline-flex w-full justify-center sm:w-auto",
+        )}
+      >
+        Agendar primeira visita
+      </Link>
     </div>
   );
 }

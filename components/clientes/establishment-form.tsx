@@ -8,11 +8,10 @@ import {
   createEstablishmentAction,
   updateEstablishmentAction,
 } from "@/lib/actions/establishments";
+import { EstablishmentCategorySelect } from "@/components/clientes/establishment-category-select";
 import {
-  ESTABLISHMENT_CATEGORIES,
   ESTABLISHMENT_TYPES_BY_CATEGORY,
   categoryFromType,
-  establishmentCategoryLabel,
   establishmentTypeLabel,
 } from "@/lib/constants/establishment-types";
 import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
@@ -96,24 +95,12 @@ export function EstablishmentForm({
         {/* Categoria — filtra os tipos disponíveis */}
         <div className="space-y-2">
           <Label htmlFor="est-category">Categoria</Label>
-          <select
+          <EstablishmentCategorySelect
             id="est-category"
-            required
             value={category}
-            onChange={(e) =>
-              handleCategoryChange(e.target.value as EstablishmentCategory | "")
-            }
+            onChange={handleCategoryChange}
             className={selectClass}
-          >
-            <option value="" disabled>
-              Selecione a categoria…
-            </option>
-            {ESTABLISHMENT_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {establishmentCategoryLabel[c]}
-              </option>
-            ))}
-          </select>
+          />
           <p className="text-muted-foreground text-xs">
             Define o enquadramento do estabelecimento para fins de visita e
             protocolos.

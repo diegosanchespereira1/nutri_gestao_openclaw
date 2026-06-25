@@ -19,9 +19,9 @@ import { cn } from "@/lib/utils";
 export default async function EquipePage({
   searchParams,
 }: {
-  searchParams: Promise<{ portalErr?: string; portalOk?: string }>;
+  searchParams: Promise<{ portalErr?: string; portalOk?: string; email_err?: string }>;
 }) {
-  const { portalErr, portalOk } = await searchParams;
+  const { portalErr, portalOk, email_err } = await searchParams;
   const [{ rows }, { rows: portalUsers }, portfolioByMember] =
     await Promise.all([
       loadTeamMembersForOwner(),
@@ -194,6 +194,7 @@ export default async function EquipePage({
           users={portalUsers}
           portalErr={portalErr}
           portalOk={portalOk}
+          emailErr={email_err}
         />
       </section>
     </PageLayout>

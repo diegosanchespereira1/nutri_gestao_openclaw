@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { getServerAppOrigin } from "@/lib/app-origin";
+import { isSmtpConfigured } from "@/lib/email/smtp-config";
+import { sendExternalPortalInviteEmailSmtp } from "@/lib/email/send-portal-invite-email";
 import { createClient } from "@/lib/supabase/server";
 import type {
   ExternalPortalUser,
@@ -92,6 +95,31 @@ export async function inviteExternalUserAction(
   );
 
   if (error) redirect("/equipe?portalErr=save");
+
+  if (!isSmtpConfigured()) {
+    revalidatePath("/equipe");
+    redirect("/equipe?portalOk=invited&email_err=config");
+  }
+
+  const { data: ownerProfile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const portalUrl = `${getServerAppOrigin()}/portal?token=${encodeURIComponent(token)}`;
+  const emailed = await sendExternalPortalInviteEmailSmtp({
+    email,
+    fullName,
+    portalUrl,
+    inviterName: ownerProfile?.full_name,
+  });
+
+  if (!emailed.ok) {
+    console.error("[inviteExternalUserAction] email:", emailed.error);
+    revalidatePath("/equipe");
+    redirect("/equipe?portalOk=invited&email_err=send");
+  }
 
   revalidatePath("/equipe");
   redirect("/equipe?portalOk=invited");

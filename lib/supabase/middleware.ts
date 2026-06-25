@@ -13,8 +13,11 @@ import {
   getProfileCtxTtlSec,
 } from "@/lib/auth/app-session-cookies";
 import { bumpAppSessionActivityCookies } from "@/lib/auth/bump-app-session-activity";
+import { shouldReuseProfileContextCache } from "@/lib/auth/profile-context-cache";
 import {
+  encodeProfileContextForHeader,
   parseProfileContextCookie,
+  PROFILE_CTX_REQUEST_HEADER,
   type ProfileContextCookie,
 } from "@/lib/auth/profile-context-cookie";
 import {
@@ -36,6 +39,8 @@ import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import {
   DEFAULT_ENABLED_MODULES,
 } from "@/lib/types/modules";
+import { isPathAllowedForEnabledModules, buildModuleBlockedInicioPath, getModuleGateForPath } from "@/lib/modules/module-path-access";
+import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
 
 const AUTH_MIDDLEWARE_TIMEOUT_MS = 4_500;
 
@@ -81,6 +86,28 @@ function copyCookies(from: NextResponse, to: NextResponse) {
   from.cookies.getAll().forEach((cookie) => {
     to.cookies.set(cookie);
   });
+}
+
+/** Repassa o perfil ao RSC no mesmo pedido (antes do browser gravar `ng_profile_ctx`). */
+function forwardProfileContextInRequest(
+  request: NextRequest,
+  response: NextResponse,
+  profileCtx: MiddlewareProfileContext | null,
+): NextResponse {
+  if (!profileCtx) return response;
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
+  requestHeaders.set(
+    PROFILE_CTX_REQUEST_HEADER,
+    encodeProfileContextForHeader(profileCtx),
+  );
+
+  const forwarded = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+  copyCookies(response, forwarded);
+  return forwarded;
 }
 
 function nextWithPathname(request: NextRequest): NextResponse {
@@ -270,17 +297,6 @@ export async function updateSession(request: NextRequest) {
     );
   }
 
-  if (
-    user &&
-    (pathname === "/login" ||
-      pathname === "/register" ||
-      pathname === "/forgot-password")
-  ) {
-    const redirectRes = NextResponse.redirect(new URL("/inicio", request.url));
-    copyCookies(supabaseResponse, redirectRes);
-    return redirectRes;
-  }
-
   if (!user && isProtectedPath(pathname)) {
     const returnTo = `${pathname}${request.nextUrl.search}`;
     const loginUrl = new URL(buildLoginRedirectPath(returnTo), request.url);
@@ -289,8 +305,13 @@ export async function updateSession(request: NextRequest) {
     return redirectRes;
   }
 
+  const isAuthEntryPath =
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/forgot-password";
+
   let profileCtx: MiddlewareProfileContext | null = null;
-  if (user && isProtectedPath(pathname)) {
+  if (user && (isProtectedPath(pathname) || isAuthEntryPath)) {
     const nowSec = Math.floor(Date.now() / 1000);
     const profileCtxTtlSec = getProfileCtxTtlSec();
     const cachedProfileCtx = parseProfileContextCookieFromRequest(
@@ -300,20 +321,34 @@ export async function updateSession(request: NextRequest) {
     const isNewAppSession = !Number.isFinite(
       Number.parseInt(sessStartRaw ?? "", 10),
     );
-    const canReuseCache =
-      !isNewAppSession &&
-      cachedProfileCtx?.userId === user.id &&
-      nowSec - cachedProfileCtx.cachedAt <= profileCtxTtlSec;
+    const canReuseCache = shouldReuseProfileContextCache({
+      isNewAppSession,
+      cached: cachedProfileCtx,
+      userId: user.id,
+      nowSec,
+      ttlSec: profileCtxTtlSec,
+      pathname,
+      bemvindoParam: request.nextUrl.searchParams.get("bemvindo"),
+    });
 
-    if (canReuseCache) {
+    if (canReuseCache && cachedProfileCtx) {
       profileCtx = cachedProfileCtx;
     } else {
       try {
-        // Três queries independentes — paralelizar elimina ~400-600 ms por nova sessão.
-        const [guard, clientCount, workspaceOwnerId] = await Promise.all([
+        const workspaceOwnerId = await withTimeout(
+          getWorkspaceAccountOwnerId(supabase, user.id),
+          "workspace_account_owner_id",
+        );
+        const [guard, clientCount, enabledModules] = await Promise.all([
           withTimeout(fetchProfileGuardContext(supabase, user.id), "fetch_profile_guard_context"),
-          withTimeout(countClientsForOwner(supabase, user.id), "count_clients_for_owner"),
-          withTimeout(getWorkspaceAccountOwnerId(supabase, user.id), "workspace_account_owner_id"),
+          withTimeout(
+            countClientsForOwner(supabase, workspaceOwnerId),
+            "count_clients_for_owner",
+          ),
+          withTimeout(
+            loadWorkspaceEnabledModules(supabase, workspaceOwnerId),
+            "load_workspace_enabled_modules",
+          ),
         ]);
         const needsOnboarding = guard.onboardingCompletedAt == null && clientCount === 0;
         profileCtx = {
@@ -325,7 +360,7 @@ export async function updateSession(request: NextRequest) {
           lgpdBlocked: guard.lgpdBlocked,
           needsOnboarding,
           cachedAt: nowSec,
-          enabledModules: guard.enabledModules,
+          enabledModules,
         };
       } catch (error) {
         logAuthMiddleware("warn", requestId, "profile_guard_context_failed", {
@@ -359,6 +394,12 @@ export async function updateSession(request: NextRequest) {
       JSON.stringify(profileCtx),
       appSessionCookieOptions(baseCookie, profileCookieMaxAge),
     );
+  }
+
+  if (user && isAuthEntryPath) {
+    const redirectRes = NextResponse.redirect(new URL("/inicio", request.url));
+    copyCookies(supabaseResponse, redirectRes);
+    return redirectRes;
   }
 
   if (
@@ -419,10 +460,33 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  if (
+    user &&
+    isProtectedPath(pathname) &&
+    !isAdminPath(pathname) &&
+    profileCtx &&
+    !isPathAllowedForEnabledModules(
+      pathname,
+      profileCtx.enabledModules ?? DEFAULT_ENABLED_MODULES,
+    )
+  ) {
+    const gate = getModuleGateForPath(pathname);
+    const blockedPath = gate
+      ? buildModuleBlockedInicioPath(gate)
+      : "/inicio";
+    const redirectRes = NextResponse.redirect(new URL(blockedPath, request.url));
+    copyCookies(supabaseResponse, redirectRes);
+    logAuthMiddleware("info", requestId, "module_access_denied_redirect", {
+      userId: user.id,
+      pathname,
+    });
+    return redirectRes;
+  }
+
   logAuthMiddleware("info", requestId, "session_ok", {
     pathname,
     hasUser: Boolean(user),
     elapsedMs: Date.now() - startedAt,
   });
-  return supabaseResponse;
+  return forwardProfileContextInRequest(request, supabaseResponse, profileCtx);
 }

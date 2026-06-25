@@ -1,11 +1,18 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { isBrazilUf } from "@/lib/constants/brazil-states";
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
+import { refreshProfileContextAfterOnboarding } from "@/lib/auth/refresh-profile-context-after-onboarding";
+import {
+  establishmentTypeDisabledMessage,
+  isEstablishmentTypeAllowedForModules,
+} from "@/lib/modules/establishment-category-access";
+import { createOnboardingActionTimer } from "@/lib/onboarding/action-timing";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { parseEnabledModules } from "@/lib/types/modules";
 import {
   isValidCnpj,
   isValidCpf,
@@ -29,6 +36,28 @@ function parseWorkContext(raw: unknown): OnboardingWorkContext | null {
   return null;
 }
 
+async function saveWorkspaceTenantName(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  tenantName: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const trimmed = tenantName.trim().slice(0, 120);
+  if (!trimmed) {
+    return { ok: false, error: "Informe o nome da sua empresa ou consultório." };
+  }
+
+  const { error: tenantErr } = await supabase.rpc("set_workspace_tenant_name", {
+    p_name: trimmed,
+  });
+  if (tenantErr) {
+    return {
+      ok: false,
+      error: "Não foi possível salvar o nome da sua empresa. Tente novamente.",
+    };
+  }
+
+  return { ok: true };
+}
+
 function parseDocumentPfPj(
   kind: "pf" | "pj",
   raw: string,
@@ -45,6 +74,18 @@ function parseDocumentPfPj(
   return { ok: true, value: digits };
 }
 
+async function finishOnboardingSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  workspaceOwnerId: string,
+  redirectTo: string,
+): Promise<never> {
+  await refreshProfileContextAfterOnboarding(supabase, userId, {
+    workspaceOwnerId,
+  });
+  redirect(redirectTo);
+}
+
 /**
  * Story 2.7: cria primeiro cliente (e estabelecimento PJ se aplicável), grava contexto e fecha onboarding.
  */
@@ -52,28 +93,42 @@ export async function completeOnboardingAction(
   _prev: CompleteOnboardingResult | undefined,
   formData: FormData,
 ): Promise<CompleteOnboardingResult> {
+  const timer = createOnboardingActionTimer("complete");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  timer.mark("auth");
 
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const [workspaceOwnerId, profileRes] = await Promise.all([
+    getWorkspaceAccountOwnerId(supabase, user.id),
+    supabase
+      .from("profiles")
+      .select("onboarding_completed_at, enabled_modules")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+  timer.mark("profile_read");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("onboarding_completed_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
+  const profile = profileRes.data;
   if (profile?.onboarding_completed_at) {
     redirect("/inicio");
   }
 
   const work_context = parseWorkContext(formData.get("work_context"));
   if (!work_context) {
-    return { ok: false, error: "Selecione como trabalha (institucional, clínico ou ambos)." };
+    return { ok: false, error: "Selecione como você trabalha (institucional, clínico ou ambos)." };
   }
+
+  const tenantName = String(formData.get("tenant_name") ?? "").trim();
+  const crn = String(formData.get("crn") ?? "").trim().slice(0, 40);
+
+  const tenantSaved = await saveWorkspaceTenantName(supabase, tenantName);
+  if (!tenantSaved.ok) {
+    return { ok: false, error: tenantSaved.error };
+  }
+  timer.mark("tenant");
 
   const needsEstablishment =
     work_context === "institutional" || work_context === "both";
@@ -83,8 +138,8 @@ export async function completeOnboardingAction(
     return {
       ok: false,
       error: needsEstablishment
-        ? "Indique a razão social do cliente (empresa)."
-        : "Indique o nome do primeiro cliente (particular).",
+        ? "Informe a razão social do cliente (empresa)."
+        : "Informe o nome do primeiro cliente (particular).",
     };
   }
 
@@ -96,6 +151,12 @@ export async function completeOnboardingAction(
   }
   const document_id = parsedDoc.value;
 
+  const enabledModules = parseEnabledModules(
+    profile && typeof profile === "object" && "enabled_modules" in profile
+      ? (profile as { enabled_modules: unknown }).enabled_modules
+      : null,
+  );
+
   if (needsEstablishment) {
     const establishment_type = parseEstablishmentType(
       formData.get("establishment_type"),
@@ -104,16 +165,25 @@ export async function completeOnboardingAction(
       return { ok: false, error: "Selecione o tipo de estabelecimento." };
     }
 
+    if (
+      !isEstablishmentTypeAllowedForModules(establishment_type, enabledModules)
+    ) {
+      return {
+        ok: false,
+        error: establishmentTypeDisabledMessage(establishment_type),
+      };
+    }
+
     const estName = String(formData.get("establishment_name") ?? "").trim();
     if (!estName) {
-      return { ok: false, error: "Indique o nome do estabelecimento." };
+      return { ok: false, error: "Informe o nome do estabelecimento." };
     }
 
     const address_line1 = String(formData.get("address_line1") ?? "").trim();
     if (!address_line1) {
       return {
         ok: false,
-        error: "Indique a morada (linha 1) do estabelecimento.",
+        error: "Informe o endereço (linha 1) do estabelecimento.",
       };
     }
 
@@ -127,11 +197,10 @@ export async function completeOnboardingAction(
     const stateRaw = String(formData.get("state") ?? "")
       .trim()
       .toUpperCase();
-    if (stateRaw.length !== 2) {
+    if (!isBrazilUf(stateRaw)) {
       return {
         ok: false,
-        error:
-          "Indique a UF com 2 letras (ex.: SP) para sugerirmos portarias aplicáveis.",
+        error: "Selecione o estado (UF) do estabelecimento.",
       };
     }
 
@@ -217,13 +286,16 @@ export async function completeOnboardingAction(
       };
     }
   }
+  timer.mark("client_data");
 
+  const completedAt = new Date().toISOString();
   const { error: profErr } = await supabase
     .from("profiles")
     .update({
       work_context,
-      onboarding_completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      crn,
+      onboarding_completed_at: completedAt,
+      updated_at: completedAt,
     })
     .eq("user_id", user.id);
 
@@ -233,12 +305,15 @@ export async function completeOnboardingAction(
       error: "Não foi possível concluir o onboarding. Tente novamente.",
     };
   }
+  timer.mark("profile_write");
 
-  revalidatePath("/inicio");
-  revalidatePath("/onboarding");
-  revalidatePath("/clientes");
-  revalidatePath("/visitas/nova");
-  redirect("/inicio?bemvindo=1");
+  timer.finish();
+  return finishOnboardingSession(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+    "/inicio?bemvindo=1",
+  );
 }
 
 export type SkipOnboardingDetailsResult =
@@ -253,19 +328,25 @@ export async function skipOnboardingDetailsAction(
   _prev: SkipOnboardingDetailsResult | undefined,
   formData: FormData,
 ): Promise<SkipOnboardingDetailsResult> {
+  const timer = createOnboardingActionTimer("skip");
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+  timer.mark("auth");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("onboarding_completed_at")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [workspaceOwnerId, profileRes] = await Promise.all([
+    getWorkspaceAccountOwnerId(supabase, user.id),
+    supabase
+      .from("profiles")
+      .select("onboarding_completed_at")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+  timer.mark("profile_read");
 
-  if (profile?.onboarding_completed_at) {
+  if (profileRes.data?.onboarding_completed_at) {
     redirect("/inicio");
   }
 
@@ -274,16 +355,27 @@ export async function skipOnboardingDetailsAction(
     return {
       ok: false,
       error:
-        "Selecione como trabalha (institucional, clínico ou ambos) antes de continuar.",
+        "Selecione como você trabalha (institucional, clínico ou ambos) antes de continuar.",
     };
   }
 
+  const tenantName = String(formData.get("tenant_name") ?? "").trim();
+  const crn = String(formData.get("crn") ?? "").trim().slice(0, 40);
+
+  const tenantSaved = await saveWorkspaceTenantName(supabase, tenantName);
+  if (!tenantSaved.ok) {
+    return { ok: false, error: tenantSaved.error };
+  }
+  timer.mark("tenant");
+
+  const completedAt = new Date().toISOString();
   const { error: profErr } = await supabase
     .from("profiles")
     .update({
       work_context,
-      onboarding_completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      crn,
+      onboarding_completed_at: completedAt,
+      updated_at: completedAt,
     })
     .eq("user_id", user.id);
 
@@ -293,10 +385,13 @@ export async function skipOnboardingDetailsAction(
       error: "Não foi possível concluir o onboarding. Tente novamente.",
     };
   }
+  timer.mark("profile_write");
 
-  revalidatePath("/inicio");
-  revalidatePath("/onboarding");
-  revalidatePath("/clientes");
-  revalidatePath("/visitas/nova");
-  redirect("/inicio?bemvindo=1&onboarding=minimal");
+  timer.finish();
+  return finishOnboardingSession(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+    "/inicio?bemvindo=1&onboarding=minimal",
+  );
 }

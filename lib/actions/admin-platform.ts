@@ -3,8 +3,32 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
 import { createClient } from "@/lib/supabase/server";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { createServiceRoleClient, isServiceRoleConfigured } from "@/lib/supabase/service-role";
+import { sendPasswordRecoveryViaSupabase } from "@/lib/email/send-supabase-auth-email";
+import {
+  readSupabaseServiceRoleKey,
+  readSupabaseUrl,
+} from "@/lib/supabase/runtime-env";
+import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
+import { buildTenantCapabilities } from "@/lib/admin/tenant-capabilities";
+import type { TenantCapabilityItem } from "@/lib/admin/tenant-capabilities";
+import {
+  getPlanFeatureDefaults,
+  isTenantFeatureKey,
+  parseTenantFeatureOverridesFromForm,
+  type TenantFeatureKey,
+} from "@/lib/constants/tenant-features";
+import {
+  hasAnyModuleEnabled,
+  parseEnabledModulesFromForm,
+} from "@/lib/types/modules";
+
+type AdminDb = SupabaseClient;
 
 // Guard: only super_admin can call these actions
 async function requireSuperAdmin() {
@@ -26,6 +50,27 @@ async function requireSuperAdmin() {
   return { supabase, user };
 }
 
+/** Service role quando disponível; senão cliente autenticado (requer RLS super_admin em profiles). */
+async function requireSuperAdminDb(): Promise<{
+  db: AdminDb;
+  user: Awaited<ReturnType<typeof requireSuperAdmin>>["user"];
+  authClient: Awaited<ReturnType<typeof createClient>>;
+}> {
+  const { supabase: authClient, user } = await requireSuperAdmin();
+  const serviceKey = readSupabaseServiceRoleKey();
+  const url = readSupabaseUrl();
+  if (serviceKey && url) {
+    return {
+      db: createSupabaseClient(url, serviceKey, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      }),
+      user,
+      authClient,
+    };
+  }
+  return { db: authClient, user, authClient };
+}
+
 type AdminSubscriptionEventType =
   | "plan_changed"
   | "suspended"
@@ -33,7 +78,7 @@ type AdminSubscriptionEventType =
   | "tenant_unblocked_lgpd";
 
 async function recordAdminTenantEvent(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: AdminDb,
   params: {
     tenantUserId: string;
     eventType: AdminSubscriptionEventType;
@@ -54,7 +99,7 @@ async function recordAdminTenantEvent(
 }
 
 async function resolveTenantUserId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: AdminDb,
   profileId: string,
 ): Promise<string | null> {
   const { data } = await supabase
@@ -70,6 +115,7 @@ async function resolveTenantUserId(
 
 export type TenantRow = {
   id: string;
+  user_id: string;
   full_name: string | null;
   plan_slug: string;
   is_suspended: boolean;
@@ -78,6 +124,8 @@ export type TenantRow = {
   created_at: string;
   lgpd_blocked_at: string | null;
   lgpd_unblocked_at: string | null;
+  modules: TenantCapabilityItem[];
+  features: TenantCapabilityItem[];
 };
 
 export async function loadTenants(search?: string): Promise<{
@@ -88,7 +136,7 @@ export async function loadTenants(search?: string): Promise<{
   let query = supabase
     .from("profiles")
     .select(
-      "id, full_name, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at, lgpd_blocked_at, lgpd_unblocked_at",
+      "id, user_id, full_name, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at, lgpd_blocked_at, lgpd_unblocked_at, enabled_modules",
     )
     .not("role", "in", '("admin","super_admin")')
     .or("acquisition_source.is.null,acquisition_source.neq.team_member")
@@ -98,9 +146,80 @@ export async function loadTenants(search?: string): Promise<{
     query = query.ilike("full_name", `%${search}%`);
   }
 
-  const { data, error } = await query;
-  if (error || !data) return { rows: [] };
-  return { rows: data as TenantRow[] };
+  const [{ data, error }, { data: plans }] = await Promise.all([
+    query,
+    supabase
+      .from("subscription_plans")
+      .select(
+        "slug, feature_portal_externo, feature_pdf_export, feature_csv_import, feature_api_access",
+      ),
+  ]);
+
+  if (error) {
+    console.error("[loadTenants]", error.message);
+    return { rows: [] };
+  }
+  if (!data) return { rows: [] };
+
+  const plansBySlug = Object.fromEntries(
+    (plans ?? []).map((plan) => [plan.slug, getPlanFeatureDefaults(plan)]),
+  );
+
+  const userIds = data
+    .map((row) => row.user_id)
+    .filter((id): id is string => typeof id === "string");
+
+  const overridesByUser = new Map<string, Partial<Record<TenantFeatureKey, boolean>>>();
+
+  if (userIds.length > 0) {
+    const { data: overrides } = await supabase
+      .from("tenant_feature_overrides")
+      .select("tenant_user_id, feature_key, enabled")
+      .in("tenant_user_id", userIds);
+
+    for (const override of overrides ?? []) {
+      if (
+        typeof override.tenant_user_id !== "string" ||
+        typeof override.feature_key !== "string" ||
+        !isTenantFeatureKey(override.feature_key)
+      ) {
+        continue;
+      }
+
+      const bucket =
+        overridesByUser.get(override.tenant_user_id) ??
+        ({} as Partial<Record<TenantFeatureKey, boolean>>);
+      bucket[override.feature_key] = Boolean(override.enabled);
+      overridesByUser.set(override.tenant_user_id, bucket);
+    }
+  }
+
+  return {
+    rows: data.map((row) => {
+      const userId = String(row.user_id);
+      const capabilities = buildTenantCapabilities({
+        enabledModulesRaw: (row as Record<string, unknown>).enabled_modules,
+        planSlug: row.plan_slug,
+        plansBySlug,
+        overridesByKey: overridesByUser.get(userId) ?? {},
+      });
+
+      return {
+        id: row.id,
+        user_id: userId,
+        full_name: row.full_name,
+        plan_slug: row.plan_slug,
+        is_suspended: row.is_suspended,
+        suspended_reason: row.suspended_reason,
+        plan_expires_at: row.plan_expires_at,
+        created_at: row.created_at,
+        lgpd_blocked_at: row.lgpd_blocked_at,
+        lgpd_unblocked_at: row.lgpd_unblocked_at,
+        modules: capabilities.modules,
+        features: capabilities.features,
+      };
+    }),
+  };
 }
 
 export async function suspendTenantAction(formData: FormData): Promise<void> {
@@ -287,12 +406,13 @@ export async function loadPlatformMetrics(): Promise<{
 }> {
   const { supabase } = await requireSuperAdmin();
 
-  const { data, error } = await supabase
-    .from("admin_platform_metrics")
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_admin_platform_metrics");
 
-  if (error || !data) return { metrics: null };
+  if (error) {
+    console.error("[loadPlatformMetrics]", error.message);
+    return { metrics: null };
+  }
+  if (!data || typeof data !== "object") return { metrics: null };
   return { metrics: data as PlatformMetrics };
 }
 
@@ -360,10 +480,10 @@ export type TenantCockpitData = {
 export async function loadTenantCockpitData(
   profileId: string,
 ): Promise<{ data: TenantCockpitData } | { error: string }> {
-  const { supabase } = await requireSuperAdmin();
+  const { db, authClient } = await requireSuperAdminDb();
 
-  // Load profile
-  const { data: profile, error: profileErr } = await supabase
+  // Perfil e dados com RLS super_admin usam cliente autenticado.
+  const { data: profile, error: profileErr } = await authClient
     .from("profiles")
     .select(
       "id, user_id, full_name, crn, phone, plan_slug, plan_expires_at, is_suspended, suspended_reason, trial_started_at, last_active_at, acquisition_source, created_at, lgpd_blocked_at, lgpd_unblocked_at",
@@ -388,43 +508,43 @@ export async function loadTenantCockpitData(
     recipesResult,
     tokensResult,
   ] = await Promise.all([
-    supabase
+    authClient
       .from("subscription_events")
       .select("id, event_type, old_value, new_value, metadata, created_at, created_by")
       .eq("tenant_user_id", tenantUserId)
       .order("created_at", { ascending: false })
       .limit(20),
-    supabase
+    authClient
       .from("tenant_feature_overrides")
       .select("id, feature_key, enabled, reason, updated_at")
       .eq("tenant_user_id", tenantUserId)
       .order("feature_key"),
-    supabase
+    authClient
       .from("admin_tenant_notes")
       .select("id, body, created_by, created_at, updated_at")
       .eq("tenant_user_id", tenantUserId)
       .order("created_at", { ascending: false }),
-    supabase
+    authClient
       .from("subscription_plans")
       .select("id, name, slug, description, price_monthly_cents, price_annual_cents, max_clients, max_establishments, max_team_members, max_patients, max_storage_mb, feature_portal_externo, feature_pdf_export, feature_csv_import, feature_api_access, is_active")
       .order("price_monthly_cents"),
-    supabase
+    db
       .from("clients")
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", tenantUserId),
-    supabase
+    db
       .from("establishments")
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", tenantUserId),
-    supabase
+    db
       .from("scheduled_visits")
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", tenantUserId),
-    supabase
+    db
       .from("technical_recipes")
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", tenantUserId),
-    supabase
+    db
       .from("api_tokens")
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", tenantUserId)
@@ -645,6 +765,15 @@ export async function createTenantAsAdminAction(
     redirect("/admin/tenants/novo?err=invalid");
   }
 
+  const enabledModules = parseEnabledModulesFromForm(formData);
+  if (!hasAnyModuleEnabled(enabledModules)) {
+    redirect("/admin/tenants/novo?err=modules");
+  }
+
+  if (!isServiceRoleConfigured()) {
+    redirect("/admin/tenants/novo?err=server_config");
+  }
+
   // Minimum password or let Supabase generate one when sending invite
   const effectivePassword =
     password.length >= 12 ? password : crypto.randomUUID().replace(/-/g, "");
@@ -656,7 +785,8 @@ export async function createTenantAsAdminAction(
     await adminSupabase.auth.admin.createUser({
       email,
       password: effectivePassword,
-      email_confirm: !sendInvite,   // confirm immediately unless sending invite
+      // Conta criada pelo admin deve permitir login imediato; convite é só email.
+      email_confirm: true,
       user_metadata: {
         full_name: fullName,
         acquisition_source: "admin_created",
@@ -672,17 +802,38 @@ export async function createTenantAsAdminAction(
 
   const newUserId = created.user.id;
 
-  // The handle_new_user trigger will have already created the profile row.
-  // Now update it with the chosen plan (using service role so RLS is bypassed).
-  await adminSupabase
-    .from("profiles")
-    .update({
+  // Self-hosted pode não ter o trigger on_auth_user_created; garantir perfil sempre.
+  const { error: profileErr } = await adminSupabase.from("profiles").upsert(
+    {
+      user_id: newUserId,
+      full_name: fullName,
+      tenant_name: fullName,
       plan_slug: planSlug,
       acquisition_source: "admin_created",
-    })
-    .eq("user_id", newUserId);
+      timezone: DEFAULT_PROFILE_TIME_ZONE,
+      enabled_modules: enabledModules,
+    },
+    { onConflict: "user_id" },
+  );
 
-  // Log admin action in subscription_events (trigger may also have logged tenant_created)
+  if (profileErr) {
+    console.error("[createTenantAsAdminAction] profile upsert:", profileErr.message);
+    redirect("/admin/tenants/novo?err=create");
+  }
+
+  await adminSupabase.from("subscription_events").insert({
+    tenant_user_id: newUserId,
+    event_type: "tenant_created",
+    new_value: "admin_created",
+    metadata: {
+      email,
+      acquisition_source: "admin_created",
+      created_by_admin: adminUser.id,
+    },
+    created_by: adminUser.id,
+  });
+
+  // Log admin action in subscription_events (plano na criação)
   await adminSupabase.from("subscription_events").insert({
     tenant_user_id: newUserId,
     event_type: "plan_changed",
@@ -694,6 +845,53 @@ export async function createTenantAsAdminAction(
     },
     created_by: adminUser.id,
   });
+
+  const featureOverrides = parseTenantFeatureOverridesFromForm(formData);
+  if (featureOverrides.length > 0) {
+    const { error: overridesErr } = await adminSupabase
+      .from("tenant_feature_overrides")
+      .upsert(
+        featureOverrides.map((override) => ({
+          tenant_user_id: newUserId,
+          feature_key: override.feature_key,
+          enabled: override.enabled,
+          reason: "Definido na criação pelo admin",
+          updated_by: adminUser.id,
+        })),
+        { onConflict: "tenant_user_id,feature_key" },
+      );
+
+    if (overridesErr) {
+      console.error(
+        "[createTenantAsAdminAction] feature overrides:",
+        overridesErr.message,
+      );
+      redirect("/admin/tenants/novo?err=create");
+    }
+
+    for (const override of featureOverrides) {
+      await adminSupabase.from("subscription_events").insert({
+        tenant_user_id: newUserId,
+        event_type: "feature_override_set",
+        new_value: override.enabled ? "enabled" : "disabled",
+        metadata: {
+          feature_key: override.feature_key,
+          created_by_admin: adminUser.id,
+          note: "Override definido na criação pelo admin",
+        },
+        created_by: adminUser.id,
+      });
+    }
+  }
+
+  if (sendInvite) {
+    const emailed = await sendPasswordRecoveryViaSupabase(adminSupabase, email);
+    if (!emailed.ok) {
+      console.error("[createTenantAsAdminAction] invite email:", emailed.error);
+      revalidatePath("/admin/tenants");
+      redirect("/admin/tenants?ok=tenant_created&email_err=send");
+    }
+  }
 
   revalidatePath("/admin/tenants");
   redirect("/admin/tenants?ok=tenant_created");

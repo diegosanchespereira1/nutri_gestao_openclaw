@@ -29,7 +29,7 @@ type Props = {
   lastError: string | null | undefined;
   sentAtLabel: string | null;
   hasApprovedDossier: boolean;
-  resendConfigured: boolean;
+  emailDeliveryConfigured: boolean;
 };
 
 export function VisitDossierEmailPanel({
@@ -39,7 +39,7 @@ export function VisitDossierEmailPanel({
   lastError,
   sentAtLabel,
   hasApprovedDossier,
-  resendConfigured,
+  emailDeliveryConfigured,
 }: Props) {
   const router = useRouter();
   const [state, formAction, pendingSave] = useActionState<
@@ -59,7 +59,7 @@ export function VisitDossierEmailPanel({
   const effectiveStatus = sendStatus ?? "not_sent";
   const hasRecipients = initialEmailsText.trim().length > 0;
   const showSendButton =
-    hasApprovedDossier && resendConfigured && hasRecipients;
+    hasApprovedDossier && emailDeliveryConfigured && hasRecipients;
 
   const sendButtonLabel =
     effectiveStatus === "not_sent"
@@ -99,13 +99,13 @@ export function VisitDossierEmailPanel({
         </p>
       ) : null}
 
-      {!resendConfigured ? (
+      {!emailDeliveryConfigured ? (
         <p className="text-muted-foreground text-xs">
-          O envio automático por email requer variáveis{" "}
-          <code className="text-foreground">RESEND_API_KEY</code> e remetente
-          (<code className="text-foreground">DOSSIER_EMAIL_FROM</code> ou{" "}
-          <code className="text-foreground">RESEND_FROM_EMAIL</code>) no
-          servidor.
+          O envio por email requer SMTP no servidor da aplicação (
+          <code className="text-foreground">SMTP_HOST</code>,{" "}
+          <code className="text-foreground">SMTP_USER</code>,{" "}
+          <code className="text-foreground">SMTP_PASS</code>,{" "}
+          <code className="text-foreground">SMTP_FROM</code>).
         </p>
       ) : null}
 
@@ -175,7 +175,7 @@ export function VisitDossierEmailPanel({
         </div>
       ) : null}
 
-      {hasApprovedDossier && resendConfigured && !hasRecipients ? (
+      {hasApprovedDossier && emailDeliveryConfigured && !hasRecipients ? (
         <p className="text-muted-foreground text-xs">
           Adicione destinatários acima para poder reenviar o PDF do dossiê.
         </p>

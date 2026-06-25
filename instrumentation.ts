@@ -44,8 +44,8 @@ export async function register() {
   const checks: Array<{ key: string; required: boolean }> = [
     { key: "NEXT_PUBLIC_SUPABASE_URL", required: true },
     { key: "NEXT_PUBLIC_SUPABASE_ANON_KEY", required: true },
-    { key: "RESEND_API_KEY", required: false },
-    { key: "DOSSIER_EMAIL_FROM", required: false },
+    { key: "SMTP_HOST", required: false },
+    { key: "SMTP_FROM", required: false },
   ];
 
   for (const { key, required } of checks) {

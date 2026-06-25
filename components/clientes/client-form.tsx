@@ -34,6 +34,7 @@ import {
   createCustomSegmentAction,
 } from "@/lib/actions/client-segments";
 import { Button } from "@/components/ui/button";
+import { EstablishmentCategorySelect } from "@/components/clientes/establishment-category-select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
   Dialog,
@@ -52,10 +53,8 @@ import {
   clientBusinessSegmentLabel,
 } from "@/lib/constants/client-business-segment";
 import {
-  ESTABLISHMENT_CATEGORIES,
   ESTABLISHMENT_TYPES_BY_CATEGORY,
   categoryFromType,
-  establishmentCategoryLabel,
   establishmentTypeLabel,
 } from "@/lib/constants/establishment-types";
 import { clientLifecycleLabel } from "@/lib/constants/client-lifecycle";
@@ -713,26 +712,12 @@ export function ClientForm({
                 {/* Categoria */}
                 <div className="space-y-2">
                   <Label htmlFor="est-category">Categoria</Label>
-                  <select
+                  <EstablishmentCategorySelect
                     id="est-category"
-                    required
                     value={estCategory}
-                    onChange={(e) =>
-                      handleEstCategoryChange(
-                        e.target.value as EstablishmentCategory | "",
-                      )
-                    }
+                    onChange={handleEstCategoryChange}
                     className={selectClassName}
-                  >
-                    <option value="" disabled>
-                      Selecione a categoria…
-                    </option>
-                    {ESTABLISHMENT_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {establishmentCategoryLabel[c]}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 {/* Tipo — só aparece após categoria */}

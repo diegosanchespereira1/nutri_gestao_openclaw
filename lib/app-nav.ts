@@ -15,12 +15,14 @@ import {
   Wallet,
 } from "lucide-react";
 
-import type { ModuleContext } from "@/lib/types/modules";
+import type { EnabledModuleKey, ModuleContext } from "@/lib/types/modules";
 
 export type AppNavItem = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Item só aparece quando a chave em `enabled_modules` estiver ativa. */
+  moduleItemGate?: EnabledModuleKey;
 };
 
 export type AppNavGroup = {
@@ -39,8 +41,18 @@ export const appNavGroups: AppNavGroup[] = [
       { href: "/inicio",     label: "Início",      icon: LayoutDashboard },
       { href: "/clientes",   label: "Clientes",    icon: UserCircle2 },
       { href: "/equipe",     label: "Equipe",       icon: Users },
-      { href: "/visitas",    label: "Visitas",      icon: ClipboardList },
-      { href: "/financeiro", label: "Financeiro",   icon: Wallet },
+      {
+        href: "/visitas",
+        label: "Visitas",
+        icon: ClipboardList,
+        moduleItemGate: "visitas",
+      },
+      {
+        href: "/financeiro",
+        label: "Financeiro",
+        icon: Wallet,
+        moduleItemGate: "financeiro",
+      },
     ],
   },
   {

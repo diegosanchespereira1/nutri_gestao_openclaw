@@ -13,6 +13,11 @@ import {
  * para ler o valor real injetado pelo container em produção.
  */
 /** Apenas server actions / route handlers. Nunca importar em Client Components. */
+export function isServiceRoleConfigured(): boolean {
+  return Boolean(readSupabaseUrl() && readSupabaseServiceRoleKey());
+}
+
+/** Apenas server actions / route handlers. Nunca importar em Client Components. */
 export function createServiceRoleClient() {
   const url = readSupabaseUrl();
   const key = readSupabaseServiceRoleKey();

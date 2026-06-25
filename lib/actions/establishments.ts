@@ -5,6 +5,11 @@ import { redirect } from "next/navigation";
 
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
+import {
+  establishmentTypeDisabledMessage,
+  isEstablishmentTypeAllowedForModules,
+} from "@/lib/modules/establishment-category-access";
+import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
@@ -400,6 +405,19 @@ export async function createEstablishmentAction(
     return { ok: false, error: "Selecione o tipo de estabelecimento." };
   }
 
+  const enabledModules = await loadWorkspaceEnabledModules(
+    supabase,
+    workspaceOwnerId,
+  );
+  if (
+    !isEstablishmentTypeAllowedForModules(establishment_type, enabledModules)
+  ) {
+    return {
+      ok: false,
+      error: establishmentTypeDisabledMessage(establishment_type),
+    };
+  }
+
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
     return { ok: false, error: "Indique o nome do estabelecimento." };
@@ -477,6 +495,19 @@ export async function updateEstablishmentAction(
   );
   if (!establishment_type) {
     return { ok: false, error: "Selecione o tipo de estabelecimento." };
+  }
+
+  const enabledModules = await loadWorkspaceEnabledModules(
+    supabase,
+    workspaceOwnerId,
+  );
+  if (
+    !isEstablishmentTypeAllowedForModules(establishment_type, enabledModules)
+  ) {
+    return {
+      ok: false,
+      error: establishmentTypeDisabledMessage(establishment_type),
+    };
   }
 
   const name = String(formData.get("name") ?? "").trim();

@@ -7,6 +7,7 @@ import {
   changeTenantPlanAction,
   unblockLgpdTenantAction,
 } from "@/lib/actions/admin-platform";
+import { TenantCapabilitiesBadges } from "@/components/admin/tenant-capabilities-badges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,9 +38,9 @@ function formatDate(iso: string): string {
 export default async function TenantsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; ok?: string; err?: string }>;
+  searchParams: Promise<{ search?: string; ok?: string; err?: string; email_err?: string }>;
 }) {
-  const { search, ok, err } = await searchParams;
+  const { search, ok, err, email_err } = await searchParams;
   const { rows } = await loadTenants(search);
 
   const okMessages: Record<string, string> = {
@@ -87,6 +88,20 @@ export default async function TenantsPage({
           role="status"
         >
           {okMessages[ok] ?? "Ação concluída."}
+          {ok === "tenant_created" && email_err === "config" && (
+            <>
+              {" "}
+              Conta criada, mas o email de convite não foi enviado. Verifique o SMTP
+              do Supabase Auth (GoTrue) no servidor self-hosted.
+            </>
+          )}
+          {ok === "tenant_created" && email_err === "send" && (
+            <>
+              {" "}
+              Conta criada, mas falhou o envio do email de convite (veja logs do
+              servidor).
+            </>
+          )}
         </p>
       )}
       {err && (
@@ -150,7 +165,13 @@ export default async function TenantsPage({
                     </p>
                   )}
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-4">
+                  <TenantCapabilitiesBadges
+                    modules={t.modules}
+                    features={t.features}
+                  />
+
+                  <div className="border-border border-t pt-3 space-y-3">
                   {/* Change plan */}
                   <form action={changeTenantPlanAction} className="flex flex-wrap gap-2 items-end">
                     <input type="hidden" name="tenant_id" value={t.id} />
@@ -211,6 +232,7 @@ export default async function TenantsPage({
                         </Button>
                       </form>
                     )}
+                  </div>
                   </div>
                 </CardContent>
               </Card>

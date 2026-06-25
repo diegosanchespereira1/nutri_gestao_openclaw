@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_ENABLED_MODULES,
   enabledModulesList,
+  enabledModuleFieldName,
   hasAnyModuleEnabled,
   isModuleContext,
   parseEnabledModules,
+  parseEnabledModulesFromForm,
 } from "./modules";
 
 // ── isModuleContext ─────────────────────────────────────────────────────────
@@ -60,8 +62,10 @@ describe("parseEnabledModules", () => {
       parseEnabledModules({
         atendimento_nutricional: true,
         assessoria_alimentacao: true,
+        visitas: true,
+        financeiro: true,
       }),
-    ).toEqual({ atendimento_nutricional: true, assessoria_alimentacao: true });
+    ).toEqual(DEFAULT_ENABLED_MODULES);
   });
 
   it("desabilita assessoria quando false explícito", () => {
@@ -69,8 +73,15 @@ describe("parseEnabledModules", () => {
       parseEnabledModules({
         atendimento_nutricional: true,
         assessoria_alimentacao: false,
+        visitas: true,
+        financeiro: true,
       }),
-    ).toEqual({ atendimento_nutricional: true, assessoria_alimentacao: false });
+    ).toEqual({
+      atendimento_nutricional: true,
+      assessoria_alimentacao: false,
+      visitas: true,
+      financeiro: true,
+    });
   });
 
   it("desabilita atendimento quando false explícito", () => {
@@ -78,8 +89,15 @@ describe("parseEnabledModules", () => {
       parseEnabledModules({
         atendimento_nutricional: false,
         assessoria_alimentacao: true,
+        visitas: true,
+        financeiro: true,
       }),
-    ).toEqual({ atendimento_nutricional: false, assessoria_alimentacao: true });
+    ).toEqual({
+      atendimento_nutricional: false,
+      assessoria_alimentacao: true,
+      visitas: true,
+      financeiro: true,
+    });
   });
 
   it("ambos desabilitados", () => {
@@ -87,8 +105,31 @@ describe("parseEnabledModules", () => {
       parseEnabledModules({
         atendimento_nutricional: false,
         assessoria_alimentacao: false,
+        visitas: true,
+        financeiro: true,
       }),
-    ).toEqual({ atendimento_nutricional: false, assessoria_alimentacao: false });
+    ).toEqual({
+      atendimento_nutricional: false,
+      assessoria_alimentacao: false,
+      visitas: true,
+      financeiro: true,
+    });
+  });
+
+  it("desabilita visitas e financeiro quando false explícito", () => {
+    expect(
+      parseEnabledModules({
+        atendimento_nutricional: true,
+        assessoria_alimentacao: true,
+        visitas: false,
+        financeiro: false,
+      }),
+    ).toEqual({
+      atendimento_nutricional: true,
+      assessoria_alimentacao: true,
+      visitas: false,
+      financeiro: false,
+    });
   });
 
   it("chaves ausentes contam como habilitadas (retrocompatibilidade)", () => {
@@ -100,13 +141,14 @@ describe("parseEnabledModules", () => {
   });
 
   it("valores não-booleanos contam como habilitados (permissivo)", () => {
-    // Qualquer valor que não seja false explícito → habilitado
     expect(
       parseEnabledModules({
         atendimento_nutricional: 1,
         assessoria_alimentacao: "yes",
+        visitas: 0,
+        financeiro: "",
       }),
-    ).toEqual({ atendimento_nutricional: true, assessoria_alimentacao: true });
+    ).toEqual(DEFAULT_ENABLED_MODULES);
   });
 
   it("null em chave individual não desabilita (apenas false desabilita)", () => {
@@ -114,8 +156,10 @@ describe("parseEnabledModules", () => {
       parseEnabledModules({
         atendimento_nutricional: null,
         assessoria_alimentacao: null,
+        visitas: null,
+        financeiro: null,
       }),
-    ).toEqual({ atendimento_nutricional: true, assessoria_alimentacao: true });
+    ).toEqual(DEFAULT_ENABLED_MODULES);
   });
 
   it("retorna cópia — não mutável com o default", () => {
@@ -128,25 +172,32 @@ describe("parseEnabledModules", () => {
 // ── hasAnyModuleEnabled ─────────────────────────────────────────────────────
 
 describe("hasAnyModuleEnabled", () => {
+  const allOn = DEFAULT_ENABLED_MODULES;
+  const onlyAn = {
+    ...DEFAULT_ENABLED_MODULES,
+    assessoria_alimentacao: false,
+  };
+  const onlyAa = {
+    ...DEFAULT_ENABLED_MODULES,
+    atendimento_nutricional: false,
+  };
+  const none = {
+    ...DEFAULT_ENABLED_MODULES,
+    atendimento_nutricional: false,
+    assessoria_alimentacao: false,
+  };
+
   it("true quando ambos habilitados", () => {
-    expect(
-      hasAnyModuleEnabled({ atendimento_nutricional: true, assessoria_alimentacao: true }),
-    ).toBe(true);
+    expect(hasAnyModuleEnabled(allOn)).toBe(true);
   });
 
   it("true quando apenas um habilitado", () => {
-    expect(
-      hasAnyModuleEnabled({ atendimento_nutricional: true, assessoria_alimentacao: false }),
-    ).toBe(true);
-    expect(
-      hasAnyModuleEnabled({ atendimento_nutricional: false, assessoria_alimentacao: true }),
-    ).toBe(true);
+    expect(hasAnyModuleEnabled(onlyAn)).toBe(true);
+    expect(hasAnyModuleEnabled(onlyAa)).toBe(true);
   });
 
   it("false quando nenhum habilitado", () => {
-    expect(
-      hasAnyModuleEnabled({ atendimento_nutricional: false, assessoria_alimentacao: false }),
-    ).toBe(false);
+    expect(hasAnyModuleEnabled(none)).toBe(false);
   });
 });
 
@@ -154,10 +205,7 @@ describe("hasAnyModuleEnabled", () => {
 
 describe("enabledModulesList", () => {
   it("retorna ambos quando ambos habilitados", () => {
-    const result = enabledModulesList({
-      atendimento_nutricional: true,
-      assessoria_alimentacao: true,
-    });
+    const result = enabledModulesList(DEFAULT_ENABLED_MODULES);
     expect(result).toContain("atendimento_nutricional");
     expect(result).toContain("assessoria_alimentacao");
     expect(result).toHaveLength(2);
@@ -165,7 +213,7 @@ describe("enabledModulesList", () => {
 
   it("retorna apenas AN quando AA desabilitado", () => {
     const result = enabledModulesList({
-      atendimento_nutricional: true,
+      ...DEFAULT_ENABLED_MODULES,
       assessoria_alimentacao: false,
     });
     expect(result).toEqual(["atendimento_nutricional"]);
@@ -173,17 +221,65 @@ describe("enabledModulesList", () => {
 
   it("retorna apenas AA quando AN desabilitado", () => {
     const result = enabledModulesList({
+      ...DEFAULT_ENABLED_MODULES,
       atendimento_nutricional: false,
-      assessoria_alimentacao: true,
     });
     expect(result).toEqual(["assessoria_alimentacao"]);
   });
 
   it("retorna array vazio quando nenhum habilitado", () => {
     const result = enabledModulesList({
+      ...DEFAULT_ENABLED_MODULES,
       atendimento_nutricional: false,
       assessoria_alimentacao: false,
     });
     expect(result).toEqual([]);
+  });
+});
+
+describe("parseEnabledModulesFromForm", () => {
+  it("lê checkboxes marcados como true", () => {
+    const formData = new FormData();
+    for (const key of [
+      "atendimento_nutricional",
+      "assessoria_alimentacao",
+      "visitas",
+      "financeiro",
+    ] as const) {
+      formData.set(enabledModuleFieldName(key), "true");
+    }
+    expect(parseEnabledModulesFromForm(formData)).toEqual(DEFAULT_ENABLED_MODULES);
+  });
+
+  it("lê módulos desmarcados como false", () => {
+    const formData = new FormData();
+    formData.set(enabledModuleFieldName("atendimento_nutricional"), "false");
+    formData.set(enabledModuleFieldName("assessoria_alimentacao"), "true");
+    formData.set(enabledModuleFieldName("visitas"), "false");
+    formData.set(enabledModuleFieldName("financeiro"), "true");
+
+    expect(parseEnabledModulesFromForm(formData)).toEqual({
+      atendimento_nutricional: false,
+      assessoria_alimentacao: true,
+      visitas: false,
+      financeiro: true,
+    });
+  });
+
+  it("lê checkbox marcado quando hidden=false precede no FormData", () => {
+    const formData = new FormData();
+    formData.append(enabledModuleFieldName("atendimento_nutricional"), "false");
+    formData.append(enabledModuleFieldName("atendimento_nutricional"), "true");
+    formData.append(enabledModuleFieldName("assessoria_alimentacao"), "false");
+    formData.append(enabledModuleFieldName("visitas"), "false");
+    formData.append(enabledModuleFieldName("visitas"), "true");
+    formData.append(enabledModuleFieldName("financeiro"), "false");
+
+    expect(parseEnabledModulesFromForm(formData)).toEqual({
+      atendimento_nutricional: true,
+      assessoria_alimentacao: false,
+      visitas: true,
+      financeiro: false,
+    });
   });
 });

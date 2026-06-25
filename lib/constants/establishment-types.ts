@@ -18,6 +18,7 @@ export const ASSESSORIA_TYPES: readonly EstablishmentType[] = [
   "frigorifico",
   "mercado",
   "cozinha_industrial",
+  "hotel",
   "empresa",
 ] as const;
 
@@ -61,6 +62,7 @@ export const establishmentTypeLabel: Record<EstablishmentType, string> = {
   frigorifico: "Frigorífico",
   mercado: "Mercado",
   cozinha_industrial: "Cozinha industrial",
+  hotel: "Hotel",
   empresa: "Empresa",
 };
 
@@ -82,6 +84,8 @@ export const establishmentTypeBadgeClass: Record<EstablishmentType, string> = {
     "border border-teal-500/30 bg-teal-500/10 text-teal-950 dark:text-teal-100",
   cozinha_industrial:
     "border border-teal-500/30 bg-teal-500/10 text-teal-950 dark:text-teal-100",
+  hotel:
+    "border border-indigo-500/30 bg-indigo-500/10 text-indigo-950 dark:text-indigo-100",
   empresa:
     "border border-violet-500/25 bg-violet-500/10 text-violet-900 dark:text-violet-100",
 };
@@ -116,6 +120,10 @@ export function establishmentTypeFromSegment(
       return "hospital";
     case "clinica":
       return "clinica";
+    case "restaurante":
+      return "restaurante";
+    case "hotel":
+      return "hotel";
     case "lar_idosos":
       return "lar_idosos";
     default:

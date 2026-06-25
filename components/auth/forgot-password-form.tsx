@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 /** Mensagem única — evita enumeração de emails (PRD / Story 1.7). */
 const GENERIC_SUCCESS =
-  "Se existir uma conta associada a este email, enviamos instruções para redefinir a senha.";
+  "Se existir uma conta associada a este email, enviaremos instruções para redefinir a senha.";
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState("");
@@ -56,9 +56,6 @@ export function ForgotPasswordForm() {
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
           Recuperar acesso
         </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Indique o email da conta. Não revelamos se o endereço está registado.
-        </p>
       </div>
 
       {sent ? (

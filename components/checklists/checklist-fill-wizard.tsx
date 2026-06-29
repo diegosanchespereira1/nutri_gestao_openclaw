@@ -410,9 +410,34 @@ function mergeFillResponses(
       (overlayRow.validUntil ?? "").trim().length > 0;
     if (!hasData) continue;
     const cur = out[itemId] ?? emptyItemState();
-    out[itemId] = { ...cur, ...overlayRow };
+    out[itemId] = {
+      outcome: overlayRow.outcome ?? cur.outcome,
+      note:
+        (overlayRow.note ?? "").trim().length > 0 ? overlayRow.note : cur.note,
+      annotation:
+        (overlayRow.annotation ?? "").trim().length > 0
+          ? overlayRow.annotation
+          : cur.annotation,
+      validUntil:
+        (overlayRow.validUntil ?? "").trim().length > 0
+          ? overlayRow.validUntil
+          : cur.validUntil,
+    };
   }
   return out;
+}
+
+function fillResponsesMapsEqual(a: FillResponsesMap, b: FillResponsesMap): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const itemId of keys) {
+    const left = a[itemId] ?? emptyItemState();
+    const right = b[itemId] ?? emptyItemState();
+    if (left.outcome !== right.outcome) return false;
+    if ((left.note ?? "") !== (right.note ?? "")) return false;
+    if ((left.annotation ?? "") !== (right.annotation ?? "")) return false;
+    if ((left.validUntil ?? "") !== (right.validUntil ?? "")) return false;
+  }
+  return true;
 }
 
 function buildIssueMessageWithSectionAndItem(
@@ -544,6 +569,11 @@ export function ChecklistFillWizard({
   );
   const responsesRef = useRef<FillResponsesMap>(responses);
   const sectionIndexRef = useRef(sectionIndex);
+  const initialResponsesRef = useRef(initialResponses);
+  initialResponsesRef.current = initialResponses;
+  const templateRef = useRef(template);
+  templateRef.current = template;
+  const serverSyncedSessionRef = useRef<string | null>(null);
 
   useEffect(() => {
     responsesRef.current = responses;
@@ -716,12 +746,54 @@ export function ChecklistFillWizard({
   );
 
   useEffect(() => {
+    const next = { ...initialResponsesRef.current };
+    setResponses(next);
+    responsesRef.current = next;
+    dirtyItemIdsRef.current.clear();
+
+    if (!initialDossierApprovedAt) {
+      const firstInherited = Object.entries(next).find(
+        ([, r]) =>
+          r.outcome !== null && (r.validUntil ?? "").trim().length > 0,
+      );
+      if (firstInherited) {
+        const idx = templateRef.current.sections.findIndex((sec) =>
+          sec.items.some((it) => it.id === firstInherited[0]),
+        );
+        if (idx >= 0) setSectionIndex(idx);
+      }
+    }
+  }, [sessionId, initialDossierApprovedAt]);
+
+  useEffect(() => {
     const draft = loadFillSessionDraft(sessionId);
     if (!draft) return;
     for (const itemId of Object.keys(draft.responses)) {
       dirtyItemIdsRef.current.add(itemId);
     }
     setResponses((prev) => mergeFillResponses(prev, draft.responses));
+  }, [sessionId]);
+
+  /** Uma única reconciliação com o servidor ao abrir a sessão (herança de validUntil). */
+  useEffect(() => {
+    if (serverSyncedSessionRef.current === sessionId) return;
+    serverSyncedSessionRef.current = sessionId;
+
+    let cancelled = false;
+    void loadFillResponsesMapForSession(sessionId, {
+      template: templateRef.current,
+    }).then((remote) => {
+      if (cancelled || !remote.ok) return;
+      setResponses((prev) => {
+        const merged = mergeFillResponses(remote.responses, prev);
+        if (fillResponsesMapsEqual(merged, prev)) return prev;
+        responsesRef.current = merged;
+        return merged;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId]);
 
   useEffect(() => {
@@ -847,7 +919,7 @@ export function ChecklistFillWizard({
 
   /** Reconcilia com BD, grava com modo merge e valida o que ficou persistido. */
   const runReconcileThenSync = useCallback(async (): Promise<FillActionResult> => {
-    const remote = await loadFillResponsesMapForSession(sessionId);
+    const remote = await loadFillResponsesMapForSession(sessionId, { template });
     if (!remote.ok) {
       if (redirectIfSessionExpired(remote.error)) {
         return {
@@ -868,7 +940,7 @@ export function ChecklistFillWizard({
     const synced = await syncAllResponsesToServer(merged, "merge");
     if (!synced.ok) return synced;
 
-    const verify = await loadFillResponsesMapForSession(sessionId);
+    const verify = await loadFillResponsesMapForSession(sessionId, { template });
     if (!verify.ok) {
       if (redirectIfSessionExpired(verify.error)) {
         return {
@@ -890,7 +962,7 @@ export function ChecklistFillWizard({
     if (dossierApprovedAt) {
       return { ok: true };
     }
-    const remote = await loadFillResponsesMapForSession(sessionId);
+    const remote = await loadFillResponsesMapForSession(sessionId, { template });
     if (!remote.ok) {
       if (redirectIfSessionExpired(remote.error)) {
         return {
@@ -1283,9 +1355,12 @@ export function ChecklistFillWizard({
       if (hasResponseChanged(prevStr, nextStr)) {
         markItemDirty(itemId);
       }
-      return { ...prev, [itemId]: { ...cur, validUntil: normalized } };
+      const next = { ...prev, [itemId]: { ...cur, validUntil: normalized } };
+      responsesRef.current = next;
+      return next;
     });
-  }, [markItemDirty]);
+    rescheduleSave("section", false, 600);
+  }, [markItemDirty, rescheduleSave]);
 
   function handleNext() {
     setAdvanceError(null);

@@ -9,6 +9,7 @@ function invalidateWorkspaceCatalogCache(workspaceOwnerId: string) {
 import { redirect } from "next/navigation";
 
 import { logApplicationActivityAction } from "@/lib/actions/application-activity";
+import { seedInheritedValidResponsesForSession } from "@/lib/actions/checklist-fill";
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import {
   WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME,
@@ -21,6 +22,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import type { ChecklistFillSessionRow } from "@/lib/types/checklist-fill";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
 /** Template candidato a ser usado como base ao criar um novo checklist da equipe. */
@@ -1140,6 +1142,8 @@ export async function startWorkspaceTemplateFillBatch(input: {
   }
 
   const sessionIds: string[] = [];
+  const templateBundle = await loadWorkspaceTemplateBundle(workspaceTemplateId);
+
   for (const areaId of resolvedAreas) {
     const { data: session, error } = await supabase
       .from("checklist_fill_sessions")
@@ -1151,9 +1155,17 @@ export async function startWorkspaceTemplateFillBatch(input: {
         workspace_template_id: workspaceTemplateId,
         area_id: areaId,
       })
-      .select("id")
+      .select("*")
       .single();
     if (error || !session) return { ok: false, error: "session_create_failed" };
+    if (templateBundle) {
+      await seedInheritedValidResponsesForSession(
+        supabase,
+        session as ChecklistFillSessionRow,
+        templateBundle,
+        user.id,
+      );
+    }
     sessionIds.push(session.id);
   }
 

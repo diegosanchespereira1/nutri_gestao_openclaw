@@ -223,6 +223,7 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
           </p>
         ) : null}
         <ChecklistFillWizard
+          key={model.sessionId}
           sessionId={model.sessionId}
           template={model.fill.template}
           initialResponses={model.fill.responses}

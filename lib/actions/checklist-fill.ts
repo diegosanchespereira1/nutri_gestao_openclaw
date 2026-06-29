@@ -17,10 +17,7 @@ import {
   getProfileSignatureDataUrl,
   MAX_SESSION_SIGNATURE_DATA_URL_CHARS,
 } from "@/lib/profile/signature-sync";
-import {
-  loadWorkspaceTemplateBundle,
-  startWorkspaceTemplateFillBatch,
-} from "@/lib/actions/checklist-workspace";
+import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
 import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
@@ -39,6 +36,17 @@ import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import { todayKey } from "@/lib/datetime/calendar-tz";
+import {
+  collectAllTemplateItemIds,
+  collectEvaluableTemplateItemIds,
+  filterInheritableResponseRows,
+  pickSourceSessionForInheritance,
+  readAnyFillResponseItemId,
+  resolveFillItemResponseColumn,
+  resolveSessionTemplateColumn,
+  sessionAreaMatchesForInheritance,
+} from "@/lib/checklists/inherit-valid-responses";
+import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 
 export type FillActionResult =
   | { ok: true }
@@ -74,18 +82,10 @@ function normalizeValidUntilDate(
   return trimmed.slice(0, 10);
 }
 
-function collectEvaluableTemplateItemIds(
+function collectEvaluableTemplateItemIdsFromTemplate(
   template: ChecklistTemplateWithSections,
 ): Set<string> {
-  const ids = new Set<string>();
-  for (const sec of template.sections) {
-    for (const item of sec.items) {
-      if (!isStructureOnlyItem(item)) {
-        ids.add(item.id);
-      }
-    }
-  }
-  return ids;
+  return collectEvaluableTemplateItemIds(template);
 }
 
 function readFillResponseItemId(
@@ -109,15 +109,11 @@ function mapFillResponseRowsToMap(
   >,
   template?: ChecklistTemplateWithSections,
 ): FillResponsesMap {
-  const allowedIds = template
-    ? collectEvaluableTemplateItemIds(template)
-    : null;
+  const allowedIds = template ? collectAllTemplateItemIds(template) : null;
   const responses: FillResponsesMap = {};
   for (const r of rows) {
-    const key =
-      r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id ?? null;
-    if (!key) continue;
-    const itemId = String(key);
+    const itemId = readAnyFillResponseItemId(r);
+    if (!itemId) continue;
     if (allowedIds && !allowedIds.has(itemId)) continue;
     responses[itemId] = {
       outcome: r.outcome,
@@ -232,10 +228,24 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
   redirect(`/checklists/preencher/${session.id}`);
 }
 
+async function loadSingleEstablishmentAreaId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  establishmentId: string,
+): Promise<string | null> {
+  const { data: areas } = await supabase
+    .from("establishment_areas")
+    .select("id")
+    .eq("establishment_id", establishmentId)
+    .order("position", { ascending: true });
+  if (!areas || areas.length !== 1) return null;
+  return String(areas[0].id);
+}
+
 /**
  * Para sessões recém-criadas (sem nenhuma resposta), copia as respostas com
- * valid_until ainda vigente da sessão aprovada mais recente para o mesmo escopo
- * (template + estabelecimento + área). Retorna o número de itens herdados.
+ * valid_until ainda vigente da sessão anterior mais recente para o mesmo escopo
+ * (template + estabelecimento + área). Prioriza dossiês aprovados; se não houver,
+ * usa a sessão anterior mais recente com itens válidos. Retorna o número de itens herdados.
  */
 async function inheritValidResponsesIfFreshSession(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -244,57 +254,73 @@ async function inheritValidResponsesIfFreshSession(
     workspace_template_id?: string | null;
   },
   template: ChecklistTemplateWithSections,
+  timeZone: string,
 ): Promise<number> {
-  const todayIso = todayKey(new Date(), "America/Sao_Paulo");
-  const curArea = session.area_id ?? null;
-
-  // Determina a coluna de template da sessão atual
-  const templateCol = session.workspace_template_id
-    ? ("workspace_template_id" as const)
-    : session.custom_template_id
-      ? ("custom_template_id" as const)
-      : session.template_id
-        ? ("template_id" as const)
-        : null;
-
-  if (!templateCol) return 0;
+  const todayIso = todayKey(new Date(), timeZone);
+  const sessionTemplateCol = resolveSessionTemplateColumn(session);
+  if (!sessionTemplateCol) return 0;
 
   const templateId =
-    templateCol === "workspace_template_id"
+    sessionTemplateCol === "workspace_template_id"
       ? session.workspace_template_id!
-      : templateCol === "custom_template_id"
+      : sessionTemplateCol === "custom_template_id"
         ? session.custom_template_id!
         : session.template_id!;
 
-  // Busca sessões aprovadas para o mesmo escopo (retorna area_id para filtrar)
-  const { data: candidates, error: prevErr } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id, area_id")
-    .eq("establishment_id", session.establishment_id)
-    .neq("id", session.id)
-    .eq(templateCol, templateId)
+  const itemCol = resolveFillItemResponseColumn(session);
+  if (!itemCol) return 0;
+
+  const singleAreaId = await loadSingleEstablishmentAreaId(
+    supabase,
+    session.establishment_id,
+  );
+
+  const baseQuery = () =>
+    supabase
+      .from("checklist_fill_sessions")
+      .select("id, area_id, dossier_approved_at, updated_at")
+      .eq("establishment_id", session.establishment_id)
+      .neq("id", session.id)
+      .eq(sessionTemplateCol, templateId);
+
+  const { data: approvedCandidates, error: approvedErr } = await baseQuery()
     .not("dossier_approved_at", "is", null)
     .order("dossier_approved_at", { ascending: false })
     .limit(20);
 
-  if (prevErr) {
-    console.error("[inherit] erro ao buscar sessões anteriores:", prevErr.message);
+  if (approvedErr) {
+    console.error("[inherit] erro ao buscar sessões aprovadas:", approvedErr.message);
     return 0;
   }
 
-  // Seleciona a mais recente com o mesmo area_id (comparação normaliza null/undefined)
-  const prevSession = (candidates ?? []).find(
-    (s) => ((s as { area_id?: string | null }).area_id ?? null) === curArea,
+  let prevSession = pickSourceSessionForInheritance(
+    approvedCandidates ?? [],
+    session.area_id,
+    singleAreaId,
   );
 
   if (!prevSession) {
-    console.log("[inherit] nenhuma sessão aprovada anterior com mesma área encontrada");
+    const { data: recentCandidates, error: recentErr } = await baseQuery()
+      .order("updated_at", { ascending: false })
+      .limit(20);
+    if (recentErr) {
+      console.error("[inherit] erro ao buscar sessões recentes:", recentErr.message);
+      return 0;
+    }
+    prevSession = pickSourceSessionForInheritance(
+      recentCandidates ?? [],
+      session.area_id,
+      singleAreaId,
+    );
+  }
+
+  if (!prevSession) {
+    console.log("[inherit] nenhuma sessão anterior com mesma área encontrada");
     return 0;
   }
 
-  const prevSessionId = (prevSession as { id: string }).id;
+  const prevSessionId = prevSession.id;
 
-  // Busca respostas com validade ainda vigente
   const { data: srcRows, error: srcErr } = await supabase
     .from("checklist_fill_item_responses")
     .select("*")
@@ -311,21 +337,13 @@ async function inheritValidResponsesIfFreshSession(
     return 0;
   }
 
-  const itemCol: FillItemResponseColumn = session.workspace_template_id
-    ? "workspace_item_id"
-    : session.custom_template_id
-      ? "custom_item_id"
-      : "template_item_id";
+  const inheritableItemIds = collectEvaluableTemplateItemIdsFromTemplate(template);
 
-  const inheritableItemIds = collectEvaluableTemplateItemIds(template);
-
-  const rowsToInsert = (
-    srcRows as (ChecklistFillItemResponseRow & { workspace_item_id?: string | null })[]
-  ).filter((r) => {
-    if (!r.outcome) return false;
-    const itemId = readFillResponseItemId(r, itemCol);
-    return Boolean(itemId && inheritableItemIds.has(itemId));
-  });
+  const rowsToInsert = filterInheritableResponseRows(
+    srcRows as (ChecklistFillItemResponseRow & { workspace_item_id?: string | null })[],
+    inheritableItemIds,
+    todayIso,
+  );
 
   if (rowsToInsert.length === 0) {
     console.log(
@@ -335,7 +353,7 @@ async function inheritValidResponsesIfFreshSession(
   }
 
   const inserts = rowsToInsert.map((r) => {
-    const itemId = readFillResponseItemId(r, itemCol)!;
+    const itemId = readAnyFillResponseItemId(r)!;
     return {
       session_id: session.id,
       template_item_id: null,
@@ -359,6 +377,20 @@ async function inheritValidResponsesIfFreshSession(
     return 0;
   }
   return inserted?.length ?? 0;
+}
+
+/** Herda respostas válidas logo após criar a sessão (antes de abrir o wizard). */
+export async function seedInheritedValidResponsesForSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  session: ChecklistFillSessionRow & {
+    custom_template_id?: string | null;
+    workspace_template_id?: string | null;
+  },
+  template: ChecklistTemplateWithSections,
+  userId: string,
+): Promise<void> {
+  const timeZone = await fetchProfileTimeZone(supabase, userId);
+  await inheritValidResponsesIfFreshSession(supabase, session, template, timeZone);
 }
 
 export async function loadFillSessionPageData(sessionId: string): Promise<{
@@ -464,24 +496,28 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   if (!template) return null;
 
+  const timeZone = await fetchProfileTimeZone(supabase, user.id);
+
   let { data: respRows } = respRowsResult;
 
   // Herança automática de itens com validade vigente (apenas na 1ª abertura)
-  let inheritedCount = 0;
   const isFirstOpen = (respRows ?? []).length === 0;
-  console.log("[inherit] sessão:", session.id, "| respostas existentes:", (respRows ?? []).length, "| é fresh:", isFirstOpen);
+  console.log("[inherit] sessão:", row.id, "| respostas existentes:", (respRows ?? []).length, "| é fresh:", isFirstOpen);
   if (isFirstOpen) {
-    inheritedCount = await inheritValidResponsesIfFreshSession(
+    const insertedCount = await inheritValidResponsesIfFreshSession(
       supabase,
       row,
       template,
+      timeZone,
     );
-    if (inheritedCount > 0) {
+    if (insertedCount > 0) {
       const { data: refreshed } = await supabase
         .from("checklist_fill_item_responses")
         .select("*")
         .eq("session_id", sessionId);
-      respRows = refreshed;
+      if (refreshed) {
+        respRows = refreshed;
+      }
     }
   }
 
@@ -491,6 +527,21 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     >,
     template,
   );
+
+  const vigenteInheritedItems = Object.values(responses).filter(
+    (r) => r.outcome !== null && (r.validUntil ?? "").trim().length > 0,
+  ).length;
+
+  let inheritedCount = 0;
+  if (isFirstOpen) {
+    inheritedCount = vigenteInheritedItems;
+  } else if (vigenteInheritedItems > 0) {
+    const createdMs = new Date(row.created_at).getTime();
+    const updatedMs = new Date(row.updated_at).getTime();
+    if (updatedMs - createdMs < 120_000) {
+      inheritedCount = vigenteInheritedItems;
+    }
+  }
 
   const est = estResult.data;
   const { data: pdfRows, error: pdfErr } = pdfResult;
@@ -560,6 +611,7 @@ export type LoadFillResponsesResult =
 /** Mapa de respostas persistidas (reconciliação antes de finalizar/aprovar). */
 export async function loadFillResponsesMapForSession(
   sessionId: string,
+  options?: { template?: ChecklistTemplateWithSections },
 ): Promise<LoadFillResponsesResult> {
   const supabase = await createClient();
   const auth = await requireWorkspaceAuthContext(supabase);
@@ -593,6 +645,7 @@ export async function loadFillResponsesMapForSession(
     (respRows ?? []) as Array<
       ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
     >,
+    options?.template,
   );
 
   return { ok: true, responses };
@@ -617,11 +670,16 @@ function buildResponseUpdatePayload(input: {
     input;
 
   if (persistMode === "full") {
+    const clientValidUntil = (input.validUntil ?? "").trim();
+    const valid_until =
+      clientValidUntil.length > 0
+        ? clientValidUntil
+        : (input.existingValidUntil ?? null);
     return {
       outcome,
       note: noteTrim.length > 0 ? noteTrim : null,
       item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
-      valid_until: input.validUntil,
+      valid_until,
     };
   }
 
@@ -1308,6 +1366,8 @@ export async function checkExistingOpenFillSession(input: {
   templateId: string | null;
   customTemplateId: string | null;
   workspaceTemplateId?: string | null;
+  /** Quando informado, só considera rascunhos da mesma área física. */
+  areaId?: string | null;
 }): Promise<ExistingOpenSession | null> {
   const supabase = await createClient();
   const auth = await requireWorkspaceAuthContext(supabase);
@@ -1329,7 +1389,7 @@ export async function checkExistingOpenFillSession(input: {
   // que pertença ao mesmo tenant (client owner).
   let query = supabase
     .from("checklist_fill_sessions")
-    .select("id, user_id, updated_at")
+    .select("id, user_id, updated_at, area_id")
     .eq("establishment_id", establishmentId)
     .is("dossier_approved_at", null)
     .order("updated_at", { ascending: false });
@@ -1347,8 +1407,25 @@ export async function checkExistingOpenFillSession(input: {
   const { data: sessions } = await query;
   if (!sessions || sessions.length === 0) return null;
 
+  const areaFilter = input.areaId;
+  let scopedSessions = sessions;
+  if (areaFilter !== undefined) {
+    const singleAreaId = await loadSingleEstablishmentAreaId(
+      supabase,
+      establishmentId,
+    );
+    scopedSessions = sessions.filter((sess) =>
+      sessionAreaMatchesForInheritance(
+        (sess as { area_id?: string | null }).area_id,
+        areaFilter,
+        singleAreaId,
+      ),
+    );
+  }
+  if (scopedSessions.length === 0) return null;
+
   // Para cada sessão, verificar se tem ao menos 1 resposta salva.
-  for (const sess of sessions) {
+  for (const sess of scopedSessions) {
     const { count } = await supabase
       .from("checklist_fill_item_responses")
       .select("id", { count: "exact", head: true })
@@ -1444,6 +1521,8 @@ export async function startChecklistFillBatch(input: {
   }
 
   const sessionIds: string[] = [];
+  const templateBundle = await loadChecklistTemplateBundleByIdDirect(supabase, templateId);
+
   for (const areaId of resolvedAreas) {
     const { data: session, error } = await supabase
       .from("checklist_fill_sessions")
@@ -1454,9 +1533,17 @@ export async function startChecklistFillBatch(input: {
         custom_template_id: null,
         area_id: areaId,
       })
-      .select("id")
+      .select("*")
       .single();
     if (error || !session) return { ok: false, error: "session_create_failed" };
+    if (templateBundle) {
+      await seedInheritedValidResponsesForSession(
+        supabase,
+        session as ChecklistFillSessionRow,
+        templateBundle,
+        auth.userId,
+      );
+    }
     sessionIds.push(session.id);
   }
 
@@ -1509,6 +1596,8 @@ export async function startCustomTemplateFillBatch(input: {
   }
 
   const sessionIds: string[] = [];
+  const templateBundle = await loadCustomTemplateUnified(input.customTemplateId);
+
   for (const areaId of resolvedAreas) {
     const { data: session, error } = await supabase
       .from("checklist_fill_sessions")
@@ -1519,9 +1608,17 @@ export async function startCustomTemplateFillBatch(input: {
         custom_template_id: input.customTemplateId,
         area_id: areaId,
       })
-      .select("id")
+      .select("*")
       .single();
     if (error || !session) return { ok: false, error: "session_create_failed" };
+    if (templateBundle) {
+      await seedInheritedValidResponsesForSession(
+        supabase,
+        session as ChecklistFillSessionRow,
+        templateBundle,
+        auth.userId,
+      );
+    }
     sessionIds.push(session.id);
   }
 
@@ -1556,10 +1653,13 @@ export async function startSystemTemplateFillOrGetConflict(input: {
   establishmentId: string;
   areaIds: string[];
 }): Promise<CatalogTemplateFillPrepareResult> {
+  const conflictAreaId =
+    input.areaIds.length === 1 ? (input.areaIds[0] ?? null) : undefined;
   const existing = await checkExistingOpenFillSession({
     establishmentId: input.establishmentId,
     templateId: input.templateId,
     customTemplateId: null,
+    areaId: conflictAreaId,
   });
   if (existing) {
     return { ok: true, kind: "conflict", existing };
@@ -1585,15 +1685,21 @@ export async function startWorkspaceTemplateFillOrGetConflict(input: {
   establishmentId: string;
   areaIds: string[];
 }): Promise<CatalogTemplateFillPrepareResult> {
+  const conflictAreaId =
+    input.areaIds.length === 1 ? (input.areaIds[0] ?? null) : undefined;
   const existing = await checkExistingOpenFillSession({
     establishmentId: input.establishmentId,
     templateId: null,
     customTemplateId: null,
     workspaceTemplateId: input.workspaceTemplateId,
+    areaId: conflictAreaId,
   });
   if (existing) {
     return { ok: true, kind: "conflict", existing };
   }
+  const { startWorkspaceTemplateFillBatch } = await import(
+    "@/lib/actions/checklist-workspace"
+  );
   const started = await startWorkspaceTemplateFillBatch(input);
   if (!started.ok) {
     return { ok: false, error: started.error };
@@ -1622,10 +1728,13 @@ export async function startCustomTemplateFillOrGetConflict(input: {
   if (!ct || ct.archived_at) return { ok: false, error: "template_not_found" };
 
   const establishmentId = String(ct.establishment_id);
+  const conflictAreaId =
+    input.areaIds.length === 1 ? (input.areaIds[0] ?? null) : undefined;
   const existing = await checkExistingOpenFillSession({
     establishmentId,
     templateId: null,
     customTemplateId: input.customTemplateId,
+    areaId: conflictAreaId,
   });
   if (existing) {
     return { ok: true, kind: "conflict", existing };

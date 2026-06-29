@@ -161,6 +161,7 @@ export default async function ChecklistPreencherPage({
       )}
 
       <ChecklistFillWizard
+        key={bundle.session.id}
         sessionId={bundle.session.id}
         {...(backHref ? { backHref } : {})}
         template={bundle.template}

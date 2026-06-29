@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2, Pencil, Archive, Play, FilePenLine } from "lucide-react";
+import { Loader2, Pencil, Archive, ArchiveRestore, Play, FilePenLine } from "lucide-react";
 
+import { ArchivedTemplateBadge } from "@/components/checklists/archived-template-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,6 +19,7 @@ import {
 import {
   archiveWorkspaceTemplateAction,
   discardWorkspaceTemplateDraftAction,
+  unarchiveWorkspaceTemplateAction,
 } from "@/lib/actions/checklist-workspace";
 import type { WorkspaceTemplateListRow } from "@/lib/actions/checklist-workspace";
 import { cn } from "@/lib/utils";
@@ -45,6 +47,8 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
   const router = useRouter();
   const [archivingTpl, setArchivingTpl] =
     useState<WorkspaceTemplateListRow | null>(null);
+  const [reactivatingTpl, setReactivatingTpl] =
+    useState<WorkspaceTemplateListRow | null>(null);
   const [discardingTpl, setDiscardingTpl] =
     useState<WorkspaceTemplateListRow | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +64,20 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
         return;
       }
       setArchivingTpl(null);
+      router.refresh();
+    });
+  }
+
+  function confirmReactivate() {
+    if (!reactivatingTpl) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await unarchiveWorkspaceTemplateAction(reactivatingTpl.id);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setReactivatingTpl(null);
       router.refresh();
     });
   }
@@ -110,6 +128,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 "min-w-0 rounded-xl border bg-card p-4 shadow-xs transition-colors",
                 highlighted ? "border-primary ring-2 ring-primary/20" : "border-border",
                 tpl.is_draft && "border-dashed border-amber-300 bg-amber-50/40",
+                tpl.is_archived && !tpl.is_draft && "border-dashed bg-muted/30 opacity-90",
               )}
             >
               <div className="min-w-0">
@@ -121,6 +140,8 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                     <Badge variant="secondary" className="text-[10px]">
                       Rascunho
                     </Badge>
+                  ) : tpl.is_archived ? (
+                    <ArchivedTemplateBadge />
                   ) : (
                     <Badge variant="outline" className="font-mono text-[10px]">
                       v{tpl.version}
@@ -161,9 +182,14 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                   Rascunho salvo ao adicionar seção ou item. Continue a edição ou
                   publique quando estiver pronto.
                 </p>
+              ) : tpl.is_archived ? (
+                <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
+                  Modelo arquivado — não pode ser usado em novos preenchimentos. Reative
+                  quando quiser voltar a utilizá-lo.
+                </p>
               ) : null}
 
-              {!tpl.is_draft && tpl.has_been_used && (
+              {!tpl.is_draft && !tpl.is_archived && tpl.has_been_used && (
                 <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
                   Modelo em uso — edições geram nova versão e preservam o histórico.
                 </p>
@@ -190,6 +216,16 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                       Descartar
                     </Button>
                   </>
+                ) : tpl.is_archived ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() => setReactivatingTpl(tpl)}
+                  >
+                    <ArchiveRestore className="size-3.5" />
+                    Reativar
+                  </Button>
                 ) : (
                   <>
                     <Link
@@ -237,10 +273,10 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
           <DialogHeader>
             <DialogTitle>Arquivar modelo da equipe?</DialogTitle>
             <DialogDescription>
-              O modelo &quot;{archivingTpl?.name}&quot; deixará de aparecer no
-              catálogo e não poderá ser usado em novos checklists. Os
-              preenchimentos já realizados continuam acessíveis no histórico de
-              cada cliente.
+              O modelo &quot;{archivingTpl?.name}&quot; ficará marcado como arquivado e
+              não poderá ser usado em novos checklists. Os preenchimentos já realizados
+              continuam acessíveis no histórico de cada cliente. Pode reativá-lo depois
+              na lista de modelos da equipe.
             </DialogDescription>
           </DialogHeader>
 
@@ -274,6 +310,59 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 </>
               ) : (
                 "Arquivar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={reactivatingTpl !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReactivatingTpl(null);
+            setError(null);
+          }
+        }}
+      >
+        <DialogContent showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Reativar modelo da equipe?</DialogTitle>
+            <DialogDescription>
+              O modelo &quot;{reactivatingTpl?.name}&quot; voltará a aparecer no catálogo
+              e poderá ser usado em novos preenchimentos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setReactivatingTpl(null)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={confirmReactivate}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Reativando…
+                </>
+              ) : (
+                "Reativar"
               )}
             </Button>
           </DialogFooter>

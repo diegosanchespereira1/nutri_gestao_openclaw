@@ -44,6 +44,8 @@ export type WorkspaceTemplateListRow = {
   has_been_used: boolean;
   /** Rascunho em criação (autosave) — ainda não publicado no catálogo. */
   is_draft: boolean;
+  /** Modelo arquivado (soft-delete) — visível para reativação. */
+  is_archived: boolean;
 };
 
 export type WorkspaceEditItem = {
@@ -100,9 +102,9 @@ async function fetchWorkspaceTemplatesForCatalogRows(
 ): Promise<WorkspaceTemplateListRow[]> {
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, name, created_by_user_id, version, updated_at, published_at")
+    .select("id, name, created_by_user_id, version, updated_at, published_at, archived_at")
     .eq("owner_user_id", workspaceOwnerId)
-    .is("archived_at", null)
+    .order("archived_at", { ascending: true, nullsFirst: true })
     .order("updated_at", { ascending: false });
 
   if (error || !templates || templates.length === 0) return [];
@@ -181,6 +183,7 @@ async function fetchWorkspaceTemplatesForCatalogRows(
     updated_at: String(t.updated_at),
     has_been_used: usedTemplateIds.has(String(t.id)),
     is_draft: t.published_at === null,
+    is_archived: t.archived_at !== null,
   }));
 }
 
@@ -191,9 +194,9 @@ async function fetchWorkspaceTemplatesForCatalogLightRows(
 ): Promise<WorkspaceTemplateListRow[]> {
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, name, created_by_user_id, version, updated_at, published_at")
+    .select("id, name, created_by_user_id, version, updated_at, published_at, archived_at")
     .eq("owner_user_id", workspaceOwnerId)
-    .is("archived_at", null)
+    .order("archived_at", { ascending: true, nullsFirst: true })
     .order("updated_at", { ascending: false });
 
   if (error || !templates || templates.length === 0) return [];
@@ -241,6 +244,7 @@ async function fetchWorkspaceTemplatesForCatalogLightRows(
     updated_at: String(t.updated_at),
     has_been_used: false,
     is_draft: t.published_at === null,
+    is_archived: t.archived_at !== null,
   }));
 }
 
@@ -251,7 +255,7 @@ function getCachedWorkspaceCatalogRows(workspaceOwnerId: string) {
         createServiceRoleClient(),
         workspaceOwnerId,
       ),
-    ["workspace-catalog-v1", workspaceOwnerId],
+    ["workspace-catalog-v2", workspaceOwnerId],
     {
       revalidate: 120,
       tags: [`workspace-catalog-${workspaceOwnerId}`],
@@ -259,7 +263,7 @@ function getCachedWorkspaceCatalogRows(workspaceOwnerId: string) {
   )();
 }
 
-/** Lista todos os modelos do workspace (não arquivados). */
+/** Lista todos os modelos do workspace (ativos e arquivados). */
 export async function loadWorkspaceTemplatesForCatalog(): Promise<{
   rows: WorkspaceTemplateListRow[];
 }> {
@@ -943,6 +947,45 @@ export async function archiveWorkspaceTemplateAction(
     .eq("owner_user_id", workspaceOwnerId);
 
   if (error) return { ok: false, error: "Não foi possível arquivar o modelo." };
+
+  revalidatePath("/checklists");
+  revalidatePath("/checklists/equipe");
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
+
+  return { ok: true, id: templateId };
+}
+
+export async function unarchiveWorkspaceTemplateAction(
+  templateId: string,
+): Promise<WorkspaceActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: existing } = await supabase
+    .from("checklist_workspace_templates")
+    .select("id, owner_user_id, archived_at")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!existing || existing.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Modelo não encontrado." };
+  }
+  if (!existing.archived_at) {
+    return { ok: false, error: "Este modelo já está ativo." };
+  }
+
+  const { error } = await supabase
+    .from("checklist_workspace_templates")
+    .update({ archived_at: null })
+    .eq("id", templateId)
+    .eq("owner_user_id", workspaceOwnerId);
+
+  if (error) return { ok: false, error: "Não foi possível reativar o modelo." };
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");

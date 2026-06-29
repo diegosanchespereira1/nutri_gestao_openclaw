@@ -40,6 +40,8 @@ export type CustomTemplateListRow = {
   created_by_name: string | null;
   /** true quando já existe ao menos 1 sessão de preenchimento usando este modelo. */
   has_been_used: boolean;
+  /** Modelo arquivado (soft-delete) — visível para reativação. */
+  is_archived: boolean;
 };
 
 async function assertEstablishmentOwned(
@@ -362,8 +364,10 @@ export async function listCustomTemplatesForOwner(): Promise<{
 
   const { data: customs, error } = await supabase
     .from("checklist_custom_templates")
-    .select("id, name, establishment_id, source_template_id, updated_at, user_id")
-    .is("archived_at", null)
+    .select(
+      "id, name, establishment_id, source_template_id, updated_at, user_id, archived_at",
+    )
+    .order("archived_at", { ascending: true, nullsFirst: true })
     .order("updated_at", { ascending: false });
 
   if (error || !customs) return { rows: [] };
@@ -443,6 +447,7 @@ export async function listCustomTemplatesForOwner(): Promise<{
       created_by_user_id: r.user_id as string,
       created_by_name: profileNames.get(r.user_id as string) ?? null,
       has_been_used: usedCustomIds.has(r.id as string),
+      is_archived: r.archived_at !== null,
     })),
   };
 }
@@ -812,6 +817,66 @@ export async function archiveCustomTemplateAction(
 
   if (error) {
     return { ok: false, error: "Não foi possível arquivar o modelo." };
+  }
+
+  revalidatePath("/checklists");
+  revalidatePath("/checklists/personalizados");
+  revalidatePath(`/checklists/personalizados/${trimmedId}/editar`);
+
+  return { ok: true };
+}
+
+export async function unarchiveCustomTemplateAction(
+  customTemplateId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const trimmedId = customTemplateId.trim();
+  if (!trimmedId) return { ok: false, error: "Modelo não encontrado." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await canDeleteCustomChecklistsForUser({
+    supabase,
+    authUserId: user.id,
+    workspaceOwnerId,
+  });
+  if (!allowed) {
+    return {
+      ok: false,
+      error:
+        "Apenas o titular da conta ou administradores podem reativar modelos personalizados.",
+    };
+  }
+
+  const hasAccess = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    trimmedId,
+    user.id,
+  );
+  if (!hasAccess) return { ok: false, error: "Modelo não encontrado." };
+
+  const { data: existing } = await supabase
+    .from("checklist_custom_templates")
+    .select("id, archived_at")
+    .eq("id", trimmedId)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: "Modelo não encontrado." };
+  if (!existing.archived_at) {
+    return { ok: false, error: "Este modelo já está ativo." };
+  }
+
+  const { error: updateErr } = await supabase
+    .from("checklist_custom_templates")
+    .update({ archived_at: null })
+    .eq("id", trimmedId);
+
+  if (updateErr) {
+    return { ok: false, error: "Não foi possível reativar o modelo." };
   }
 
   revalidatePath("/checklists");

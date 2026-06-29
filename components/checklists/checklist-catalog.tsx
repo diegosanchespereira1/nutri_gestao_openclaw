@@ -66,6 +66,7 @@ import type {
 } from "@/lib/types/establishments";
 
 import { TemplateItemRow } from "./template-item-row";
+import { ArchivedTemplateBadge } from "./archived-template-badge";
 
 /* ─── tipos ──────────────────────────────────────────────────────────────── */
 
@@ -516,6 +517,18 @@ export function ChecklistCatalog({
     if (!stillVisible) setSelectedCustomTemplateId(null);
   }, [filteredCustomTemplates, selectedCustomTemplateId]);
 
+  useEffect(() => {
+    if (!selectedWorkspaceTemplateId) return;
+    const wt = workspaceTemplates.find((t) => t.id === selectedWorkspaceTemplateId);
+    if (wt?.is_archived) setSelectedWorkspaceTemplateId(null);
+  }, [selectedWorkspaceTemplateId, workspaceTemplates]);
+
+  useEffect(() => {
+    if (!selectedCustomTemplateId) return;
+    const ct = customTemplates.find((t) => t.id === selectedCustomTemplateId);
+    if (ct?.is_archived) setSelectedCustomTemplateId(null);
+  }, [selectedCustomTemplateId, customTemplates]);
+
   // Fechar dropdown de áreas ao clicar fora
   useEffect(() => {
     if (!areaDropdownOpen) return;
@@ -639,19 +652,21 @@ export function ChecklistCatalog({
   }
 
   function selectWorkspaceTemplate(id: string) {
+    const tpl = workspaceTemplates.find((t) => t.id === id);
+    if (tpl?.is_archived) return;
     setSelectedWorkspaceTemplateId((prev) => (prev === id ? null : id));
     setSelectedTemplateId(null);
     setSelectedCustomTemplateId(null);
   }
 
   function selectCustomTemplate(id: string) {
+    const ct = customTemplates.find((t) => t.id === id);
+    if (ct?.is_archived) return;
     const willSelect = selectedCustomTemplateId !== id ? id : null;
     setSelectedCustomTemplateId(willSelect);
     setSelectedTemplateId(null);
     setSelectedWorkspaceTemplateId(null);
-    if (!willSelect) return;
-    const ct = customTemplates.find((t) => t.id === willSelect);
-    if (!ct || establishmentId === ct.establishment_id) return;
+    if (!willSelect || !ct || establishmentId === ct.establishment_id) return;
     void syncEstablishmentForCustom(ct);
   }
 
@@ -1533,7 +1548,7 @@ export function ChecklistCatalog({
                   href="/checklists/equipe"
                   className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
                 >
-                  Gerir modelos
+                  Gerenciar modelos
                 </Link>
                 <span className="text-[11px] text-muted-foreground">
                   {filteredWorkspaceTemplates.length} modelo
@@ -1557,24 +1572,31 @@ export function ChecklistCatalog({
             >
               {filteredWorkspaceTemplates.map((wt) => {
                 const isSelected = selectedWorkspaceTemplateId === wt.id;
+                const isArchived = wt.is_archived;
                 return (
                   <li key={wt.id} id={`workspace-template-${wt.id}`}>
                     <div
-                      role="radio"
-                      aria-checked={isSelected}
-                      tabIndex={0}
+                      role={isArchived ? undefined : "radio"}
+                      aria-checked={isArchived ? undefined : isSelected}
+                      aria-disabled={isArchived || undefined}
+                      tabIndex={isArchived ? -1 : 0}
                       onClick={() => selectWorkspaceTemplate(wt.id)}
                       onKeyDown={(e) => {
+                        if (isArchived) return;
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           selectWorkspaceTemplate(wt.id);
                         }
                       }}
                       className={cn(
-                        "cursor-pointer select-none rounded-xl border bg-card p-4 transition-all duration-150",
-                        isSelected
-                          ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
-                          : "border-border shadow-xs hover:border-primary/30 hover:shadow-md",
+                        "select-none rounded-xl border bg-card p-4 transition-all duration-150",
+                        isArchived
+                          ? "cursor-default border-dashed bg-muted/30 opacity-90"
+                          : "cursor-pointer",
+                        !isArchived &&
+                          (isSelected
+                            ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+                            : "border-border shadow-xs hover:border-primary/30 hover:shadow-md"),
                       )}
                     >
                       <div className="min-w-0">
@@ -1582,9 +1604,12 @@ export function ChecklistCatalog({
                             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
                               {wt.name}
                             </p>
-                            <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                              Equipe
-                            </span>
+                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                              {isArchived ? <ArchivedTemplateBadge /> : null}
+                              <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                                Equipe
+                              </span>
+                            </div>
                           </div>
                           <p className="mt-1 text-xs text-foreground/85">
                             Criado por:{" "}
@@ -1630,7 +1655,7 @@ export function ChecklistCatalog({
                   href="/checklists/personalizados"
                   className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
                 >
-                  Gerir modelos
+                  Gerenciar modelos
                 </Link>
                 <span className="text-[11px] text-muted-foreground">
                   {filteredCustomTemplates.length} modelo
@@ -1658,24 +1683,31 @@ export function ChecklistCatalog({
               >
                 {filteredCustomTemplates.map((ct) => {
                   const isSelected = selectedCustomTemplateId === ct.id;
+                  const isArchived = ct.is_archived;
                   return (
                     <li key={ct.id} id={`custom-template-${ct.id}`}>
                       <div
-                        role="radio"
-                        aria-checked={isSelected}
-                        tabIndex={0}
+                        role={isArchived ? undefined : "radio"}
+                        aria-checked={isArchived ? undefined : isSelected}
+                        aria-disabled={isArchived || undefined}
+                        tabIndex={isArchived ? -1 : 0}
                         onClick={() => selectCustomTemplate(ct.id)}
                         onKeyDown={(e) => {
+                          if (isArchived) return;
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             selectCustomTemplate(ct.id);
                           }
                         }}
                         className={cn(
-                          "cursor-pointer select-none rounded-xl border bg-card p-4 transition-all duration-150",
-                          isSelected
-                            ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
-                            : "border-border shadow-xs hover:border-primary/30 hover:shadow-md",
+                          "select-none rounded-xl border bg-card p-4 transition-all duration-150",
+                          isArchived
+                            ? "cursor-default border-dashed bg-muted/30 opacity-90"
+                            : "cursor-pointer",
+                          !isArchived &&
+                            (isSelected
+                              ? "border-primary bg-primary/5 shadow-md ring-2 ring-primary/20"
+                              : "border-border shadow-xs hover:border-primary/30 hover:shadow-md"),
                         )}
                       >
                         <div className="min-w-0">
@@ -1683,9 +1715,12 @@ export function ChecklistCatalog({
                             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
                               {ct.name}
                             </p>
-                            <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
-                              Personalizado
-                            </span>
+                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                              {isArchived ? <ArchivedTemplateBadge /> : null}
+                              <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                                Personalizado
+                              </span>
+                            </div>
                           </div>
                           <p className="mt-1 truncate text-xs text-foreground/85">
                             {ct.establishment_label}

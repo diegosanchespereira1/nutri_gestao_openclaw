@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Archive, Loader2, Pencil, Play, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Loader2, Pencil, Play, Trash2 } from "lucide-react";
 
+import { ArchivedTemplateBadge } from "@/components/checklists/archived-template-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,6 +18,7 @@ import {
 import {
   archiveCustomTemplateAction,
   deleteCustomTemplateAction,
+  unarchiveCustomTemplateAction,
   type CustomTemplateListRow,
 } from "@/lib/actions/checklist-custom";
 import { startChecklistCustomFill } from "@/lib/actions/checklist-fill";
@@ -47,6 +49,9 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
     null,
   );
   const [archivingRow, setArchivingRow] = useState<CustomTemplateListRow | null>(
+    null,
+  );
+  const [reactivatingRow, setReactivatingRow] = useState<CustomTemplateListRow | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +85,20 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
     });
   }
 
+  function confirmReactivate() {
+    if (!reactivatingRow) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await unarchiveCustomTemplateAction(reactivatingRow.id);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setReactivatingRow(null);
+      router.refresh();
+    });
+  }
+
   if (rows.length === 0) {
     return (
       <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
@@ -103,12 +122,18 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
         {rows.map((r) => (
           <li
             key={r.id}
-            className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs"
+            className={cn(
+              "min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs",
+              r.is_archived && "border-dashed bg-muted/30 opacity-90",
+            )}
           >
             <div className="min-w-0">
-              <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                Personalizado
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  Personalizado
+                </span>
+                {r.is_archived ? <ArchivedTemplateBadge /> : null}
+              </div>
               <p className="mt-2 truncate text-sm font-semibold text-foreground">
                 {r.name}
               </p>
@@ -126,14 +151,34 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
               </div>
             </div>
 
-            {r.has_been_used && (
+            {r.is_archived ? (
+              <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
+                Modelo arquivado — não pode ser usado em novos preenchimentos. Reative
+                quando quiser voltar a utilizá-lo.
+              </p>
+            ) : r.has_been_used ? (
               <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
                 Modelo em uso — não pode ser editado. Arquive para ocultar do
-                catálogo; os preenchimentos anteriores permanecem no histórico.
+                catálogo; os preenchimentos anteriores permanecem no histórico. Pode
+                reativar depois nesta lista.
               </p>
-            )}
+            ) : null}
 
             <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {r.is_archived ? (
+                canDelete ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    onClick={() => setReactivatingRow(r)}
+                  >
+                    <ArchiveRestore className="size-3.5" />
+                    Reativar
+                  </Button>
+                ) : null
+              ) : (
+                <>
               <form action={startChecklistCustomFill}>
                 <input type="hidden" name="custom_template_id" value={r.id} />
                 <Button type="submit" size="sm" className="w-full sm:w-auto">
@@ -177,6 +222,8 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
                   Remover
                 </Button>
               )}
+                </>
+              )}
             </div>
           </li>
         ))}
@@ -195,10 +242,10 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
           <DialogHeader>
             <DialogTitle>Arquivar modelo personalizado?</DialogTitle>
             <DialogDescription>
-              O modelo &quot;{archivingRow?.name}&quot; deixará de aparecer no
-              catálogo e não poderá ser usado em novos checklists. Os
-              preenchimentos já realizados continuam acessíveis no histórico de
-              cada cliente.
+              O modelo &quot;{archivingRow?.name}&quot; ficará marcado como arquivado e
+              não poderá ser usado em novos checklists. Os preenchimentos já realizados
+              continuam acessíveis no histórico de cada cliente. Pode reativá-lo depois
+              na lista de modelos personalizados.
             </DialogDescription>
           </DialogHeader>
 
@@ -232,6 +279,59 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
                 </>
               ) : (
                 "Arquivar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={reactivatingRow !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReactivatingRow(null);
+            setError(null);
+          }
+        }}
+      >
+        <DialogContent showCloseButton>
+          <DialogHeader>
+            <DialogTitle>Reativar modelo personalizado?</DialogTitle>
+            <DialogDescription>
+              O modelo &quot;{reactivatingRow?.name}&quot; voltará a aparecer no catálogo
+              e poderá ser usado em novos preenchimentos.
+            </DialogDescription>
+          </DialogHeader>
+
+          {error ? (
+            <p className="text-destructive text-sm" role="alert">
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setReactivatingRow(null)}
+              disabled={isPending}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={confirmReactivate}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Reativando…
+                </>
+              ) : (
+                "Reativar"
               )}
             </Button>
           </DialogFooter>

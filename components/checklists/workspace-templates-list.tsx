@@ -19,10 +19,13 @@ import {
 import {
   archiveWorkspaceTemplateAction,
   discardWorkspaceTemplateDraftAction,
+  loadWorkspaceTemplatePreviewAction,
   unarchiveWorkspaceTemplateAction,
 } from "@/lib/actions/checklist-workspace";
 import type { WorkspaceTemplateListRow } from "@/lib/actions/checklist-workspace";
 import { cn } from "@/lib/utils";
+
+import { ExpandableTemplateSections } from "./expandable-template-sections";
 
 type Props = {
   templates: WorkspaceTemplateListRow[];
@@ -125,13 +128,14 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
             <li
               key={tpl.id}
               className={cn(
-                "min-w-0 rounded-xl border bg-card p-4 shadow-xs transition-colors",
+                "min-w-0 overflow-hidden rounded-xl border bg-card shadow-xs transition-colors",
                 highlighted ? "border-primary ring-2 ring-primary/20" : "border-border",
                 tpl.is_draft && "border-dashed border-amber-300 bg-amber-50/40",
                 tpl.is_archived && !tpl.is_draft && "border-dashed bg-muted/30 opacity-90",
               )}
             >
-              <div className="min-w-0">
+              <div className="p-4">
+                <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
                     Equipe
@@ -195,7 +199,13 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 </p>
               )}
 
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              </div>
+
+            <ExpandableTemplateSections
+              loadSections={() => loadWorkspaceTemplatePreviewAction(tpl.id)}
+            />
+
+              <div className="flex flex-col gap-2 border-t border-border/50 p-4 sm:flex-row sm:flex-wrap">
                 {tpl.is_draft ? (
                   <>
                     <Link

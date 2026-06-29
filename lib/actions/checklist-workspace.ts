@@ -23,7 +23,10 @@ import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistFillSessionRow } from "@/lib/types/checklist-fill";
-import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
+import type {
+  ChecklistTemplateSectionWithItems,
+  ChecklistTemplateWithSections,
+} from "@/lib/types/checklists";
 
 /** Template candidato a ser usado como base ao criar um novo checklist da equipe. */
 export type BaseCandidateTemplate = {
@@ -374,6 +377,28 @@ export async function loadWorkspaceTemplateForEdit(
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user || !workspaceOwnerId) return null;
   return loadWorkspaceTemplateForEditWithClient(supabase, workspaceOwnerId, id);
+}
+
+/** Seções e itens de um modelo da equipe — para expandir o cartão no catálogo. */
+export async function loadWorkspaceTemplatePreviewAction(
+  workspaceTemplateId: string,
+): Promise<ChecklistTemplateSectionWithItems[] | null> {
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return null;
+
+  const id = workspaceTemplateId.trim();
+  if (!id) return null;
+
+  const { data: template } = await supabase
+    .from("checklist_workspace_templates")
+    .select("id, owner_user_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!template || template.owner_user_id !== workspaceOwnerId) return null;
+
+  const bundle = await loadWorkspaceTemplateBundle(id);
+  return bundle?.sections ?? null;
 }
 
 /** Carrega no formato unificado para reusar o wizard de preenchimento. */

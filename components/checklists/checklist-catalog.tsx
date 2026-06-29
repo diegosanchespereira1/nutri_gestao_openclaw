@@ -43,9 +43,15 @@ import {
   startWorkspaceTemplateFillOrGetConflict,
   type ExistingOpenSession,
 } from "@/lib/actions/checklist-fill";
-import { startWorkspaceTemplateFillBatch } from "@/lib/actions/checklist-workspace";
-import type { CustomTemplateListRow } from "@/lib/actions/checklist-custom";
-import type { WorkspaceTemplateListRow } from "@/lib/actions/checklist-workspace";
+import {
+  loadWorkspaceTemplatePreviewAction,
+  startWorkspaceTemplateFillBatch,
+  type WorkspaceTemplateListRow,
+} from "@/lib/actions/checklist-workspace";
+import {
+  loadCustomTemplatePreviewAction,
+  type CustomTemplateListRow,
+} from "@/lib/actions/checklist-custom";
 import {
   loadEstablishmentPickerOptionById,
   loadOwnerChecklistEstablishmentsDropdownAction,
@@ -67,6 +73,7 @@ import type {
 
 import { TemplateItemRow } from "./template-item-row";
 import { ArchivedTemplateBadge } from "./archived-template-badge";
+import { ExpandableTemplateSections } from "./expandable-template-sections";
 
 /* ─── tipos ──────────────────────────────────────────────────────────────── */
 
@@ -1589,7 +1596,7 @@ export function ChecklistCatalog({
                         }
                       }}
                       className={cn(
-                        "select-none rounded-xl border bg-card p-4 transition-all duration-150",
+                        "select-none rounded-xl border bg-card transition-all duration-150",
                         isArchived
                           ? "cursor-default border-dashed bg-muted/30 opacity-90"
                           : "cursor-pointer",
@@ -1599,7 +1606,8 @@ export function ChecklistCatalog({
                             : "border-border shadow-xs hover:border-primary/30 hover:shadow-md"),
                       )}
                     >
-                      <div className="min-w-0">
+                      <div className="p-4">
+                        <div className="min-w-0">
                           <div className="flex items-start gap-2">
                             <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
                               {wt.name}
@@ -1633,7 +1641,12 @@ export function ChecklistCatalog({
                               {wt.total_item_count === 1 ? "item" : "itens"}
                             </span>
                           </div>
+                        </div>
                       </div>
+
+                      <ExpandableTemplateSections
+                        loadSections={() => loadWorkspaceTemplatePreviewAction(wt.id)}
+                      />
                     </div>
                   </li>
                 );
@@ -1700,7 +1713,7 @@ export function ChecklistCatalog({
                           }
                         }}
                         className={cn(
-                          "select-none rounded-xl border bg-card p-4 transition-all duration-150",
+                          "select-none rounded-xl border bg-card transition-all duration-150",
                           isArchived
                             ? "cursor-default border-dashed bg-muted/30 opacity-90"
                             : "cursor-pointer",
@@ -1710,28 +1723,34 @@ export function ChecklistCatalog({
                               : "border-border shadow-xs hover:border-primary/30 hover:shadow-md"),
                         )}
                       >
-                        <div className="min-w-0">
-                          <div className="flex items-start gap-2">
-                            <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
-                              {ct.name}
-                            </p>
-                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
-                              {isArchived ? <ArchivedTemplateBadge /> : null}
-                              <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
-                                Personalizado
-                              </span>
+                        <div className="p-4">
+                          <div className="min-w-0">
+                            <div className="flex items-start gap-2">
+                              <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground line-clamp-2">
+                                {ct.name}
+                              </p>
+                              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                                {isArchived ? <ArchivedTemplateBadge /> : null}
+                                <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                                  Personalizado
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                          <p className="mt-1 truncate text-xs text-foreground/85">
-                            {ct.establishment_label}
-                          </p>
-                          {ct.created_by_name ? (
-                            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                              Criado por:{" "}
-                              <span className="text-foreground/90">{ct.created_by_name}</span>
+                            <p className="mt-1 truncate text-xs text-foreground/85">
+                              {ct.establishment_label}
                             </p>
-                          ) : null}
+                            {ct.created_by_name ? (
+                              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                                Criado por:{" "}
+                                <span className="text-foreground/90">{ct.created_by_name}</span>
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
+
+                        <ExpandableTemplateSections
+                          loadSections={() => loadCustomTemplatePreviewAction(ct.id)}
+                        />
                       </div>
                     </li>
                   );

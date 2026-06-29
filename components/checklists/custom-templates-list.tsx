@@ -18,11 +18,14 @@ import {
 import {
   archiveCustomTemplateAction,
   deleteCustomTemplateAction,
+  loadCustomTemplatePreviewAction,
   unarchiveCustomTemplateAction,
   type CustomTemplateListRow,
 } from "@/lib/actions/checklist-custom";
 import { startChecklistCustomFill } from "@/lib/actions/checklist-fill";
 import { cn } from "@/lib/utils";
+
+import { ExpandableTemplateSections } from "./expandable-template-sections";
 
 type Props = {
   rows: CustomTemplateListRow[];
@@ -123,48 +126,54 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
           <li
             key={r.id}
             className={cn(
-              "min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs",
+              "min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-xs",
               r.is_archived && "border-dashed bg-muted/30 opacity-90",
             )}
           >
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
-                  Personalizado
-                </span>
-                {r.is_archived ? <ArchivedTemplateBadge /> : null}
-              </div>
-              <p className="mt-2 truncate text-sm font-semibold text-foreground">
-                {r.name}
-              </p>
-              <div className="mt-1 space-y-0.5 text-xs text-foreground/85">
-                <p className="truncate">{r.establishment_label}</p>
-                {r.created_by_name && (
-                  <p className="truncate">
-                    Criado por:{" "}
-                    <span className="text-foreground/95">{r.created_by_name}</span>
-                  </p>
-                )}
-                <p className="truncate">
-                  Última alteração em {formatDate(r.updated_at)}
+            <div className="p-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                    Personalizado
+                  </span>
+                  {r.is_archived ? <ArchivedTemplateBadge /> : null}
+                </div>
+                <p className="mt-2 truncate text-sm font-semibold text-foreground">
+                  {r.name}
                 </p>
+                <div className="mt-1 space-y-0.5 text-xs text-foreground/85">
+                  <p className="truncate">{r.establishment_label}</p>
+                  {r.created_by_name && (
+                    <p className="truncate">
+                      Criado por:{" "}
+                      <span className="text-foreground/95">{r.created_by_name}</span>
+                    </p>
+                  )}
+                  <p className="truncate">
+                    Última alteração em {formatDate(r.updated_at)}
+                  </p>
+                </div>
               </div>
+
+              {r.is_archived ? (
+                <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
+                  Modelo arquivado — não pode ser usado em novos preenchimentos. Reative
+                  quando quiser voltar a utilizá-lo.
+                </p>
+              ) : r.has_been_used ? (
+                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
+                  Modelo em uso — não pode ser editado. Arquive para ocultar do
+                  catálogo; os preenchimentos anteriores permanecem no histórico. Pode
+                  reativar depois nesta lista.
+                </p>
+              ) : null}
             </div>
 
-            {r.is_archived ? (
-              <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
-                Modelo arquivado — não pode ser usado em novos preenchimentos. Reative
-                quando quiser voltar a utilizá-lo.
-              </p>
-            ) : r.has_been_used ? (
-              <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                Modelo em uso — não pode ser editado. Arquive para ocultar do
-                catálogo; os preenchimentos anteriores permanecem no histórico. Pode
-                reativar depois nesta lista.
-              </p>
-            ) : null}
+            <ExpandableTemplateSections
+              loadSections={() => loadCustomTemplatePreviewAction(r.id)}
+            />
 
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <div className="flex flex-col gap-2 border-t border-border/50 p-4 sm:flex-row sm:flex-wrap">
               {r.is_archived ? (
                 canDelete ? (
                   <Button

@@ -10,7 +10,10 @@ import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-it
 import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
-import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
+import type {
+  ChecklistTemplateSectionWithItems,
+  ChecklistTemplateWithSections,
+} from "@/lib/types/checklists";
 
 export type CustomEditItem = {
   id: string;
@@ -247,6 +250,26 @@ export async function renameCustomTemplateAction(
   revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
   revalidatePath("/checklists/personalizados");
   return { ok: true };
+}
+
+/** Seções e itens de um modelo personalizado — para expandir o cartão no catálogo. */
+export async function loadCustomTemplatePreviewAction(
+  customTemplateId: string,
+): Promise<ChecklistTemplateSectionWithItems[] | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const id = customTemplateId.trim();
+  if (!id) return null;
+
+  const ok = await assertCustomTemplateWorkspaceAccess(supabase, id, user.id);
+  if (!ok) return null;
+
+  const bundle = await loadCustomTemplateUnified(id);
+  return bundle?.sections ?? null;
 }
 
 /** Constrói o mesmo formato do catálogo global para reutilizar o wizard de preenchimento. */

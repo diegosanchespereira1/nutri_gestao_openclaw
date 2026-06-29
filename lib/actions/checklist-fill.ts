@@ -126,11 +126,11 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
 
   const { data: ct } = await supabase
     .from("checklist_custom_templates")
-    .select("id, establishment_id")
+    .select("id, establishment_id, archived_at")
     .eq("id", customTemplateId)
     .maybeSingle();
 
-  if (!ct) redirect("/checklists/personalizados?err=forbidden");
+  if (!ct || ct.archived_at) redirect("/checklists/personalizados?err=forbidden");
 
   // Validar area_id se fornecido
   let resolvedAreaIdCustom: string | null = null;
@@ -1407,10 +1407,10 @@ export async function startCustomTemplateFillBatch(input: {
 
   const { data: ct } = await supabase
     .from("checklist_custom_templates")
-    .select("id, establishment_id")
+    .select("id, establishment_id, archived_at")
     .eq("id", input.customTemplateId)
     .maybeSingle();
-  if (!ct) return { ok: false, error: "template_not_found" };
+  if (!ct || ct.archived_at) return { ok: false, error: "template_not_found" };
 
   const establishmentId = String(ct.establishment_id);
   const owned = await assertEstablishmentOwned(supabase, auth.workspaceOwnerId, establishmentId);
@@ -1537,10 +1537,10 @@ export async function startCustomTemplateFillOrGetConflict(input: {
 }): Promise<CatalogTemplateFillPrepareResult> {
   const { data: ct } = await (await createClient())
     .from("checklist_custom_templates")
-    .select("establishment_id")
+    .select("establishment_id, archived_at")
     .eq("id", input.customTemplateId)
     .maybeSingle();
-  if (!ct) return { ok: false, error: "template_not_found" };
+  if (!ct || ct.archived_at) return { ok: false, error: "template_not_found" };
 
   const establishmentId = String(ct.establishment_id);
   const existing = await checkExistingOpenFillSession({

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
+import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
@@ -62,6 +63,38 @@ async function assertEstablishmentOwned(
  * Verifica se o usuário (ou seu workspace) tem acesso ao template personalizado
  * via propriedade do estabelecimento associado.
  */
+async function canDeleteCustomChecklistsForUser(args: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  authUserId: string;
+  workspaceOwnerId: string;
+}): Promise<boolean> {
+  const { supabase, authUserId, workspaceOwnerId } = args;
+  if (workspaceOwnerId === authUserId) return true;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", authUserId)
+    .maybeSingle();
+
+  return canAccessAdminArea(profile?.role ?? null);
+}
+
+export async function canCurrentUserDeleteCustomChecklists(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  return canDeleteCustomChecklistsForUser({
+    supabase,
+    authUserId: user.id,
+    workspaceOwnerId,
+  });
+}
+
 async function assertCustomTemplateWorkspaceAccess(
   supabase: Awaited<ReturnType<typeof createClient>>,
   customTemplateId: string,
@@ -99,11 +132,11 @@ export async function loadCustomTemplateEditData(
 
   const { data: ct, error: cErr } = await supabase
     .from("checklist_custom_templates")
-    .select("id, name, user_id, establishment_id")
+    .select("id, name, user_id, establishment_id, archived_at")
     .eq("id", customTemplateId)
     .maybeSingle();
 
-  if (cErr || !ct) return null;
+  if (cErr || !ct || ct.archived_at) return null;
 
   // Verifica acesso via propriedade do estabelecimento (workspace-level)
   const owned = await assertEstablishmentOwned(
@@ -301,7 +334,7 @@ export async function loadCustomTemplateUnified(
     applies_to: parseAppliesTo(src.applies_to),
     description: `Modelo personalizado (base: ${String(src.name)}).`,
     version: 1,
-    is_active: true,
+    is_active: ct.archived_at === null,
     created_at: String(ct.created_at),
     updated_at: String(ct.updated_at),
     sections: mappedSections,
@@ -322,6 +355,7 @@ export async function listCustomTemplatesForOwner(): Promise<{
   const { data: customs, error } = await supabase
     .from("checklist_custom_templates")
     .select("id, name, establishment_id, source_template_id, updated_at, user_id")
+    .is("archived_at", null)
     .order("updated_at", { ascending: false });
 
   if (error || !customs) return { rows: [] };
@@ -653,4 +687,126 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
   if (error) return;
 
   revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
+}
+
+export async function deleteCustomTemplateAction(
+  customTemplateId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const trimmedId = customTemplateId.trim();
+  if (!trimmedId) return { ok: false, error: "Modelo não encontrado." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await canDeleteCustomChecklistsForUser({
+    supabase,
+    authUserId: user.id,
+    workspaceOwnerId,
+  });
+  if (!allowed) {
+    return {
+      ok: false,
+      error:
+        "Apenas o titular da conta ou administradores podem remover modelos personalizados.",
+    };
+  }
+
+  const hasAccess = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    trimmedId,
+    user.id,
+  );
+  if (!hasAccess) return { ok: false, error: "Modelo não encontrado." };
+
+  const { count: sessionCount } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("custom_template_id", trimmedId);
+
+  if ((sessionCount ?? 0) > 0) {
+    return {
+      ok: false,
+      error:
+        "Este modelo já foi usado em preenchimentos e não pode ser removido.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("checklist_custom_templates")
+    .delete()
+    .eq("id", trimmedId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível remover o modelo." };
+  }
+
+  revalidatePath("/checklists");
+  revalidatePath("/checklists/personalizados");
+  revalidatePath(`/checklists/personalizados/${trimmedId}/editar`);
+
+  return { ok: true };
+}
+
+export async function archiveCustomTemplateAction(
+  customTemplateId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const trimmedId = customTemplateId.trim();
+  if (!trimmedId) return { ok: false, error: "Modelo não encontrado." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await canDeleteCustomChecklistsForUser({
+    supabase,
+    authUserId: user.id,
+    workspaceOwnerId,
+  });
+  if (!allowed) {
+    return {
+      ok: false,
+      error:
+        "Apenas o titular da conta ou administradores podem arquivar modelos personalizados.",
+    };
+  }
+
+  const hasAccess = await assertCustomTemplateWorkspaceAccess(
+    supabase,
+    trimmedId,
+    user.id,
+  );
+  if (!hasAccess) return { ok: false, error: "Modelo não encontrado." };
+
+  const { data: existing } = await supabase
+    .from("checklist_custom_templates")
+    .select("id, archived_at")
+    .eq("id", trimmedId)
+    .maybeSingle();
+
+  if (!existing) return { ok: false, error: "Modelo não encontrado." };
+  if (existing.archived_at) {
+    return { ok: false, error: "Este modelo já está arquivado." };
+  }
+
+  const { error } = await supabase
+    .from("checklist_custom_templates")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", trimmedId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível arquivar o modelo." };
+  }
+
+  revalidatePath("/checklists");
+  revalidatePath("/checklists/personalizados");
+  revalidatePath(`/checklists/personalizados/${trimmedId}/editar`);
+
+  return { ok: true };
 }

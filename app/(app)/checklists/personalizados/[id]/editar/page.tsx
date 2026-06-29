@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { CustomChecklistEditor } from "@/components/checklists/custom-checklist-editor";
+import { CustomTemplateDeleteButton } from "@/components/checklists/custom-template-delete-button";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { loadCustomTemplateEditData } from "@/lib/actions/checklist-custom";
+import {
+  canCurrentUserDeleteCustomChecklists,
+  loadCustomTemplateEditData,
+} from "@/lib/actions/checklist-custom";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -13,7 +17,10 @@ export default async function EditarCustomChecklistPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const bundle = await loadCustomTemplateEditData(id);
+  const [bundle, canDelete] = await Promise.all([
+    loadCustomTemplateEditData(id),
+    canCurrentUserDeleteCustomChecklists(),
+  ]);
   if (!bundle) {
     notFound();
   }
@@ -53,6 +60,12 @@ export default async function EditarCustomChecklistPage({
           >
             Catálogo
           </Link>
+          {canDelete ? (
+            <CustomTemplateDeleteButton
+              customTemplateId={id}
+              templateName={bundle.name}
+            />
+          ) : null}
         </div>
       </div>
 

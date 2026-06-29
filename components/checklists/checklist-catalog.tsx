@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -1523,14 +1524,22 @@ export function ChecklistCatalog({
         {/* Modelos da equipe (workspace) */}
         {showWorkspaceTemplates ? (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Modelos da equipe
               </p>
-              <span className="text-[11px] text-muted-foreground">
-                {filteredWorkspaceTemplates.length} modelo
-                {filteredWorkspaceTemplates.length !== 1 ? "s" : ""}
-              </span>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/checklists/equipe"
+                  className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  Gerir modelos
+                </Link>
+                <span className="text-[11px] text-muted-foreground">
+                  {filteredWorkspaceTemplates.length} modelo
+                  {filteredWorkspaceTemplates.length !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
             {filteredWorkspaceTemplates.length === 0 ? (
               <div className="rounded-xl border border-dashed p-6 text-center">
@@ -1612,14 +1621,22 @@ export function ChecklistCatalog({
         {/* Modelos personalizados */}
         {showCustomTemplates ? (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Modelos personalizados
               </p>
-              <span className="text-[11px] text-muted-foreground">
-                {filteredCustomTemplates.length} modelo
-                {filteredCustomTemplates.length !== 1 ? "s" : ""}
-              </span>
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/checklists/personalizados"
+                  className="text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  Gerir modelos
+                </Link>
+                <span className="text-[11px] text-muted-foreground">
+                  {filteredCustomTemplates.length} modelo
+                  {filteredCustomTemplates.length !== 1 ? "s" : ""}
+                </span>
+              </div>
             </div>
             {filteredCustomTemplates.length === 0 ? (
               <div className="rounded-xl border border-dashed p-6 text-center">

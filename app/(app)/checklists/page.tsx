@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { ChecklistCatalogSection } from "@/components/checklists/checklist-catalog-section";
+import { ChecklistModelsNav } from "@/components/checklists/checklist-models-nav";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -42,11 +43,12 @@ export default async function ChecklistsPage({
             </PageHelpHint>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <ChecklistModelsNav current="catalog" />
           <Link
             href="/checklists/novo"
             prefetch
-            className={cn(buttonVariants({ size: "sm" }))}
+            className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
           >
             + Criar checklist personalizado
           </Link>

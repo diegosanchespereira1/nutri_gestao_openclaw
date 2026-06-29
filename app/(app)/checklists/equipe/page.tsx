@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { WorkspaceTemplatesList } from "@/components/checklists/workspace-templates-list";
+import { ChecklistModelsNav } from "@/components/checklists/checklist-models-nav";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadWorkspaceTemplatesForCatalog } from "@/lib/actions/checklist-workspace";
 import { cn } from "@/lib/utils";
@@ -27,16 +28,11 @@ export default async function ChecklistsEquipePage({
             perder o histórico.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/checklists"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-          >
-            Voltar ao catálogo
-          </Link>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <ChecklistModelsNav current="equipe" />
           <Link
             href="/checklists/novo?novo=1"
-            className={cn(buttonVariants({ size: "sm" }))}
+            className={cn(buttonVariants({ size: "sm" }), "w-full sm:w-auto")}
           >
             + Criar checklist personalizado
           </Link>

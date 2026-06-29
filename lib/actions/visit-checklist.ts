@@ -212,6 +212,7 @@ async function loadCustomTemplateRowsForEstablishment(
     .from("checklist_custom_templates")
     .select("id, name")
     .eq("establishment_id", establishmentId)
+    .is("archived_at", null)
     .order("updated_at", { ascending: false });
 
   if (error || !data) return [];
@@ -347,11 +348,11 @@ export async function insertVisitChecklistFillSession(input: {
 
   const { data: ct } = await supabase
     .from("checklist_custom_templates")
-    .select("id, establishment_id")
+    .select("id, establishment_id, archived_at")
     .eq("id", option.customTemplateId)
     .maybeSingle();
 
-  if (!ct || ct.establishment_id !== establishmentId) {
+  if (!ct || ct.establishment_id !== establishmentId || ct.archived_at) {
     return { error: "Modelo personalizado inválido." };
   }
 

@@ -1,0 +1,36 @@
+name: Supabase Migrations (DEV)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrations-dev
+  cancel-in-progress: false
+
+jobs:
+  migrate-dev:
+    name: Apply migrations to DEV database
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Validate DEV database URL secret
+        run: |
+          if [ -z "${{ secrets.SUPABASE_DB_URL_DEV }}" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL_DEV não configurado — migrações DEV ignoradas."
+            exit 0
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push migrations to DEV
+        if: ${{ secrets.SUPABASE_DB_URL_DEV != '' }}
+        run: supabase db push --db-url "$SUPABASE_DB_URL_DEV" --yes
+        env:
+          SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getServerUser } from "@/lib/supabase/get-server-user";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
+import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-items";
 import type {
   ChecklistTemplateItemRow,
   ChecklistTemplateRow,
@@ -73,8 +74,8 @@ function assembleTemplates(
     list.push(item);
     itemsBySection.set(sectionId, list);
   }
-  for (const list of itemsBySection.values()) {
-    list.sort((a, b) => a.position - b.position);
+  for (const [sectionId, list] of itemsBySection.entries()) {
+    itemsBySection.set(sectionId, sortChecklistItemsByPosition(list));
   }
 
   return templatesRaw.map((raw) => {
@@ -232,7 +233,7 @@ async function fetchActiveChecklistCatalogCached(): Promise<
 
 const getCachedActiveChecklistCatalog = unstable_cache(
   fetchActiveChecklistCatalogCached,
-  ["checklist-catalog-active-v3"],
+  ["checklist-catalog-active-v4"],
   { revalidate: 300, tags: ["checklist-catalog"] },
 );
 
@@ -290,7 +291,7 @@ async function fetchChecklistTemplatePreviewCached(
 function getCachedChecklistTemplatePreview(templateId: string) {
   return unstable_cache(
     () => fetchChecklistTemplatePreviewCached(templateId),
-    ["checklist-template-preview-v1", templateId],
+    ["checklist-template-preview-v2", templateId],
     { revalidate: 300, tags: ["checklist-catalog", `checklist-template-${templateId}`] },
   )();
 }

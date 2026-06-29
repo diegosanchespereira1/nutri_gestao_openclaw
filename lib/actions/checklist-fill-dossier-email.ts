@@ -12,10 +12,10 @@ import { getLatestFillSessionIdForVisit } from "@/lib/actions/visit-checklist";
 import type { ChecklistFillSessionRow } from "@/lib/types/checklist-fill";
 import { collectValidUniqueEmails } from "@/lib/validators/dossier-email-recipients";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { mapSmtpError } from "@/lib/email/map-smtp-error";
 
-function truncateErr(msg: string, max = 480): string {
-  const t = msg.trim();
-  return t.length > max ? `${t.slice(0, max - 3)}...` : t;
+function formatActionError(raw: unknown): string {
+  return mapSmtpError(raw).message;
 }
 
 async function persistVisitEmailStatus(
@@ -34,7 +34,7 @@ async function persistVisitEmailStatus(
       : {
           dossier_email_send_status: "failed" as const,
           dossier_email_last_error: errorMessage
-            ? truncateErr(errorMessage)
+            ? errorMessage
             : "Falha desconhecida.",
         };
 
@@ -223,10 +223,9 @@ export async function resendDossierEmailAction(
     revalidatePath("/inicio");
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await persistVisitEmailStatus(supabase, visitId, "failed", msg);
+    await persistVisitEmailStatus(supabase, visitId, "failed", formatActionError(e));
     revalidatePath(`/visitas/${visitId}`);
-    return { ok: false, error: truncateErr(msg) };
+    return { ok: false, error: formatActionError(e) };
   }
 }
 
@@ -406,17 +405,16 @@ export async function sendDossierPdfToClientFromSessionAction(
     revalidatePath("/inicio");
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
     if (visitIdForStatus) {
       await persistVisitEmailStatus(
         supabase,
         visitIdForStatus,
         "failed",
-        truncateErr(msg),
+        formatActionError(e),
       );
       revalidatePath(`/visitas/${visitIdForStatus}`);
     }
     revalidatePath(`/checklists/preencher/${sessionId}`);
-    return { ok: false, error: truncateErr(msg) };
+    return { ok: false, error: formatActionError(e) };
   }
 }

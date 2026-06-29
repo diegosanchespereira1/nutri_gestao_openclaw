@@ -14,6 +14,8 @@ import {
   WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME,
   normalizeDraftTemplateInput,
 } from "@/lib/checklists/workspace-template-draft";
+import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
+import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-items";
 import { persistWorkspaceTemplateStructure } from "@/lib/checklists/workspace-template-persist";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
@@ -415,8 +417,14 @@ export async function loadWorkspaceTemplateBundle(
   let required_item_count = 0;
   let total_item_count = 0;
   const mappedSections = (sections ?? []).map((sec) => {
-    const secItems = itemsBySection.get(String(sec.id)) ?? [];
-    const mappedItems = secItems.map((it) => {
+    const secItems = sortChecklistItemsByPosition(
+      (itemsBySection.get(String(sec.id)) ?? []).map((it) => ({
+        raw: it,
+        id: String(it.id),
+        position: Number(it.position),
+      })),
+    );
+    const mappedItems = secItems.map(({ raw: it }) => {
       const structureOnly = Boolean(it.is_structure_only);
       if (!structureOnly) {
         total_item_count += 1;
@@ -477,13 +485,13 @@ function sanitizeInput(input: WorkspaceTemplateInput): {
 
   const sections: WorkspaceEditSection[] = [];
   for (const sec of input.sections ?? []) {
-    const title = (sec.title ?? "").trim();
+    const title = normalizeChecklistText(sec.title ?? "");
     if (title.length === 0) {
       return { ok: false, error: "Cada seção precisa de um título." };
     }
     const items: WorkspaceEditItem[] = [];
     for (const it of sec.items ?? []) {
-      const desc = (it.description ?? "").trim();
+      const desc = normalizeChecklistText(it.description ?? "");
       if (desc.length === 0) continue;
       items.push({
         id: it.id,

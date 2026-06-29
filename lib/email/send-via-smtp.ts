@@ -3,6 +3,7 @@ import "server-only";
 import nodemailer from "nodemailer";
 
 import { readSmtpConfig, smtpNotConfiguredMessage } from "@/lib/email/smtp-config";
+import { mapSmtpError } from "@/lib/email/map-smtp-error";
 
 export type SendEmailResult = { ok: true } | { ok: false; error: string };
 
@@ -50,7 +51,13 @@ export async function sendEmailViaSmtp(input: {
 
     return { ok: true };
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return { ok: false, error: msg.slice(0, 400) };
+    const mapped = mapSmtpError(e);
+    console.error("[smtp]", mapped.code, rawSmtpDetail(e));
+    return { ok: false, error: mapped.message };
   }
+}
+
+function rawSmtpDetail(raw: unknown): string {
+  const text = raw instanceof Error ? raw.message : String(raw ?? "");
+  return text.trim().slice(0, 200);
 }

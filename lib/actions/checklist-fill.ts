@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 import { requireWorkspaceAuthContext } from "@/lib/actions/auth-context";
 import { getClientSignatureRequiredAction } from "@/lib/actions/checklist-pdf-settings";
 import { generateDocumentHash } from "@/lib/checklists/document-hash";
+import { isStructureOnlyItem } from "@/lib/checklists/is-structure-only-item";
 import { resolveApprovalClientIp } from "@/lib/server/client-ip";
 import { loadSessionItemPhotosWithUrls } from "@/lib/actions/checklist-fill-photos";
 import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
@@ -57,6 +58,75 @@ async function assertEstablishmentOwned(
   // Supabase types the join as array; at runtime PostgREST returns a single object for many-to-one FK
   const ownerRow = data.clients as unknown as { owner_user_id: string } | null;
   return ownerRow?.owner_user_id === workspaceOwnerId;
+}
+
+type FillItemResponseColumn =
+  | "template_item_id"
+  | "custom_item_id"
+  | "workspace_item_id";
+
+function normalizeValidUntilDate(
+  value: string | null | undefined,
+): string | null {
+  if (value == null) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  return trimmed.slice(0, 10);
+}
+
+function collectEvaluableTemplateItemIds(
+  template: ChecklistTemplateWithSections,
+): Set<string> {
+  const ids = new Set<string>();
+  for (const sec of template.sections) {
+    for (const item of sec.items) {
+      if (!isStructureOnlyItem(item)) {
+        ids.add(item.id);
+      }
+    }
+  }
+  return ids;
+}
+
+function readFillResponseItemId(
+  row: ChecklistFillItemResponseRow & { workspace_item_id?: string | null },
+  itemColumn: FillItemResponseColumn,
+): string | null {
+  const raw =
+    itemColumn === "template_item_id"
+      ? row.template_item_id
+      : itemColumn === "custom_item_id"
+        ? row.custom_item_id
+        : row.workspace_item_id;
+  if (raw == null) return null;
+  const id = String(raw).trim();
+  return id.length > 0 ? id : null;
+}
+
+function mapFillResponseRowsToMap(
+  rows: Array<
+    ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+  >,
+  template?: ChecklistTemplateWithSections,
+): FillResponsesMap {
+  const allowedIds = template
+    ? collectEvaluableTemplateItemIds(template)
+    : null;
+  const responses: FillResponsesMap = {};
+  for (const r of rows) {
+    const key =
+      r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id ?? null;
+    if (!key) continue;
+    const itemId = String(key);
+    if (allowedIds && !allowedIds.has(itemId)) continue;
+    responses[itemId] = {
+      outcome: r.outcome,
+      note: r.note,
+      annotation: r.item_annotation ?? null,
+      validUntil: normalizeValidUntilDate(r.valid_until),
+    };
+  }
+  return responses;
 }
 
 export async function startChecklistFill(formData: FormData): Promise<void> {
@@ -173,6 +243,7 @@ async function inheritValidResponsesIfFreshSession(
     custom_template_id?: string | null;
     workspace_template_id?: string | null;
   },
+  template: ChecklistTemplateWithSections,
 ): Promise<number> {
   const todayIso = todayKey(new Date(), "America/Sao_Paulo");
   const curArea = session.area_id ?? null;
@@ -240,22 +311,43 @@ async function inheritValidResponsesIfFreshSession(
     return 0;
   }
 
-  const itemCol = session.workspace_template_id
+  const itemCol: FillItemResponseColumn = session.workspace_template_id
     ? "workspace_item_id"
     : session.custom_template_id
       ? "custom_item_id"
       : "template_item_id";
 
-  const inserts = (
+  const inheritableItemIds = collectEvaluableTemplateItemIds(template);
+
+  const rowsToInsert = (
     srcRows as (ChecklistFillItemResponseRow & { workspace_item_id?: string | null })[]
-  ).map((r) => ({
-    session_id: session.id,
-    [itemCol]: r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id,
-    outcome: r.outcome,
-    note: r.note,
-    item_annotation: r.item_annotation ?? null,
-    valid_until: r.valid_until,
-  }));
+  ).filter((r) => {
+    if (!r.outcome) return false;
+    const itemId = readFillResponseItemId(r, itemCol);
+    return Boolean(itemId && inheritableItemIds.has(itemId));
+  });
+
+  if (rowsToInsert.length === 0) {
+    console.log(
+      "[inherit] respostas anteriores não correspondem a itens avaliáveis do modelo atual",
+    );
+    return 0;
+  }
+
+  const inserts = rowsToInsert.map((r) => {
+    const itemId = readFillResponseItemId(r, itemCol)!;
+    return {
+      session_id: session.id,
+      template_item_id: null,
+      custom_item_id: null,
+      workspace_item_id: null,
+      [itemCol]: itemId,
+      outcome: r.outcome,
+      note: r.note,
+      item_annotation: r.item_annotation ?? null,
+      valid_until: normalizeValidUntilDate(r.valid_until),
+    };
+  });
 
   const { data: inserted, error: insertErr } = await supabase
     .from("checklist_fill_item_responses")
@@ -379,7 +471,11 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   const isFirstOpen = (respRows ?? []).length === 0;
   console.log("[inherit] sessão:", session.id, "| respostas existentes:", (respRows ?? []).length, "| é fresh:", isFirstOpen);
   if (isFirstOpen) {
-    inheritedCount = await inheritValidResponsesIfFreshSession(supabase, row);
+    inheritedCount = await inheritValidResponsesIfFreshSession(
+      supabase,
+      row,
+      template,
+    );
     if (inheritedCount > 0) {
       const { data: refreshed } = await supabase
         .from("checklist_fill_item_responses")
@@ -389,20 +485,12 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     }
   }
 
-  const responses: FillResponsesMap = {};
-  for (const raw of respRows ?? []) {
-    const r = raw as ChecklistFillItemResponseRow & {
-      workspace_item_id?: string | null;
-    };
-    const key = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
-    if (!key) continue;
-    responses[key] = {
-      outcome: r.outcome,
-      note: r.note,
-      annotation: r.item_annotation ?? null,
-      validUntil: r.valid_until ?? null,
-    };
-  }
+  const responses = mapFillResponseRowsToMap(
+    (respRows ?? []) as Array<
+      ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+    >,
+    template,
+  );
 
   const est = estResult.data;
   const { data: pdfRows, error: pdfErr } = pdfResult;
@@ -501,20 +589,11 @@ export async function loadFillResponsesMapForSession(
     .select("*")
     .eq("session_id", sessionId);
 
-  const responses: FillResponsesMap = {};
-  for (const raw of respRows ?? []) {
-    const r = raw as ChecklistFillItemResponseRow & {
-      workspace_item_id?: string | null;
-    };
-    const key = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
-    if (!key) continue;
-    responses[key] = {
-      outcome: r.outcome,
-      note: r.note,
-      annotation: r.item_annotation ?? null,
-      validUntil: r.valid_until ?? null,
-    };
-  }
+  const responses = mapFillResponseRowsToMap(
+    (respRows ?? []) as Array<
+      ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+    >,
+  );
 
   return { ok: true, responses };
 }
@@ -1695,18 +1774,12 @@ async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
 
   if (!template) return null;
 
-  const responses: FillResponsesMap = {};
-  for (const raw of respResult.data ?? []) {
-    const r = raw as ChecklistFillItemResponseRow & { workspace_item_id?: string | null };
-    const key = r.template_item_id ?? r.custom_item_id ?? r.workspace_item_id;
-    if (!key) continue;
-    responses[key] = {
-      outcome: r.outcome,
-      note: r.note,
-      annotation: r.item_annotation ?? null,
-      validUntil: r.valid_until ?? null,
-    };
-  }
+  const responses = mapFillResponseRowsToMap(
+    (respResult.data ?? []) as Array<
+      ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+    >,
+    template,
+  );
 
   return { session: row, template, responses };
 }

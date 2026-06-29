@@ -7,6 +7,7 @@ function revalidateGlobalChecklistCatalog() {
   updateTag("checklist-catalog");
 }
 import { createClient } from "@/lib/supabase/server";
+import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 import type { EstablishmentType } from "@/lib/types/establishments";
@@ -188,7 +189,7 @@ export async function addChecklistSectionAction(
   const { supabase } = await requireAdmin();
 
   const templateId = String(formData.get("template_id") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
+  const title = normalizeChecklistText(String(formData.get("title") ?? ""));
 
   if (!templateId || !title)
     redirect(`/admin/checklists/${templateId}/editar?err=invalid`);
@@ -222,7 +223,7 @@ export async function updateChecklistSectionAction(
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const sectionId = String(formData.get("section_id") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
+  const title = normalizeChecklistText(String(formData.get("title") ?? ""));
   const position = parseInt(String(formData.get("position") ?? "1"), 10);
 
   if (!templateId || !sectionId || !title)
@@ -281,7 +282,9 @@ export async function addChecklistItemAction(
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const sectionId = String(formData.get("section_id") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
+  const description = normalizeChecklistText(
+    String(formData.get("description") ?? ""),
+  );
   const is_required = formData.get("is_required") === "true";
   const peso = parseFloat(String(formData.get("peso") ?? "1")) || 1;
   const is_structure_only = formData.get("is_structure_only") === "true";
@@ -325,7 +328,9 @@ export async function updateChecklistItemAction(
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const itemId = String(formData.get("item_id") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
+  const description = normalizeChecklistText(
+    String(formData.get("description") ?? ""),
+  );
   const is_required = formData.get("is_required") === "true";
   const peso = parseFloat(String(formData.get("peso") ?? "1")) || 1;
   const is_structure_only = formData.get("is_structure_only") === "true";
@@ -354,7 +359,9 @@ export async function undoChecklistItemAction(
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const itemId = String(formData.get("item_id") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
+  const description = normalizeChecklistText(
+    String(formData.get("description") ?? ""),
+  );
   const is_required = formData.get("is_required") === "true";
   const peso = parseFloat(String(formData.get("peso") ?? "1")) || 1;
   const is_structure_only = formData.get("is_structure_only") === "true";
@@ -407,8 +414,9 @@ export async function addSectionQuickAction(payload: {
   title: string;
 }): Promise<{ ok: boolean; error?: string }> {
   const { supabase } = await requireAdmin();
-  const { templateId, title } = payload;
-  if (!templateId || !title.trim()) return { ok: false, error: "invalid" };
+  const { templateId, title: rawTitle } = payload;
+  const title = normalizeChecklistText(rawTitle);
+  if (!templateId || !title) return { ok: false, error: "invalid" };
 
   const { data: existing } = await supabase
     .from("checklist_template_sections")
@@ -422,7 +430,7 @@ export async function addSectionQuickAction(payload: {
 
   const { error } = await supabase
     .from("checklist_template_sections")
-    .insert({ template_id: templateId, title: title.trim(), position: nextPosition });
+    .insert({ template_id: templateId, title, position: nextPosition });
 
   if (error) return { ok: false, error: error.message };
 
@@ -468,9 +476,16 @@ export async function addItemQuickAction(payload: {
   is_structure_only: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
   const { supabase } = await requireAdmin();
-  const { templateId, sectionId, description, is_required, peso, is_structure_only } =
-    payload;
-  if (!templateId || !sectionId || !description.trim())
+  const {
+    templateId,
+    sectionId,
+    description: rawDescription,
+    is_required,
+    peso,
+    is_structure_only,
+  } = payload;
+  const description = normalizeChecklistText(rawDescription);
+  if (!templateId || !sectionId || !description)
     return { ok: false, error: "invalid" };
 
   const { data: existing } = await supabase
@@ -485,7 +500,7 @@ export async function addItemQuickAction(payload: {
 
   const { error } = await supabase.from("checklist_template_items").insert({
     section_id: sectionId,
-    description: description.trim(),
+    description,
     is_required,
     peso,
     is_structure_only,
@@ -548,7 +563,10 @@ export async function saveChecklistDraftAction(payload: {
       sections.map((s) =>
         supabase
           .from("checklist_template_sections")
-          .update({ title: s.title, position: s.position })
+          .update({
+            title: normalizeChecklistText(s.title),
+            position: s.position,
+          })
           .eq("id", s.id)
           .eq("template_id", templateId),
       ),
@@ -558,7 +576,7 @@ export async function saveChecklistDraftAction(payload: {
         supabase
           .from("checklist_template_items")
           .update({
-            description: it.description,
+            description: normalizeChecklistText(it.description),
             is_required: it.is_required,
             peso: it.peso,
             is_structure_only: it.is_structure_only,

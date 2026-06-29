@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
+import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
+import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-items";
 import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -298,7 +300,13 @@ export async function loadCustomTemplateUnified(
   let required_item_count = 0;
   let total_item_count = 0;
   const mappedSections = (sections ?? []).map((sec) => {
-    const secItems = itemsBySection.get(String(sec.id)) ?? [];
+    const secItems = sortChecklistItemsByPosition(
+      (itemsBySection.get(String(sec.id)) ?? []).map((it) => ({
+        ...it,
+        id: String(it.id),
+        position: Number(it.position),
+      })),
+    );
     const mappedItems = secItems.map((it) => {
       const structureOnly = Boolean(it.is_structure_only);
       if (!structureOnly) {
@@ -484,7 +492,7 @@ export async function duplicateGlobalTemplateAction(
       .from("checklist_custom_sections")
       .insert({
         custom_template_id: customId,
-        title: sec.title,
+        title: normalizeChecklistText(sec.title),
         position: sec.position,
       })
       .select("id")
@@ -498,7 +506,7 @@ export async function duplicateGlobalTemplateAction(
     const newSecId = newSec.id as string;
     const itemRows = sec.items.map((it) => ({
       custom_section_id: newSecId,
-      description: it.description,
+      description: normalizeChecklistText(it.description),
       is_required: it.is_required,
       position: it.position,
       is_user_extra: false,
@@ -529,7 +537,7 @@ export async function addCustomSectionAction(formData: FormData): Promise<void> 
   if (!user) return;
 
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
-  const title = String(formData.get("title") ?? "").trim();
+  const title = normalizeChecklistText(String(formData.get("title") ?? ""));
   if (!customTemplateId || !title) return;
 
   // Qualquer membro do workspace pode editar
@@ -645,7 +653,9 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
 
   const customSectionId = String(formData.get("custom_section_id") ?? "").trim();
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim();
+  const description = normalizeChecklistText(
+    String(formData.get("description") ?? ""),
+  );
   const isRequired = String(formData.get("is_required") ?? "") === "on";
   const pesoRaw = parseFloat(String(formData.get("peso") ?? "1"));
   const peso = isFinite(pesoRaw) && pesoRaw > 0 ? pesoRaw : 1;

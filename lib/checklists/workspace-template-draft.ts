@@ -3,6 +3,7 @@ import type {
   WorkspaceEditSection,
   WorkspaceTemplateInput,
 } from "@/lib/actions/checklist-workspace";
+import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 
 export const WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME = "(Rascunho)";
 
@@ -22,15 +23,23 @@ export function normalizeDraftTemplateInput(
           const itemsIn = sec.items ?? [];
           const items: WorkspaceEditItem[] =
             itemsIn.length > 0
-              ? itemsIn.map((it) => ({
-                  id: it.id,
-                  description: (it.description ?? "").trim(),
-                  is_required: Boolean(it.is_required),
-                }))
+              ? itemsIn.map((it) => {
+                  const description = (it.description ?? "").trim();
+                  return {
+                    id: it.id,
+                    description:
+                      description.length > 0
+                        ? normalizeChecklistText(description)
+                        : description,
+                    is_required: Boolean(it.is_required),
+                  };
+                })
               : [{ description: "", is_required: false }];
           return {
             id: sec.id,
-            title: (sec.title ?? "").trim() || `Seção ${secIdx + 1}`,
+            title:
+              normalizeChecklistText(sec.title ?? "") ||
+              `Seção ${secIdx + 1}`,
             items,
           };
         })

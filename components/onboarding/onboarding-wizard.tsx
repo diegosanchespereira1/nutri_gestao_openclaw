@@ -332,7 +332,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
   const suggestedTemplates = useMemo(() => {
     if (!needsEstablishment) return [];
     const uf = stateUf.trim().toUpperCase();
-    if (uf.length !== 2) return [];
+    if (uf.length !== 2 || establishmentType === "") return [];
     return filterTemplatesForEstablishment(templates, {
       state: uf,
       establishment_type: establishmentType,
@@ -377,6 +377,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
 
   const summaryItems = useMemo(() => {
     if (!workContext) return [];
+    if (needsEstablishment && establishmentType === "") return [];
     return buildOnboardingSummaryItems({
       tenantCompanyName,
       crn,
@@ -386,7 +387,9 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
       documentId,
       needsEstablishment,
       establishmentName,
-      establishmentType,
+      establishmentType: (
+        needsEstablishment ? establishmentType : "restaurante"
+      ) as EstablishmentType,
       postalCode,
       addressStreet,
       addressNumber,

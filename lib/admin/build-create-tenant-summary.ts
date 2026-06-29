@@ -127,7 +127,7 @@ export function buildCreateTenantSummary(
   return {
     fullName,
     email,
-    passwordMode: password.length >= 12 ? "defined" : "auto",
+    passwordMode: (password?.length ?? 0) >= 12 ? "defined" : "auto",
     modules,
     planName: selectedPlan?.name ?? planSlug ?? "—",
     planPrice: selectedPlan

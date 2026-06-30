@@ -40,4 +40,26 @@ describe("filterTemplatesForEstablishment", () => {
     });
     expect(out).toHaveLength(1);
   });
+
+  it("inclui templates de empresa para estabelecimento restaurante", () => {
+    const list = [
+      template("*", ["empresa"]),
+      template("*", ["escola"]),
+      template("SP", ["empresa"]),
+    ];
+    const out = filterTemplatesForEstablishment(list, {
+      state: null,
+      establishment_type: "restaurante",
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]?.uf).toBe("*");
+  });
+
+  it("não aplica templates de empresa a tipos de atendimento nutricional", () => {
+    const out = filterTemplatesForEstablishment([template("*", ["empresa"])], {
+      state: "SP",
+      establishment_type: "escola",
+    });
+    expect(out).toHaveLength(0);
+  });
 });

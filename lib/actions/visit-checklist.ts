@@ -4,15 +4,22 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
-import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
-import { loadChecklistCatalog } from "@/lib/actions/checklists";
+import { loadFillSessionPageData, seedInheritedValidResponsesForSession } from "@/lib/actions/checklist-fill";
+import {
+  loadChecklistCatalog,
+  loadChecklistTemplateBundleByIdDirect,
+} from "@/lib/actions/checklists";
+import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
 import { loadScheduledVisitById } from "@/lib/visits/load-scheduled-visits";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
-import type { FillResponsesMap } from "@/lib/types/checklist-fill";
+import type {
+  ChecklistFillSessionRow,
+  FillResponsesMap,
+} from "@/lib/types/checklist-fill";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
 import type {
   EstablishmentType,
@@ -339,10 +346,24 @@ export async function insertVisitChecklistFillSession(input: {
         custom_template_id: null,
         scheduled_visit_id: visitId,
       })
-      .select("id")
+      .select("*")
       .single();
 
     if (error || !session) return { error: "Não foi possível iniciar o checklist." };
+
+    const templateBundle = await loadChecklistTemplateBundleByIdDirect(
+      supabase,
+      option.templateId,
+    );
+    if (templateBundle) {
+      await seedInheritedValidResponsesForSession(
+        supabase,
+        session as ChecklistFillSessionRow,
+        templateBundle,
+        authUserId,
+      );
+    }
+
     return { sessionId: session.id as string };
   }
 
@@ -365,10 +386,21 @@ export async function insertVisitChecklistFillSession(input: {
       custom_template_id: option.customTemplateId,
       scheduled_visit_id: visitId,
     })
-    .select("id")
+    .select("*")
     .single();
 
   if (error || !session) return { error: "Não foi possível iniciar o checklist." };
+
+  const templateBundle = await loadCustomTemplateUnified(option.customTemplateId);
+  if (templateBundle) {
+    await seedInheritedValidResponsesForSession(
+      supabase,
+      session as ChecklistFillSessionRow,
+      templateBundle,
+      authUserId,
+    );
+  }
+
   return { sessionId: session.id as string };
 }
 

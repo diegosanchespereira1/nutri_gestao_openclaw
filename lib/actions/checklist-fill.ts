@@ -37,10 +37,11 @@ import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import { todayKey } from "@/lib/datetime/calendar-tz";
 import {
+  buildInheritanceSessionOrder,
   collectAllTemplateItemIds,
   collectEvaluableTemplateItemIds,
-  filterInheritableResponseRows,
-  pickSourceSessionForInheritance,
+  collectExistingResponseItemIds,
+  collectLatestValidResponsePerItem,
   readAnyFillResponseItemId,
   resolveFillItemResponseColumn,
   resolveSessionTemplateColumn,
@@ -173,10 +174,20 @@ export async function startChecklistFill(formData: FormData): Promise<void> {
       custom_template_id: null,
       area_id: resolvedAreaId,
     })
-    .select("id")
+    .select("*")
     .single();
 
   if (error || !session) redirect("/checklists?err=session");
+
+  const templateBundle = await loadChecklistTemplateBundleByIdDirect(supabase, templateId);
+  if (templateBundle) {
+    await seedInheritedValidResponsesForSession(
+      supabase,
+      session as ChecklistFillSessionRow,
+      templateBundle,
+      auth.userId,
+    );
+  }
 
   redirect(`/checklists/preencher/${session.id}`);
 }
@@ -220,10 +231,20 @@ export async function startChecklistCustomFill(formData: FormData): Promise<void
       custom_template_id: customTemplateId,
       area_id: resolvedAreaIdCustom,
     })
-    .select("id")
+    .select("*")
     .single();
 
   if (error || !session) redirect("/checklists/personalizados?err=session");
+
+  const templateBundle = await loadCustomTemplateUnified(customTemplateId);
+  if (templateBundle) {
+    await seedInheritedValidResponsesForSession(
+      supabase,
+      session as ChecklistFillSessionRow,
+      templateBundle,
+      auth.userId,
+    );
+  }
 
   redirect(`/checklists/preencher/${session.id}`);
 }
@@ -242,10 +263,10 @@ async function loadSingleEstablishmentAreaId(
 }
 
 /**
- * Para sessões recém-criadas (sem nenhuma resposta), copia as respostas com
- * valid_until ainda vigente da sessão anterior mais recente para o mesmo escopo
- * (template + estabelecimento + área). Prioriza dossiês aprovados; se não houver,
- * usa a sessão anterior mais recente com itens válidos. Retorna o número de itens herdados.
+ * Copia respostas com valid_until ainda vigente de sessões anteriores para o mesmo
+ * escopo (template + estabelecimento + área). Por item, usa a fonte mais recente
+ * entre dossiês aprovados e rascunhos. Idempotente: não sobrescreve itens já
+ * respondidos na sessão atual. Retorna o número de itens inseridos.
  */
 async function inheritValidResponsesIfFreshSession(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -270,6 +291,22 @@ async function inheritValidResponsesIfFreshSession(
   const itemCol = resolveFillItemResponseColumn(session);
   if (!itemCol) return 0;
 
+  const { data: existingRows, error: existingErr } = await supabase
+    .from("checklist_fill_item_responses")
+    .select("template_item_id, custom_item_id, workspace_item_id")
+    .eq("session_id", session.id);
+
+  if (existingErr) {
+    console.error("[inherit] erro ao buscar respostas da sessão atual:", existingErr.message);
+    return 0;
+  }
+
+  const existingItemIds = collectExistingResponseItemIds(
+    (existingRows ?? []) as Array<
+      ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+    >,
+  );
+
   const singleAreaId = await loadSingleEstablishmentAreaId(
     supabase,
     session.establishment_id,
@@ -283,71 +320,69 @@ async function inheritValidResponsesIfFreshSession(
       .neq("id", session.id)
       .eq(sessionTemplateCol, templateId);
 
-  const { data: approvedCandidates, error: approvedErr } = await baseQuery()
-    .not("dossier_approved_at", "is", null)
-    .order("dossier_approved_at", { ascending: false })
-    .limit(20);
+  const [{ data: approvedCandidates, error: approvedErr }, { data: recentCandidates, error: recentErr }] =
+    await Promise.all([
+      baseQuery()
+        .not("dossier_approved_at", "is", null)
+        .order("dossier_approved_at", { ascending: false })
+        .limit(20),
+      baseQuery().order("updated_at", { ascending: false }).limit(20),
+    ]);
 
   if (approvedErr) {
     console.error("[inherit] erro ao buscar sessões aprovadas:", approvedErr.message);
     return 0;
   }
+  if (recentErr) {
+    console.error("[inherit] erro ao buscar sessões recentes:", recentErr.message);
+    return 0;
+  }
 
-  let prevSession = pickSourceSessionForInheritance(
+  const sessionOrder = buildInheritanceSessionOrder(
     approvedCandidates ?? [],
+    recentCandidates ?? [],
     session.area_id,
     singleAreaId,
   );
 
-  if (!prevSession) {
-    const { data: recentCandidates, error: recentErr } = await baseQuery()
-      .order("updated_at", { ascending: false })
-      .limit(20);
-    if (recentErr) {
-      console.error("[inherit] erro ao buscar sessões recentes:", recentErr.message);
-      return 0;
-    }
-    prevSession = pickSourceSessionForInheritance(
-      recentCandidates ?? [],
-      session.area_id,
-      singleAreaId,
-    );
-  }
-
-  if (!prevSession) {
+  if (sessionOrder.length === 0) {
     console.log("[inherit] nenhuma sessão anterior com mesma área encontrada");
     return 0;
   }
 
-  const prevSessionId = prevSession.id;
-
   const { data: srcRows, error: srcErr } = await supabase
     .from("checklist_fill_item_responses")
     .select("*")
-    .eq("session_id", prevSessionId)
+    .in("session_id", sessionOrder)
     .not("valid_until", "is", null)
     .gte("valid_until", todayIso);
 
   if (srcErr) {
-    console.error("[inherit] erro ao buscar respostas da sessão anterior:", srcErr.message);
+    console.error("[inherit] erro ao buscar respostas de sessões anteriores:", srcErr.message);
     return 0;
   }
   if (!srcRows?.length) {
-    console.log("[inherit] nenhum item com validade futura na sessão anterior");
+    console.log("[inherit] nenhum item com validade futura nas sessões anteriores");
     return 0;
   }
 
   const inheritableItemIds = collectEvaluableTemplateItemIdsFromTemplate(template);
 
-  const rowsToInsert = filterInheritableResponseRows(
+  const perItemRows = collectLatestValidResponsePerItem(
+    sessionOrder,
     srcRows as (ChecklistFillItemResponseRow & { workspace_item_id?: string | null })[],
     inheritableItemIds,
     todayIso,
   );
 
+  const rowsToInsert = perItemRows.filter((r) => {
+    const itemId = readAnyFillResponseItemId(r);
+    return Boolean(itemId && !existingItemIds.has(itemId));
+  });
+
   if (rowsToInsert.length === 0) {
     console.log(
-      "[inherit] respostas anteriores não correspondem a itens avaliáveis do modelo atual",
+      "[inherit] todos os itens vigentes já existem na sessão ou não são avaliáveis no modelo atual",
     );
     return 0;
   }
@@ -500,24 +535,27 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   let { data: respRows } = respRowsResult;
 
-  // Herança automática de itens com validade vigente (apenas na 1ª abertura)
-  const isFirstOpen = (respRows ?? []).length === 0;
-  console.log("[inherit] sessão:", row.id, "| respostas existentes:", (respRows ?? []).length, "| é fresh:", isFirstOpen);
-  if (isFirstOpen) {
-    const insertedCount = await inheritValidResponsesIfFreshSession(
-      supabase,
-      row,
-      template,
-      timeZone,
-    );
-    if (insertedCount > 0) {
-      const { data: refreshed } = await supabase
-        .from("checklist_fill_item_responses")
-        .select("*")
-        .eq("session_id", sessionId);
-      if (refreshed) {
-        respRows = refreshed;
-      }
+  // Herança idempotente: preenche itens ainda sem resposta com validade vigente do histórico.
+  const responseCountBefore = (respRows ?? []).length;
+  console.log(
+    "[inherit] sessão:",
+    row.id,
+    "| respostas existentes:",
+    responseCountBefore,
+  );
+  const insertedCount = await inheritValidResponsesIfFreshSession(
+    supabase,
+    row,
+    template,
+    timeZone,
+  );
+  if (insertedCount > 0) {
+    const { data: refreshed } = await supabase
+      .from("checklist_fill_item_responses")
+      .select("*")
+      .eq("session_id", sessionId);
+    if (refreshed) {
+      respRows = refreshed;
     }
   }
 
@@ -532,13 +570,13 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     (r) => r.outcome !== null && (r.validUntil ?? "").trim().length > 0,
   ).length;
 
-  let inheritedCount = 0;
-  if (isFirstOpen) {
-    inheritedCount = vigenteInheritedItems;
-  } else if (vigenteInheritedItems > 0) {
+  let inheritedCount = insertedCount;
+  if (inheritedCount === 0 && vigenteInheritedItems > 0) {
     const createdMs = new Date(row.created_at).getTime();
     const updatedMs = new Date(row.updated_at).getTime();
-    if (updatedMs - createdMs < 120_000) {
+    const isFreshSession =
+      responseCountBefore === 0 || updatedMs - createdMs < 120_000;
+    if (isFreshSession) {
       inheritedCount = vigenteInheritedItems;
     }
   }

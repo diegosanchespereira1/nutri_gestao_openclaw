@@ -19,18 +19,19 @@ describe("filterTemplatesForEstablishment", () => {
     expect(filterTemplatesForEstablishment(list, null)).toHaveLength(1);
   });
 
-  it("filtra por UF e tipo", () => {
+  it("filtra apenas por UF, não por tipo de estabelecimento", () => {
     const list = [
       template("SP", ["escola"]),
       template("RJ", ["escola"]),
       template("SP", ["hospital"]),
+      template("*", ["empresa"]),
     ];
     const out = filterTemplatesForEstablishment(list, {
       state: "sp",
-      establishment_type: "escola",
+      establishment_type: "restaurante",
     });
-    expect(out).toHaveLength(1);
-    expect(out[0]?.uf).toBe("SP");
+    expect(out).toHaveLength(3);
+    expect(out.every((t) => t.uf === "SP" || t.uf === "*")).toBe(true);
   });
 
   it("aceita UF wildcard", () => {
@@ -41,25 +42,16 @@ describe("filterTemplatesForEstablishment", () => {
     expect(out).toHaveLength(1);
   });
 
-  it("inclui templates de empresa para estabelecimento restaurante", () => {
+  it("mostra templates de qualquer applies_to independente do tipo", () => {
     const list = [
       template("*", ["empresa"]),
       template("*", ["escola"]),
-      template("SP", ["empresa"]),
+      template("*", ["lar_idosos"]),
     ];
     const out = filterTemplatesForEstablishment(list, {
       state: null,
       establishment_type: "restaurante",
     });
-    expect(out).toHaveLength(1);
-    expect(out[0]?.uf).toBe("*");
-  });
-
-  it("não aplica templates de empresa a tipos de atendimento nutricional", () => {
-    const out = filterTemplatesForEstablishment([template("*", ["empresa"])], {
-      state: "SP",
-      establishment_type: "escola",
-    });
-    expect(out).toHaveLength(0);
+    expect(out).toHaveLength(3);
   });
 });

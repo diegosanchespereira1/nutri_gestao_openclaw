@@ -150,7 +150,7 @@ export async function InicioClinicalPanel() {
       >
         {validityAlerts.length === 0 ? (
           <p className="text-muted-foreground text-sm">
-            Sem itens vencidos ou a vencer nos próximos 7 dias.
+            Sem itens vencidos (último ano) ou com validade nos próximos 90 dias.
           </p>
         ) : (
           <ChecklistValidityAlertGroups alerts={validityAlerts} timeZone={tz} />

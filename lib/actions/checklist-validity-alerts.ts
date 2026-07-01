@@ -5,6 +5,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { addCalendarDays, calendarDaysUntilDueDate, todayKey } from "@/lib/datetime/calendar-tz";
+import {
+  balanceValidityAlerts,
+  VALIDITY_ALERTS_LIMIT_DEFAULT,
+  VALIDITY_ALERTS_PAST_DAYS,
+  VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT,
+} from "@/lib/checklists/validity-alerts-balance";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
 
@@ -111,13 +117,13 @@ async function loadChecklistValidityAlertsViaRpc(
   timeZone: string,
   options?: { withinDays?: number; limit?: number; clientId?: string | null },
 ): Promise<ChecklistValidityAlert[] | null> {
-  const withinDays = options?.withinDays ?? 7;
-  const limit = options?.limit ?? 8;
+  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
   const clientFilter = options?.clientId ?? null;
 
   const tKey = todayKey(new Date(), timeZone);
   const horizon = addCalendarDays(tKey, withinDays, timeZone);
-  const pastCap = addCalendarDays(tKey, -365, timeZone);
+  const pastCap = addCalendarDays(tKey, -VALIDITY_ALERTS_PAST_DAYS, timeZone);
 
   const { data, error } = await supabase.rpc("get_checklist_validity_alerts", {
     p_owner_user_id: workspaceOwnerId,
@@ -125,6 +131,7 @@ async function loadChecklistValidityAlertsViaRpc(
     p_past_cap: pastCap,
     p_limit: Math.max(1, limit),
     p_client_id: clientFilter,
+    p_today: tKey,
   });
 
   if (error) {
@@ -137,7 +144,8 @@ async function loadChecklistValidityAlertsViaRpc(
     return null;
   }
 
-  return mapRpcRows((data ?? []) as RpcAlertRow[], timeZone);
+  const mapped = mapRpcRows((data ?? []) as RpcAlertRow[], timeZone);
+  return balanceValidityAlerts(mapped, limit);
 }
 
 /** Fallback até a migração `20260805150000_perf_navigation_queries.sql` estar aplicada. */
@@ -147,13 +155,13 @@ async function loadChecklistValidityAlertsLegacy(
   timeZone: string,
   options?: { withinDays?: number; limit?: number; clientId?: string | null },
 ): Promise<ChecklistValidityAlert[]> {
-  const withinDays = options?.withinDays ?? 7;
-  const limit = options?.limit ?? 8;
+  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
   const clientFilter = options?.clientId ?? null;
 
   const tKey = todayKey(new Date(), timeZone);
   const horizon = addCalendarDays(tKey, withinDays, timeZone);
-  const pastCap = addCalendarDays(tKey, -365, timeZone);
+  const pastCap = addCalendarDays(tKey, -VALIDITY_ALERTS_PAST_DAYS, timeZone);
 
   let clientsQuery = supabase
     .from("clients")
@@ -333,7 +341,7 @@ async function loadChecklistValidityAlertsLegacy(
     return aTime - bTime;
   });
 
-  return alerts.slice(0, Math.max(1, limit));
+  return balanceValidityAlerts(alerts, Math.max(1, limit));
 }
 
 export async function loadChecklistValidityAlerts(
@@ -343,8 +351,8 @@ export async function loadChecklistValidityAlerts(
   const { supabase, workspaceOwnerId } = await getServerContext();
   if (!workspaceOwnerId) return [];
 
-  const withinDays = options?.withinDays ?? 7;
-  const limit = options?.limit ?? 8;
+  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
   const clientId = options?.clientId ?? null;
 
   const cachedLoad = unstable_cache(
@@ -364,7 +372,7 @@ export async function loadChecklistValidityAlerts(
       );
     },
     [
-      "checklist-validity-alerts-v1",
+      "checklist-validity-alerts-v2",
       workspaceOwnerId,
       timeZone,
       String(withinDays),

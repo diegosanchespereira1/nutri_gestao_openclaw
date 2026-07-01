@@ -136,8 +136,7 @@ export async function ClientChecklistHistorySection({
         : DEFAULT_PROFILE_TIME_ZONE;
       const alerts = await loadChecklistValidityAlerts(t, {
         clientId,
-        limit: 12,
-        withinDays: 7,
+        limit: 24,
       });
       return { alerts, tz: t };
     })(),
@@ -205,11 +204,11 @@ export async function ClientChecklistHistorySection({
           </h3>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Itens vencidos ou com validade nos próximos 7 dias para este cliente.
+          Itens vencidos (último ano) ou com validade nos próximos 90 dias para este cliente.
         </p>
         {validityAlerts.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">
-            Sem itens vencidos ou a vencer nos próximos 7 dias.
+            Sem itens vencidos ou a vencer neste período.
           </p>
         ) : (
           <ul className="mt-4 space-y-3" aria-label="Validades de checklist do cliente">

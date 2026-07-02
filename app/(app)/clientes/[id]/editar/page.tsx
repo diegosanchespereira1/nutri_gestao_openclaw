@@ -7,6 +7,7 @@ import { ClientEditHeaderAvatar } from "@/components/clientes/client-edit-header
 import { ClientEditTabShell } from "@/components/clientes/client-edit-tab-shell";
 import { ClientContractsSection } from "@/components/clientes/client-contracts-section";
 import { ClientFormLazy } from "@/components/clientes/client-form-lazy";
+import { ChecklistEvolutionExportDialog } from "@/components/checklists/checklist-evolution-export-dialog";
 import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
 import { ClientChecklistHistorySection } from "@/components/clientes/client-checklist-history-section";
 import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
@@ -125,9 +126,12 @@ async function ChecklistScoreHistoryBlock({ clientId }: { clientId: string }) {
   if (scoreHistory.byTemplate.length === 0) return null;
   return (
     <div className="rounded-xl border border-border bg-white p-4 shadow-xs">
-      <h3 className="text-base font-semibold text-foreground tracking-tight">
-        Evolução da pontuação
-      </h3>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h3 className="text-base font-semibold text-foreground tracking-tight">
+          Evolução da pontuação
+        </h3>
+        <ChecklistEvolutionExportDialog clientId={clientId} />
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">
         Pontuação por dossiê aprovado — cada linha representa um template de
         checklist.

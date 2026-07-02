@@ -911,6 +911,99 @@ export async function loadChecklistSessionNcItems(
   return result;
 }
 
+/* ─── E.2b: loadTenantChecklistBenchmark ─────────────────────────────────── */
+
+export type TenantChecklistBenchmark = {
+  /** Média 0-100 de score_percentage das sessões aprovadas de todos os clientes do tenant. */
+  avgScore: number;
+  scoredSessionsCount: number;
+  clientsCount: number;
+  updatedAt: string;
+};
+
+/**
+ * Fallback: calcula o benchmark on-the-fly a partir das sessões aprovadas com
+ * score de todos os clientes do tenant (RLS já limita ao workspace).
+ * Usado quando a tabela persistida ainda não existe (migração não aplicada)
+ * ou ainda não foi populada.
+ */
+async function computeTenantChecklistBenchmarkFallback(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<TenantChecklistBenchmark | null> {
+  const { data: clients } = await supabase.from("clients").select("id");
+  const clientIds = (clients ?? []).map((c) => String(c.id));
+  if (clientIds.length === 0) return null;
+
+  const { data: ests } = await supabase
+    .from("establishments")
+    .select("id, client_id")
+    .in("client_id", clientIds);
+  const estIds = (ests ?? []).map((e) => String(e.id));
+  if (estIds.length === 0) return null;
+
+  const estToClient = new Map<string, string>();
+  for (const e of ests ?? []) estToClient.set(String(e.id), String(e.client_id));
+
+  const { data: sessions } = await supabase
+    .from("checklist_fill_sessions")
+    .select("establishment_id, score_percentage")
+    .in("establishment_id", estIds)
+    .not("dossier_approved_at", "is", null)
+    .not("score_percentage", "is", null);
+
+  const scored = (sessions ?? []).filter(
+    (s) => Number.isFinite(Number(s.score_percentage)),
+  );
+  if (scored.length === 0) return null;
+
+  const sum = scored.reduce((acc, s) => acc + Number(s.score_percentage), 0);
+  const clientsWithScore = new Set(
+    scored
+      .map((s) => estToClient.get(String(s.establishment_id)))
+      .filter(Boolean),
+  );
+
+  return {
+    avgScore: Math.round((sum / scored.length) * 100) / 100,
+    scoredSessionsCount: scored.length,
+    clientsCount: clientsWithScore.size,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Lê o benchmark persistido da carteira (tenant_checklist_benchmarks),
+ * mantido por trigger a cada aprovação/reabertura de dossiê.
+ * Se a tabela ainda não existir ou não tiver dado para o tenant, calcula
+ * on-the-fly (fallback) para garantir que o indicador fique visível.
+ * Retorna null apenas quando não há nenhuma avaliação pontuada no tenant.
+ */
+export async function loadTenantChecklistBenchmark(): Promise<TenantChecklistBenchmark | null> {
+  const { supabase, workspaceOwnerId } = await getServerContext();
+  if (!workspaceOwnerId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from("tenant_checklist_benchmarks")
+      .select("avg_score, scored_sessions_count, clients_count, updated_at")
+      .eq("owner_user_id", workspaceOwnerId)
+      .maybeSingle();
+
+    if (!error && data && (Number(data.scored_sessions_count) || 0) > 0) {
+      return {
+        avgScore: Number(data.avg_score) || 0,
+        scoredSessionsCount: Number(data.scored_sessions_count) || 0,
+        clientsCount: Number(data.clients_count) || 0,
+        updatedAt: String(data.updated_at),
+      };
+    }
+  } catch {
+    // Tabela pode não existir ainda (migração pendente) — segue para o fallback.
+  }
+
+  return computeTenantChecklistBenchmarkFallback(supabase);
+}
+
 /* ─── E.3: loadChecklistScoreHistory ────────────────────────────────────── */
 
 export type ScoreHistoryPoint = {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
 import { ChecklistValidityAlertCard } from "@/components/dashboard/checklist-validity-alert-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PaginationControls } from "@/components/ui/pagination-controls";
 import {
   Select,
   SelectContent,
@@ -22,9 +23,34 @@ type Props = {
 
 type StatusFilter = "todos" | "proximo" | "vencido";
 
+const STATUS_FILTER_LABELS: Record<StatusFilter, string> = {
+  todos: "Todos",
+  proximo: "A vencer",
+  vencido: "Vencidos",
+};
+
+const ITEMS_PER_COLUMN = 10;
+
+function useGridColumnCount(): number {
+  const [columnCount, setColumnCount] = useState(1);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = () => setColumnCount(mq.matches ? 2 : 1);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  return columnCount;
+}
+
 export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
+  const [page, setPage] = useState(1);
+  const columnCount = useGridColumnCount();
+  const pageSize = ITEMS_PER_COLUMN * columnCount;
 
   const filteredAlerts = useMemo(() => {
     const search = searchTerm.trim().toLocaleLowerCase("pt-BR");
@@ -35,6 +61,24 @@ export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
       return alert.clientName.toLocaleLowerCase("pt-BR").includes(search);
     });
   }, [alerts, searchTerm, statusFilter]);
+
+  const total = filteredAlerts.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const offset = (safePage - 1) * pageSize;
+  const pagedAlerts = filteredAlerts.slice(offset, offset + pageSize);
+  const from = total === 0 ? 0 : offset + 1;
+  const to = Math.min(offset + pageSize, total);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <div className="space-y-4">
@@ -60,10 +104,17 @@ export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
           <Label htmlFor="validity-status-filter">Filtrar por status</Label>
           <Select
             value={statusFilter}
-            onValueChange={(value) => setStatusFilter(value as StatusFilter)}
+            onValueChange={(value) => {
+              setStatusFilter(value as StatusFilter);
+              setPage(1);
+            }}
           >
             <SelectTrigger id="validity-status-filter">
-              <SelectValue placeholder="Selecione o status" />
+              <SelectValue placeholder="Selecione o status">
+                {(selected) =>
+                  selected ? STATUS_FILTER_LABELS[selected as StatusFilter] : null
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
@@ -79,20 +130,35 @@ export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
           Nenhum item encontrado para os filtros aplicados.
         </p>
       ) : (
-        <ul
-          className="grid grid-cols-1 gap-3 md:grid-cols-2"
-          aria-label="Validades de itens de checklist"
-        >
-          {filteredAlerts.map((alert) => (
-            <li key={alert.responseId} className="min-h-0">
-              <ChecklistValidityAlertCard
-                alert={alert}
-                timeZone={timeZone}
-                stacked
+        <>
+          <ul
+            className="grid grid-cols-1 gap-3 md:grid-cols-2"
+            aria-label="Validades de itens de checklist"
+          >
+            {pagedAlerts.map((alert) => (
+              <li key={alert.responseId} className="min-h-0">
+                <ChecklistValidityAlertCard
+                  alert={alert}
+                  timeZone={timeZone}
+                  stacked
+                />
+              </li>
+            ))}
+          </ul>
+
+          {totalPages > 1 && (
+            <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-4 sm:flex-row">
+              <p className="text-muted-foreground text-sm">
+                {`Exibindo ${from}–${to} de ${total} item${total !== 1 ? "s" : ""}`}
+              </p>
+              <PaginationControls
+                page={safePage}
+                totalPages={totalPages}
+                onPageChange={setPage}
               />
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

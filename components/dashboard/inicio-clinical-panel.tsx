@@ -123,11 +123,7 @@ export async function InicioClinicalPanel() {
           }
         >
           <p className="text-muted-foreground mb-3 text-xs">
-            Últimos 6 meses civis no seu fuso (visitas exceto canceladas). As
-            barras usam a paleta de gráficos do tema (tokens{" "}
-            <code className="text-foreground/90 text-[11px]">--chart-1</code> …{" "}
-            <code className="text-foreground/90 text-[11px]">--chart-5</code>
-            ).
+            Gráfico abaixo mostra as visitas realizadas nos últimos 6 meses.
           </p>
           <VisitsMonthBarChart data={visitsByMonth} />
         </DashboardClinicalSubsection>

@@ -1489,10 +1489,19 @@ export function ChecklistFillWizard({
               </div>
             ) : null}
             <p className="text-muted-foreground mt-1 text-sm">
-              Visualização do dossiê desta sessão.
+              {dossierApprovedAt
+                ? "Dossiê aprovado — somente leitura."
+                : "Visualização do dossiê desta sessão."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {dossierApprovedAt ? (
+              <ChecklistReopenDialog
+                sessionId={sessionId}
+                canReopen={canReopenDossier}
+                onReopened={handleDossierReopened}
+              />
+            ) : null}
             {!dossierApprovedAt ? (
               <Link
                 href={`/checklists/preencher/${sessionId}`}
@@ -1509,6 +1518,29 @@ export function ChecklistFillWizard({
             </Link>
           </div>
         </div>
+
+        {dossierApprovedAt && initialReopenEvents.length > 0 ? (
+          <div className="bg-muted/30 rounded-lg border p-4 text-sm">
+            <p className="text-foreground font-medium">Histórico de reaberturas</p>
+            <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
+              {initialReopenEvents.map((ev) => (
+                <li key={ev.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
+                  <p>
+                    {formatDossierApprovedLabel(ev.created_at)} — {ev.reopened_by_label} (
+                    {ev.reopened_by_role === "owner"
+                      ? "Titular"
+                      : ev.reopened_by_role === "gestao"
+                        ? "Gestão"
+                        : "Administrador"})
+                  </p>
+                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
+                    Justificativa: {ev.justification}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <ChecklistFillDossierPreview
           template={template}
@@ -1532,6 +1564,16 @@ export function ChecklistFillWizard({
           dossierApprovedClientIp={savedApprovedClientIp}
           reopenEvents={initialReopenEvents}
         />
+
+        {dossierApprovedAt ? (
+          <ChecklistFillDossierPdfCard
+            sessionId={sessionId}
+            dossierApprovedAt={dossierApprovedAt}
+            initialJob={initialPdfExport ?? null}
+            pdfExportHistory={pdfExportHistory}
+            dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+          />
+        ) : null}
       </div>
     );
   }

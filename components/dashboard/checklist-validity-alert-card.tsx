@@ -45,8 +45,9 @@ export function ChecklistValidityAlertCard({
       : "border-l-[3px] border-l-warning bg-amber-50/50 dark:bg-amber-950/20";
 
   const titleId = `validity-alert-title-${alert.responseId}`;
-  const href = `/checklists/preencher/${alert.sessionId}?returnTo=${encodeURIComponent("/inicio")}`;
-  const ariaLabel = `Abrir checklist ${alert.checklistName} de ${alert.clientName}, ${statusLabel}`;
+  const returnTo = encodeURIComponent("/inicio");
+  const href = `/checklists/preencher/${alert.sessionId}?view=dossie&returnTo=${returnTo}`;
+  const ariaLabel = `Ver dossiê do checklist ${alert.checklistName} de ${alert.clientName}, ${statusLabel}`;
 
   return (
     <Link

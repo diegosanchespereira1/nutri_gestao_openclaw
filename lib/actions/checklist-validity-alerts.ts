@@ -1,9 +1,7 @@
 "use server";
 
-import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { addCalendarDays, calendarDaysUntilDueDate, todayKey } from "@/lib/datetime/calendar-tz";
 import {
   balanceValidityAlerts,
@@ -111,6 +109,16 @@ function summarizeSupabaseError(errorMessage: string): string {
   return `${trimmed.slice(0, 180)}…`;
 }
 
+function isRpcSignatureOrParamError(errorMessage: string): boolean {
+  const msg = errorMessage.toLowerCase();
+  return (
+    isRpcUnavailable(errorMessage) ||
+    msg.includes("p_today") ||
+    msg.includes("permission denied for function") ||
+    msg.includes("could not choose a best candidate function")
+  );
+}
+
 async function loadChecklistValidityAlertsViaRpc(
   supabase: SupabaseClient,
   workspaceOwnerId: string,
@@ -125,17 +133,25 @@ async function loadChecklistValidityAlertsViaRpc(
   const horizon = addCalendarDays(tKey, withinDays, timeZone);
   const pastCap = addCalendarDays(tKey, -VALIDITY_ALERTS_PAST_DAYS, timeZone);
 
-  const { data, error } = await supabase.rpc("get_checklist_validity_alerts", {
+  const baseArgs = {
     p_owner_user_id: workspaceOwnerId,
     p_horizon: horizon,
     p_past_cap: pastCap,
     p_limit: Math.max(1, limit),
     p_client_id: clientFilter,
+  };
+
+  let { data, error } = await supabase.rpc("get_checklist_validity_alerts", {
+    ...baseArgs,
     p_today: tKey,
   });
 
+  if (error && isRpcSignatureOrParamError(error.message)) {
+    ({ data, error } = await supabase.rpc("get_checklist_validity_alerts", baseArgs));
+  }
+
   if (error) {
-    if (!isExpectedRpcFailure(error.message)) {
+    if (!isExpectedRpcFailure(error.message) && !isRpcSignatureOrParamError(error.message)) {
       console.error(
         "[loadChecklistValidityAlerts] RPC",
         summarizeSupabaseError(error.message),
@@ -146,6 +162,31 @@ async function loadChecklistValidityAlertsViaRpc(
 
   const mapped = mapRpcRows((data ?? []) as RpcAlertRow[], timeZone);
   return balanceValidityAlerts(mapped, limit);
+}
+
+async function loadChecklistValidityAlertsResolved(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
+  timeZone: string,
+  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+): Promise<ChecklistValidityAlert[]> {
+  const viaRpc = await loadChecklistValidityAlertsViaRpc(
+    supabase,
+    workspaceOwnerId,
+    timeZone,
+    options,
+  );
+  if (viaRpc && viaRpc.length > 0) return viaRpc;
+
+  const legacy = await loadChecklistValidityAlertsLegacy(
+    supabase,
+    workspaceOwnerId,
+    timeZone,
+    options,
+  );
+  if (legacy.length > 0) return legacy;
+
+  return viaRpc ?? legacy;
 }
 
 /** Fallback até a migração `20260805150000_perf_navigation_queries.sql` estar aplicada. */
@@ -200,7 +241,8 @@ async function loadChecklistValidityAlertsLegacy(
     const { data: sessions, error: sessionError } = await supabase
       .from("checklist_fill_sessions")
       .select("id, establishment_id, template_id, custom_template_id")
-      .in("establishment_id", ids);
+      .in("establishment_id", ids)
+      .not("dossier_approved_at", "is", null);
     if (sessionError || !sessions) continue;
     for (const s of sessions) {
       sessionMap.set(String(s.id), {
@@ -351,39 +393,10 @@ export async function loadChecklistValidityAlerts(
   const { supabase, workspaceOwnerId } = await getServerContext();
   if (!workspaceOwnerId) return [];
 
-  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
-  const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
-  const clientId = options?.clientId ?? null;
-
-  const cachedLoad = unstable_cache(
-    async () => {
-      const viaRpc = await loadChecklistValidityAlertsViaRpc(
-        supabase,
-        workspaceOwnerId,
-        timeZone,
-        { withinDays, limit, clientId },
-      );
-      if (viaRpc) return viaRpc;
-      return loadChecklistValidityAlertsLegacy(
-        supabase,
-        workspaceOwnerId,
-        timeZone,
-        { withinDays, limit, clientId },
-      );
-    },
-    [
-      "checklist-validity-alerts-v2",
-      workspaceOwnerId,
-      timeZone,
-      String(withinDays),
-      String(limit),
-      clientId ?? "",
-    ],
-    {
-      revalidate: 120,
-      tags: [checklistValidityAlertsCacheTag(workspaceOwnerId)],
-    },
+  return loadChecklistValidityAlertsResolved(
+    supabase,
+    workspaceOwnerId,
+    timeZone,
+    options,
   );
-
-  return cachedLoad();
 }

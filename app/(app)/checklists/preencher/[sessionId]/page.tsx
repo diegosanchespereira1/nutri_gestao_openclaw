@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
 import { PageHelpHint } from "@/components/help/page-help-hint";
@@ -40,7 +40,24 @@ export default async function ChecklistPreencherPage({
     notFound();
   }
 
+  const isApproved = Boolean(bundle.session.dossier_approved_at);
+  if (isApproved && !viewOnlyDossier) {
+    const params = new URLSearchParams({ view: "dossie" });
+    if (backHref) params.set("returnTo", backHref);
+    redirect(`/checklists/preencher/${sessionId}?${params.toString()}`);
+  }
+
+  const pageTitle = viewOnlyDossier
+    ? isApproved
+      ? "Dossiê do checklist"
+      : "Visualizar checklist"
+    : "Preencher checklist";
+
   const dossierEmailDeliveryConfigured = isDossierEmailDeliveryConfigured();
+
+  const showDraftContinuationBanner =
+    Boolean(bundle.createdByName) && !isApproved && !viewOnlyDossier;
+  const showInheritedBanner = bundle.inheritedCount > 0 && !isApproved && !viewOnlyDossier;
 
   // O profissional responsável é sempre o criador da sessão — nunca o visualizador atual.
   // Isso evita que um admin/dono do workspace veja o próprio nome no dossiê de outra profissional.
@@ -109,8 +126,9 @@ export default async function ChecklistPreencherPage({
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Preencher checklist
+            {pageTitle}
           </h1>
+          {!viewOnlyDossier ? (
           <PageHelpHint ariaLabel="Como funciona o preenchimento do checklist">
             <p>
               A <strong>avaliação</strong> (Conforme / Não conforme / Não aplicável) grava ao clicar.{" "}
@@ -132,10 +150,11 @@ export default async function ChecklistPreencherPage({
               (imutável).
             </p>
           </PageHelpHint>
+          ) : null}
         </div>
       </div>
 
-      {bundle.createdByName && (
+      {showDraftContinuationBanner ? (
         <div className="bg-muted/60 border-border flex items-start gap-3 rounded-lg border px-4 py-3 text-sm">
           <Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <p className="text-muted-foreground">
@@ -145,9 +164,9 @@ export default async function ChecklistPreencherPage({
             continuando o preenchimento.
           </p>
         </div>
-      )}
+      ) : null}
 
-      {bundle.inheritedCount > 0 && (
+      {showInheritedBanner ? (
         <div className="bg-muted/60 border-border flex items-start gap-3 rounded-lg border px-4 py-3 text-sm">
           <Info className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <p className="text-muted-foreground">
@@ -158,7 +177,7 @@ export default async function ChecklistPreencherPage({
             da sessão anterior.
           </p>
         </div>
-      )}
+      ) : null}
 
       <ChecklistFillWizard
         key={bundle.session.id}

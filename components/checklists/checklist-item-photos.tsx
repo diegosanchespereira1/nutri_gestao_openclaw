@@ -7,7 +7,6 @@ import { Camera, Images, Trash2, ZoomIn } from "lucide-react";
 import { tryRefreshSupabaseSession } from "@/lib/client/refresh-supabase-session";
 import { isNativeApp } from "@/lib/mobile/platform";
 import { openNativeCamera, openNativeGallery } from "@/lib/mobile/camera";
-import { createClient } from "@/lib/supabase/client";
 
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { Button } from "@/components/ui/button";

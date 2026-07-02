@@ -19,7 +19,6 @@ import {
 } from "@/lib/checklists/fill-session-draft-storage";
 import { pushWithLoading, signalNavigationCancel } from "@/lib/navigation-pending";
 import { resolveDeviceIpForDossierApproval } from "@/lib/client/resolve-device-ip";
-import { toast } from "sonner";
 
 import { ChecklistFillDossierPdfCard } from "@/components/checklists/checklist-fill-dossier-pdf-card";
 import { ChecklistFillDossierPreview } from "@/components/checklists/checklist-fill-dossier-preview";
@@ -173,20 +172,18 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
   onSetAnnotation,
   onPhotosChange,
 }: ChecklistFillItemProps) {
+  const empty = r ?? { outcome: null, note: null, annotation: null, validUntil: null };
+  const annotationText = empty.annotation ?? "";
+  const hasAnnotation = annotationText.trim().length > 0;
+  const [annotationOpenOverride, setAnnotationOpenOverride] = useState<boolean | null>(null);
+  const annotationOpen = annotationOpenOverride ?? hasAnnotation;
+
   if (isStructureOnlyItem(item)) {
     return <ChecklistFillStructureHeading description={item.description} />;
   }
 
   const requiredInvalid = item.is_required && Boolean(err);
   const showRecurringNc = recurringNcSessions > 0;
-  const empty = r ?? { outcome: null, note: null, annotation: null, validUntil: null };
-  const annotationText = empty.annotation ?? "";
-  const hasAnnotation = annotationText.trim().length > 0;
-  const [annotationOpen, setAnnotationOpen] = useState(hasAnnotation);
-
-  useEffect(() => {
-    if (hasAnnotation) setAnnotationOpen(true);
-  }, [hasAnnotation]);
 
   return (
     <div
@@ -326,7 +323,7 @@ const ChecklistFillItem = memo(function ChecklistFillItem({
         <div className="mt-3 rounded-lg border border-border/60 bg-muted/15">
           <button
             type="button"
-            onClick={() => setAnnotationOpen((open) => !open)}
+            onClick={() => setAnnotationOpenOverride((prev) => !(prev ?? hasAnnotation))}
             className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/35"
             aria-expanded={annotationOpen}
             aria-controls={`annotation-panel-${item.id}`}

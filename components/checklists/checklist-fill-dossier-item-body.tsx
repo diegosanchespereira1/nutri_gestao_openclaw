@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, ChevronDown, X, ZoomIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatChecklistOutcomeLabel } from "@/lib/checklists/dossier-outcome-label";
@@ -29,17 +29,14 @@ function DossierEditableAnnotation({
   onPatch: (annotation: string) => void;
 }) {
   const hasAnnotation = annotation.trim().length > 0;
-  const [annotationOpen, setAnnotationOpen] = useState(hasAnnotation);
-
-  useEffect(() => {
-    if (hasAnnotation) setAnnotationOpen(true);
-  }, [hasAnnotation]);
+  const [annotationOpenOverride, setAnnotationOpenOverride] = useState<boolean | null>(null);
+  const annotationOpen = annotationOpenOverride ?? hasAnnotation;
 
   return (
     <div className="mt-2 rounded-lg border border-border/60 bg-muted/15">
       <button
         type="button"
-        onClick={() => setAnnotationOpen((open) => !open)}
+        onClick={() => setAnnotationOpenOverride((prev) => !(prev ?? hasAnnotation))}
         className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-muted/35"
         aria-expanded={annotationOpen}
         aria-controls={`dossier-ann-panel-${itemId}`}

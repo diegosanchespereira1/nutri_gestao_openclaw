@@ -8,9 +8,9 @@ export async function tryRefreshSupabaseSession(): Promise<boolean> {
     if (!error && data.session) return true;
 
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    return Boolean(session);
+      data: { user },
+    } = await supabase.auth.getUser();
+    return Boolean(user);
   } catch {
     return false;
   }

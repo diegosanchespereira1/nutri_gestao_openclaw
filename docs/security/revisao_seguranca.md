@@ -1,7 +1,7 @@
 # Revisão de Segurança — NutriGestão
 
 > Documento vivo. Atualizar a cada ciclo de revisão.
-> Última revisão: 2026-05-29
+> Última revisão: 2026-07-01
 
 ---
 
@@ -71,15 +71,28 @@ A revisão cobre as seguintes categorias (baseada em OWASP Top 10 + contexto Saa
 
 ---
 
+### 6. Auditoria automatizada v2.0 — correções pós-script (2026-07-01)
+
+- **Script:** `.claude/skills/nutrigestao-security/scripts/security-audit.sh`
+- **Resultado:** ✅ Aprovado (92/100, 0 críticos, 3 warnings)
+- **Correções aplicadas:**
+  - `lib/client/refresh-supabase-session.ts` — fallback de sessão passou de `getSession()` para `getUser()`.
+  - `components/admin/create-tenant-wizard.tsx` — mensagem de erro genérica no client (evita falso positivo de `service_role` no bundle).
+  - `security-audit.sh` — reconhece `proxy.ts` (Next.js 16) como middleware de rotas.
+- **Warnings remanescentes (aceites):** funções `SECURITY DEFINER`; source maps; `dangerouslySetInnerHTML` em bootstrap/preview.
+- **Verificado em:** 2026-07-01
+
+---
+
 ## Itens monitorizados — sem ação imediata necessária
 
 | # | Área | Descrição | Estado |
 |---|------|-----------|--------|
 | A | SQL Injection | Todas as queries usam o cliente Supabase com placeholders parametrizados. Nenhum `.rpc()` ou `.sql()` raw com interpolação de string encontrado. | OK |
-| B | Autenticação | `supabase.auth.getUser()` (verifica JWT no servidor) usado consistentemente. Nunca `getSession()` em Server Actions. | OK |
+| B | Autenticação | `supabase.auth.getUser()` (verifica JWT no servidor) usado consistentemente. Cliente de refresh também usa `getUser()`. | OK |
 | C | Isolamento multitenant | `workspace_account_owner_id()` usada na maioria das RLS policies. | OK |
 | D | Tokens API | `api_tokens` com `revoked_at` e `last_used_at`. Sem expiração automática configurada — adicionar `expires_at` é recomendado no futuro. | A melhorar |
-| E | CSP / Headers | Verificar se `next.config` tem `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options`. | A verificar |
+| E | CSP / Headers | CSP, HSTS, X-Frame-Options, Permissions-Policy em `next.config.ts` + `proxy.ts`. | OK |
 | F | LGPD / Deleção de dados | `account-deletion` action existe. Verificar se cobre todas as tabelas com dados pessoais. | A verificar |
 
 ---

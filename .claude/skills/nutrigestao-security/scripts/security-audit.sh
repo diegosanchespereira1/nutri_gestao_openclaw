@@ -475,7 +475,7 @@ section "8. MIDDLEWARE E PROTEÇÃO DE ROTAS (OWASP A01)"
 # =========================================================
 
 MW_FILE=""
-for f in middleware.ts src/middleware.ts app/middleware.ts; do
+for f in middleware.ts proxy.ts src/middleware.ts app/middleware.ts; do
   [ -f "$f" ] && MW_FILE="$f" && break
 done
 
@@ -494,7 +494,7 @@ if [ -n "$MW_FILE" ]; then
     && pass "Rate limiting no middleware" \
     || info "Rate limiting não detectado no middleware (pode estar nas actions)"
 else
-  fail "middleware.ts NÃO encontrado — rotas desprotegidas! (CWE-306)"
+  fail "middleware.ts / proxy.ts NÃO encontrado — rotas desprotegidas! (CWE-306)"
 fi
 
 # =========================================================

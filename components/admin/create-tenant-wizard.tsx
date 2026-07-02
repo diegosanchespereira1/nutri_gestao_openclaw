@@ -44,7 +44,7 @@ const SERVER_ERR_MESSAGES: Record<string, string> = {
   exists: "Já existe uma conta com este email.",
   create: "Não foi possível criar a conta. Tente novamente.",
   server_config:
-    "SUPABASE_SERVICE_ROLE_KEY não está definida no servidor. Adicione ao .env.local e reinicie o servidor.",
+    "Configuração do servidor incompleta. Contacte o administrador da plataforma.",
 };
 
 type Props = {

@@ -1840,10 +1840,12 @@ export function ChecklistCatalog({
 
                           {/* Portaria e UF */}
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                            <span className="text-xs text-muted-foreground">
-                              <span className="font-medium text-foreground/70">Portaria:</span>{" "}
-                              {t.portaria_ref}
-                            </span>
+                            {t.portaria_ref && (
+                              <span className="text-xs text-muted-foreground">
+                                <span className="font-medium text-foreground/70">Portaria:</span>{" "}
+                                {t.portaria_ref}
+                              </span>
+                            )}
                             {t.uf !== "*" && (
                               <span className="text-xs text-muted-foreground">
                                 <span className="font-medium text-foreground/70">UF:</span>{" "}

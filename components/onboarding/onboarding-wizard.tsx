@@ -824,7 +824,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base">{t.name}</CardTitle>
                           <CardDescription>
-                            {t.portaria_ref} · UF {t.uf}
+                            {t.portaria_ref ? `${t.portaria_ref} · ` : ""}UF {t.uf}
                           </CardDescription>
                         </CardHeader>
                         {t.description ? (

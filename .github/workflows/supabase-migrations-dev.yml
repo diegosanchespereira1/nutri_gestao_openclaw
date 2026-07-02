@@ -18,19 +18,16 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Validate DEV database URL secret
-        run: |
-          if [ -z "${{ secrets.SUPABASE_DB_URL_DEV }}" ]; then
-            echo "::warning::Secret SUPABASE_DB_URL_DEV não configurado — migrações DEV ignoradas."
-            exit 0
-          fi
-
       - uses: supabase/setup-cli@v1
         with:
           version: latest
 
       - name: Push migrations to DEV
-        if: ${{ secrets.SUPABASE_DB_URL_DEV != '' }}
-        run: supabase db push --db-url "$SUPABASE_DB_URL_DEV" --yes
+        run: |
+          if [ -z "$SUPABASE_DB_URL_DEV" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL_DEV não configurado — migrações DEV ignoradas."
+            exit 0
+          fi
+          supabase db push --db-url "$SUPABASE_DB_URL_DEV" --yes
         env:
           SUPABASE_DB_URL_DEV: ${{ secrets.SUPABASE_DB_URL_DEV }}

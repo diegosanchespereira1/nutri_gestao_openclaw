@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, type ReactElement } from "react";
 
 import {
   CartesianGrid,
@@ -41,12 +41,25 @@ export function evolutionXAxisProps(pointCount: number, scrolling: boolean) {
     };
   }
 
+  if (pointCount > 7) {
+    return {
+      dataKey: "date" as const,
+      tick: AXIS_TICK_STYLE,
+      axisLine: { stroke: "#cbd5e1" },
+      tickLine: false,
+      interval: 1 as const,
+      minTickGap: 22,
+      tickMargin: 8,
+      height: 36,
+    };
+  }
+
   return {
     dataKey: "date" as const,
     tick: AXIS_TICK_STYLE,
     axisLine: { stroke: "#cbd5e1" },
     tickLine: false,
-    interval: (pointCount > 7 ? 1 : "preserveStartEnd") as const,
+    interval: "preserveStartEnd" as const,
     minTickGap: 22,
     tickMargin: 8,
     height: 36,
@@ -130,7 +143,7 @@ export function EvolutionChartScrollShell({
   pointCount: number;
   height: number;
   yAxisPanel: React.ReactNode;
-  plotChart: (needsScroll: boolean) => React.ReactNode;
+  plotChart: (needsScroll: boolean) => ReactElement;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const needsScroll = pointCount > EVOLUTION_CHART_MAX_VISIBLE;

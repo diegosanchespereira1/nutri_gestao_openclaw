@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import {
   CartesianGrid,
@@ -18,35 +18,6 @@ export const EVOLUTION_CHART_MAX_VISIBLE = 10;
 
 /** Largura mínima (px) por ponto — cabe dd/mm/yy em 10px sem colisão. */
 export const EVOLUTION_CHART_PX_PER_POINT = 72;
-
-const DEBUG_LOG_ENDPOINT =
-  "http://127.0.0.1:7366/ingest/cc59036d-bbf7-423d-aeb9-6b66efcd2505";
-const DEBUG_SESSION_ID = "06313e";
-
-function debugLog(
-  hypothesisId: string,
-  location: string,
-  message: string,
-  data: Record<string, unknown>,
-) {
-  // #region agent log
-  fetch(DEBUG_LOG_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": DEBUG_SESSION_ID,
-    },
-    body: JSON.stringify({
-      sessionId: DEBUG_SESSION_ID,
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
 
 const Y_AXIS_WIDTH = 40;
 const MINI_CHART_HEIGHT = 176;
@@ -155,16 +126,13 @@ export function EvolutionChartScrollShell({
   height,
   yAxisPanel,
   plotChart,
-  chartKey,
 }: {
   pointCount: number;
   height: number;
   yAxisPanel: React.ReactNode;
   plotChart: (needsScroll: boolean) => React.ReactNode;
-  chartKey?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const shellRef = useRef<HTMLDivElement>(null);
   const needsScroll = pointCount > EVOLUTION_CHART_MAX_VISIBLE;
   const plotMinWidth = pointCount * EVOLUTION_CHART_PX_PER_POINT;
 
@@ -175,70 +143,16 @@ export function EvolutionChartScrollShell({
     el.scrollLeft = el.scrollWidth - el.clientWidth;
   }, [needsScroll, pointCount]);
 
-  useLayoutEffect(() => {
-    const root = shellRef.current;
-    if (!root) return;
-
-    const tickNodes = root.querySelectorAll(
-      ".recharts-xAxis .recharts-cartesian-axis-tick-value, .recharts-xAxis text",
-    );
-    const tickSamples = Array.from(tickNodes).slice(0, 5).map((node) => {
-      const el = node as SVGTextElement;
-      const rect = el.getBoundingClientRect();
-      return {
-        text: el.textContent,
-        y: el.getAttribute("y"),
-        fill: el.getAttribute("fill"),
-        visible: rect.width > 0 && rect.height > 0,
-        rectTop: Math.round(rect.top),
-        rectBottom: Math.round(rect.bottom),
-      };
-    });
-
-    const svg = root.querySelector(".recharts-surface") as SVGSVGElement | null;
-    const svgRect = svg?.getBoundingClientRect();
-    const shellRect = root.getBoundingClientRect();
-    const scrollEl = scrollRef.current;
-    const scrollRect = scrollEl?.getBoundingClientRect();
-
-    const tickRects = Array.from(tickNodes).map((node) =>
-      (node as SVGTextElement).getBoundingClientRect(),
-    );
-    let overlappingPairs = 0;
-    for (let i = 1; i < tickRects.length; i++) {
-      if (tickRects[i].left < tickRects[i - 1].right - 2) overlappingPairs++;
-    }
-
-    debugLog("H2", "EvolutionChartScrollShell:dom", "x-axis dom probe", {
-      chartKey,
-      runId: "post-fix-overlap",
-      needsScroll,
-      pointCount,
-      plotMinWidth,
-      tickNodeCount: tickNodes.length,
-      overlappingPairs,
-      tickSamples,
-      svgHeight: svgRect?.height,
-      svgBottom: svgRect ? Math.round(svgRect.bottom) : null,
-      shellBottom: Math.round(shellRect.bottom),
-      scrollBottom: scrollRect ? Math.round(scrollRect.bottom) : null,
-      scrollClientHeight: scrollEl?.clientHeight,
-      scrollScrollWidth: scrollEl?.scrollWidth,
-    });
-  }, [chartKey, needsScroll, pointCount, height]);
-
   if (!needsScroll) {
     return (
-      <div ref={shellRef}>
-        <ResponsiveContainer width="100%" height={height}>
-          {plotChart(false)}
-        </ResponsiveContainer>
-      </div>
+      <ResponsiveContainer width="100%" height={height}>
+        {plotChart(false)}
+      </ResponsiveContainer>
     );
   }
 
   return (
-    <div ref={shellRef} className="flex w-full">
+    <div className="flex w-full">
       {yAxisPanel}
       <div
         ref={scrollRef}
@@ -330,21 +244,9 @@ function MiniChart({
   const validCount = data.filter((d) => d[config.dataKey] != null).length;
   if (validCount < 2) return <EmptyChart />;
 
-  const needsScroll = data.length > EVOLUTION_CHART_MAX_VISIBLE;
   const domain = computeNumericDomain(data, config.dataKey, config.refLines);
   const yTickFormatter =
     config.tickFmt ?? ((v: number) => fmtNum(v, 0));
-
-  useEffect(() => {
-    debugLog("H3", "MiniChart:mount", "chart data summary", {
-      chartKey: config.dataKey,
-      pointCount: data.length,
-      needsScroll,
-      dates: data.map((row) => String(row.date)),
-      marginBottom: CHART_MARGIN.bottom,
-      chartHeight: MINI_CHART_HEIGHT,
-    });
-  }, [config.dataKey, data, needsScroll]);
 
   const renderPlot = (scrolling: boolean) => (
     <LineChart
@@ -402,7 +304,6 @@ function MiniChart({
     <EvolutionChartScrollShell
       pointCount={data.length}
       height={MINI_CHART_HEIGHT}
-      chartKey={config.dataKey}
       yAxisPanel={
         <FixedYAxisPanel
           data={data}

@@ -3,6 +3,13 @@
 import { useActionState, useState } from "react";
 
 import {
+  FormSection,
+  FormSectionDivider,
+  formFieldClass,
+  formGridClass,
+  nativeSelectValueClass,
+} from "@/components/forms/form-section";
+import {
   type NutritionAssessmentFormResult,
   createNutritionAssessmentAction,
 } from "@/lib/actions/nutrition-assessments";
@@ -13,18 +20,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 const initial: NutritionAssessmentFormResult | undefined = undefined;
-
-const selectClass =
-  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
-
-const textareaClass =
-  "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
-
-const legendClass =
-  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
 export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
   const [state, formAction, pending] = useActionState(
@@ -32,7 +30,6 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
     initial,
   );
 
-  // Controlled state preserves values if the action returns an error
   const [heightCm, setHeightCm] = useState("");
   const [weightKg, setWeightKg] = useState("");
   const [waistCm, setWaistCm] = useState("");
@@ -45,11 +42,9 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
     <form action={formAction} className="space-y-6">
       <input type="hidden" name="patient_id" value={patientId} />
 
-      {/* ── Grupo 1: Antropometria ────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Antropometria</legend>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
+      <FormSection title="Antropometria">
+        <div className={formGridClass}>
+          <div className={formFieldClass}>
             <Label htmlFor="na-height">Altura (cm)</Label>
             <Input
               id="na-height"
@@ -65,7 +60,7 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
               onChange={(e) => setHeightCm(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="na-weight">Peso (kg)</Label>
             <Input
               id="na-weight"
@@ -81,7 +76,7 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
               onChange={(e) => setWeightKg(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="na-waist">Cintura (cm)</Label>
             <Input
               id="na-waist"
@@ -98,24 +93,21 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
             />
           </div>
         </div>
-      </fieldset>
+      </FormSection>
 
-      <div className="border-t border-border" />
+      <FormSectionDivider />
 
-      {/* ── Grupo 2: Hábitos ──────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Hábitos</legend>
-
-        <div className="space-y-2">
+      <FormSection title="Hábitos">
+        <div className={formFieldClass}>
           <Label htmlFor="na-activity">Nível de atividade física</Label>
           <select
             id="na-activity"
             name="activity_level"
-            className={cn(selectClass, activityLevel === "" && "text-muted-foreground")}
+            className={nativeSelectValueClass(activityLevel)}
             value={activityLevel}
             onChange={(e) => setActivityLevel(e.target.value)}
           >
-            <option value="">— selecionar —</option>
+            <option value="">Selecione</option>
             {ACTIVITY_LEVELS.map((lvl) => (
               <option key={lvl} value={lvl}>
                 {activityLevelLabel[lvl]}
@@ -124,57 +116,47 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
           </select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="na-diet">Recordatório alimentar / hábitos</Label>
-          <textarea
+        <div className={formFieldClass}>
+          <Label htmlFor="na-diet">Hábitos alimentares</Label>
+          <Textarea
             id="na-diet"
             name="diet_notes"
             rows={3}
-            className={textareaClass}
-            style={{ minHeight: "72px" }}
-            placeholder="Padrão alimentar, refeições típicas, preferências… (opcional)"
+            placeholder="Rotina alimentar, refeições habituais, preferências… (opcional)"
             value={dietNotes}
             onChange={(e) => setDietNotes(e.target.value)}
           />
         </div>
-      </fieldset>
+      </FormSection>
 
-      <div className="border-t border-border" />
+      <FormSectionDivider />
 
-      {/* ── Grupo 3: Clínica e objetivos ──────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Clínica e objetivos</legend>
-
-        <div className="space-y-2">
+      <FormSection title="Clínica e objetivos">
+        <div className={formFieldClass}>
           <Label htmlFor="na-clinical">Notas clínicas relevantes</Label>
-          <textarea
+          <Textarea
             id="na-clinical"
             name="clinical_notes"
             rows={3}
-            className={textareaClass}
-            style={{ minHeight: "72px" }}
-            placeholder="Condicionantes, medicação com impacto nutricional… (opcional)"
+            placeholder="Condições clínicas, medicamentos com impacto nutricional… (opcional)"
             value={clinicalNotes}
             onChange={(e) => setClinicalNotes(e.target.value)}
           />
         </div>
 
-        <div className="space-y-2">
+        <div className={formFieldClass}>
           <Label htmlFor="na-goals">Objetivos do plano</Label>
-          <textarea
+          <Textarea
             id="na-goals"
             name="goals"
             rows={2}
-            className={textareaClass}
-            style={{ minHeight: "56px" }}
-            placeholder="Ex.: ganho de massa muscular, controlo glicémico… (opcional)"
+            placeholder="Ex.: ganho de massa muscular, controle glicêmico… (opcional)"
             value={goals}
             onChange={(e) => setGoals(e.target.value)}
           />
         </div>
-      </fieldset>
+      </FormSection>
 
-      {/* ── Feedback ──────────────────────────────────────── */}
       {state?.ok === false ? (
         <p
           className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
@@ -186,10 +168,10 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
 
       <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:gap-4">
         <Button type="submit" disabled={pending}>
-          {pending ? "Registando…" : "Registar avaliação"}
+          {pending ? "Atualizando…" : "Atualizar informações complementares"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          Cada envio cria um novo registo datado — o histórico anterior não é alterado.
+          Cada envio cria um novo registro datado — o histórico anterior não é alterado.
         </p>
       </div>
     </form>

@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 const clinicalQuickLinkClass =
   "text-primary font-medium underline-offset-4 hover:underline";
 
-export async function InicioClinicalPanel() {
+export async function DashboardClinicalPanel() {
   const [cookieStore, { supabase, user, workspaceOwnerId }] = await Promise.all([
     cookies(),
     getServerContext(),

@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
 import {
-  buildModuleBlockedInicioPath,
+  buildModuleBlockedDashboardPath,
   getModuleGateForPath,
   isPathAllowedForEnabledModules,
 } from "@/lib/modules/module-path-access";
@@ -21,5 +22,5 @@ export async function requireModulePathAccess(pathname: string): Promise<void> {
   if (isPathAllowedForEnabledModules(pathname, enabledModules)) return;
 
   const gate = getModuleGateForPath(pathname);
-  redirect(gate ? buildModuleBlockedInicioPath(gate) : "/inicio");
+  redirect(gate ? buildModuleBlockedDashboardPath(gate) : APP_DASHBOARD_PATH);
 }

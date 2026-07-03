@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PasswordField } from "@/components/auth/password-field";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { getBrowserAppOrigin } from "@/lib/app-origin";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ export function RegisterForm() {
       email,
       password,
       options: {
-        emailRedirectTo: `${origin}/auth/callback?next=/inicio`,
+        emailRedirectTo: `${origin}/auth/callback?next=${APP_DASHBOARD_PATH}`,
         data: { full_name: fullName },
       },
     });
@@ -84,7 +85,7 @@ export function RegisterForm() {
 
     if (data.session) {
       setLoading(false);
-      router.replace("/inicio");
+      router.replace(APP_DASHBOARD_PATH);
       router.refresh();
       return;
     }

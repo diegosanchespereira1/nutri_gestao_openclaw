@@ -9,57 +9,84 @@ import {
   TabsContent,
 } from "@/components/ui/tabs";
 
+type AssessmentTab = {
+  value: string;
+  label: string;
+  content: ReactNode;
+};
+
 /**
- * Abas de avaliação. Cada avaliação especializada (infantil/adulto/idoso) é
- * exibida conforme a faixa etária do paciente — não se mostra a aba de adulto
- * para uma criança/idoso e vice-versa. A "Avaliação Geral" é sempre exibida.
+ * Abas de avaliação especializada (infantil/adulto/idoso).
+ * Com uma única aba visível, o conteúdo é exibido direto — sem tablist.
  */
 export function NutritionAssessmentsTabs({
   generalTab,
   adultTab,
   geriatricTab,
   childTab,
+  showGeneral = true,
   showAdult = true,
   showGeriatric = true,
   showChild = false,
 }: {
-  generalTab: ReactNode;
+  generalTab?: ReactNode;
   adultTab: ReactNode;
   geriatricTab: ReactNode;
   childTab?: ReactNode;
+  showGeneral?: boolean;
   showAdult?: boolean;
   showGeriatric?: boolean;
   showChild?: boolean;
 }) {
-  const childVisible = showChild && childTab != null;
-  const adultVisible = showAdult && adultTab != null;
-  const geriatricVisible = showGeriatric && geriatricTab != null;
+  const tabs: AssessmentTab[] = [];
 
-  const defaultValue = childVisible
-    ? "child"
-    : adultVisible
-      ? "adult"
-      : geriatricVisible
-        ? "geriatric"
-        : "general";
+  if (showGeneral && generalTab != null) {
+    tabs.push({
+      value: "general",
+      label: "Informações complementares",
+      content: generalTab,
+    });
+  }
+  if (showChild && childTab != null) {
+    tabs.push({
+      value: "child",
+      label: "Avaliação Infantil",
+      content: childTab,
+    });
+  }
+  if (showAdult && adultTab != null) {
+    tabs.push({
+      value: "adult",
+      label: "Avaliação Adultos",
+      content: adultTab,
+    });
+  }
+  if (showGeriatric && geriatricTab != null) {
+    tabs.push({
+      value: "geriatric",
+      label: "Avaliação para Idosos",
+      content: geriatricTab,
+    });
+  }
+
+  if (tabs.length === 0) return null;
+  if (tabs.length === 1) return <>{tabs[0].content}</>;
 
   return (
-    <Tabs defaultValue={defaultValue}>
+    <Tabs defaultValue={tabs[0].value}>
       <TabsList className="flex h-auto min-h-10 w-full flex-wrap gap-1">
-        <TabsTrigger value="general">Avaliação Geral</TabsTrigger>
-        {childVisible && <TabsTrigger value="child">Avaliação Infantil</TabsTrigger>}
-        {adultVisible && <TabsTrigger value="adult">Avaliação Adultos</TabsTrigger>}
-        {geriatricVisible && (
-          <TabsTrigger value="geriatric">Avaliação para Idosos</TabsTrigger>
-        )}
+        {tabs.map((tab) => (
+          <TabsTrigger key={tab.value} value={tab.value}>
+            {tab.label}
+          </TabsTrigger>
+        ))}
       </TabsList>
 
-      <TabsContent value="general">{generalTab}</TabsContent>
-      {childVisible && <TabsContent value="child">{childTab}</TabsContent>}
-      {adultVisible && <TabsContent value="adult">{adultTab}</TabsContent>}
-      {geriatricVisible && (
-        <TabsContent value="geriatric">{geriatricTab}</TabsContent>
-      )}
+      {tabs.map((tab) => (
+        <TabsContent key={tab.value} value={tab.value}>
+          {tab.content}
+        </TabsContent>
+      ))}
     </Tabs>
   );
 }

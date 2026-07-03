@@ -11,6 +11,7 @@ import { AppVersionGuard } from "@/components/app-version-guard";
 import { Toaster } from "@/components/ui/sonner";
 import { resolveAppShellContext } from "@/lib/auth/resolve-app-shell-context";
 import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { canAccessAdminArea } from "@/lib/roles";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
@@ -26,7 +27,7 @@ export default async function AppAreaLayout({
   ]);
   const pathname = headersList.get("x-pathname") ?? "";
   if (!profileCtx?.userId) {
-    redirect(buildLoginRedirectPath(pathname || "/inicio"));
+    redirect(buildLoginRedirectPath(pathname || APP_DASHBOARD_PATH));
   }
 
   const role = profileCtx.role;

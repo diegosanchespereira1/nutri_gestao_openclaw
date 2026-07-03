@@ -39,7 +39,8 @@ import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import {
   DEFAULT_ENABLED_MODULES,
 } from "@/lib/types/modules";
-import { isPathAllowedForEnabledModules, buildModuleBlockedInicioPath, getModuleGateForPath } from "@/lib/modules/module-path-access";
+import { isPathAllowedForEnabledModules, buildModuleBlockedDashboardPath, getModuleGateForPath } from "@/lib/modules/module-path-access";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
 
 const AUTH_MIDDLEWARE_TIMEOUT_MS = 4_500;
@@ -397,7 +398,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && isAuthEntryPath) {
-    const redirectRes = NextResponse.redirect(new URL("/inicio", request.url));
+    const redirectRes = NextResponse.redirect(new URL(APP_DASHBOARD_PATH, request.url));
     copyCookies(supabaseResponse, redirectRes);
     return redirectRes;
   }
@@ -436,7 +437,7 @@ export async function updateSession(request: NextRequest) {
       return redirectRes;
     }
     if (!needsOnboarding && onOnboardingRoute) {
-      const redirectRes = NextResponse.redirect(new URL("/inicio", request.url));
+      const redirectRes = NextResponse.redirect(new URL(APP_DASHBOARD_PATH, request.url));
       copyCookies(supabaseResponse, redirectRes);
       logAuthMiddleware("info", requestId, "onboarding_skip_redirect", {
         userId: user.id,
@@ -449,7 +450,7 @@ export async function updateSession(request: NextRequest) {
   if (user && isAdminPath(pathname)) {
     const role = profileCtx?.role ?? null;
     if (!canAccessAdminArea(role)) {
-      const redirectRes = NextResponse.redirect(new URL("/inicio", request.url));
+      const redirectRes = NextResponse.redirect(new URL(APP_DASHBOARD_PATH, request.url));
       copyCookies(supabaseResponse, redirectRes);
       logAuthMiddleware("warn", requestId, "admin_access_denied_redirect", {
         userId: user.id,
@@ -472,8 +473,8 @@ export async function updateSession(request: NextRequest) {
   ) {
     const gate = getModuleGateForPath(pathname);
     const blockedPath = gate
-      ? buildModuleBlockedInicioPath(gate)
-      : "/inicio";
+      ? buildModuleBlockedDashboardPath(gate)
+      : APP_DASHBOARD_PATH;
     const redirectRes = NextResponse.redirect(new URL(blockedPath, request.url));
     copyCookies(supabaseResponse, redirectRes);
     logAuthMiddleware("info", requestId, "module_access_denied_redirect", {

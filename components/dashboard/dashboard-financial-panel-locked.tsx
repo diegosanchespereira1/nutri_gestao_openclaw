@@ -6,7 +6,7 @@ import { DashboardFocusPanel } from "@/components/dashboard/dashboard-focus-pane
 import { useModuleGate } from "@/components/modules/module-gate-provider";
 import { Button } from "@/components/ui/button";
 
-export function InicioFinancialPanelLocked() {
+export function DashboardFinancialPanelLocked() {
   const { openDisabledModule } = useModuleGate();
 
   return (

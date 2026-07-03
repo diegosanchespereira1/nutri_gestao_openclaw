@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppBuildLabel, AppVersionGuard } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Toaster } from "@/components/ui/sonner";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import { fetchProfileRole } from "@/lib/supabase/profile";
@@ -22,7 +23,7 @@ export default async function AdminAreaLayout({
 
   const role = await fetchProfileRole(supabase, user.id);
   if (!canAccessAdminArea(role)) {
-    redirect("/inicio");
+    redirect(APP_DASHBOARD_PATH);
   }
 
   return (

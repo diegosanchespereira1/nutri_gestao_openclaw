@@ -6,6 +6,7 @@ import {
   isPathAllowedWhenLgpdBlocked,
   isProtectedPath,
 } from "@/lib/auth-paths";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 
 describe("auth-paths", () => {
   it("login é público", () => {
@@ -13,8 +14,8 @@ describe("auth-paths", () => {
     expect(isAuthPublicPath("/auth/callback")).toBe(true);
   });
 
-  it("inicio é protegido", () => {
-    expect(isProtectedPath("/inicio")).toBe(true);
+  it("dashboard é protegido", () => {
+    expect(isProtectedPath(APP_DASHBOARD_PATH)).toBe(true);
     expect(isProtectedPath("/pacientes/1")).toBe(true);
   });
 
@@ -25,7 +26,7 @@ describe("auth-paths", () => {
 
   it("LGPD bloqueado permite conta-bloqueada", () => {
     expect(isPathAllowedWhenLgpdBlocked("/conta-bloqueada")).toBe(true);
-    expect(isPathAllowedWhenLgpdBlocked("/inicio")).toBe(false);
+    expect(isPathAllowedWhenLgpdBlocked(APP_DASHBOARD_PATH)).toBe(false);
   });
 
   it("raiz é pública", () => {

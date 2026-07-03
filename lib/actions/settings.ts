@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -44,7 +46,7 @@ export async function updateTimeZoneAction(
 
   revalidatePath("/", "layout");
   revalidatePath("/definicoes/regiao");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath("/visitas");
   return { ok: true, timeZone: timezone };
 }

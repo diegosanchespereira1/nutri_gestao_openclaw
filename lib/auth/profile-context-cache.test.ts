@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { shouldReuseProfileContextCache } from "./profile-context-cache";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 
 const baseCached = {
@@ -41,13 +42,13 @@ describe("shouldReuseProfileContextCache", () => {
         userId: "user-1",
         nowSec,
         ttlSec,
-        pathname: "/inicio",
+        pathname: APP_DASHBOARD_PATH,
         bemvindoParam: "1",
       }),
     ).toBe(false);
   });
 
-  it("invalida inicio quando cache ainda marca needsOnboarding", () => {
+  it("invalida dashboard quando cache ainda marca needsOnboarding", () => {
     expect(
       shouldReuseProfileContextCache({
         isNewAppSession: false,
@@ -55,7 +56,7 @@ describe("shouldReuseProfileContextCache", () => {
         userId: "user-1",
         nowSec,
         ttlSec,
-        pathname: "/inicio",
+        pathname: APP_DASHBOARD_PATH,
         bemvindoParam: null,
       }),
     ).toBe(false);

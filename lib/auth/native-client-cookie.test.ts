@@ -14,7 +14,7 @@ function requestWith(
   if (init.userAgent) headers.set("user-agent", init.userAgent);
   if (init.cookie) headers.set("cookie", init.cookie);
 
-  return new NextRequest(init.url ?? "https://nutricao.stratostech.com.br/inicio", {
+  return new NextRequest(init.url ?? "https://nutricao.stratostech.com.br/dashboard", {
     headers,
   });
 }

@@ -1,3 +1,4 @@
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import type { EnabledModuleKey, EnabledModules } from "@/lib/types/modules";
 import { ENABLED_MODULE_LABELS } from "@/lib/types/modules";
 
@@ -42,8 +43,11 @@ export function getModuleLabel(moduleKey: EnabledModuleKey): string {
   return ENABLED_MODULE_LABELS[moduleKey];
 }
 
-export function buildModuleBlockedInicioPath(
+export function buildModuleBlockedDashboardPath(
   moduleKey: EnabledModuleKey,
 ): string {
-  return `/inicio?${MODULE_BLOCKED_QUERY_PARAM}=${moduleKey}`;
+  return `${APP_DASHBOARD_PATH}?${MODULE_BLOCKED_QUERY_PARAM}=${moduleKey}`;
 }
+
+/** @deprecated Use {@link buildModuleBlockedDashboardPath}. */
+export const buildModuleBlockedInicioPath = buildModuleBlockedDashboardPath;

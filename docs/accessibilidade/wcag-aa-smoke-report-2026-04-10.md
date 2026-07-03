@@ -4,7 +4,7 @@
 
 - `/login`
 - `/forgot-password`
-- `/inicio`
+- `/dashboard`
 - `/pacientes`
 - `/visitas`
 - `/configuracoes/notificacoes`
@@ -22,7 +22,7 @@
 |---|---|---|---|---|---|
 | `/login` | PASS* | Sem bloqueante identificado no código (labels, erros com `role="alert"`, foco visível via classes) | `components/auth/login-form.tsx` | Cursor | 2026-04-10 |
 | `/forgot-password` | PASS* | Sem bloqueante identificado no código (label, mensagem de sucesso com `role="status"`, erro com `role="alert"`) | `components/auth/forgot-password-form.tsx` | Cursor | 2026-04-10 |
-| `/inicio` | PASS* | Skip link e landmark principal presentes no shell, headings e regiões nomeadas | `components/app-shell.tsx`, `app/(app)/inicio/page.tsx` | Cursor | 2026-04-10 |
+| `/dashboard` | PASS* | Skip link e landmark principal presentes no shell, headings e regiões nomeadas | `components/app-shell.tsx`, `app/(app)/dashboard/page.tsx` | Cursor | 2026-04-10 |
 | `/pacientes` | PASS* | Formulário com labels e lista com `aria-label` | `app/(app)/pacientes/page.tsx` | Cursor | 2026-04-10 |
 | `/visitas` | PASS* | Página delega para componente cliente; sem bloqueante evidente nesta camada | `app/(app)/visitas/page.tsx` | Cursor | 2026-04-10 |
 | `/configuracoes/notificacoes` | PASS* | **BLOQ corrigido:** redirect inválido para `/auth/login` ajustado para `/login`; adicionados `role="status"` e `role="alert"` no painel | `app/(app)/configuracoes/notificacoes/page.tsx`, `components/notifications/preferences-panel.tsx` | Cursor | 2026-04-10 |

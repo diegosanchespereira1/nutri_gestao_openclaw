@@ -339,7 +339,7 @@ export function VisitsAgendaClient({
             fica disponível no{" "}
             <span className="font-medium">dia da visita</span> (no fuso de
             Definições → Região), no detalhe da visita, no painel ao lado ou no
-            cartão do dia em Início. Se houver vários modelos, escolha um antes
+            cartão do dia no Dashboard. Se houver vários modelos, escolha um antes
             do preenchimento.
           </div>
         ) : null}

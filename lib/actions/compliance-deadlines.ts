@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 
 import { addCalendarDays, todayKey } from "@/lib/datetime/calendar-tz";
@@ -190,7 +192,7 @@ export async function createComplianceDeadlineAction(
   if (error) return { ok: false, error: "Não foi possível criar o prazo." };
 
   revalidatePath(`/clientes/${clientId}/estabelecimentos/${establishmentId}/editar`);
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   return { ok: true };
 }
 
@@ -221,6 +223,6 @@ export async function deleteComplianceDeadlineFormAction(
   if (error) return { ok: false, error: "Não foi possível eliminar." };
 
   revalidatePath(`/clientes/${clientId}/estabelecimentos/${establishmentId}/editar`);
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   return { ok: true };
 }

@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -195,7 +197,7 @@ export async function createFinancialChargeAction(
   }
 
   revalidatePath("/financeiro");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath(`/clientes/${clientId}/editar`);
   redirect("/financeiro?tab=operacoes");
 }
@@ -235,7 +237,7 @@ export async function markFinancialChargePaidAction(
   }
 
   revalidatePath("/financeiro");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   const cid = existing?.client_id as string | undefined;
   if (cid) {
     revalidatePath(`/clientes/${cid}/editar`);

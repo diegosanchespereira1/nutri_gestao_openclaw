@@ -3,8 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 const PRIMARY_ROUTES = [
-  "/inicio",
+  APP_DASHBOARD_PATH,
   "/clientes",
   "/checklists",
   "/visitas",

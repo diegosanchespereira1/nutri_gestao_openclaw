@@ -28,7 +28,7 @@ type WithPatientEmbed = {
 };
 
 const ASSESSMENT_KIND_LABELS: Record<ConsolidatedAssessmentKind, string> = {
-  general: "Avaliação geral",
+  general: "Informações complementares",
   adult: "Adultos",
   geriatric: "Idosos",
   child: "Infantil",

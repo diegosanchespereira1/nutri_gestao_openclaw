@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 import {
-  buildModuleBlockedInicioPath,
+  buildModuleBlockedDashboardPath,
   getModuleGateForPath,
   isPathAllowedForEnabledModules,
 } from "./module-path-access";
@@ -14,7 +15,7 @@ describe("isPathAllowedForEnabledModules", () => {
       visitas: false,
       financeiro: false,
     };
-    expect(isPathAllowedForEnabledModules("/inicio", modules)).toBe(true);
+    expect(isPathAllowedForEnabledModules(APP_DASHBOARD_PATH, modules)).toBe(true);
     expect(isPathAllowedForEnabledModules("/clientes", modules)).toBe(true);
   });
 
@@ -49,12 +50,12 @@ describe("isPathAllowedForEnabledModules", () => {
   it("resolve gate por pathname", () => {
     expect(getModuleGateForPath("/financeiro")).toBe("financeiro");
     expect(getModuleGateForPath("/financeiro/operacoes")).toBe("financeiro");
-    expect(getModuleGateForPath("/inicio")).toBeNull();
+    expect(getModuleGateForPath(APP_DASHBOARD_PATH)).toBeNull();
   });
 
-  it("monta URL de bloqueio para o início", () => {
-    expect(buildModuleBlockedInicioPath("financeiro")).toBe(
-      "/inicio?modulo_bloqueado=financeiro",
+  it("monta URL de bloqueio para o dashboard", () => {
+    expect(buildModuleBlockedDashboardPath("financeiro")).toBe(
+      "/dashboard?modulo_bloqueado=financeiro",
     );
   });
 });

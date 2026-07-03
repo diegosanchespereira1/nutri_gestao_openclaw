@@ -1,5 +1,13 @@
+import { APP_DASHBOARD_PATH, LEGACY_INICIO_PATH } from "@/lib/routes";
+
 /** Destino interno após login/callback — bloqueia open redirect (URLs absolutas, //, javascript:, etc.). */
-const DEFAULT_SAFE_NEXT = "/inicio";
+const DEFAULT_SAFE_NEXT = APP_DASHBOARD_PATH;
+
+/** Reescreve `/inicio` (e query/hash) para a rota actual do dashboard. */
+function normalizeLegacyDashboardPath(trimmed: string, pathOnly: string): string {
+  if (pathOnly !== LEGACY_INICIO_PATH) return trimmed;
+  return `${APP_DASHBOARD_PATH}${trimmed.slice(pathOnly.length)}`;
+}
 
 /**
  * Devolve um path seguro para `router.push`, `location.assign` ou `new URL(path, origin)`.
@@ -18,7 +26,7 @@ export function safeNextPath(raw: string | null | undefined): string {
     return DEFAULT_SAFE_NEXT;
   }
 
-  return trimmed;
+  return normalizeLegacyDashboardPath(trimmed, pathOnly);
 }
 
 export type LoginRedirectReason = "session_expired";

@@ -342,10 +342,10 @@ export function PatientForm({
         </>
       ) : null}
 
-      {/* ── Grupo 2: Contacto ────────────────────────────────── */}
+      {/* ── Grupo 2: Contato ────────────────────────────────── */}
       <fieldset className="space-y-4">
         <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Contacto
+          Contato
         </legend>
 
         <div className="grid gap-4 sm:grid-cols-2">

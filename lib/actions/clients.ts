@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -578,7 +580,7 @@ function revalidatePathsAfterClientMutation(clientId: string) {
   revalidatePath("/visitas/nova");
   revalidatePath("/visitas");
   revalidatePath("/pacientes");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath("/estabelecimentos");
   revalidatePath("/checklists");
 }
@@ -800,7 +802,7 @@ export async function deleteClientAction(formData: FormData) {
   revalidatePath("/pacientes");
   revalidatePath("/visitas/nova");
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   redirect("/clientes");
 }
 

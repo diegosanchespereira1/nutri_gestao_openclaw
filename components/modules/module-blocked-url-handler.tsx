@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { useModuleGate } from "@/components/modules/module-gate-provider";
 import { MODULE_BLOCKED_QUERY_PARAM } from "@/lib/modules/module-path-access";
 import { ENABLED_MODULE_KEYS, type EnabledModuleKey } from "@/lib/types/modules";
@@ -36,7 +37,10 @@ export function ModuleBlockedUrlHandler() {
     const next = new URLSearchParams(searchParams.toString());
     next.delete(MODULE_BLOCKED_QUERY_PARAM);
     const query = next.toString();
-    router.replace(query ? `/inicio?${query}` : "/inicio", { scroll: false });
+    router.replace(
+      query ? `${APP_DASHBOARD_PATH}?${query}` : APP_DASHBOARD_PATH,
+      { scroll: false },
+    );
   }, [openDisabledModule, router, searchParams]);
 
   return null;

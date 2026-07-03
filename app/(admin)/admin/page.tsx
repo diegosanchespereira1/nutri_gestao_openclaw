@@ -1,6 +1,7 @@
 // Epic 10 — Administração da plataforma — hub de navegação
 import Link from "next/link";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 import {
@@ -97,7 +98,7 @@ export default function AdminHomePage() {
       </div>
 
       <Link
-        href="/inicio"
+        href={APP_DASHBOARD_PATH}
         className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
       >
         ← Voltar à aplicação

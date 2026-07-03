@@ -30,10 +30,12 @@ import { establishmentClientLabel } from "@/lib/utils/establishment-client-label
 import { cn } from "@/lib/utils";
 
 const selectClassName =
-  "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+  "border-input bg-background text-foreground box-border h-9 min-w-0 w-full max-w-full truncate rounded-lg border px-2.5 text-sm shadow-xs outline-none transition-[color,box-shadow] focus:border-ring focus:ring-2 focus:ring-inset focus:ring-ring/40";
 
 const textareaClass =
-  "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
+  "border-input bg-background placeholder:text-muted-foreground box-border flex min-h-[72px] min-w-0 w-full max-w-full resize-y break-words rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus:border-ring focus:ring-2 focus:ring-inset focus:ring-ring/40";
+
+const fieldClassName = "flex min-w-0 flex-col gap-2";
 
 function schedulingBlockedSuffix(status: ClientLifecycleStatus): string {
   if (status === "ativo") return "";
@@ -115,8 +117,8 @@ export function VisitScheduleDialog({
         }
       }}
     >
-      <DialogContent className="flex max-h-[92dvh] max-w-lg flex-col" showCloseButton>
-        <DialogHeader className="shrink-0">
+      <DialogContent className="flex max-h-[min(92dvh,820px)] w-[calc(100%-2rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0" showCloseButton>
+        <DialogHeader className="shrink-0 px-6 pt-6">
           <DialogTitle>Agendar visita</DialogTitle>
           <DialogDescription>
             Tipo, destino, data/hora e prioridade. Profissional e notas são opcionais.
@@ -125,7 +127,7 @@ export function VisitScheduleDialog({
 
         {isLoadingTargets ? (
           <div
-            className="flex-1 space-y-3 py-4"
+            className="flex-1 space-y-3 px-6 py-4"
             role="status"
             aria-live="polite"
             aria-label="Carregando destinos"
@@ -135,7 +137,7 @@ export function VisitScheduleDialog({
             ))}
           </div>
         ) : noTargets ? (
-          <div className="border-border bg-muted/30 flex-1 rounded-lg border border-dashed p-6 text-sm">
+          <div className="border-border bg-muted/30 mx-6 mb-6 flex-1 rounded-lg border border-dashed p-6 text-sm">
             <p className="text-muted-foreground">
               Precisa de pelo menos um estabelecimento ou paciente ativo para agendar.
             </p>
@@ -161,13 +163,14 @@ export function VisitScheduleDialog({
             key={formKey}
             action={formAction}
             onSubmit={handleSubmit}
-            className="flex min-h-0 flex-1 flex-col gap-0"
+            className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden px-6 pb-6"
           >
             <input type="hidden" name="scheduled_start_iso" defaultValue="" />
 
-            <div className="flex-1 space-y-5 overflow-y-auto pr-1 pb-1">
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain [-webkit-overflow-scrolling:touch]">
+              <div className="flex flex-col gap-6 pb-6">
               {/* Destino */}
-              <fieldset className="space-y-2">
+              <fieldset className="flex min-w-0 flex-col gap-2">
                 <legend className="text-foreground text-sm font-medium">
                   Destino da visita
                 </legend>
@@ -201,7 +204,7 @@ export function VisitScheduleDialog({
 
               {/* Estabelecimento / Paciente */}
               {targetType === "establishment" ? (
-                <div className="space-y-2">
+                <div className={fieldClassName}>
                   <Label htmlFor="dlg-establishment">Estabelecimento (cliente PJ)</Label>
                   <select
                     id="dlg-establishment"
@@ -227,7 +230,7 @@ export function VisitScheduleDialog({
               )}
 
               {targetType === "patient" ? (
-                <div className="space-y-2">
+                <div className={fieldClassName}>
                   <Label htmlFor="dlg-patient">Paciente</Label>
                   <select
                     id="dlg-patient"
@@ -255,7 +258,7 @@ export function VisitScheduleDialog({
               )}
 
               {/* Tipo de visita */}
-              <div className="space-y-2">
+              <div className={fieldClassName}>
                 <Label htmlFor="dlg-visit-kind">Tipo de visita</Label>
                 <select
                   id="dlg-visit-kind"
@@ -276,7 +279,7 @@ export function VisitScheduleDialog({
               </div>
 
               {/* Profissional */}
-              <div className="space-y-2">
+              <div className={fieldClassName}>
                 <Label htmlFor="dlg-assignee">Profissional que atende</Label>
                 <select
                   id="dlg-assignee"
@@ -297,41 +300,42 @@ export function VisitScheduleDialog({
                 </select>
               </div>
 
-              {/* Data e hora */}
-              <div className="space-y-2">
-                <Label htmlFor="dlg-scheduled-start">Data e hora</Label>
-                <Input
-                  id="dlg-scheduled-start"
-                  name="scheduled_start_local"
-                  type="datetime-local"
-                  required
-                  defaultValue={defaultScheduledStart}
-                  className="w-full max-w-xs"
-                />
-                <p className="text-muted-foreground text-xs">
-                  Horário no fuso configurado em Definições → Região.
-                </p>
-              </div>
+              {/* Data e hora + Prioridade */}
+              <div className="grid min-w-0 grid-cols-1 gap-6 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] sm:gap-4">
+                <div className={fieldClassName}>
+                  <Label htmlFor="dlg-scheduled-start">Data e hora</Label>
+                  <Input
+                    id="dlg-scheduled-start"
+                    name="scheduled_start_local"
+                    type="datetime-local"
+                    required
+                    defaultValue={defaultScheduledStart}
+                    className="w-full focus-visible:ring-inset focus-visible:ring-ring/40"
+                  />
+                  <p className="text-muted-foreground break-words text-xs">
+                    Horário no fuso configurado em Definições → Região.
+                  </p>
+                </div>
 
-              {/* Prioridade */}
-              <div className="space-y-2">
-                <Label htmlFor="dlg-priority">Prioridade</Label>
-                <select
-                  id="dlg-priority"
-                  name="priority"
-                  className={selectClassName}
-                  defaultValue="normal"
-                >
-                  {VISIT_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {visitPriorityLabel[p]}
-                    </option>
-                  ))}
-                </select>
+                <div className={fieldClassName}>
+                  <Label htmlFor="dlg-priority">Prioridade</Label>
+                  <select
+                    id="dlg-priority"
+                    name="priority"
+                    className={selectClassName}
+                    defaultValue="normal"
+                  >
+                    {VISIT_PRIORITIES.map((p) => (
+                      <option key={p} value={p}>
+                        {visitPriorityLabel[p]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Notas */}
-              <div className="space-y-2">
+              <div className={fieldClassName}>
                 <Label htmlFor="dlg-notes">Notas (opcional)</Label>
                 <textarea
                   id="dlg-notes"
@@ -342,7 +346,7 @@ export function VisitScheduleDialog({
               </div>
 
               {/* Emails dossiê */}
-              <div className="space-y-2">
+              <div className={fieldClassName}>
                 <Label htmlFor="dlg-dossier-emails">
                   Emails para dossiê (opcional)
                 </Label>
@@ -351,19 +355,20 @@ export function VisitScheduleDialog({
                   name="dossier_recipient_emails"
                   rows={2}
                   className={textareaClass}
-                  placeholder="ex.: contacto@cliente.pt"
+                  placeholder="ex.: contato@cliente.com.br"
                 />
-                <p className="text-muted-foreground text-xs">
+                <p className="text-muted-foreground break-words text-xs">
                   Até {MAX_DOSSIER_EMAIL_RECIPIENTS} emails, separados por vírgula ou linha.
                 </p>
+              </div>
               </div>
             </div>
 
             {state?.ok === false ? (
-              <p className="text-destructive mt-3 shrink-0 text-sm">{state.error}</p>
+              <p className="text-destructive mt-3 min-w-0 shrink-0 break-words text-sm">{state.error}</p>
             ) : null}
 
-            <div className="mt-4 flex shrink-0 gap-2 border-t pt-4">
+            <div className="bg-popover mt-4 flex min-w-0 shrink-0 gap-2 border-t pt-4">
               <button
                 type="button"
                 onClick={onClose}
@@ -380,7 +385,7 @@ export function VisitScheduleDialog({
                 disabled={isPending || disableSubmit}
                 className={cn(buttonVariants(), "min-h-11 flex-1 justify-center")}
               >
-                {isPending ? "A guardar…" : "Agendar visita"}
+                {isPending ? "Salvando…" : "Agendar visita"}
               </button>
             </div>
           </form>

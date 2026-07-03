@@ -125,7 +125,7 @@ export default async function EditarPacientePage({
           role="status"
         >
           <p className="text-sm font-medium text-green-800">
-            Avaliação nutricional registada com sucesso.
+            Informações complementares registradas com sucesso.
           </p>
         </div>
       ) : null}
@@ -135,7 +135,7 @@ export default async function EditarPacientePage({
           role="status"
         >
           <p className="text-sm font-medium text-green-800">
-            Avaliação nutricional (adultos) registada com sucesso.
+            Avaliação nutricional (adultos) registrada com sucesso.
           </p>
         </div>
       ) : null}
@@ -207,13 +207,13 @@ export default async function EditarPacientePage({
         </Card>
       ) : null}
 
-      {/* ── Seção 3: Avaliações nutricionais ───────────────────── */}
+      {/* ── Seção 3: Avaliações especializadas ─────────────────── */}
       <Card>
         <CardHeader className="border-b border-border pb-4">
-          <CardTitle className="text-base">Avaliações nutricionais</CardTitle>
+          <CardTitle className="text-base">Avaliações especializadas</CardTitle>
           <CardDescription>
-            Registe medidas antropométricas, hábitos e objetivos. Cada registo
-            é imutável e forma o histórico de acompanhamento.
+            Modelos por faixa etária (infantil, adultos ou idosos). As informações
+            complementares estão no prontuário do paciente.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">

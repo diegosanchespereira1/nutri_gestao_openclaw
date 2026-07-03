@@ -19,7 +19,7 @@ const IOS_65_DIR = path.join(OUT, "app-store/screenshots-iphone-6.5");
 const IOS_69_DIR = path.join(OUT, "app-store/screenshots-iphone-6.9");
 
 const SCREENS: Array<{ slug: string; path: string; heading?: RegExp | string }> = [
-  { slug: "01-inicio", path: "/inicio", heading: /início/i },
+  { slug: "01-dashboard", path: "/dashboard", heading: /dashboard/i },
   { slug: "02-ficha-tecnica", path: "/ficha-tecnica", heading: /ficha técnica/i },
   { slug: "03-checklists", path: "/checklists", heading: /checklist/i },
   { slug: "04-clientes", path: "/clientes", heading: /cliente/i },

@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { AdultNutritionAssessmentForm } from "@/components/pacientes/adult-nutrition-assessment-form";
 import { ChildAssessmentForm } from "@/components/pacientes/child-assessment-form";
 import { GeriatricAssessmentForm } from "@/components/pacientes/geriatric-assessment-form";
-import { NutritionAssessmentForm } from "@/components/pacientes/nutrition-assessment-form";
 import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -41,18 +40,18 @@ export default async function NovaAvaliacaoPage({
   return (
     <PageLayout variant="form">
       <PageHeader
-        title="Realizar avaliação nutricional"
-        description={row.full_name}
+        title="Realizar avaliação especializada"
+        description={`${row.full_name} — informações complementares no prontuário`}
         back={{ href: `/pacientes/${id}`, label: "Prontuário" }}
       />
 
       <Card>
         <CardContent className="pt-6">
           <NutritionAssessmentsTabs
+            showGeneral={false}
             showChild={showChild}
             showAdult={showAdult}
             showGeriatric={showGeriatric}
-            generalTab={<NutritionAssessmentForm patientId={id} />}
             childTab={
               <ChildAssessmentForm
                 patientId={id}

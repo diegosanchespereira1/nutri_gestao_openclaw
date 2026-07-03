@@ -3,6 +3,14 @@
 import { useActionState, useMemo, useState } from "react";
 
 import {
+  FormSection,
+  FormSectionDivider,
+  formFieldClass,
+  formGridClass,
+  nativeSelectClass,
+  nativeSelectValueClass,
+} from "@/components/forms/form-section";
+import {
   type AdultNutritionAssessmentFormResult,
   createAdultNutritionAssessmentAction,
 } from "@/lib/actions/adult-nutrition-assessments";
@@ -21,23 +29,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { Textarea } from "@/components/ui/textarea";
 
 const initial: AdultNutritionAssessmentFormResult | undefined = undefined;
-
-const selectClass =
-  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
-
-// Selects com opção vazia: texto claro (muted) quando nada selecionado, escuro quando preenchido
-function selectValueClass(value: string) {
-  return cn(selectClass, value === "" && "text-muted-foreground");
-}
-
-const legendClass =
-  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
-
-const textareaClass =
-  "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
 function toNum(v: string): number | null {
   const n = Number(v.replace(",", "."));
@@ -49,7 +43,6 @@ function fmt(n: number | null, decimals = 2): string {
   return n.toFixed(decimals).replace(".", ",");
 }
 
-// ── Caixa de valor calculado ──────────────────────────────────────────────────
 function CalcBox({
   label,
   value,
@@ -63,9 +56,7 @@ function CalcBox({
 }) {
   return (
     <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
+      <p className="text-xs font-semibold text-foreground">{label}</p>
       <p className="mt-1 font-mono text-xl font-bold tabular-nums text-foreground">
         {value}{" "}
         <span className="text-sm font-normal text-muted-foreground">{unit}</span>
@@ -75,8 +66,7 @@ function CalcBox({
   );
 }
 
-// ── Tipos auxiliares ──────────────────────────────────────────────────────────
-type NumericField = string; // valor string do input; converte para número só no cálculo
+type NumericField = string;
 
 export function AdultNutritionAssessmentForm({
   patientId,
@@ -85,39 +75,38 @@ export function AdultNutritionAssessmentForm({
   patientId: string;
   defaultAge?: number;
 }) {
-  const [state, formAction] = useActionState(
+  const [state, formAction, pending] = useActionState(
     createAdultNutritionAssessmentAction,
     initial,
   );
 
-  // ── Estado dos inputs (todos controlados para preservar valores em re-render) ─
-  const [group, setGroup]               = useState<PatientGroup>("mulher_branca");
+  const [group, setGroup] = useState<PatientGroup>("mulher_branca");
   const [hasAmputation, setHasAmputation] = useState(false);
-  const [ampPct, setAmpPct]             = useState<NumericField>("5.9");
+  const [ampPct, setAmpPct] = useState<NumericField>("5.9");
 
-  const [age, setAge]               = useState<NumericField>(defaultAge != null ? String(defaultAge) : "");
-  const [cb, setCb]                 = useState<NumericField>("");
-  const [dct, setDct]               = useState<NumericField>("");
-  const [cp, setCp]                 = useState<NumericField>("");
-  const [aj, setAj]                 = useState<NumericField>("");
+  const [age, setAge] = useState<NumericField>(
+    defaultAge != null ? String(defaultAge) : "",
+  );
+  const [cb, setCb] = useState<NumericField>("");
+  const [dct, setDct] = useState<NumericField>("");
+  const [cp, setCp] = useState<NumericField>("");
+  const [aj, setAj] = useState<NumericField>("");
   const [weightReal, setWeightReal] = useState<NumericField>("");
-  const [kcal, setKcal]             = useState<NumericField>("");
-  const [ptn, setPtn]               = useState<NumericField>("");
+  const [kcal, setKcal] = useState<NumericField>("");
+  const [ptn, setPtn] = useState<NumericField>("");
 
-  const [risk, setRisk]             = useState<string>("");
-  const [diagnosis, setDiagnosis]   = useState<string>("");
-  const [notes, setNotes]           = useState<string>("");
+  const [risk, setRisk] = useState<string>("");
+  const [diagnosis, setDiagnosis] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
 
-  // ── Valores numéricos derivados do estado ─────────────────────────────────
-  const numAge  = toNum(age);
-  const numCb   = toNum(cb);
-  const numDct  = toNum(dct);
-  const numAj   = toNum(aj);
+  const numAge = toNum(age);
+  const numCb = toNum(cb);
+  const numDct = toNum(dct);
+  const numAj = toNum(aj);
   const numKcal = toNum(kcal);
-  const numPtn  = toNum(ptn);
-  const numAmp  = toNum(ampPct);
+  const numPtn = toNum(ptn);
+  const numAmp = toNum(ampPct);
 
-  // ── Cálculos em tempo real ────────────────────────────────────────────────
   const cmb = useMemo<number | null>(() => {
     if (numCb === null || numDct === null) return null;
     return numCb - numDct * 0.314;
@@ -141,11 +130,7 @@ export function AdultNutritionAssessmentForm({
     if (numAj === null) return null;
     const needsAge = group === "mulher_branca" || group === "mulher_negra";
     if (needsAge && numAge === null) return null;
-    return calcAdultEstimatedHeightM(
-      group,
-      numAj,
-      needsAge ? numAge : null,
-    );
+    return calcAdultEstimatedHeightM(group, numAj, needsAge ? numAge : null);
   }, [group, numAj, numAge]);
 
   const imc = useMemo<number | null>(() => {
@@ -165,7 +150,6 @@ export function AdultNutritionAssessmentForm({
     return pe * numPtn;
   }, [pe, numPtn]);
 
-  // ── Fórmulas exibidas ────────────────────────────────────────────────────
   const peBaseStr = ADULT_ESTIMATED_WEIGHT_FORMULA_DESC.replace("PE (kg) = ", "");
   const peFormula =
     hasAmputation && ampPctNum > 0
@@ -180,47 +164,73 @@ export function AdultNutritionAssessmentForm({
       : "PE ÷ Altura²";
 
   return (
-    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
-      {/* ── Campos ocultos: identificação + valores calculados ───────────── */}
-      <input type="hidden" name="patient_id"          value={patientId} />
-      <input type="hidden" name="has_amputation"      value={String(hasAmputation)} />
-      <input type="hidden" name="cmb_cm"              value={cmb              !== null ? String(cmb)    : ""} />
-      <input type="hidden" name="estimated_weight_kg" value={pe               !== null ? String(pe)     : ""} />
-      <input type="hidden" name="estimated_height_m"  value={altura           !== null ? String(altura) : ""} />
-      <input type="hidden" name="bmi"                 value={imc              !== null ? String(imc)    : ""} />
-      <input type="hidden" name="energy_needs_kcal"   value={ne               !== null ? String(ne)     : ""} />
-      <input type="hidden" name="protein_needs_g"     value={np               !== null ? String(np)     : ""} />
+    <form
+      action={formAction}
+      onReset={(e) => e.preventDefault()}
+      className="space-y-6"
+    >
+      <input type="hidden" name="patient_id" value={patientId} />
+      <input type="hidden" name="has_amputation" value={String(hasAmputation)} />
+      <input
+        type="hidden"
+        name="cmb_cm"
+        value={cmb !== null ? String(cmb) : ""}
+      />
+      <input
+        type="hidden"
+        name="estimated_weight_kg"
+        value={pe !== null ? String(pe) : ""}
+      />
+      <input
+        type="hidden"
+        name="estimated_height_m"
+        value={altura !== null ? String(altura) : ""}
+      />
+      <input
+        type="hidden"
+        name="bmi"
+        value={imc !== null ? String(imc) : ""}
+      />
+      <input
+        type="hidden"
+        name="energy_needs_kcal"
+        value={ne !== null ? String(ne) : ""}
+      />
+      <input
+        type="hidden"
+        name="protein_needs_g"
+        value={np !== null ? String(np) : ""}
+      />
 
-      {/* ── Grupo 1: Perfil ─────────────────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Perfil do paciente</legend>
-
+      <FormSection title="Perfil do paciente">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="adult-group">Grupo (sexo / etnia)</Label>
             <select
               id="adult-group"
               name="patient_group"
-              className={selectClass}
+              className={nativeSelectClass}
               value={group}
               onChange={(e) => setGroup(e.target.value as PatientGroup)}
             >
-              {(Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]).map(
-                ([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ),
-              )}
+              {(
+                Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]
+              ).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
             </select>
             <p className="text-xs text-muted-foreground">
               <strong>Peso estimado:</strong> mesma equação para todos (
               {ADULT_ESTIMATED_WEIGHT_FORMULA_DESC}).{" "}
               <strong>Altura estimada:</strong> Chumlea et al. (1985), faixa adulta
-              18–60 anos; mulheres precisam de idade no cálculo. A CB não entra na
-              estatura.
+              18–60 anos; mulheres precisam de idade no cálculo. A CB não entra no
+              cálculo da altura.
             </p>
           </div>
 
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="adult-age">Idade (anos)</Label>
             <Input
               id="adult-age"
@@ -239,7 +249,7 @@ export function AdultNutritionAssessmentForm({
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border-input"
@@ -249,10 +259,10 @@ export function AdultNutritionAssessmentForm({
             Membro amputado
           </label>
 
-          {hasAmputation && (
-            <div className="flex items-center gap-2">
+          {hasAmputation ? (
+            <div className="flex flex-wrap items-center gap-2">
               <Label htmlFor="adult-amp-pct" className="whitespace-nowrap text-sm">
-                % segmento amputado
+                % do segmento amputado
               </Label>
               <Input
                 id="adult-amp-pct"
@@ -266,22 +276,19 @@ export function AdultNutritionAssessmentForm({
                 onChange={(e) => setAmpPct(e.target.value)}
               />
               <span className="text-xs text-muted-foreground">
-                coxa=10,0% · perna+pé=5,9% · pé=1,8%
+                coxa = 10,0% · perna + pé = 5,9% · pé = 1,8%
               </span>
             </div>
-          )}
+          ) : null}
         </div>
-      </fieldset>
+      </FormSection>
 
-      <div className="border-t border-border" />
+      <FormSectionDivider />
 
-      {/* ── Grupo 2: Medidas antropométricas ────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Medidas antropométricas</legend>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="adult-cb">CB — Circ. do Braço (cm)</Label>
+      <FormSection title="Medidas antropométricas">
+        <div className={formGridClass}>
+          <div className={formFieldClass}>
+            <Label htmlFor="adult-cb">CB — circunferência do braço (cm)</Label>
             <Input
               id="adult-cb"
               name="cb_cm"
@@ -295,8 +302,8 @@ export function AdultNutritionAssessmentForm({
               onChange={(e) => setCb(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="adult-dct">DCT — Dobra Cutânea Tricipital (mm)</Label>
+          <div className={formFieldClass}>
+            <Label htmlFor="adult-dct">DCT — dobra cutânea tricipital (mm)</Label>
             <Input
               id="adult-dct"
               name="dct_mm"
@@ -310,8 +317,8 @@ export function AdultNutritionAssessmentForm({
               onChange={(e) => setDct(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="adult-cp">CP — Circ. da Panturrilha (cm)</Label>
+          <div className={formFieldClass}>
+            <Label htmlFor="adult-cp">CP — circunferência da panturrilha (cm)</Label>
             <Input
               id="adult-cp"
               name="cp_cm"
@@ -327,17 +334,16 @@ export function AdultNutritionAssessmentForm({
           </div>
         </div>
 
-        {/* CMB calculado em destaque */}
         <CalcBox
-          label="CMB — Circunferência Muscular do Braço"
+          label="CMB — circunferência muscular do braço"
           value={fmt(cmb)}
           unit="cm"
           formula="CMB = CB − (DCT × 0,314)   [Gurney & Jelliffe, 1973]"
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="adult-aj">AJ — Altura do Joelho (cm)</Label>
+          <div className={formFieldClass}>
+            <Label htmlFor="adult-aj">AJ — altura do joelho (cm)</Label>
             <Input
               id="adult-aj"
               name="aj_cm"
@@ -351,8 +357,8 @@ export function AdultNutritionAssessmentForm({
               onChange={(e) => setAj(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="adult-weight">Peso Real (kg)</Label>
+          <div className={formFieldClass}>
+            <Label htmlFor="adult-weight">Peso real (kg)</Label>
             <Input
               id="adult-weight"
               name="weight_real_kg"
@@ -361,7 +367,7 @@ export function AdultNutritionAssessmentForm({
               min={0}
               inputMode="decimal"
               placeholder="Opcional"
-              className="tabular-nums text-xs placeholder:text-xs md:text-xs"
+              className="tabular-nums"
               value={weightReal}
               onChange={(e) => setWeightReal(e.target.value)}
             />
@@ -370,25 +376,23 @@ export function AdultNutritionAssessmentForm({
             </p>
           </div>
         </div>
-      </fieldset>
+      </FormSection>
 
-      <div className="border-t border-border" />
+      <FormSectionDivider />
 
-      {/* ── Grupo 3: Valores calculados ──────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Valores calculados automaticamente</legend>
+      <FormSection title="Valores calculados automaticamente">
         <p className="text-xs text-muted-foreground">
           Atualizados em tempo real conforme as medidas são preenchidas acima.
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
           <CalcBox
-            label="Peso Estimado"
+            label="Peso estimado"
             value={fmt(pe)}
             unit="kg"
             formula={peFormula}
           />
           <CalcBox
-            label="Altura Estimada"
+            label="Altura estimada"
             value={fmt(altura, 3)}
             unit="m"
             formula={altFormula}
@@ -400,16 +404,13 @@ export function AdultNutritionAssessmentForm({
             formula={imcFormula}
           />
         </div>
-      </fieldset>
+      </FormSection>
 
-      <div className="border-t border-border" />
+      <FormSectionDivider />
 
-      {/* ── Grupo 4: Prescrição energético-proteica ───────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Prescrição energético-proteica</legend>
-
+      <FormSection title="Prescrição energético-proteica">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="adult-kcal">Kcal/kg · dia</Label>
             <Input
               id="adult-kcal"
@@ -424,7 +425,7 @@ export function AdultNutritionAssessmentForm({
               onChange={(e) => setKcal(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="adult-ptn">g PTN/kg · dia</Label>
             <Input
               id="adult-ptn"
@@ -443,45 +444,47 @@ export function AdultNutritionAssessmentForm({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <CalcBox
-            label="Necessidade Energética"
+            label="Necessidade energética"
             value={ne !== null ? Math.round(ne).toLocaleString("pt-BR") : "–"}
             unit="kcal/dia"
             formula="NE = Peso Estimado × Kcal/kg"
           />
           <CalcBox
-            label="Necessidade Proteica"
+            label="Necessidade proteica"
             value={fmt(np, 1)}
             unit="g/dia"
             formula="NP = g PTN/kg × Peso Estimado"
           />
         </div>
-      </fieldset>
+      </FormSection>
 
-      <div className="border-t border-border" />
+      <FormSectionDivider />
 
-      {/* ── Grupo 5: Avaliação clínica ────────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Avaliação clínica</legend>
-
+      <FormSection title="Avaliação clínica">
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="adult-risk">Risco Nutricional</Label>
+          <div className={formFieldClass}>
+            <Label htmlFor="adult-risk">Risco nutricional</Label>
             <select
               id="adult-risk"
               name="nutritional_risk"
-              className={selectValueClass(risk)}
+              className={nativeSelectValueClass(risk)}
               value={risk}
               onChange={(e) => setRisk(e.target.value)}
             >
-              <option value="">— não avaliado —</option>
-              {(Object.entries(NUTRITIONAL_RISK_LABELS) as [NutritionalRisk, string][]).map(
-                ([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ),
-              )}
+              <option value="">Não avaliado</option>
+              {(
+                Object.entries(NUTRITIONAL_RISK_LABELS) as [
+                  NutritionalRisk,
+                  string,
+                ][]
+              ).map(([val, label]) => (
+                <option key={val} value={val}>
+                  {label}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="space-y-2">
+          <div className={formFieldClass}>
             <Label htmlFor="adult-diagnosis">Diagnóstico nutricional</Label>
             <Input
               id="adult-diagnosis"
@@ -493,22 +496,19 @@ export function AdultNutritionAssessmentForm({
           </div>
         </div>
 
-        <div className="space-y-2">
+        <div className={formFieldClass}>
           <Label htmlFor="adult-notes">Notas clínicas</Label>
-          <textarea
+          <Textarea
             id="adult-notes"
             name="clinical_notes"
             rows={3}
-            className={textareaClass}
-            style={{ minHeight: "72px" }}
-            placeholder="Condicionantes, medicação com impacto nutricional, objetivos… (opcional)"
+            placeholder="Condições clínicas, medicamentos com impacto nutricional, objetivos… (opcional)"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />
         </div>
-      </fieldset>
+      </FormSection>
 
-      {/* ── Feedback ──────────────────────────────────────────────────────── */}
       {state?.ok === false ? (
         <p
           className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
@@ -519,9 +519,11 @@ export function AdultNutritionAssessmentForm({
       ) : null}
 
       <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:items-center sm:gap-4">
-        <Button type="submit">Registar avaliação (adultos)</Button>
+        <Button type="submit" disabled={pending}>
+          {pending ? "Registrando…" : "Registrar avaliação (adultos)"}
+        </Button>
         <p className="text-xs text-muted-foreground">
-          Cada envio cria um novo registo com data e hora — o histórico anterior
+          Cada envio cria um novo registro com data e hora — o histórico anterior
           não é alterado.
         </p>
       </div>

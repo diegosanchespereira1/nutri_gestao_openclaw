@@ -131,7 +131,7 @@ export function VisitRescheduleConfirmDialog({
             disabled={isLoading || !editedLocal}
             className={cn(buttonVariants(), "min-h-11 flex-1 justify-center")}
           >
-            {isLoading ? "A guardar…" : "Confirmar"}
+            {isLoading ? "Salvando…" : "Confirmar"}
           </button>
         </div>
       </DialogContent>

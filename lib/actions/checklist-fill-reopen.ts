@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
@@ -331,7 +333,7 @@ export async function reopenChecklistFillDossierAction(
     revalidatePath(`/visitas/${vid}/iniciar`);
   }
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
 
   return { ok: true };
 }

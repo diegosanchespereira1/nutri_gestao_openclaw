@@ -19,13 +19,17 @@ import {
   toAssessmentNum,
 } from "@/lib/utils/nutrition-assessment-display";
 import { computeBmi } from "@/lib/utils/bmi";
+import {
+  formFieldClass,
+  formGridClass,
+  formSectionLegendClass,
+  nativeSelectValueClass,
+} from "@/components/forms/form-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-
-const legendClass =
-  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
 function DataItem({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
@@ -39,21 +43,15 @@ function DataItem({ label, value, highlight = false }: { label: string; value: s
 function TextField({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <p className={legendClass}>{label}</p>
+      <p className={formSectionLegendClass}>{label}</p>
       {value ? (
-        <p className="mt-1 whitespace-pre-wrap text-foreground">{value}</p>
+        <p className="mt-1 whitespace-pre-wrap text-sm text-foreground">{value}</p>
       ) : (
-        <p className="mt-1 text-muted-foreground">–</p>
+        <p className="mt-1 text-sm text-muted-foreground">–</p>
       )}
     </div>
   );
 }
-
-const selectClass =
-  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full max-w-md rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
-
-const textareaClass =
-  "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
 type Mode = "view" | "edit" | "confirm-delete";
 
@@ -76,10 +74,9 @@ function EditForm({
     <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4 border-t border-border bg-card px-4 py-4">
       <input type="hidden" name="assessment_id" value={row.id} />
 
-      {/* Antropometria */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <Label htmlFor={`edit-h-${row.id}`} className="text-xs">Altura (cm)</Label>
+      <div className={formGridClass}>
+        <div className={formFieldClass}>
+          <Label htmlFor={`edit-h-${row.id}`}>Altura (cm)</Label>
           <Input
             id={`edit-h-${row.id}`}
             name="height_cm"
@@ -90,8 +87,8 @@ function EditForm({
             className="tabular-nums"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`edit-w-${row.id}`} className="text-xs">Peso (kg)</Label>
+        <div className={formFieldClass}>
+          <Label htmlFor={`edit-w-${row.id}`}>Peso (kg)</Label>
           <Input
             id={`edit-w-${row.id}`}
             name="weight_kg"
@@ -102,8 +99,8 @@ function EditForm({
             className="tabular-nums"
           />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor={`edit-wt-${row.id}`} className="text-xs">Cintura (cm)</Label>
+        <div className={formFieldClass}>
+          <Label htmlFor={`edit-wt-${row.id}`}>Cintura (cm)</Label>
           <Input
             id={`edit-wt-${row.id}`}
             name="waist_cm"
@@ -116,53 +113,48 @@ function EditForm({
         </div>
       </div>
 
-      {/* Atividade */}
-      <div className="space-y-1.5">
-        <Label htmlFor={`edit-act-${row.id}`} className="text-xs">Nível de atividade</Label>
+      <div className={formFieldClass}>
+        <Label htmlFor={`edit-act-${row.id}`}>Nível de atividade</Label>
         <select
           id={`edit-act-${row.id}`}
           name="activity_level"
-          className={cn(selectClass, "max-w-xs", activityLevel === "" && "text-muted-foreground")}
+          className={nativeSelectValueClass(activityLevel)}
           value={activityLevel}
           onChange={(e) => setActivityLevel(e.target.value)}
         >
-          <option value="">— selecionar —</option>
+          <option value="">Selecione</option>
           {ACTIVITY_LEVELS.map((lvl) => (
             <option key={lvl} value={lvl}>{activityLevelLabel[lvl]}</option>
           ))}
         </select>
       </div>
 
-      {/* Notas */}
-      <div className="space-y-1.5">
-        <Label htmlFor={`edit-diet-${row.id}`} className="text-xs">Alimentação / hábitos</Label>
-        <textarea
+      <div className={formFieldClass}>
+        <Label htmlFor={`edit-diet-${row.id}`}>Hábitos alimentares</Label>
+        <Textarea
           id={`edit-diet-${row.id}`}
           name="diet_notes"
           rows={2}
-          className={textareaClass}
           defaultValue={row.diet_notes ?? ""}
           placeholder="Opcional"
         />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={`edit-clin-${row.id}`} className="text-xs">Notas clínicas</Label>
-        <textarea
+      <div className={formFieldClass}>
+        <Label htmlFor={`edit-clin-${row.id}`}>Notas clínicas</Label>
+        <Textarea
           id={`edit-clin-${row.id}`}
           name="clinical_notes"
           rows={2}
-          className={textareaClass}
           defaultValue={row.clinical_notes ?? ""}
           placeholder="Opcional"
         />
       </div>
-      <div className="space-y-1.5">
-        <Label htmlFor={`edit-goals-${row.id}`} className="text-xs">Objetivos</Label>
-        <textarea
+      <div className={formFieldClass}>
+        <Label htmlFor={`edit-goals-${row.id}`}>Objetivos</Label>
+        <Textarea
           id={`edit-goals-${row.id}`}
           name="goals"
           rows={2}
-          className={textareaClass}
           defaultValue={row.goals ?? ""}
           placeholder="Opcional"
         />
@@ -205,7 +197,7 @@ function DeleteConfirm({
     <form action={formAction} onReset={(e) => e.preventDefault()} className="flex flex-wrap items-center gap-2 border-t border-border bg-destructive/5 px-4 py-3">
       <input type="hidden" name="assessment_id" value={row.id} />
       <p className="flex-1 text-sm text-destructive">
-        Eliminar este registo permanentemente?
+        Excluir este registro permanentemente?
       </p>
       {state?.ok === false && (
         <span className="w-full text-xs text-destructive">{state.error}</span>
@@ -282,7 +274,7 @@ export function NutritionAssessmentHistoryItem({
           </button>
           <button
             type="button"
-            aria-label="Eliminar avaliação"
+            aria-label="Excluir avaliação"
             onClick={() => { setMode(mode === "confirm-delete" ? "view" : "confirm-delete"); setIsOpen(false); }}
             className={cn(
               "rounded-md p-1.5 transition-colors",
@@ -301,8 +293,8 @@ export function NutritionAssessmentHistoryItem({
         <div className="space-y-4 border-t border-border bg-card px-4 py-4 text-sm">
           {/* Antropometria */}
           <div>
-            <p className={legendClass}>Antropometria & atividade</p>
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+            <p className={formSectionLegendClass}>Antropometria & atividade</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DataItem label="Altura" value={h != null ? `${h} cm` : "–"} />
               <DataItem label="Peso" value={w != null ? `${w} kg` : "–"} />
               <DataItem label="IMC" value={bmi != null ? `${bmi} kg/m²` : "–"} highlight />
@@ -312,7 +304,7 @@ export function NutritionAssessmentHistoryItem({
           </div>
 
           {/* Texto */}
-          <TextField label="Alimentação / hábitos" value={row.diet_notes} />
+          <TextField label="Hábitos alimentares" value={row.diet_notes} />
           <TextField label="Notas clínicas" value={row.clinical_notes} />
           <TextField label="Objetivos" value={row.goals} />
         </div>

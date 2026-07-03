@@ -1,3 +1,4 @@
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import type { ProfileContextCookie } from "@/lib/auth/profile-context-cookie";
 
 export function shouldReuseProfileContextCache(input: {
@@ -25,7 +26,7 @@ export function shouldReuseProfileContextCache(input: {
 
   if (bemvindoParam === "1") return false;
 
-  if (pathname === "/inicio" && cached.needsOnboarding) return false;
+  if (pathname === APP_DASHBOARD_PATH && cached.needsOnboarding) return false;
 
   return true;
 }

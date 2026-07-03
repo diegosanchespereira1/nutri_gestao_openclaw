@@ -1,13 +1,11 @@
 import Link from "next/link";
 import { ClipboardList, TrendingUp, ChevronDown, FileDown } from "lucide-react";
 
+import { formSectionLegendClass } from "@/components/forms/form-section";
 import {
-  GeneralEvolutionCharts,
   AnthroEvolutionCharts,
-  type GeneralChartPoint,
   type AnthroChartPoint,
 } from "@/components/pacientes/assessment-evolution-charts";
-import { NutritionAssessmentHistoryItem } from "@/components/pacientes/nutrition-assessment-history-item";
 import { GeriatricAssessmentHistoryItem } from "@/components/pacientes/geriatric-assessment-history-item";
 import { ChildAssessmentHistoryItem } from "@/components/pacientes/child-assessment-history-item";
 import { SemestralReminder } from "@/components/pacientes/child-assessments-section";
@@ -16,7 +14,6 @@ import {
   type ChildEvolutionPoint,
 } from "@/components/pacientes/child-assessment-evolution";
 import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
-import { loadNutritionAssessmentsForPatient } from "@/lib/actions/nutrition-assessments";
 import { loadAdultNutritionAssessmentsForPatient } from "@/lib/actions/adult-nutrition-assessments";
 import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
 import { loadChildAssessmentsForPatient } from "@/lib/actions/child-assessments";
@@ -32,13 +29,6 @@ import {
   NUTRITIONAL_RISK_LABELS,
 } from "@/lib/types/geriatric-assessments";
 import type { AdultNutritionAssessmentRow } from "@/lib/types/adult-nutrition-assessments";
-import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
-import {
-  ACTIVITY_LEVELS,
-  activityLevelLabel,
-} from "@/lib/constants/activity-levels";
-import type { ActivityLevel } from "@/lib/constants/activity-levels";
-import { computeBmi } from "@/lib/utils/bmi";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
@@ -74,8 +64,6 @@ function fmt(n: number | null | undefined, decimals = 2): string {
   return n.toFixed(decimals).replace(".", ",");
 }
 
-const legendClass =
-  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
 function DataItem({
   label,
@@ -134,8 +122,8 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
 
         <div className="space-y-4 border-t border-border bg-card px-4 py-4 text-sm">
           <div>
-            <p className={legendClass}>Medidas antropométricas</p>
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+            <p className={formSectionLegendClass}>Medidas antropométricas</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DataItem label="CB" value={row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–"} />
               <DataItem label="DCT" value={row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–"} />
               <DataItem label="CMB" value={row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–"} />
@@ -146,8 +134,8 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
           </div>
 
           <div>
-            <p className={legendClass}>Valores calculados</p>
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+            <p className={formSectionLegendClass}>Valores calculados</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
               <DataItem label="Peso Estimado" value={row.estimated_weight_kg != null ? `${fmt(row.estimated_weight_kg)} kg` : "–"} highlight />
               <DataItem label="Altura Estimada" value={row.estimated_height_m != null ? `${fmt(row.estimated_height_m, 3)} m` : "–"} />
               <DataItem label="IMC" value={row.bmi != null ? `${fmt(row.bmi)} kg/m²` : "–"} highlight />
@@ -155,8 +143,8 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
           </div>
 
           <div>
-            <p className={legendClass}>Prescrição energético-proteica</p>
-            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+            <p className={formSectionLegendClass}>Prescrição energético-proteica</p>
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3">
               <DataItem
                 label="Nec. Energética"
                 value={row.energy_needs_kcal != null ? `${Math.round(row.energy_needs_kcal).toLocaleString("pt-BR")} kcal/dia` : "–"}
@@ -171,7 +159,7 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
           </div>
 
           <div className="space-y-1.5">
-            <p className={legendClass}>Avaliação clínica</p>
+            <p className={formSectionLegendClass}>Avaliação clínica</p>
             {riskLabel ? (
               <p><span className="font-medium">Risco: </span>{riskLabel}</p>
             ) : <p className="text-muted-foreground">Risco: –</p>}
@@ -248,42 +236,15 @@ function ChildStatusCard({
 }
 
 function AssessmentIndicatorStrip({
-  generalRows,
   adultRows,
   geriatricRows,
   childRows,
 }: {
-  generalRows: NutritionAssessmentRow[];
   adultRows: AdultNutritionAssessmentRow[];
   geriatricRows: Awaited<ReturnType<typeof loadGeriatricAssessmentsForPatient>>["rows"];
   childRows: ChildAssessmentRow[];
 }) {
   const cards: React.ReactNode[] = [];
-
-  const latestGeneral = generalRows[0];
-  if (latestGeneral) {
-    const date = fmtDate(latestGeneral.recorded_at);
-    const h = latestGeneral.height_cm != null ? Number(latestGeneral.height_cm) : null;
-    const w = latestGeneral.weight_kg != null ? Number(latestGeneral.weight_kg) : null;
-    const waist = latestGeneral.waist_cm != null ? Number(latestGeneral.waist_cm) : null;
-    const bmi = h && w ? computeBmi(h, w) : null;
-    const activity =
-      latestGeneral.activity_level &&
-      ACTIVITY_LEVELS.includes(latestGeneral.activity_level as ActivityLevel)
-        ? activityLevelLabel[latestGeneral.activity_level as ActivityLevel]
-        : null;
-
-    if (w != null)
-      cards.push(<IndicatorCard key="peso" label="Peso" value={fmt(w, 1)} unit="kg" date={date} />);
-    if (h != null)
-      cards.push(<IndicatorCard key="altura" label="Altura" value={String(h)} unit="cm" date={date} />);
-    if (bmi != null)
-      cards.push(<IndicatorCard key="imc-g" label="IMC" value={fmt(bmi, 1)} unit="kg/m²" date={date} accent />);
-    if (waist != null)
-      cards.push(<IndicatorCard key="cintura" label="Cintura" value={fmt(waist, 1)} unit="cm" date={date} />);
-    if (activity)
-      cards.push(<IndicatorCard key="atividade" label="Atividade" value={activity} date={date} />);
-  }
 
   const latestAdult = adultRows[0] ?? null;
   const latestGeriatric = geriatricRows[0] ?? null;
@@ -295,9 +256,9 @@ function AssessmentIndicatorStrip({
       ? NUTRITIONAL_RISK_LABELS[latestAnthro.nutritional_risk]?.split("—")[0].trim()
       : null;
 
-    if (latestAnthro.estimated_weight_kg != null && !latestGeneral)
+    if (latestAnthro.estimated_weight_kg != null)
       cards.push(<IndicatorCard key="pe" label="Peso Estimado" value={fmt(latestAnthro.estimated_weight_kg)} unit="kg" date={date} />);
-    if (latestAnthro.bmi != null && !latestGeneral)
+    if (latestAnthro.bmi != null)
       cards.push(<IndicatorCard key="imc-a" label="IMC" value={fmt(latestAnthro.bmi)} unit="kg/m²" date={date} accent />);
     if (latestAnthro.energy_needs_kcal != null)
       cards.push(<IndicatorCard key="ne" label="Nec. Energética" value={Math.round(latestAnthro.energy_needs_kcal).toLocaleString("pt-BR")} unit="kcal/dia" date={date} />);
@@ -349,7 +310,7 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
       <h3 className="text-sm font-semibold text-foreground">{title}</h3>
       {count > 0 && (
         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-          {count} {count === 1 ? "registo" : "registos"}
+          {count} {count === 1 ? "registro" : "registros"}
         </span>
       )}
     </div>
@@ -359,48 +320,15 @@ function SectionHeader({ title, count }: { title: string; count: number }) {
 function EmptyState({ label }: { label: string }) {
   return (
     <p className="text-sm text-muted-foreground py-2">
-      Sem {label} registadas.{" "}
-      <span className="text-foreground">Use &quot;Realizar avaliação&quot; para o primeiro registo.</span>
+      Sem {label} registradas.{" "}
+      <span className="text-foreground">
+        Use &quot;Realizar avaliação&quot; para o primeiro registro.
+      </span>
     </p>
   );
 }
 
 // ── Tab content por tipo ──────────────────────────────────────────────────────
-
-function GeneralTabContent({
-  chartData,
-  rows,
-}: {
-  chartData: GeneralChartPoint[];
-  rows: Awaited<ReturnType<typeof loadNutritionAssessmentsForPatient>>["rows"];
-}) {
-  return (
-    <div className="space-y-6 pt-2">
-      {chartData.length >= 2 && (
-        <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
-            <TrendingUp className="size-3.5" aria-hidden />
-            Evolução
-          </p>
-          <GeneralEvolutionCharts data={chartData} />
-        </div>
-      )}
-
-      <div>
-        <SectionHeader title="Histórico" count={rows.length} />
-        {rows.length === 0 ? (
-          <EmptyState label="avaliações gerais" />
-        ) : (
-          <ul className="space-y-2">
-            {rows.map((r) => (
-              <NutritionAssessmentHistoryItem key={r.id} row={r} />
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function AdultTabContent({
   chartData,
@@ -537,27 +465,17 @@ export async function PatientAssessmentsBlock({
   birthDate?: string | null;
 }) {
   const [
-    { rows: generalRows },
     { rows: adultRows },
     { rows: geriatricRows },
     { rows: childRows },
   ] = await Promise.all([
-    loadNutritionAssessmentsForPatient(patientId),
     loadAdultNutritionAssessmentsForPatient(patientId),
     loadGeriatricAssessmentsForPatient(patientId),
     loadChildAssessmentsForPatient(patientId),
   ]);
 
-  // Rows vêm em ordem descendente; para gráficos precisamos de ascendente
-  const generalAsc = [...generalRows].reverse().slice(-20);
   const adultAsc = [...adultRows].reverse().slice(-20);
   const geriatricAsc = [...geriatricRows].reverse().slice(-20);
-
-  const generalChartData: GeneralChartPoint[] = generalAsc.map((r) => ({
-    date: fmtDate(r.recorded_at),
-    weight_kg: r.weight_kg != null ? Number(r.weight_kg) : null,
-    waist_cm: r.waist_cm != null ? Number(r.waist_cm) : null,
-  }));
 
   const toAnthroPoint = (r: AdultNutritionAssessmentRow): AnthroChartPoint => ({
     date: fmtDate(r.recorded_at),
@@ -590,35 +508,37 @@ export async function PatientAssessmentsBlock({
   const showAdultTab = vis.showAdult || adultRows.length > 0;
   const showGeriatricTab = vis.showGeriatric || geriatricRows.length > 0;
 
+  if (!showChildTab && !showAdultTab && !showGeriatricTab) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Não há avaliações especializadas para a faixa etária deste paciente.
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* CTA */}
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href={`/pacientes/${patientId}/avaliacao/nova`}
           className={cn(buttonVariants({ size: "sm" }))}
         >
           <ClipboardList className="mr-1.5 size-3.5" aria-hidden />
-          Realizar avaliação
+          Realizar avaliação especializada
         </Link>
       </div>
 
-      {/* Indicadores da avaliação mais recente */}
       <AssessmentIndicatorStrip
-        generalRows={generalRows}
         adultRows={adultRows}
         geriatricRows={geriatricRows}
         childRows={childRows}
       />
 
-      {/* Tabs com gráficos + histórico */}
       <NutritionAssessmentsTabs
+        showGeneral={false}
         showChild={showChildTab}
         showAdult={showAdultTab}
         showGeriatric={showGeriatricTab}
-        generalTab={
-          <GeneralTabContent chartData={generalChartData} rows={generalRows} />
-        }
         childTab={
           <ChildTabContent
             patientId={patientId}

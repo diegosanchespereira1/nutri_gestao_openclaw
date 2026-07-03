@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import {
   createFinancialChargeAction,
   loadFinancialChargesForOwner,
@@ -249,13 +251,13 @@ export default async function FinanceiroPage({ searchParams }: Props) {
     <div className="space-y-8">
       <div>
         <Link
-          href="/inicio"
+          href={APP_DASHBOARD_PATH}
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
             "text-muted-foreground -ml-2 mb-2",
           )}
         >
-          ← Início
+          ← Dashboard
         </Link>
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
           Financeiro

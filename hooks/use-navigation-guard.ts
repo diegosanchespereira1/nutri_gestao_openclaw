@@ -103,7 +103,7 @@ export function useNavigationGuard(
     activeRef.current = false;
     setGuardTriggered(false);
 
-    // Entrada sentinel + página actual: recuar 2 níveis volta à origem (ex.: /inicio).
+    // Entrada sentinel + página actual: recuar 2 níveis volta à origem (ex.: /dashboard).
     if (window.history.length > 2) {
       history.go(-2);
       return;

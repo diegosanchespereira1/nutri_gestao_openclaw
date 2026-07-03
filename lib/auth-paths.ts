@@ -29,9 +29,11 @@ export function isPathAllowedWhenLgpdBlocked(pathname: string): boolean {
   );
 }
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 /** Área logada (Épico 1) — requer utilizador autenticado. */
 export const PROTECTED_PREFIXES = [
-  "/inicio",
+  APP_DASHBOARD_PATH,
   "/onboarding",
   "/clientes",
   "/visitas",

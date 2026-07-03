@@ -8,7 +8,7 @@ Checklist rápido para validar acessibilidade nos fluxos críticos antes de rele
 
 - `/login`
 - `/forgot-password`
-- `/inicio`
+- `/dashboard`
 - `/pacientes`
 - `/visitas`
 - `/configuracoes/notificacoes`

@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import {
   AlertCircle,
-  ClipboardList,
+  Calendar,
   HeartPulse,
   UtensilsCrossed,
   Wallet,
@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 const MODULE_ICONS: Record<EnabledModuleKey, LucideIcon> = {
   atendimento_nutricional: HeartPulse,
   assessoria_alimentacao: UtensilsCrossed,
-  visitas: ClipboardList,
+  visitas: Calendar,
   financeiro: Wallet,
 };
 

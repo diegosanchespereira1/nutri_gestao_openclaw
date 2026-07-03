@@ -31,7 +31,7 @@ const TINY_JPEG = Buffer.from(
 test.describe("Autenticação", () => {
   test("login com credenciais válidas entra na aplicação", async ({ page }) => {
     await login(page);
-    await expect(page).toHaveURL(/\/inicio/);
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 
   test("login com senha errada mostra mensagem de erro", async ({ page }) => {

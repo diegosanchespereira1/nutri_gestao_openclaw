@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -172,7 +174,7 @@ export async function createScheduledVisitAction(
   }
 
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath(`/visitas/${created.id as string}`);
   redirect(`/visitas/${created.id as string}`);
 }
@@ -303,7 +305,7 @@ export async function createVisitDialogAction(
   }
 
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath(`/visitas/${created.id as string}`);
   return { ok: true, visitId: created.id as string };
 }
@@ -359,7 +361,7 @@ export async function rescheduleVisitAction(
   if (error) return { ok: false, error: "Não foi possível salvar." };
 
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   return { ok: true };
 }
 
@@ -421,7 +423,7 @@ export async function cancelVisitAction(
   }
 
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath(`/visitas/${visitId}`);
   return { ok: true };
 }
@@ -468,6 +470,6 @@ export async function updateScheduledVisitDossierRecipientsFormAction(
 
   revalidatePath(`/visitas/${visitId}`);
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   return { ok: true };
 }

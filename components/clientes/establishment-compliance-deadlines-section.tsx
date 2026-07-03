@@ -63,7 +63,7 @@ export function EstablishmentComplianceDeadlinesSection({
         <p className="text-muted-foreground mt-1 text-sm">
           Defina datas limite para auditorias, renovações ou obrigações
           regulatórias em <span className="font-medium">{establishmentName}</span>.
-          Os alertas aparecem no Início até 90 dias antes (e até 1 ano em atraso).
+          Os alertas aparecem no Dashboard até 90 dias antes (e até 1 ano em atraso).
         </p>
       </div>
 
@@ -163,7 +163,7 @@ export function EstablishmentComplianceDeadlinesSection({
             ))}
           </select>
           <p className="text-muted-foreground text-xs">
-            Se escolher, o botão «Ver checklist» no Início abre o catálogo nesse modelo.
+            Se escolher, o botão «Ver checklist» no Dashboard abre o catálogo nesse modelo.
           </p>
         </div>
         <div className="space-y-2">

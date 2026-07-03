@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 
 import { loadFillSessionPageData } from "@/lib/actions/checklist-fill";
@@ -123,7 +125,7 @@ export async function trySendDossierEmailAfterApprove(
   revalidatePath(`/visitas/${visitId}/iniciar`);
   revalidatePath(`/checklists/preencher/${sessionId}`);
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
 }
 
 export type ResendDossierEmailResult =
@@ -220,7 +222,7 @@ export async function resendDossierEmailAction(
     revalidatePath(`/visitas/${visitId}/iniciar`);
     revalidatePath(`/checklists/preencher/${sessionId}`);
     revalidatePath("/visitas");
-    revalidatePath("/inicio");
+    revalidatePath(APP_DASHBOARD_PATH);
     return { ok: true };
   } catch (e) {
     await persistVisitEmailStatus(supabase, visitId, "failed", formatActionError(e));
@@ -402,7 +404,7 @@ export async function sendDossierPdfToClientFromSessionAction(
     }
     revalidatePath(`/checklists/preencher/${sessionId}`);
     revalidatePath("/visitas");
-    revalidatePath("/inicio");
+    revalidatePath(APP_DASHBOARD_PATH);
     return { ok: true };
   } catch (e) {
     if (visitIdForStatus) {

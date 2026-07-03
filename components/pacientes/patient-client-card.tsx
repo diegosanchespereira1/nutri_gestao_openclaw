@@ -75,7 +75,7 @@ export function PatientClientCard({
       ) : null}
 
       <Button type="submit" disabled={isPending || !selected}>
-        {isPending ? "A guardar…" : "Atribuir cliente"}
+        {isPending ? "Salvando…" : "Atribuir cliente"}
       </Button>
     </form>
   );

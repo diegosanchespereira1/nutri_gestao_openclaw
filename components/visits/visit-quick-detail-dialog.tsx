@@ -126,7 +126,7 @@ function VisitQuickDetailBody({
                     "h-7 px-2.5 text-xs",
                   )}
                 >
-                  {isSaving ? "A guardar…" : "Guardar"}
+                  {isSaving ? "Salvando…" : "Salvar"}
                 </button>
                 <button
                   type="button"

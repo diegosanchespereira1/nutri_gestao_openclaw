@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { buildOnboardingInitialValues } from "@/lib/onboarding/initial-values";
@@ -12,7 +13,7 @@ export default async function OnboardingPage() {
   if (!user) redirect("/login");
 
   const needsOnboarding = await profileNeedsOnboarding(supabase, user.id);
-  if (!needsOnboarding) redirect("/inicio");
+  if (!needsOnboarding) redirect(APP_DASHBOARD_PATH);
 
   const [{ templates }, { data: profile }] = await Promise.all([
     loadChecklistCatalog(),

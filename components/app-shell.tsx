@@ -2,57 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Leaf, Menu } from "lucide-react";
+import { Leaf } from "lucide-react";
 
-import type { AppNavGroup, AppNavItem } from "@/lib/app-nav";
-import { adminNavItem, appNavGroups } from "@/lib/app-nav";
+import {
+  buildVisibleNavGroups,
+  isNavItemActive,
+  resolveNavItemModuleGate,
+} from "@/lib/app-nav";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { useModuleGate } from "@/components/modules/module-gate-provider";
-import type { EnabledModuleKey } from "@/lib/types/modules";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { AndroidTopInset } from "@/components/mobile/android-top-inset";
+import { MobileBottomNav } from "@/components/mobile/mobile-bottom-nav";
 import { AppMainContent } from "@/components/app-main-content";
 import { AppRoutePrefetcher } from "@/components/app-route-prefetcher";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
-
-/** Resolve o módulo que controla um item de navegação. */
-function resolveNavItemModuleGate(
-  item: AppNavItem,
-  group: AppNavGroup,
-): EnabledModuleKey | null {
-  return item.moduleItemGate ?? group.moduleGate ?? null;
-}
-
-/** Mantém todos os grupos/itens visíveis; o gate só afeta o clique. */
-function buildVisibleGroups(
-  showAdminNav: boolean,
-): AppNavGroup[] {
-  const filtered = appNavGroups.filter((group) => group.items.length > 0);
-
-  if (showAdminNav) {
-    const sistemaIdx = filtered.findIndex((g) => g.label === "Sistema");
-    const adminGroup: AppNavGroup = {
-      label: "Sistema",
-      items: [adminNavItem],
-    };
-    if (sistemaIdx >= 0) {
-      // Adiciona item de admin dentro do grupo Sistema
-      return filtered.map((g, i) =>
-        i === sistemaIdx
-          ? { ...g, items: [...g.items, adminNavItem] }
-          : g,
-      );
-    }
-    return [...filtered, adminGroup];
-  }
-
-  return filtered;
-}
 
 function NavGroups({
   onNavigate,
@@ -65,7 +32,7 @@ function NavGroups({
 }) {
   const pathname = usePathname();
   const { isModuleEnabled, openDisabledModule } = useModuleGate();
-  const groups = buildVisibleGroups(showAdminNav ?? false);
+  const groups = buildVisibleNavGroups(showAdminNav ?? false);
 
   return (
     <nav
@@ -93,9 +60,7 @@ function NavGroups({
                 moduleGate !== null && !isModuleEnabled(moduleGate);
               const active =
                 !isLocked &&
-                (pathname === item.href ||
-                  (item.href !== "/inicio" &&
-                    pathname.startsWith(`${item.href}/`)));
+                isNavItemActive(pathname, item.href);
 
               const itemClassName = cn(
                 "flex min-h-9 min-w-0 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors duration-150",
@@ -165,8 +130,6 @@ export function AppShell({
   showAdminNav?: boolean;
   userFirstName?: string | null;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   return (
     <div className="bg-background flex min-h-screen w-full max-w-full overflow-x-hidden">
       <AppRoutePrefetcher />
@@ -186,7 +149,7 @@ export function AppShell({
         <div className="flex h-14 items-center gap-2 px-4">
           <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
           <Link
-            href="/inicio"
+            href={APP_DASHBOARD_PATH}
             prefetch
             className="text-sidebar-foreground font-heading text-base font-semibold tracking-tight"
           >
@@ -225,85 +188,31 @@ export function AppShell({
         <AndroidTopInset className="shrink-0 lg:hidden" />
         {/* Header mobile / tablet */}
         <header
-          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex min-h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur lg:hidden"
+          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex min-h-14 shrink-0 items-center justify-center border-b px-4 backdrop-blur lg:hidden"
           role="banner"
         >
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Abrir menu de navegação"
-            aria-expanded={menuOpen}
-            aria-controls="menu-navegacao-mobile"
-            onClick={() => setMenuOpen(true)}
+          <Link
+            href={APP_DASHBOARD_PATH}
+            prefetch
+            className="flex items-center gap-2"
           >
-            <Menu className="size-5" />
-          </Button>
-          <div className="flex items-center gap-2">
             <Leaf className="text-primary size-4 shrink-0" aria-hidden />
             <span className="font-heading font-semibold">NutriGestão</span>
-          </div>
+          </Link>
         </header>
-
-        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-          <SheetContent
-            id="menu-navegacao-mobile"
-            side="left"
-            closeButtonClassName="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring"
-            className="border-sidebar-border bg-sidebar text-sidebar-foreground flex w-72 max-w-[min(18rem,100vw)] flex-col gap-0 overflow-x-hidden border-r p-0 shadow-lg"
-          >
-            <SheetTitle className="sr-only">Menu de navegação NutriGestão</SheetTitle>
-
-            <AndroidTopInset />
-            <div className="flex min-h-14 items-center gap-2 pr-12 pl-4">
-              <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
-              <Link
-                href="/inicio"
-                prefetch
-                onClick={() => setMenuOpen(false)}
-                className="text-sidebar-foreground font-heading text-base font-semibold tracking-tight"
-              >
-                NutriGestão
-              </Link>
-            </div>
-
-            <Separator className="bg-sidebar-border opacity-40" />
-
-            <AppShellUserGreeting firstName={userFirstName} />
-
-            <Separator className="bg-sidebar-border opacity-40" />
-
-            <NavGroups
-              className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
-              showAdminNav={showAdminNav}
-              onNavigate={() => setMenuOpen(false)}
-            />
-
-            <Separator className="bg-sidebar-border opacity-40" />
-
-            <div className="p-2">
-              <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
-              <AppBuildLabel className="text-sidebar-foreground/45" />
-              <Link
-                href="/politica-de-privacidade"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={() => setMenuOpen(false)}
-                className="text-sidebar-foreground/35 hover:text-sidebar-foreground/60 mt-1 block px-3 text-[10px] transition-colors"
-              >
-                Política de Privacidade
-              </Link>
-            </div>
-          </SheetContent>
-        </Sheet>
 
         <main
           id="conteudo-principal"
-          className="min-w-0 max-w-full flex-1 overflow-x-hidden p-4 md:p-6"
+          className="min-w-0 max-w-full flex-1 overflow-x-hidden p-4 pb-[calc(5.5rem+var(--safe-area-bottom))] md:p-6 lg:pb-6"
           tabIndex={-1}
         >
           <AppMainContent>{children}</AppMainContent>
         </main>
+
+        <MobileBottomNav
+          showAdminNav={showAdminNav}
+          userFirstName={userFirstName}
+        />
       </div>
     </div>
   );

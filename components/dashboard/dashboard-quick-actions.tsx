@@ -6,7 +6,7 @@ import { ModuleGatedLink } from "@/components/modules/module-gated-link";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
 
-export function InicioQuickActions() {
+export function DashboardQuickActions() {
   return (
     <div className="flex gap-2">
       <ModuleGatedLink

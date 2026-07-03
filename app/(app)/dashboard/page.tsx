@@ -2,19 +2,19 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { LayoutDashboard } from "lucide-react";
 
-import { InicioClientReminder } from "@/components/dashboard/inicio-client-reminder";
-import { InicioClinicalPanel } from "@/components/dashboard/inicio-clinical-panel";
-import { InicioFinancialPanel } from "@/components/dashboard/inicio-financial-panel";
-import { InicioQuickActions } from "@/components/dashboard/inicio-quick-actions";
+import { DashboardClientReminder } from "@/components/dashboard/dashboard-client-reminder";
+import { DashboardClinicalPanel } from "@/components/dashboard/dashboard-clinical-panel";
+import { DashboardFinancialPanel } from "@/components/dashboard/dashboard-financial-panel";
+import { DashboardQuickActions } from "@/components/dashboard/dashboard-quick-actions";
 import {
-  InicioClinicalPanelSkeleton,
-  InicioFinancialPanelSkeleton,
-} from "@/components/dashboard/inicio-panel-skeleton";
-import { InicioWelcomeBanner } from "@/components/dashboard/inicio-welcome-banner";
+  DashboardClinicalPanelSkeleton,
+  DashboardFinancialPanelSkeleton,
+} from "@/components/dashboard/dashboard-panel-skeleton";
+import { DashboardWelcomeBanner } from "@/components/dashboard/dashboard-welcome-banner";
 import { PageLayout } from "@/components/layout/page-layout";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 
-export default async function InicioPage({
+export default async function DashboardPage({
   searchParams,
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -33,12 +33,12 @@ export default async function InicioPage({
     <PageLayout>
       {!deferHeavyPanels ? (
         <Suspense fallback={null}>
-          <InicioClientReminder />
+          <DashboardClientReminder />
         </Suspense>
       ) : null}
 
       <Suspense fallback={null}>
-        <InicioWelcomeBanner
+        <DashboardWelcomeBanner
           bemvindo={bemvindo}
           onboardingMinimal={onboardingMinimal}
         />
@@ -48,10 +48,10 @@ export default async function InicioPage({
         <div className="flex items-center gap-2">
           <LayoutDashboard className="text-primary size-5" aria-hidden />
           <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Início
+            Dashboard
           </h1>
         </div>
-        <InicioQuickActions />
+        <DashboardQuickActions />
       </div>
 
       {deferHeavyPanels ? (
@@ -63,21 +63,21 @@ export default async function InicioPage({
                 atalhos acima para agendar uma visita ou cadastrar outro
                 cliente.
               </p>
-              <InicioClinicalPanelSkeleton />
-              <InicioFinancialPanelSkeleton />
+              <DashboardClinicalPanelSkeleton />
+              <DashboardFinancialPanelSkeleton />
             </div>
           }
         >
-          <InicioPostWelcomePanels />
+          <DashboardPostWelcomePanels />
         </Suspense>
       ) : (
         <>
-          <Suspense fallback={<InicioClinicalPanelSkeleton />}>
-            <InicioClinicalPanel />
+          <Suspense fallback={<DashboardClinicalPanelSkeleton />}>
+            <DashboardClinicalPanel />
           </Suspense>
 
-          <Suspense fallback={<InicioFinancialPanelSkeleton />}>
-            <InicioFinancialPanel />
+          <Suspense fallback={<DashboardFinancialPanelSkeleton />}>
+            <DashboardFinancialPanel />
           </Suspense>
         </>
       )}
@@ -85,11 +85,11 @@ export default async function InicioPage({
   );
 }
 
-async function InicioPostWelcomePanels() {
+async function DashboardPostWelcomePanels() {
   return (
     <>
-      <InicioClinicalPanel />
-      <InicioFinancialPanel />
+      <DashboardClinicalPanel />
+      <DashboardFinancialPanel />
     </>
   );
 }

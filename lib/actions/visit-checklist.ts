@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -88,7 +90,7 @@ export async function markScheduledVisitInProgress(
   // Não chamar revalidatePath durante o render do RSC (ex.: página iniciar).
   after(() => {
     revalidatePath("/visitas");
-    revalidatePath("/inicio");
+    revalidatePath(APP_DASHBOARD_PATH);
     revalidatePath(`/visitas/${visitId}`);
   });
 }

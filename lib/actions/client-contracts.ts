@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -177,7 +179,7 @@ export async function createContractAction(
 
   revalidatePath(`/clientes/${clientId}/editar`);
   revalidatePath("/financeiro");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   redirect(`/clientes/${clientId}/editar?tab=financeiro`);
 }
 
@@ -230,7 +232,7 @@ export async function updateContractAction(
 
   revalidatePath(`/clientes/${clientId}/editar`);
   revalidatePath("/financeiro");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   redirect(`/clientes/${clientId}/editar?tab=financeiro`);
 }
 
@@ -263,6 +265,6 @@ export async function deleteContractAction(
 
   revalidatePath(`/clientes/${clientId}/editar`);
   revalidatePath("/financeiro");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   redirect(`/clientes/${clientId}/editar?tab=financeiro`);
 }

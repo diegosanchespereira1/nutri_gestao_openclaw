@@ -1,5 +1,7 @@
 "use server";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
+
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
@@ -1852,7 +1854,7 @@ export async function deleteChecklistFillSessionAction(
     return { ok: false, error: "Não foi possível excluir o rascunho." };
   }
 
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath("/checklists");
 
   return { ok: true };
@@ -2172,7 +2174,7 @@ export async function approveChecklistFillDossierAction(
     revalidatePath(`/visitas/${vid}/iniciar`);
   }
   revalidatePath("/visitas");
-  revalidatePath("/inicio");
+  revalidatePath(APP_DASHBOARD_PATH);
 
   if (visitId) {
     const vid = String(visitId);

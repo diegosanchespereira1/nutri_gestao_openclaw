@@ -43,7 +43,7 @@ test.describe("Páginas públicas", () => {
 });
 
 test.describe("Guard de autenticação", () => {
-  for (const path of ["/inicio", "/clientes", "/perfil", "/checklists"]) {
+  for (const path of ["/dashboard", "/clientes", "/perfil", "/checklists"]) {
     test(`rota protegida ${path} redireciona para login com next`, async ({
       page,
     }) => {

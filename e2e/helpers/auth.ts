@@ -10,7 +10,7 @@ export async function login(page: Page): Promise<void> {
   const email = process.env.E2E_EMAIL ?? "";
   const password = process.env.E2E_PASSWORD ?? "";
 
-  if (/\/(inicio|onboarding)/.test(page.url())) return;
+  if (/\/(dashboard|onboarding)/.test(page.url())) return;
 
   await retryUntil(
     async () => {
@@ -18,7 +18,7 @@ export async function login(page: Page): Promise<void> {
       await page.getByLabel("Email").fill(email);
       await page.getByLabel("Senha", { exact: true }).fill(password);
       await page.getByRole("button", { name: "Entrar" }).click();
-      await page.waitForURL(/\/(inicio|onboarding)/, { timeout: 20_000 });
+      await page.waitForURL(/\/(dashboard|onboarding)/, { timeout: 20_000 });
       return true;
     },
     { label: "login E2E", attempts: 3, delayMs: 1_000 },

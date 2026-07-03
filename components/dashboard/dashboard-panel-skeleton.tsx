@@ -9,7 +9,7 @@ function Block({ className }: { className?: string }) {
   );
 }
 
-export function InicioClinicalPanelSkeleton() {
+export function DashboardClinicalPanelSkeleton() {
   return (
     <div
       className="space-y-4 rounded-xl border border-border bg-card p-4"
@@ -26,7 +26,7 @@ export function InicioClinicalPanelSkeleton() {
   );
 }
 
-export function InicioFinancialPanelSkeleton() {
+export function DashboardFinancialPanelSkeleton() {
   return (
     <div
       className="space-y-4 rounded-xl border border-border bg-card p-4"

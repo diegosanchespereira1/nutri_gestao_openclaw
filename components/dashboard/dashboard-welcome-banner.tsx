@@ -19,7 +19,7 @@ function parseWorkContext(raw: string | null | undefined): WorkContext | null {
   return null;
 }
 
-export async function InicioWelcomeBanner({
+export async function DashboardWelcomeBanner({
   bemvindo,
   onboardingMinimal,
 }: Props) {

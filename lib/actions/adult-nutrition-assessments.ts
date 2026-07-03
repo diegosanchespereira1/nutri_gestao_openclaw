@@ -163,5 +163,5 @@ export async function createAdultNutritionAssessmentAction(
 
   revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}?avaliacao=ok`);
+  redirect(`/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`);
 }

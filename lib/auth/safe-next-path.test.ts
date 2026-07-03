@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { buildLoginRedirectPath, safeNextPath } from "@/lib/auth/safe-next-path";
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 
 describe("safeNextPath", () => {
   it("devolve default para null", () => {
-    expect(safeNextPath(null)).toBe("/inicio");
+    expect(safeNextPath(null)).toBe(APP_DASHBOARD_PATH);
   });
 
   it("aceita path relativo", () => {
@@ -15,16 +16,23 @@ describe("safeNextPath", () => {
     expect(safeNextPath("/visitas?x=1")).toBe("/visitas?x=1");
   });
 
+  it("normaliza rota legada /inicio para dashboard", () => {
+    expect(safeNextPath("/inicio")).toBe(APP_DASHBOARD_PATH);
+    expect(safeNextPath("/inicio?bemvindo=1")).toBe(
+      `${APP_DASHBOARD_PATH}?bemvindo=1`,
+    );
+  });
+
   it("bloqueia URL absoluta", () => {
-    expect(safeNextPath("https://evil.com")).toBe("/inicio");
+    expect(safeNextPath("https://evil.com")).toBe(APP_DASHBOARD_PATH);
   });
 
   it("bloqueia protocol-relative", () => {
-    expect(safeNextPath("//evil.com")).toBe("/inicio");
+    expect(safeNextPath("//evil.com")).toBe(APP_DASHBOARD_PATH);
   });
 
   it("bloqueia javascript:", () => {
-    expect(safeNextPath("/javascript:alert(1)")).toBe("/inicio");
+    expect(safeNextPath("/javascript:alert(1)")).toBe(APP_DASHBOARD_PATH);
   });
 });
 

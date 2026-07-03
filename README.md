@@ -55,7 +55,7 @@ Estrutura do repositório e o que não mover sem revisão: **[docs/architecture/
 ## Área logada (Story 1.3)
 
 - Rotas sob `app/(app)/` com layout partilhado: sidebar fixa a partir de **1024px** (`lg`), menu em **Sheet** (ícone *hamburger*) abaixo disso — inclui &lt;768px conforme UX.
-- Entrada de demonstração: `/inicio` (ligação também na página `/`).
+- Entrada da área logada: `/dashboard` (rota legada `/inicio` redireciona permanentemente).
 - *Skip link* “Saltar para conteúdo” no shell (WCAG).
 
 ## Autenticação e perfil (Stories 1.4–1.9)

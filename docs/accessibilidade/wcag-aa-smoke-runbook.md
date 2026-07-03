@@ -33,9 +33,9 @@ Resultado esperado: sem perda de foco, sem elementos inacessíveis por teclado.
 
 Resultado esperado: fluxo completo sem mouse.
 
-## Passo 3 - Início (`/inicio`)
+## Passo 3 - Dashboard (`/dashboard`)
 
-1. Com sessão ativa, abrir `/inicio`.
+1. Com sessão ativa, abrir `/dashboard`.
 2. Pressionar `Tab` no início da página e acionar skip link.
 3. Confirmar que o foco vai para `#conteudo-principal`.
 4. Navegar por atalhos/cards com teclado e validar foco visível.

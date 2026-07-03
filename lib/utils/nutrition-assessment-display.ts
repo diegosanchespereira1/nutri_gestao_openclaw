@@ -22,9 +22,10 @@ export function toAssessmentNum(
 
 export function formatAssessmentRecordedAt(iso: string): string {
   try {
-    return new Intl.DateTimeFormat("pt-PT", {
+    return new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
+      timeZone: "America/Sao_Paulo",
     }).format(new Date(iso));
   } catch {
     return iso;

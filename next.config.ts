@@ -16,6 +16,15 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "210mb",
     },
   },
+  async redirects() {
+    return [
+      {
+        source: "/inicio",
+        destination: "/dashboard",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     const base: { key: string; value: string }[] = [
       { key: "X-Frame-Options", value: "DENY" },

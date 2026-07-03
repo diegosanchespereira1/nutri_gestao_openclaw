@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 
+import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { isBrazilUf } from "@/lib/constants/brazil-states";
 import { parseEstablishmentType } from "@/lib/constants/establishment-types";
 import { refreshProfileContextAfterOnboarding } from "@/lib/auth/refresh-profile-context-after-onboarding";
@@ -113,7 +114,7 @@ export async function completeOnboardingAction(
 
   const profile = profileRes.data;
   if (profile?.onboarding_completed_at) {
-    redirect("/inicio");
+    redirect(APP_DASHBOARD_PATH);
   }
 
   const work_context = parseWorkContext(formData.get("work_context"));
@@ -312,7 +313,7 @@ export async function completeOnboardingAction(
     supabase,
     user.id,
     workspaceOwnerId,
-    "/inicio?bemvindo=1",
+    `${APP_DASHBOARD_PATH}?bemvindo=1`,
   );
 }
 
@@ -347,7 +348,7 @@ export async function skipOnboardingDetailsAction(
   timer.mark("profile_read");
 
   if (profileRes.data?.onboarding_completed_at) {
-    redirect("/inicio");
+    redirect(APP_DASHBOARD_PATH);
   }
 
   const work_context = parseWorkContext(formData.get("work_context"));
@@ -392,6 +393,6 @@ export async function skipOnboardingDetailsAction(
     supabase,
     user.id,
     workspaceOwnerId,
-    "/inicio?bemvindo=1&onboarding=minimal",
+    `${APP_DASHBOARD_PATH}?bemvindo=1&onboarding=minimal`,
   );
 }

@@ -21,7 +21,7 @@ function OverlayInner({ pending }: { pending: boolean }) {
     <div
       role="status"
       aria-live="polite"
-      aria-label={slow ? "Ainda a guardar, quase pronto" : "A guardar"}
+      aria-label={slow ? "Ainda salvando, quase pronto" : "Salvando"}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px]"
     >
       <div className="mx-4 flex w-full max-w-xs flex-col items-center gap-4 rounded-2xl border border-border bg-card px-8 py-7 shadow-2xl">
@@ -31,7 +31,7 @@ function OverlayInner({ pending }: { pending: boolean }) {
 
         <div className="space-y-1.5 text-center">
           <p className="text-sm font-semibold text-foreground">
-            {slow ? "Quase lá…" : "A guardar"}
+            {slow ? "Quase lá…" : "Salvando"}
           </p>
           <p className="text-xs leading-relaxed text-muted-foreground">
             {slow

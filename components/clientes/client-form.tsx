@@ -752,7 +752,7 @@ export function ClientForm({
                       type="hidden"
                       name="est_type"
                       value={estType}
-                      required={estCategory !== ""}
+                      required
                     />
                     <EstablishmentTypeSelect
                       id="est-type"

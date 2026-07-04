@@ -39,8 +39,17 @@ type IndicatorRect = {
   height: number;
 };
 
-const INDICATOR_TRANSITION =
-  "transform 280ms cubic-bezier(0.32, 0.72, 0, 1), width 280ms cubic-bezier(0.32, 0.72, 0, 1), opacity 180ms ease-out";
+const INDICATOR_SLIDE_TRANSITION =
+  "transform 420ms cubic-bezier(0.34, 1.56, 0.64, 1), width 420ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 220ms ease-out";
+
+const navItemClassName = (active: boolean) =>
+  cn(
+    "relative z-10 flex h-10 items-center gap-1.5 rounded-full py-1.5 pl-2 pr-2.5",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+    active
+      ? "shrink-0 text-primary-foreground"
+      : "shrink-0 text-muted-foreground hover:text-foreground",
+  );
 
 const BottomNavItem = forwardRef<
   HTMLAnchorElement | HTMLButtonElement,
@@ -56,40 +65,22 @@ const BottomNavItem = forwardRef<
   { label, icon: Icon, active, onClick, onNavigate, href },
   ref,
 ) {
-  const className = cn(
-    "relative z-10 flex min-h-10 items-center justify-center gap-1.5 rounded-full px-2 py-1.5",
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-    active
-      ? "shrink-0 text-primary-foreground"
-      : "min-w-0 shrink text-muted-foreground hover:text-foreground",
-  );
+  const className = navItemClassName(active);
 
   const content = (
     <>
-      <span
-        className={cn(
-          "flex shrink-0 items-center justify-center rounded-full transition-[transform,background-color] duration-200 ease-out motion-reduce:transition-none",
-          active ? "bg-background size-8 text-primary" : "size-8",
-        )}
-      >
-        <Icon
-          className={cn(
-            "shrink-0 transition-transform duration-200 ease-out motion-reduce:transition-none",
-            active ? "size-4 scale-100" : "size-5 scale-95",
-          )}
-          aria-hidden
-        />
+      <span className="flex size-8 shrink-0 items-center justify-center">
+        <Icon className="size-4 shrink-0" aria-hidden />
       </span>
       <span
         className={cn(
-          "grid overflow-hidden transition-opacity duration-200 ease-out motion-reduce:transition-none",
+          "grid overflow-hidden text-xs font-semibold whitespace-nowrap transition-[grid-template-columns,opacity] duration-300 motion-reduce:transition-none",
+          "ease-[cubic-bezier(0.34,1.56,0.64,1)]",
           active ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0",
         )}
         aria-hidden={!active}
       >
-        <span className="overflow-hidden pr-1 text-xs font-semibold whitespace-nowrap">
-          {label}
-        </span>
+        <span className="overflow-hidden pr-0.5">{label}</span>
       </span>
     </>
   );
@@ -240,6 +231,7 @@ export function MobileBottomNav({
   const itemRefs = useRef(new Map<string, HTMLElement>());
   const [indicator, setIndicator] = useState<IndicatorRect | null>(null);
   const [indicatorReady, setIndicatorReady] = useState(false);
+  const [indicatorPop, setIndicatorPop] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [navShellHeight, setNavShellHeight] = useState(0);
 
@@ -310,6 +302,14 @@ export function MobileBottomNav({
     });
     setIndicatorReady(true);
   }, [activeNavId]);
+
+  useEffect(() => {
+    if (!activeNavId || reduceMotion) return;
+
+    setIndicatorPop(true);
+    const timer = window.setTimeout(() => setIndicatorPop(false), 420);
+    return () => window.clearTimeout(timer);
+  }, [activeNavId, reduceMotion]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -389,11 +389,11 @@ export function MobileBottomNav({
       >
         <div
           ref={navShellRef}
-          className="pointer-events-auto mx-auto max-w-lg px-4 pb-[max(0.75rem,var(--safe-area-bottom))]"
+          className="pointer-events-auto flex justify-center px-4 pb-[max(0.75rem,var(--safe-area-bottom))]"
         >
           <div
             ref={containerRef}
-            className="relative flex items-center justify-between gap-1 rounded-full bg-card px-2 py-2 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/50"
+            className="relative inline-flex max-w-full items-center gap-0.5 rounded-full bg-muted px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60"
           >
             {indicator ? (
               <div
@@ -403,11 +403,11 @@ export function MobileBottomNav({
                   "motion-reduce:transition-none",
                 )}
                 style={{
-                  transform: `translate3d(${indicator.x}px, ${indicator.y}px, 0)`,
+                  transform: `translate3d(${indicator.x}px, ${indicator.y}px, 0) scale(${indicatorPop ? 1.03 : 1})`,
                   width: indicator.width,
                   height: indicator.height,
                   opacity: indicatorReady ? 1 : 0,
-                  transition: reduceMotion ? "none" : INDICATOR_TRANSITION,
+                  transition: reduceMotion ? "none" : INDICATOR_SLIDE_TRANSITION,
                   willChange: reduceMotion ? undefined : "transform, width",
                 }}
               />
@@ -430,14 +430,14 @@ export function MobileBottomNav({
                       openDisabledModule(moduleGate);
                     }}
                     className={cn(
-                      "relative z-10 flex min-h-10 min-w-0 items-center justify-center rounded-full px-2 py-1.5 text-muted-foreground/70 transition-colors duration-200",
-                      "hover:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                      navItemClassName(false),
+                      "text-muted-foreground/70 hover:text-muted-foreground",
                     )}
                     aria-disabled="true"
                     aria-label={item.label}
                   >
                     <span className="flex size-8 shrink-0 items-center justify-center">
-                      <Icon className="size-5 shrink-0 opacity-60" aria-hidden />
+                      <Icon className="size-4 shrink-0 opacity-60" aria-hidden />
                     </span>
                   </button>
                 );

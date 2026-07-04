@@ -134,6 +134,13 @@ function FixedYAxisPanel({
   );
 }
 
+function scrollChartToLatest(scrollEl: HTMLDivElement) {
+  const maxScroll = scrollEl.scrollWidth - scrollEl.clientWidth;
+  if (maxScroll > 0) {
+    scrollEl.scrollLeft = maxScroll;
+  }
+}
+
 export function EvolutionChartScrollShell({
   pointCount,
   height,
@@ -153,8 +160,34 @@ export function EvolutionChartScrollShell({
     if (!needsScroll) return;
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollLeft = el.scrollWidth - el.clientWidth;
-  }, [needsScroll, pointCount]);
+
+    const syncScroll = () => scrollChartToLatest(el);
+
+    syncScroll();
+    const rafId = requestAnimationFrame(syncScroll);
+
+    const resizeObserver = new ResizeObserver(syncScroll);
+    resizeObserver.observe(el);
+    if (el.firstElementChild instanceof Element) {
+      resizeObserver.observe(el.firstElementChild);
+    }
+
+    const intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          syncScroll();
+        }
+      },
+      { threshold: 0 },
+    );
+    intersectionObserver.observe(el);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+      intersectionObserver.disconnect();
+    };
+  }, [needsScroll, pointCount, plotMinWidth]);
 
   if (!needsScroll) {
     return (

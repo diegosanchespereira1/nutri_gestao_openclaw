@@ -276,7 +276,7 @@ export function PerfilForm({
             className="from-primary/15 pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--tw-gradient-stops))] via-transparent to-transparent"
             aria-hidden
           />
-          <div className="relative space-y-6 p-6 sm:p-8">
+          <div className="relative space-y-4 p-5 sm:p-6">
             {pendingEmail && !isEditing ? (
               <div className="border-primary/25 bg-primary/5 rounded-xl border p-4">
                 <p className="text-foreground flex items-center gap-2 text-sm font-medium">
@@ -293,117 +293,119 @@ export function PerfilForm({
               </div>
             ) : null}
 
-            <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:pr-44">
-              <div className="flex shrink-0 flex-col items-start gap-2 self-start">
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                className="group ring-primary/25 ring-offset-background bg-muted relative size-24 overflow-hidden rounded-full text-xl font-semibold text-foreground ring-4 ring-offset-2 transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/40 sm:size-28 sm:text-2xl"
-                aria-label="Alterar foto do perfil"
-              >
-                {displayPhotoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={displayPhotoUrl}
-                    alt=""
-                    className="size-full object-cover"
-                  />
-                ) : (
-                  <span className="flex size-full items-center justify-center">
-                    {initialsFromName(fullNameValue)}
-                  </span>
-                )}
-                <span
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-1 rounded-full bg-black/55 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:bg-black/40"
-                  aria-hidden
-                >
-                  <Camera className="size-6 sm:size-7" />
-                  <span className="text-[10px] font-medium tracking-wide uppercase sm:text-xs">
-                    Alterar
-                  </span>
-                </span>
-              </button>
-              {hasStoredPhoto && !photoPreviewUrl && !removePhotoChecked ? (
-                <button
-                  type="button"
-                  onClick={handleRemovePhoto}
-                  className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1 text-xs transition-colors"
-                >
-                  <Trash2 className="size-3" aria-hidden />
-                  Remover foto
-                </button>
-              ) : removePhotoChecked && !photoPreviewUrl ? (
-                <button
-                  type="button"
-                  onClick={() => setRemovePhotoChecked(false)}
-                  className="text-primary text-xs font-medium hover:underline"
-                >
-                  Desfazer remoção
-                </button>
-              ) : null}
-            </div>
-
-            <div className="min-w-0 flex-1 space-y-3">
-              <div>
-                <h2 className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
-                  {fullNameValue.trim() || "Profissional"}
-                </h2>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  {emailValue}
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {roleLabel !== "—" ? (
-                  <Badge variant="secondary">{roleLabel}</Badge>
-                ) : null}
-                {crnValue.trim() ? (
-                  <Badge variant="outline">CRN {crnValue.trim()}</Badge>
-                ) : null}
-                {phoneValue.trim() ? (
-                  <Badge variant="outline">{phoneValue.trim()}</Badge>
-                ) : null}
-              </div>
-            </div>
-            </div>
-
-            {isEditing || !isChangingPassword ? (
-              <div className="border-border/60 flex flex-wrap items-center gap-x-5 gap-y-2 border-t pt-4 sm:absolute sm:top-6 sm:right-6 sm:justify-end sm:border-0 sm:pt-0">
-                {isEditing ? (
+            <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start sm:gap-x-5">
+              <div className="flex items-start gap-4 sm:contents">
+                <div className="flex shrink-0 flex-col items-center gap-1.5 sm:col-start-1 sm:row-start-1">
                   <button
                     type="button"
-                    onClick={handleCancelEdit}
-                    className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="group ring-primary/25 ring-offset-background bg-muted relative size-20 shrink-0 overflow-hidden rounded-full text-lg font-semibold text-foreground ring-4 ring-offset-2 transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/40 sm:size-24 sm:text-xl"
+                    aria-label="Alterar foto do perfil"
                   >
-                    Cancelar
+                    {displayPhotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={displayPhotoUrl}
+                        alt=""
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex size-full items-center justify-center">
+                        {initialsFromName(fullNameValue)}
+                      </span>
+                    )}
+                    <span
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 rounded-full bg-black/55 text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100 [@media(hover:none)]:bg-black/40"
+                      aria-hidden
+                    >
+                      <Camera className="size-5 sm:size-6" />
+                      <span className="text-[10px] font-medium tracking-wide uppercase">
+                        Alterar
+                      </span>
+                    </span>
                   </button>
-                ) : (
-                  <>
+                  {hasStoredPhoto && !photoPreviewUrl && !removePhotoChecked ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsChangingPassword(true);
-                        setIsEditing(false);
-                      }}
-                      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+                      onClick={handleRemovePhoto}
+                      className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1 text-xs transition-colors"
                     >
-                      <Lock className="size-3.5 shrink-0" aria-hidden />
-                      Alterar senha
+                      <Trash2 className="size-3" aria-hidden />
+                      Remover foto
                     </button>
+                  ) : removePhotoChecked && !photoPreviewUrl ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setIsEditing(true);
-                        setIsChangingPassword(false);
-                      }}
-                      className="text-primary hover:text-primary/80 inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+                      onClick={() => setRemovePhotoChecked(false)}
+                      className="text-primary text-xs font-medium hover:underline"
                     >
-                      <Pencil className="size-3.5 shrink-0" aria-hidden />
-                      Editar dados
+                      Desfazer remoção
                     </button>
-                  </>
-                )}
+                  ) : null}
+                </div>
+
+                <div className="min-w-0 flex-1 space-y-2 sm:col-start-2 sm:row-start-1">
+                  <div>
+                    <h2 className="text-foreground text-xl font-bold tracking-tight sm:text-2xl">
+                      {fullNameValue.trim() || "Profissional"}
+                    </h2>
+                    <p className="text-muted-foreground mt-0.5 text-sm">
+                      {emailValue}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {roleLabel !== "—" ? (
+                      <Badge variant="secondary">{roleLabel}</Badge>
+                    ) : null}
+                    {crnValue.trim() ? (
+                      <Badge variant="outline">CRN {crnValue.trim()}</Badge>
+                    ) : null}
+                    {phoneValue.trim() ? (
+                      <Badge variant="outline">{phoneValue.trim()}</Badge>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            ) : null}
+
+              {isEditing || !isChangingPassword ? (
+                <div className="border-border/60 flex flex-wrap items-center justify-end gap-x-4 gap-y-2 border-t pt-3 sm:col-start-3 sm:row-start-1 sm:flex-col sm:items-end sm:gap-2 sm:self-start sm:border-0 sm:pt-0">
+                  {isEditing ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsChangingPassword(true);
+                          setIsEditing(false);
+                        }}
+                        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+                      >
+                        <Lock className="size-3.5 shrink-0" aria-hidden />
+                        Alterar senha
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditing(true);
+                          setIsChangingPassword(false);
+                        }}
+                        className="text-primary hover:text-primary/80 inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
+                      >
+                        <Pencil className="size-3.5 shrink-0" aria-hidden />
+                        Editar dados
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
 

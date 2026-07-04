@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { Search } from "lucide-react";
 
@@ -19,6 +21,11 @@ import type { ClientLifecycleStatus, ClientBusinessSegment } from "@/lib/types/c
 import { cn } from "@/lib/utils";
 import { BusinessSegmentFilterDropdown } from "./business-segment-filter-dropdown";
 
+const SITUACAO_FILTER_LABELS: Record<ClientLifecycleStatus | "all", string> = {
+  all: "Todos",
+  ...clientLifecycleBadgeLabel,
+};
+
 export function ClientesFilters({
   defaultQ,
   defaultSituacao,
@@ -29,13 +36,9 @@ export function ClientesFilters({
   defaultSegmentos?: ClientBusinessSegment[];
 }) {
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <form
-        action="/clientes"
-        method="get"
-        className="flex flex-wrap items-center gap-3"
-      >
-        <div className="relative min-w-0 flex-1 basis-48">
+    <div className="overflow-visible rounded-xl border border-border bg-card p-4">
+      <form action="/clientes" method="get" className="flex flex-col gap-3">
+        <div className="relative min-w-0">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             name="q"
@@ -47,39 +50,49 @@ export function ClientesFilters({
           />
         </div>
 
-        <div className="w-44 shrink-0">
-          <Select name="situacao" defaultValue={defaultSituacao}>
-            <SelectTrigger className="h-9 w-full">
-              <SelectValue placeholder="Todas as situações" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as situações</SelectItem>
-              {CLIENT_LIFECYCLE_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {clientLifecycleBadgeLabel[s]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="min-w-0 flex-1 sm:max-w-[11rem]">
+              <Select name="situacao" defaultValue={defaultSituacao}>
+                <SelectTrigger className="h-9 w-full">
+                  <SelectValue placeholder="Todos">
+                    {(selected) =>
+                      selected
+                        ? SITUACAO_FILTER_LABELS[selected as ClientLifecycleStatus | "all"]
+                        : null
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {CLIENT_LIFECYCLE_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {clientLifecycleBadgeLabel[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="w-44 shrink-0">
-          <BusinessSegmentFilterDropdown
-            defaultSegmentos={defaultSegmentos}
-            showLabel={false}
-          />
-        </div>
+            <div className="min-w-0 flex-1 sm:max-w-[11rem]">
+              <BusinessSegmentFilterDropdown
+                defaultSegmentos={defaultSegmentos}
+                showLabel={false}
+              />
+            </div>
+          </div>
 
-        <div className="flex gap-2">
-          <Button type="submit" size="lg" className="rounded-md">
-            Filtrar
-          </Button>
-          <Link
-            href="/clientes"
-            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-md")}
-          >
-            Limpar
-          </Link>
+          <div className="flex shrink-0 gap-2">
+            <Button type="submit" size="lg" className="rounded-md">
+              Filtrar
+            </Button>
+            <Link
+              href="/clientes"
+              className={cn(buttonVariants({ variant: "outline", size: "lg" }), "rounded-md")}
+            >
+              Limpar
+            </Link>
+          </div>
         </div>
       </form>
     </div>

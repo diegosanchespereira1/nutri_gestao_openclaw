@@ -70,7 +70,6 @@ export default async function PerfilPage() {
       <PageHeader
         title="Perfil profissional"
         description="Gerencie seus dados de identificação, foto, assinatura e segurança da conta."
-        back={{ href: "/definicoes", label: "Definições" }}
       />
       <PerfilForm
         defaultFullName={effectiveFullName}

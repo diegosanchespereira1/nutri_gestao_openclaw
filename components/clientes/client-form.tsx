@@ -35,6 +35,8 @@ import {
 } from "@/lib/actions/client-segments";
 import { Button } from "@/components/ui/button";
 import { EstablishmentCategorySelect } from "@/components/clientes/establishment-category-select";
+import { EstablishmentTypeSelect } from "@/components/clientes/establishment-type-select";
+import { BusinessSegmentSelect } from "@/components/clientes/business-segment-select";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
   Dialog,
@@ -46,22 +48,24 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  CLIENT_BUSINESS_SEGMENTS,
-  clientBusinessSegmentLabel,
-} from "@/lib/constants/client-business-segment";
-import {
-  ESTABLISHMENT_TYPES_BY_CATEGORY,
   categoryFromType,
-  establishmentTypeLabel,
 } from "@/lib/constants/establishment-types";
 import { clientLifecycleLabel } from "@/lib/constants/client-lifecycle";
 import { MAX_CLIENT_LOGO_BYTES } from "@/lib/constants/client-logos-storage";
 import type { ClientKind, ClientLifecycleStatus } from "@/lib/types/clients";
 import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
 import type { PatientSex } from "@/lib/types/patients";
+import { cn } from "@/lib/utils";
 
 const initial: ClientFormResult | undefined = undefined;
 
@@ -71,8 +75,7 @@ const sexOptions: { value: PatientSex; label: string }[] = [
   { value: "other", label: "Outro" },
 ];
 
-const selectClassName =
-  "border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
+const EMPTY_SELECT_VALUE = "__empty__";
 
 const textareaClass =
   "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
@@ -210,7 +213,7 @@ export function ClientForm({
   defaultCustomSegments?: ClientCustomSegment[];
   /** Membros da equipe para atribuir responsável pela carteira. */
   teamMembersForSelect?: TeamMemberSelectOption[];
-  /** ID do `team_member` responsável (opcional). */
+  /** ID do `team_member` responsável. */
   defaultResponsibleTeamMemberId?: string | null;
   /** Campos do estabelecimento 1:1 (apenas PJ). */
   defaultEstName?: string;
@@ -252,6 +255,10 @@ export function ClientForm({
   }
 
   const [segmentValue, setSegmentValue] = useState(defaultBusinessSegment);
+  const [responsibleValue, setResponsibleValue] = useState(
+    defaultResponsibleTeamMemberId ?? "",
+  );
+  const [sexValue, setSexValue] = useState(defaultSex);
   const [customSegments, setCustomSegments] =
     useState<ClientCustomSegment[]>(defaultCustomSegments);
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
@@ -463,8 +470,7 @@ export function ClientForm({
 
                 <div className="space-y-2">
                   <Label htmlFor="client-trade-name">
-                    Nome fantasia (opcional)
-                  </Label>
+                    Nome fantasia                  </Label>
                   <Input
                     id="client-trade-name"
                     name="trade_name"
@@ -483,32 +489,15 @@ export function ClientForm({
                 {kind === "pj" ? (
                   <div className="space-y-2">
                     <Label htmlFor="business-segment">
-                      Categoria do negócio (opcional)
-                    </Label>
+                      Categoria do negócio                    </Label>
                     <div className="flex gap-2">
-                      <select
+                      <BusinessSegmentSelect
                         id="business-segment"
-                        name="business_segment"
                         value={segmentValue}
-                        onChange={(e) => setSegmentValue(e.target.value)}
-                        className={selectClassName}
-                      >
-                        <option value="">— Indefinida —</option>
-                        {CLIENT_BUSINESS_SEGMENTS.map((s) => (
-                          <option key={s} value={s}>
-                            {clientBusinessSegmentLabel[s]}
-                          </option>
-                        ))}
-                        {customSegments.length > 0 && (
-                          <optgroup label="Personalizadas">
-                            {customSegments.map((s) => (
-                              <option key={s.id} value={s.label}>
-                                {s.label}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
+                        onChange={setSegmentValue}
+                        customSegments={customSegments}
+                        className="min-w-0 flex-1"
+                      />
                       <Button
                         type="button"
                         variant="outline"
@@ -536,8 +525,8 @@ export function ClientForm({
                 <div className="space-y-2">
                   <Label htmlFor="client-document">
                     {kind === "pf"
-                      ? "CPF do titular (opcional)"
-                      : "CNPJ (opcional)"}
+                      ? "CPF do titular"
+                      : "CNPJ"}
                   </Label>
                   <Input
                     id="client-document"
@@ -554,7 +543,7 @@ export function ClientForm({
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="client-email">Email (opcional)</Label>
+                    <Label htmlFor="client-email">Email</Label>
                     <Input
                       id="client-email"
                       name="email"
@@ -564,7 +553,7 @@ export function ClientForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="client-phone">Telefone (opcional)</Label>
+                    <Label htmlFor="client-phone">Telefone</Label>
                     <Input
                       id="client-phone"
                       name="phone"
@@ -578,21 +567,48 @@ export function ClientForm({
                 {teamMembersForSelect.length > 0 ? (
                   <div className="space-y-2">
                     <Label htmlFor="responsible-team-member">
-                      Profissional responsável pelo atendimento (opcional)
-                    </Label>
-                    <select
-                      id="responsible-team-member"
+                      Profissional responsável pelo atendimento                    </Label>
+                    <input
+                      type="hidden"
                       name="responsible_team_member_id"
-                      defaultValue={defaultResponsibleTeamMemberId ?? ""}
-                      className={selectClassName}
+                      value={responsibleValue}
+                    />
+                    <Select
+                      value={responsibleValue || EMPTY_SELECT_VALUE}
+                      onValueChange={(next) => {
+                        setResponsibleValue(
+                          !next || next === EMPTY_SELECT_VALUE ? "" : next,
+                        );
+                      }}
                     >
-                      <option value="">— Nenhum —</option>
-                      {teamMembersForSelect.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.full_name}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger
+                        id="responsible-team-member"
+                        className={cn(
+                          "w-full",
+                          !responsibleValue && "text-muted-foreground",
+                        )}
+                      >
+                        <SelectValue placeholder="Selecione">
+                          {(selected) => {
+                            if (!selected || selected === EMPTY_SELECT_VALUE) {
+                              return "Selecione";
+                            }
+                            return (
+                              teamMembersForSelect.find((m) => m.id === selected)
+                                ?.full_name ?? selected
+                            );
+                          }}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={EMPTY_SELECT_VALUE}>Selecione</SelectItem>
+                        {teamMembersForSelect.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p className="text-muted-foreground text-xs">
                       Quem acompanha a carteira deste cliente. Se outro colega
                       fizer uma visita ou checklist, pode actualizar este campo
@@ -637,24 +653,33 @@ export function ClientForm({
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="lifecycle-status">Estado</Label>
-                        <select
-                          id="lifecycle-status"
+                        <Select
                           name="lifecycle_status"
-                          required={kind === "pj"}
                           defaultValue={defaultLifecycleStatus}
-                          className={selectClassName}
                         >
-                          {lifecycleOptions.map((s) => (
-                            <option key={s} value={s}>
-                              {clientLifecycleLabel[s]}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger id="lifecycle-status" className="w-full">
+                            <SelectValue placeholder="Selecione o estado">
+                              {(selected) =>
+                                selected
+                                  ? clientLifecycleLabel[
+                                      selected as ClientLifecycleStatus
+                                    ]
+                                  : null
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {lifecycleOptions.map((s) => (
+                              <SelectItem key={s} value={s}>
+                                {clientLifecycleLabel[s]}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="activated-at">
-                          Data de ativação (opcional)
-                        </Label>
+                          Data de ativação                        </Label>
                         <Input
                           id="activated-at"
                           name="activated_at"
@@ -698,8 +723,7 @@ export function ClientForm({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="est-name">
-                    Nome do estabelecimento (opcional)
-                  </Label>
+                    Nome do estabelecimento                  </Label>
                   <Input
                     id="est-name"
                     name="est_name"
@@ -716,7 +740,7 @@ export function ClientForm({
                     id="est-category"
                     value={estCategory}
                     onChange={handleEstCategoryChange}
-                    className={selectClassName}
+                    className="w-full"
                   />
                 </div>
 
@@ -724,32 +748,28 @@ export function ClientForm({
                 {estCategory !== "" ? (
                   <div className="space-y-2">
                     <Label htmlFor="est-type">Tipo de estabelecimento</Label>
-                    <select
-                      id="est-type"
+                    <input
+                      type="hidden"
                       name="est_type"
-                      required
                       value={estType}
-                      onChange={(e) => {
-                        setEstType(e.target.value as EstablishmentType);
-                        if (e.target.value) setEstValidationError(false);
+                      required={estCategory !== ""}
+                    />
+                    <EstablishmentTypeSelect
+                      id="est-type"
+                      category={estCategory}
+                      value={estType}
+                      onChange={(value) => {
+                        setEstType(value);
+                        setEstValidationError(false);
                       }}
-                      className={selectClassName}
-                    >
-                      <option value="" disabled>
-                        Selecione o tipo…
-                      </option>
-                      {ESTABLISHMENT_TYPES_BY_CATEGORY[estCategory].map((t) => (
-                        <option key={t} value={t}>
-                          {establishmentTypeLabel[t]}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder="Selecione o tipo…"
+                      className="w-full"
+                    />
                   </div>
                 ) : null}
                 <div className="space-y-2">
                   <Label htmlFor="est-address1">
-                    Endereço (linha 1) (opcional)
-                  </Label>
+                    Endereço (linha 1)                  </Label>
                   <Input
                     id="est-address1"
                     name="est_address_line1"
@@ -760,8 +780,7 @@ export function ClientForm({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="est-address2">
-                    Endereço (linha 2) (opcional)
-                  </Label>
+                    Endereço (linha 2)                  </Label>
                   <Input
                     id="est-address2"
                     name="est_address_line2"
@@ -771,7 +790,7 @@ export function ClientForm({
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="space-y-2 sm:col-span-1">
-                    <Label htmlFor="est-city">Cidade (opcional)</Label>
+                    <Label htmlFor="est-city">Cidade</Label>
                     <Input
                       id="est-city"
                       name="est_city"
@@ -780,7 +799,7 @@ export function ClientForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="est-state">UF (opcional)</Label>
+                    <Label htmlFor="est-state">UF</Label>
                     <Input
                       id="est-state"
                       name="est_state"
@@ -792,7 +811,7 @@ export function ClientForm({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="est-postal">CEP (opcional)</Label>
+                    <Label htmlFor="est-postal">CEP</Label>
                     <Input
                       id="est-postal"
                       name="est_postal_code"
@@ -830,8 +849,7 @@ export function ClientForm({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="client-attended-name">
-                        Nome completo da pessoa atendida (opcional)
-                      </Label>
+                        Nome completo da pessoa atendida                      </Label>
                       <Input
                         id="client-attended-name"
                         name="attended_full_name"
@@ -857,8 +875,7 @@ export function ClientForm({
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="client-birth">
-                          Data de nascimento (opcional)
-                        </Label>
+                          Data de nascimento                        </Label>
                         <Input
                           id="client-birth"
                           name="birth_date"
@@ -867,20 +884,40 @@ export function ClientForm({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="client-sex">Sexo (opcional)</Label>
-                        <select
-                          id="client-sex"
-                          name="sex"
-                          defaultValue={defaultSex}
-                          className={selectClassName}
+                        <Label htmlFor="client-sex">Sexo</Label>
+                        <input type="hidden" name="sex" value={sexValue} />
+                        <Select
+                          value={sexValue || EMPTY_SELECT_VALUE}
+                          onValueChange={(next) => {
+                            setSexValue(
+                              !next || next === EMPTY_SELECT_VALUE
+                                ? ""
+                                : (next as PatientSex),
+                            );
+                          }}
                         >
-                          <option value="">—</option>
-                          {sexOptions.map((o) => (
-                            <option key={o.value} value={o.value}>
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger id="client-sex" className="w-full">
+                            <SelectValue placeholder="—">
+                              {(selected) => {
+                                if (!selected || selected === EMPTY_SELECT_VALUE) {
+                                  return null;
+                                }
+                                return (
+                                  sexOptions.find((o) => o.value === selected)?.label ??
+                                  selected
+                                );
+                              }}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={EMPTY_SELECT_VALUE}>—</SelectItem>
+                            {sexOptions.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
                   </section>
@@ -898,8 +935,7 @@ export function ClientForm({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="client-dietary">
-                        Restrições alimentares (opcional)
-                      </Label>
+                        Restrições alimentares                      </Label>
                       <textarea
                         id="client-dietary"
                         name="dietary_restrictions"
@@ -911,8 +947,7 @@ export function ClientForm({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="client-meds">
-                        Medicamento(s) de uso contínuo (opcional)
-                      </Label>
+                        Medicamento(s) de uso contínuo                      </Label>
                       <textarea
                         id="client-meds"
                         name="chronic_medications"
@@ -938,8 +973,7 @@ export function ClientForm({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="guardian-name">
-                        Nome completo (opcional)
-                      </Label>
+                        Nome completo                      </Label>
                       <Input
                         id="guardian-name"
                         name="guardian_full_name"
@@ -949,8 +983,7 @@ export function ClientForm({
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="guardian-doc">
-                        Documento de identificação (opcional)
-                      </Label>
+                        Documento de identificação                      </Label>
                       <Input
                         id="guardian-doc"
                         name="guardian_document_id"
@@ -960,7 +993,7 @@ export function ClientForm({
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="guardian-email">Email (opcional)</Label>
+                        <Label htmlFor="guardian-email">Email</Label>
                         <Input
                           id="guardian-email"
                           name="guardian_email"
@@ -971,8 +1004,7 @@ export function ClientForm({
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="guardian-phone">
-                          Telefone (opcional)
-                        </Label>
+                          Telefone                        </Label>
                         <Input
                           id="guardian-phone"
                           name="guardian_phone"
@@ -983,7 +1015,7 @@ export function ClientForm({
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="guardian-rel">Vínculo (opcional)</Label>
+                      <Label htmlFor="guardian-rel">Vínculo</Label>
                       <Input
                         id="guardian-rel"
                         name="guardian_relationship"
@@ -1006,8 +1038,7 @@ export function ClientForm({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="exam-previous">
-                      Exames já realizados (opcional)
-                    </Label>
+                      Exames já realizados                    </Label>
                     <Input
                       id="exam-previous"
                       name="exam_previous"
@@ -1019,8 +1050,7 @@ export function ClientForm({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="exam-scheduled">
-                      Exames pedidos, agendados ou a realizar (opcional)
-                    </Label>
+                      Exames pedidos, agendados ou a realizar                    </Label>
                     <Input
                       id="exam-scheduled"
                       name="exam_scheduled"
@@ -1042,8 +1072,7 @@ export function ClientForm({
                   </p>
                   <div className="space-y-2">
                     <Label htmlFor="state-registration">
-                      Inscrição estadual (IE) (opcional)
-                    </Label>
+                      Inscrição estadual (IE)                    </Label>
                     <Input
                       id="state-registration"
                       name="state_registration"
@@ -1053,8 +1082,7 @@ export function ClientForm({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="municipal-registration">
-                      Inscrição municipal (IM) (opcional)
-                    </Label>
+                      Inscrição municipal (IM)                    </Label>
                     <Input
                       id="municipal-registration"
                       name="municipal_registration"
@@ -1063,8 +1091,7 @@ export function ClientForm({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="sanitary-license">
-                      Alvará / licença sanitária (opcional)
-                    </Label>
+                      Alvará / licença sanitária                    </Label>
                     <textarea
                       id="sanitary-license"
                       name="sanitary_license"
@@ -1078,7 +1105,7 @@ export function ClientForm({
 
                 <TabsContent value="pj-web" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="website-url">Site (opcional)</Label>
+                    <Label htmlFor="website-url">Site</Label>
                     <Input
                       id="website-url"
                       name="website_url"
@@ -1089,8 +1116,7 @@ export function ClientForm({
                   </div>
                   <Separator />
                   <p className="text-foreground text-sm font-medium">
-                    Redes sociais (opcional)
-                  </p>
+                    Redes sociais                  </p>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="social-ig">Instagram</Label>
@@ -1193,7 +1219,7 @@ export function ClientForm({
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="legal-rep-doc">CPF (opcional)</Label>
+                        <Label htmlFor="legal-rep-doc">CPF</Label>
                         <Input
                           id="legal-rep-doc"
                           name="legal_rep_document_id"
@@ -1279,7 +1305,7 @@ export function ClientForm({
             ) : null}
 
             <TabsContent value="notas" className="space-y-2">
-              <Label htmlFor="client-notes">Notas internas (opcional)</Label>
+              <Label htmlFor="client-notes">Notas internas</Label>
               <textarea
                 id="client-notes"
                 name="notes"

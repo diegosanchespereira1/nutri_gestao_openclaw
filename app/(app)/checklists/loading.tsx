@@ -1,18 +1,4 @@
-function ChecklistCatalogSkeleton() {
-  return (
-    <div
-      className="space-y-4 rounded-xl border border-border bg-card p-6"
-      aria-hidden
-    >
-      <div className="h-10 animate-pulse rounded-lg bg-muted" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />
-        ))}
-      </div>
-    </div>
-  );
-}
+import { ChecklistCatalogSkeleton } from "@/components/checklists/checklist-skeletons";
 
 /** Skeleton inline — ocupa só o `<main>`, sem cobrir a sidebar (≥ lg). */
 export default function ChecklistsLoading() {

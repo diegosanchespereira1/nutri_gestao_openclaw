@@ -3,6 +3,7 @@ import { Suspense } from "react";
 
 import { ChecklistCatalogSection } from "@/components/checklists/checklist-catalog-section";
 import { ChecklistModelsNav } from "@/components/checklists/checklist-models-nav";
+import { ChecklistCatalogSkeleton } from "@/components/checklists/checklist-skeletons";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -78,7 +79,7 @@ export default async function ChecklistsPage({
         </p>
       ) : null}
 
-      <Suspense fallback={null}>
+      <Suspense fallback={<ChecklistCatalogSkeleton />}>
         <ChecklistCatalogSection
           focusTemplateId={focusTemplateId}
           focusWorkspaceTemplateId={focusWorkspaceTemplateId}

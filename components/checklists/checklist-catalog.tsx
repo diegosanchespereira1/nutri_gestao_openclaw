@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -107,6 +108,11 @@ const TEMPLATE_SOURCE_FILTERS: Array<{ id: TemplateSourceFilter; label: string }
 ];
 
 const DROPDOWN_PAGE_SIZE = 80;
+
+/** Rota de cadastro de novo cliente (PJ). */
+const NEW_CLIENT_HREF = "/clientes/novo";
+/** Valor sentinela para a opção "Cadastrar novo cliente" no dropdown. */
+const NEW_CLIENT_OPTION_VALUE = "__new_client__";
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 
@@ -230,6 +236,7 @@ export function ChecklistCatalog({
   focusWorkspaceTemplateId = null,
   initialEstablishmentId = null,
 }: Props) {
+  const router = useRouter();
   /* ── estado ── */
   const [establishmentId, setEstablishmentId] = useState<string>("");
   const [selectedEstablishment, setSelectedEstablishment] =
@@ -246,6 +253,7 @@ export function ChecklistCatalog({
     EstablishmentPickerOption[]
   >(() => recentEstablishments);
   const fullDropdownLoadedRef = useRef(false);
+  const [dropdownLoaded, setDropdownLoaded] = useState(false);
   const [dropdownTotal, setDropdownTotal] = useState(0);
   const [dropdownOffset, setDropdownOffset] = useState(0);
   const [isLoadingDropdownOptions, setIsLoadingDropdownOptions] = useState(false);
@@ -438,6 +446,16 @@ export function ChecklistCatalog({
   }, [alphabeticalDropdownOptions, searchResults, selectedEstablishment]);
 
   const hasMoreDropdownOptions = dropdownOffset < dropdownTotal;
+
+  /**
+   * Tenant sem nenhum estabelecimento/cliente cadastrado: a lista já foi
+   * carregada, não está carregando e não há opções. Nesse caso orientamos o
+   * cadastro de um novo cliente em vez de deixar o dropdown vazio.
+   */
+  const hasNoEstablishments =
+    dropdownLoaded &&
+    !isLoadingDropdownOptions &&
+    establishmentDropdownOptions.length === 0;
 
   const step1Done = Boolean(establishmentId);
   const step2Done = Boolean(
@@ -793,6 +811,7 @@ export function ChecklistCatalog({
         );
       });
       fullDropdownLoadedRef.current = true;
+      setDropdownLoaded(true);
     } catch {
       setDropdownLoadError("Não foi possível carregar a lista de empresas.");
     } finally {
@@ -804,6 +823,15 @@ export function ChecklistCatalog({
     if (fullDropdownLoadedRef.current || isLoadingDropdownOptions) return;
     void loadDropdownOptions(true);
   }
+
+  // Sem estabelecimentos recentes: carrega a lista completa no mount para
+  // detectar com segurança o caso de tenant sem clientes e sugerir o cadastro.
+  useEffect(() => {
+    if (recentEstablishments.length === 0) {
+      ensureDropdownOptions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function registerEstablishmentOpen() {
     if (!establishmentId) return;
@@ -1016,6 +1044,10 @@ export function ChecklistCatalog({
                   onFocus={ensureDropdownOptions}
                   onChange={(e) => {
                     const nextId = e.target.value;
+                    if (nextId === NEW_CLIENT_OPTION_VALUE) {
+                      router.push(NEW_CLIENT_HREF);
+                      return;
+                    }
                     if (!nextId) {
                       setEstablishmentId("");
                       setSelectedEstablishment(null);
@@ -1036,12 +1068,17 @@ export function ChecklistCatalog({
                   )}
                   aria-label="Selecionar estabelecimento"
                 >
-                  <option value="">Selecionar</option>
+                  <option value="">
+                    {hasNoEstablishments ? "Nenhum cliente cadastrado" : "Selecionar"}
+                  </option>
                   {establishmentDropdownOptions.map((option) => (
                     <option key={`dropdown-${option.id}`} value={option.id}>
                       {option.label}
                     </option>
                   ))}
+                  <option value={NEW_CLIENT_OPTION_VALUE}>
+                    + Cadastrar novo cliente…
+                  </option>
                 </select>
 
                 <Button
@@ -1196,23 +1233,45 @@ export function ChecklistCatalog({
                   </DropdownMenuScroll>
                 </DialogContent>
               </Dialog>
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                <p className="min-w-0 text-[11px] text-muted-foreground">
-                  {isLoadingDropdownOptions
-                    ? "Carregando empresas..."
-                    : `${alphabeticalDropdownOptions.length} de ${dropdownTotal || alphabeticalDropdownOptions.length} empresas carregadas (A-Z)`}
-                </p>
-                {hasMoreDropdownOptions ? (
-                  <button
-                    type="button"
-                    onClick={() => void loadDropdownOptions(false)}
-                    className="text-[11px] font-medium text-primary transition-colors hover:underline disabled:cursor-not-allowed disabled:no-underline"
-                    disabled={isLoadingDropdownOptions}
+              {hasNoEstablishments ? (
+                <div className="mt-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                  <p className="text-sm font-medium text-foreground">
+                    Você ainda não tem clientes cadastrados
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Cadastre um cliente (empresa, hospital ou clínica) e seus
+                    estabelecimentos para começar a preencher checklists.
+                  </p>
+                  <Link
+                    href={NEW_CLIENT_HREF}
+                    className={cn(
+                      "mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary/90",
+                      touchMinHeight,
+                    )}
                   >
-                    Carregar mais
-                  </button>
-                ) : null}
-              </div>
+                    <ArrowRight className="size-4 shrink-0" aria-hidden />
+                    Cadastrar novo cliente
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <p className="min-w-0 text-[11px] text-muted-foreground">
+                    {isLoadingDropdownOptions
+                      ? "Carregando empresas..."
+                      : `${alphabeticalDropdownOptions.length} de ${dropdownTotal || alphabeticalDropdownOptions.length} empresas carregadas (A-Z)`}
+                  </p>
+                  {hasMoreDropdownOptions ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadDropdownOptions(false)}
+                      className="text-[11px] font-medium text-primary transition-colors hover:underline disabled:cursor-not-allowed disabled:no-underline"
+                      disabled={isLoadingDropdownOptions}
+                    >
+                      Carregar mais
+                    </button>
+                  ) : null}
+                </div>
+              )}
               {dropdownLoadError ? (
                 <p className="mt-1 text-xs text-destructive" role="alert">
                   {dropdownLoadError}

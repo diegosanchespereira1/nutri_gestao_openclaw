@@ -266,9 +266,10 @@ async function loadSingleEstablishmentAreaId(
 
 /**
  * Copia respostas com valid_until ainda vigente de sessões anteriores para o mesmo
- * escopo (template + estabelecimento + área). Por item, usa a fonte mais recente
- * entre dossiês aprovados e rascunhos. Idempotente: não sobrescreve itens já
- * respondidos na sessão atual. Retorna o número de itens inseridos.
+ * escopo (template + estabelecimento + área). Só herda de dossiês finalizados/aprovados
+ * (dossier_approved_at preenchido); rascunhos não finalizados nunca são fonte. Por item,
+ * usa a fonte aprovada mais recente. Idempotente: não sobrescreve itens já respondidos
+ * na sessão atual. Retorna o número de itens inseridos.
  */
 async function inheritValidResponsesIfFreshSession(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -328,7 +329,12 @@ async function inheritValidResponsesIfFreshSession(
         .not("dossier_approved_at", "is", null)
         .order("dossier_approved_at", { ascending: false })
         .limit(20),
-      baseQuery().order("updated_at", { ascending: false }).limit(20),
+      // Apenas dossiês finalizados/aprovados: rascunhos não finalizados nunca
+      // devem ser fonte de herança para um novo checklist.
+      baseQuery()
+        .not("dossier_approved_at", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(20),
     ]);
 
   if (approvedErr) {

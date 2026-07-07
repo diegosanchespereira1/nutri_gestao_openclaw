@@ -62,8 +62,9 @@ export function filterSessionsForInheritance(
 }
 
 /**
- * Ordem de busca: aprovadas (mais recentes primeiro), depois rascunhos recentes
- * (sem repetir IDs já listados nas aprovadas).
+ * Ordem de busca entre sessões aprovadas: por data de aprovação (mais recentes
+ * primeiro) e, em seguida, por data de atualização, sem repetir IDs já listados.
+ * Somente dossiês finalizados/aprovados são considerados fonte de herança.
  */
 export function buildInheritanceSessionOrder(
   approvedCandidates: InheritanceSessionCandidate[],

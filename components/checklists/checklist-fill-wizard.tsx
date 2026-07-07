@@ -747,19 +747,8 @@ export function ChecklistFillWizard({
     setResponses(next);
     responsesRef.current = next;
     dirtyItemIdsRef.current.clear();
-
-    if (!initialDossierApprovedAt) {
-      const firstInherited = Object.entries(next).find(
-        ([, r]) =>
-          r.outcome !== null && (r.validUntil ?? "").trim().length > 0,
-      );
-      if (firstInherited) {
-        const idx = templateRef.current.sections.findIndex((sec) =>
-          sec.items.some((it) => it.id === firstInherited[0]),
-        );
-        if (idx >= 0) setSectionIndex(idx);
-      }
-    }
+    // Um checklist novo sempre começa na primeira seção, mesmo que haja
+    // respostas herdadas com validade vigente em seções posteriores.
   }, [sessionId, initialDossierApprovedAt]);
 
   useEffect(() => {

@@ -11,7 +11,18 @@ export type FillItemResponseColumn =
 export type InheritanceSessionCandidate = {
   id: string;
   area_id?: string | null;
+  dossier_approved_at?: string | null;
 };
+
+/**
+ * Uma sessão só pode ser fonte de herança se for um dossiê finalizado/aprovado.
+ * Rascunhos em aberto (dossier_approved_at nulo/vazio) nunca herdam respostas.
+ */
+export function isApprovedInheritanceSession(
+  candidate: InheritanceSessionCandidate,
+): boolean {
+  return Boolean(candidate.dossier_approved_at?.trim());
+}
 
 export function normalizeInheritanceAreaId(
   areaId: string | null | undefined,
@@ -76,13 +87,15 @@ export function buildInheritanceSessionOrder(
     approvedCandidates,
     currentAreaId,
     singleEstablishmentAreaId,
-  );
+  ).filter(isApprovedInheritanceSession);
   const approvedIds = new Set(approved.map((s) => s.id));
   const recent = filterSessionsForInheritance(
     recentCandidates,
     currentAreaId,
     singleEstablishmentAreaId,
-  ).filter((s) => !approvedIds.has(s.id));
+  )
+    .filter(isApprovedInheritanceSession)
+    .filter((s) => !approvedIds.has(s.id));
   return [...approved.map((s) => s.id), ...recent.map((s) => s.id)];
 }
 

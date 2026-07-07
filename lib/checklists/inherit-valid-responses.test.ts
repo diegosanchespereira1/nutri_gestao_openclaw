@@ -6,6 +6,7 @@ import {
   collectLatestValidResponsePerItem,
   filterInheritableResponseRows,
   filterSessionsForInheritance,
+  isApprovedInheritanceSession,
   normalizeInheritanceAreaId,
   pickSourceSessionForInheritance,
   sessionAreaMatchesForInheritance,
@@ -75,17 +76,68 @@ describe("buildInheritanceSessionOrder", () => {
   it("prioriza aprovadas e depois recentes sem duplicar", () => {
     const order = buildInheritanceSessionOrder(
       [
-        { id: "ap1", area_id: "a1" },
-        { id: "ap2", area_id: "a1" },
+        { id: "ap1", area_id: "a1", dossier_approved_at: "2026-06-10T00:00:00Z" },
+        { id: "ap2", area_id: "a1", dossier_approved_at: "2026-06-05T00:00:00Z" },
       ],
       [
-        { id: "ap1", area_id: "a1" },
-        { id: "dr1", area_id: "a1" },
+        { id: "ap1", area_id: "a1", dossier_approved_at: "2026-06-10T00:00:00Z" },
+        { id: "ap3", area_id: "a1", dossier_approved_at: "2026-06-20T00:00:00Z" },
       ],
       "a1",
       null,
     );
-    expect(order).toEqual(["ap1", "ap2", "dr1"]);
+    expect(order).toEqual(["ap1", "ap2", "ap3"]);
+  });
+
+  it("nunca herda de sessão não finalizada (rascunho) mesmo com área compatível", () => {
+    const order = buildInheritanceSessionOrder(
+      [
+        { id: "ap1", area_id: "a1", dossier_approved_at: "2026-06-10T00:00:00Z" },
+      ],
+      [
+        // Rascunhos em aberto: dossier_approved_at nulo/vazio.
+        { id: "draft-null", area_id: "a1", dossier_approved_at: null },
+        { id: "draft-empty", area_id: "a1", dossier_approved_at: "  " },
+        { id: "draft-undef", area_id: "a1" },
+      ],
+      "a1",
+      null,
+    );
+    expect(order).toEqual(["ap1"]);
+  });
+
+  it("retorna vazio quando só existem rascunhos não finalizados", () => {
+    const order = buildInheritanceSessionOrder(
+      [],
+      [
+        { id: "draft-1", area_id: "a1", dossier_approved_at: null },
+        { id: "draft-2", area_id: "a1" },
+      ],
+      "a1",
+      null,
+    );
+    expect(order).toEqual([]);
+  });
+});
+
+describe("isApprovedInheritanceSession", () => {
+  it("aceita apenas sessões com dossiê aprovado", () => {
+    expect(
+      isApprovedInheritanceSession({
+        id: "s1",
+        dossier_approved_at: "2026-06-10T00:00:00Z",
+      }),
+    ).toBe(true);
+  });
+
+  it("rejeita rascunhos (nulo, vazio ou ausente)", () => {
+    expect(
+      isApprovedInheritanceSession({ id: "s1", dossier_approved_at: null }),
+    ).toBe(false);
+    expect(
+      isApprovedInheritanceSession({ id: "s2", dossier_approved_at: "   " }),
+    ).toBe(false);
+    expect(isApprovedInheritanceSession({ id: "s3" })).toBe(false);
   });
 });
 

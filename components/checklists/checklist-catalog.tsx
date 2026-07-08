@@ -2017,7 +2017,7 @@ export function ChecklistCatalog({
 
       {/* ─── Etapa 3: Barra de ação flutuante ────────────────────────────── */}
       {(selectedTemplate || selectedWorkspaceTemplate || selectedCustomTemplate) && (
-        <div className="fixed bottom-4 left-1/2 z-50 w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2">
+        <div className="fixed bottom-[calc(5.75rem+var(--safe-area-bottom))] left-1/2 z-[61] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 lg:bottom-4">
           <div className="rounded-xl border bg-background p-3 shadow-2xl ring-1 ring-black/10 sm:p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               {/* Info do template selecionado */}

@@ -44,11 +44,12 @@ const INDICATOR_SLIDE_TRANSITION =
 
 const navItemClassName = (active: boolean) =>
   cn(
-    "relative z-10 flex h-10 items-center gap-1.5 rounded-full py-1.5 pl-2 pr-2.5",
+    "relative z-10 flex h-10 min-w-0 items-center gap-1.5 rounded-full py-1.5 pl-2 pr-2.5",
+    "max-[380px]:h-9 max-[380px]:gap-1 max-[380px]:py-1 max-[380px]:pl-1.5 max-[380px]:pr-2",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     active
-      ? "shrink-0 text-primary-foreground"
-      : "shrink-0 text-muted-foreground hover:text-foreground",
+      ? "text-primary-foreground"
+      : "text-muted-foreground hover:text-foreground",
   );
 
 const BottomNavItem = forwardRef<
@@ -70,17 +71,20 @@ const BottomNavItem = forwardRef<
   const content = (
     <>
       <span className="flex size-8 shrink-0 items-center justify-center">
-        <Icon className="size-4 shrink-0" aria-hidden />
+        <Icon className="size-4 shrink-0 max-[380px]:size-3.5" aria-hidden />
       </span>
       <span
         className={cn(
           "grid overflow-hidden text-xs font-semibold whitespace-nowrap transition-[grid-template-columns,opacity] duration-300 motion-reduce:transition-none",
+          "max-[380px]:text-[10px] max-[380px]:tracking-tight",
           "ease-[cubic-bezier(0.34,1.56,0.64,1)]",
           active ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0",
         )}
         aria-hidden={!active}
       >
-        <span className="overflow-hidden pr-0.5">{label}</span>
+        <span className="max-w-[12ch] overflow-hidden text-ellipsis pr-0.5 max-[380px]:max-w-[10ch]">
+          {label}
+        </span>
       </span>
     </>
   );
@@ -389,11 +393,11 @@ export function MobileBottomNav({
       >
         <div
           ref={navShellRef}
-          className="pointer-events-auto flex justify-center px-4 pb-[max(0.75rem,var(--safe-area-bottom))]"
+          className="pointer-events-auto flex justify-center px-3 pb-[max(0.75rem,var(--safe-area-bottom))]"
         >
           <div
             ref={containerRef}
-            className="relative inline-flex max-w-full items-center gap-0.5 rounded-full bg-muted px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60"
+            className="relative flex w-full max-w-md items-center justify-between gap-0.5 rounded-full bg-muted px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60"
           >
             {indicator ? (
               <div

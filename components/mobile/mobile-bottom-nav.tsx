@@ -397,7 +397,7 @@ export function MobileBottomNav({
         >
           <div
             ref={containerRef}
-            className="relative flex w-full max-w-md items-center justify-between gap-0.5 rounded-full bg-muted px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60"
+            className="relative flex w-full max-w-md items-center justify-between gap-0.5 rounded-full bg-white dark:bg-white px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60"
           >
             {indicator ? (
               <div

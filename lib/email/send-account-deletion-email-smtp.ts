@@ -3,20 +3,46 @@ import { escapeHtml } from "@/lib/email/html-utils";
 import { sendEmailViaSmtp } from "@/lib/email/send-via-smtp";
 import { LGPD_RETENTION_YEARS } from "@/lib/types/account-deletion";
 
+export type AccountDeletionEmailLinkBase = "in_app" | "public_web";
+
 export type SendAccountDeletionRequestEmailInput = {
   to: string;
   recipientName: string;
   token: string;
   expiresAt: Date;
+  linkBase?: AccountDeletionEmailLinkBase;
 };
+
+function buildDeletionEmailLinks(
+  token: string,
+  linkBase: AccountDeletionEmailLinkBase,
+  origin: string,
+): { confirmLink: string; cancelLink: string } {
+  if (linkBase === "public_web") {
+    const base = `${origin}/excluir-conta/confirmar`;
+    return {
+      confirmLink: `${base}?token=${encodeURIComponent(token)}&action=confirm`,
+      cancelLink: `${base}?token=${encodeURIComponent(token)}&action=cancel`,
+    };
+  }
+
+  const base = `${origin}/configuracoes/deletar-conta`;
+  return {
+    confirmLink: `${base}?token=${encodeURIComponent(token)}&action=confirm`,
+    cancelLink: `${base}?token=${encodeURIComponent(token)}&action=cancel`,
+  };
+}
 
 export async function sendAccountDeletionRequestEmailSmtp(
   input: SendAccountDeletionRequestEmailInput,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const origin = getServerAppOrigin();
-  const base = `${origin}/configuracoes/deletar-conta`;
-  const confirmLink = `${base}?token=${encodeURIComponent(input.token)}&action=confirm`;
-  const cancelLink = `${base}?token=${encodeURIComponent(input.token)}&action=cancel`;
+  const linkBase = input.linkBase ?? "in_app";
+  const { confirmLink, cancelLink } = buildDeletionEmailLinks(
+    input.token,
+    linkBase,
+    origin,
+  );
 
   const name = escapeHtml(input.recipientName || "Utilizador");
   const expires = input.expiresAt.toLocaleString("pt-BR", {

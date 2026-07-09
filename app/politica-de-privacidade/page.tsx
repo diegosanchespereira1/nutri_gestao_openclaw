@@ -355,6 +355,17 @@ export default function PoliticaDePrivacidadePage() {
               Responderemos às suas solicitações em até <strong>15 dias úteis</strong>, podendo
               este prazo ser prorrogado conforme a complexidade da solicitação.
             </p>
+            <p className="mt-4">
+              Para solicitar a <strong>exclusão da sua conta</strong> na plataforma, acesse{" "}
+              <a
+                href="/excluir-conta"
+                style={{ color: "hsl(173 72% 28%)" }}
+                className="underline"
+              >
+                nutrigestao.app/excluir-conta
+              </a>
+              .
+            </p>
           </Section>
 
           {/* 12 */}

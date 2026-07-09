@@ -19,6 +19,12 @@ const adminSections = [
     emoji: "🏢",
   },
   {
+    href: "/admin/lgpd/pedidos-exclusao",
+    title: "Pedidos de exclusão",
+    description: "Solicitações públicas de encerramento de conta (Google Play / LGPD).",
+    emoji: "🗑️",
+  },
+  {
     href: "/admin/tenants/novo",
     title: "Criar tenant",
     description: "Criar conta de profissional directamente pelo admin.",

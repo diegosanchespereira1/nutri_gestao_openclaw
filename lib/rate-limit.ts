@@ -34,6 +34,23 @@ export const passwordResetRatelimit = new Ratelimit({
 });
 
 /**
+ * Rate limiter para pedido público de exclusão de conta (3 por hora por email)
+ */
+export const accountClosureRequestRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.fixedWindow(3, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:account-closure',
+});
+
+export const accountClosureIpRatelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.fixedWindow(5, '1 h'),
+  analytics: true,
+  prefix: 'ratelimit:account-closure-ip',
+});
+
+/**
  * Rate limiter para API calls (100 por minuto por usuário)
  */
 export const apiRatelimit = new Ratelimit({
@@ -127,3 +144,41 @@ export async function checkApiRateLimit(userId: string) {
     return rateLimitUnavailable(60);
   }
 }
+
+function getClientIpFromHeaders(forwarded: string | null, realIp: string | null): string {
+  return (
+    (forwarded ? forwarded.split(',')[0].trim() : null) ||
+    realIp ||
+    'unknown'
+  );
+}
+
+/**
+ * Rate limit para pedido público de exclusão de conta (email + IP).
+ */
+export async function checkAccountClosureRequestRateLimit(
+  email: string,
+  ip: string,
+) {
+  try {
+    const [emailLimit, ipLimit] = await Promise.all([
+      accountClosureRequestRatelimit.limit(`closure:${email.toLowerCase().trim()}`),
+      accountClosureIpRatelimit.limit(`closure-ip:${ip}`),
+    ]);
+
+    const success = emailLimit.success && ipLimit.success;
+    const reset = Math.max(emailLimit.reset, ipLimit.reset);
+
+    return {
+      success,
+      remaining: Math.min(emailLimit.remaining, ipLimit.remaining),
+      reset,
+      retryAfter: reset ? Math.ceil((reset - Date.now()) / 1000) : null,
+    };
+  } catch (error) {
+    console.error('[Rate Limit Error]', error);
+    return rateLimitUnavailable(3600);
+  }
+}
+
+export { getClientIpFromHeaders };

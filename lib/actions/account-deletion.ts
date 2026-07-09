@@ -5,10 +5,13 @@
  * Estado em `profiles` + RPCs; ban opcional via service role.
  */
 
-import crypto from "crypto";
-
 import { revalidatePath } from "next/cache";
 
+import {
+  closureTokenExpiresAt,
+  createClosureToken,
+  hashClosureToken,
+} from "@/lib/account-closure/tokens";
 import {
   isLgpdClosurePending,
   isProfileLgpdActivelyBlocked,
@@ -23,17 +26,10 @@ import {
   ConfirmClosureResponse,
   DeleteAccountResponse,
 } from "@/lib/types/account-deletion";
-import { sendAccountDeletionRequestEmailSmtp } from "@/lib/email/send-account-deletion-email-smtp";
-
-const DELETION_CONFIRMATION_HOURS = 24;
-
-function hashToken(token: string): string {
-  return crypto.createHash("sha256").update(token, "utf8").digest("hex");
-}
-
-function randomToken(): string {
-  return crypto.randomBytes(32).toString("hex");
-}
+import {
+  sendAccountDeletionRequestEmailSmtp,
+  type AccountDeletionEmailLinkBase,
+} from "@/lib/email/send-account-deletion-email-smtp";
 
 async function tryBanUser(userId: string): Promise<void> {
   try {
@@ -58,6 +54,26 @@ async function tryUnbanUser(userId: string): Promise<void> {
   } catch (e) {
     console.warn(
       "[account-deletion] unban via service role ignorado:",
+      e instanceof Error ? e.message : e,
+    );
+  }
+}
+
+async function syncClosureRequestStatus(
+  userId: string,
+  status: "confirmed" | "cancelled",
+): Promise<void> {
+  try {
+    const service = createServiceRoleClient();
+    await service.rpc("account_closure_request_sync_by_user", {
+      p_user_id: userId,
+      p_status: status,
+      p_confirmed_at: status === "confirmed" ? new Date().toISOString() : null,
+      p_cancelled_at: status === "cancelled" ? new Date().toISOString() : null,
+    });
+  } catch (e) {
+    console.warn(
+      "[account-deletion] sync closure request ignorado:",
       e instanceof Error ? e.message : e,
     );
   }
@@ -166,11 +182,9 @@ export async function requestAccountDeletion(
       return { success: false, error: "Senha incorreta" };
     }
 
-    const rawToken = randomToken();
-    const tokenHash = hashToken(rawToken);
-    const expiresAt = new Date(
-      Date.now() + DELETION_CONFIRMATION_HOURS * 60 * 60 * 1000,
-    );
+    const rawToken = createClosureToken();
+    const tokenHash = hashClosureToken(rawToken);
+    const expiresAt = closureTokenExpiresAt();
 
     const { error: rpcError } = await supabase.rpc("lgpd_set_pending_closure", {
       p_token_hash: tokenHash,
@@ -196,6 +210,7 @@ export async function requestAccountDeletion(
       recipientName: displayName,
       token: rawToken,
       expiresAt,
+      linkBase: "in_app",
     });
 
     if (!emailResult.ok) {
@@ -221,7 +236,8 @@ export async function requestAccountDeletion(
   }
 }
 
-export async function confirmAccountDeletion(
+/** Confirma encerramento via link do email (com ou sem sessão). */
+export async function confirmAccountDeletionByToken(
   token: string,
 ): Promise<ConfirmClosureResponse> {
   try {
@@ -234,24 +250,40 @@ export async function confirmAccountDeletion(
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return { success: false, error: "Não autenticado" };
+    if (user) {
+      const { error: rpcError } = await supabase.rpc("lgpd_confirm_closure", {
+        p_token: token,
+      });
+
+      if (rpcError) {
+        return {
+          success: false,
+          error: rpcError.message || "Não foi possível confirmar",
+        };
+      }
+
+      await tryBanUser(user.id);
+      await syncClosureRequestStatus(user.id, "confirmed");
+    } else {
+      const anon = createAnonSupabaseClient();
+      const { data: blockedUserId, error: rpcError } = await anon.rpc(
+        "lgpd_confirm_closure_by_token",
+        { p_token: token },
+      );
+
+      if (rpcError || !blockedUserId) {
+        return {
+          success: false,
+          error: "Token inválido ou expirado",
+        };
+      }
+
+      await tryBanUser(blockedUserId);
+      await syncClosureRequestStatus(blockedUserId, "confirmed");
     }
-
-    const { error: rpcError } = await supabase.rpc("lgpd_confirm_closure", {
-      p_token: token,
-    });
-
-    if (rpcError) {
-      return {
-        success: false,
-        error: rpcError.message || "Não foi possível confirmar",
-      };
-    }
-
-    await tryBanUser(user.id);
 
     revalidatePath("/configuracoes/deletar-conta");
+    revalidatePath("/excluir-conta");
 
     return {
       success: true,
@@ -260,9 +292,15 @@ export async function confirmAccountDeletion(
       status: "blocked",
     };
   } catch (err) {
-    console.error("Erro em confirmAccountDeletion:", err);
+    console.error("Erro em confirmAccountDeletionByToken:", err);
     return { success: false, error: "Erro inesperado" };
   }
+}
+
+export async function confirmAccountDeletion(
+  token: string,
+): Promise<ConfirmClosureResponse> {
+  return confirmAccountDeletionByToken(token);
 }
 
 export async function cancelAccountDeletion(
@@ -284,10 +322,20 @@ export async function cancelAccountDeletion(
           error: rpcError.message || "Não foi possível cancelar",
         };
       }
+      await syncClosureRequestStatus(user.id, "cancelled");
     } else {
       if (!token || token.length < 32) {
         return { success: false, error: "Token inválido" };
       }
+
+      const service = createServiceRoleClient();
+      const tokenHash = hashClosureToken(token);
+      const { data: profileBeforeCancel } = await service
+        .from("profiles")
+        .select("user_id")
+        .eq("lgpd_cancel_token_hash", tokenHash)
+        .maybeSingle();
+
       const anon = createAnonSupabaseClient();
       const { data, error: rpcError } = await anon.rpc(
         "lgpd_cancel_pending_by_token",
@@ -299,9 +347,14 @@ export async function cancelAccountDeletion(
           error: "Token inválido ou pedido já não pode ser cancelado",
         };
       }
+
+      if (profileBeforeCancel?.user_id) {
+        await syncClosureRequestStatus(profileBeforeCancel.user_id, "cancelled");
+      }
     }
 
     revalidatePath("/configuracoes/deletar-conta");
+    revalidatePath("/excluir-conta");
 
     return {
       success: true,
@@ -317,4 +370,53 @@ export async function cancelAccountDeletion(
 /** Chamado após desbloqueio administrativo (admin-platform). */
 export async function liftAuthBanAfterLgpdUnblock(userId: string): Promise<void> {
   await tryUnbanUser(userId);
+}
+
+export type InitiateClosureForUserResult =
+  | {
+      ok: true;
+      rawToken: string;
+      expiresAt: Date;
+      profileId: string;
+    }
+  | { ok: false; error: string };
+
+/** Inicia pedido de encerramento para um user_id (service role / formulário público). */
+export async function initiateClosureForUser(
+  userId: string,
+  source: AccountDeletionEmailLinkBase,
+): Promise<InitiateClosureForUserResult> {
+  const rawToken = createClosureToken();
+  const tokenHash = hashClosureToken(rawToken);
+  const expiresAt = closureTokenExpiresAt();
+
+  try {
+    const service = createServiceRoleClient();
+    const { data: profileId, error } = await service.rpc(
+      "lgpd_set_pending_closure_for_user",
+      {
+        p_user_id: userId,
+        p_token_hash: tokenHash,
+        p_expires_at: expiresAt.toISOString(),
+        p_source: source === "public_web" ? "public_web" : "in_app",
+      },
+    );
+
+    if (error || !profileId) {
+      return {
+        ok: false,
+        error: error?.message || "Falha ao registar pedido",
+      };
+    }
+
+    return {
+      ok: true,
+      rawToken,
+      expiresAt,
+      profileId: profileId as string,
+    };
+  } catch (err) {
+    console.error("initiateClosureForUser:", err);
+    return { ok: false, error: "Erro inesperado" };
+  }
 }

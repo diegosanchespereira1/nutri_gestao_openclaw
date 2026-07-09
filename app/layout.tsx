@@ -29,6 +29,13 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "NutriGestão",
   description: "Gestão nutricional para profissionais",
+  manifest: "/manifest.webmanifest",
+  applicationName: "NutriGestão",
+  appleWebApp: {
+    capable: true,
+    title: "NutriGestão",
+    statusBarStyle: "default",
+  },
 };
 
 // Evita cache RSC do shell com env do build (supabaseUrl vazio / chave errada no inline).

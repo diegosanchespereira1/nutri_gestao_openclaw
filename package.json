@@ -28,6 +28,7 @@
     "mobile:run:android": "npx cap run android",
     "mobile:assets": "npm run mobile:icons",
     "mobile:icons": "node scripts/mobile/prepare-app-icons.mjs",
+    "web:icons": "node scripts/mobile/prepare-web-icons.mjs",
     "mobile:store-assets": "node scripts/mobile/generate-store-assets.mjs",
     "mobile:store-screenshots": "playwright test e2e/store-screenshots.spec.ts --workers=1",
     "mobile:check-production": "node scripts/mobile/check-mobile-production-deploy.mjs",

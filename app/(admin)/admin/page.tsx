@@ -21,7 +21,7 @@ const adminSections = [
   {
     href: "/admin/lgpd/pedidos-exclusao",
     title: "Pedidos de exclusão",
-    description: "Solicitações públicas de encerramento de conta (Google Play / LGPD).",
+    description: "Solicitações de encerramento de conta (área autenticada / LGPD).",
     emoji: "🗑️",
   },
   {

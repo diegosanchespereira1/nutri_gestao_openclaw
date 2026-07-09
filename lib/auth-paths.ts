@@ -52,6 +52,7 @@ export const PROTECTED_PREFIXES = [
 ] as const;
 
 export function isProtectedPath(pathname: string): boolean {
+  if (pathname === "/excluir-conta") return true;
   return PROTECTED_PREFIXES.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );

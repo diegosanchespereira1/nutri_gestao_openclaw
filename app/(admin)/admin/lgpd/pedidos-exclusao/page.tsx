@@ -43,8 +43,8 @@ export default async function AdminAccountClosureRequestsPage() {
             Pedidos de exclusão de conta
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Solicitações recebidas via{" "}
-            <code className="text-xs">/excluir-conta</code> (Google Play / LGPD).
+            Solicitações recebidas via formulário autenticado em{" "}
+            <code className="text-xs">/excluir-conta</code> (LGPD).
             {pendingCount > 0 ? (
               <>
                 {" "}

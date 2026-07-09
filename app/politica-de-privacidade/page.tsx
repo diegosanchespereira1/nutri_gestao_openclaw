@@ -93,16 +93,18 @@ export default function PoliticaDePrivacidadePage() {
               ["9", "Segurança dos dados"],
               ["10", "Cookies e tecnologias similares"],
               ["11", "Seus direitos como titular"],
+              ["11a", "Exclusão de conta"],
               ["12", "Menores de idade"],
               ["13", "Alterações nesta Política"],
               ["14", "Contato e Encarregado de Dados (DPO)"],
             ].map(([num, title]) => (
               <li key={num}>
                 <a
-                  href={`#secao-${num}`}
+                  href={num === "11a" ? "#exclusao-conta" : `#secao-${num}`}
                   className="hover:underline underline-offset-2"
                 >
-                  {num}. {title}
+                  {num === "11a" ? "" : `${num}. `}
+                  {title}
                 </a>
               </li>
             ))}
@@ -355,17 +357,43 @@ export default function PoliticaDePrivacidadePage() {
               Responderemos às suas solicitações em até <strong>15 dias úteis</strong>, podendo
               este prazo ser prorrogado conforme a complexidade da solicitação.
             </p>
-            <p className="mt-4">
-              Para solicitar a <strong>exclusão da sua conta</strong> na plataforma, acesse{" "}
-              <a
-                href="/excluir-conta"
-                style={{ color: "hsl(173 72% 28%)" }}
-                className="underline"
+
+            <div id="exclusao-conta" className="mt-8 scroll-mt-24">
+              <h3
+                className="mb-3 text-lg font-semibold"
+                style={{ color: "hsl(172 46% 10%)" }}
               >
-                nutrigestao.app/excluir-conta
-              </a>
-              .
-            </p>
+                Exclusão de conta
+              </h3>
+              <p className="mb-4">
+                Você pode solicitar o <strong>encerramento do acesso</strong> à sua conta
+                NutriGestão a qualquer momento. Este pedido bloqueia o login após confirmação
+                por email; dados clínicos de pacientes podem permanecer retidos pelo prazo legal
+                mínimo de <strong>10 anos</strong>, conforme LGPD e regulamentações do setor de
+                saúde.
+              </p>
+              <InfoBox>
+                A exclusão de conta está disponível apenas para{" "}
+                <strong>usuários com sessão iniciada</strong>. Faça login e acesse a página
+                dedicada para iniciar o pedido com segurança (confirmação por senha e email).
+              </InfoBox>
+              <p className="mt-4">
+                <Link
+                  href="/excluir-conta"
+                  className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+                  style={{ color: "hsl(173 72% 28%)" }}
+                >
+                  Solicitar exclusão da conta →
+                </Link>
+              </p>
+              <p className="mt-3 text-sm" style={{ color: "hsl(168 10% 45%)" }}>
+                Se ainda não tiver sessão iniciada,{" "}
+                <Link href="/login" className="underline" style={{ color: "hsl(173 72% 28%)" }}>
+                  entre na plataforma
+                </Link>{" "}
+                antes de acessar o formulário.
+              </p>
+            </div>
           </Section>
 
           {/* 12 */}

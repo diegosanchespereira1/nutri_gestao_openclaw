@@ -101,7 +101,7 @@ export default async function ProntuarioPacientePage({
     ? await getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
     : null;
 
-  const [clientResult, estResult, teamMemberResult] = await Promise.all([
+  const [clientResult, estResult, teamMemberResult, schoolGradeResult] = await Promise.all([
     row.client_id
       ? supabase
           .from("clients")
@@ -123,6 +123,13 @@ export default async function ProntuarioPacientePage({
           .eq("id", row.responsible_team_member_id)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    row.school_grade_id
+      ? supabase
+          .from("client_school_grades")
+          .select("name")
+          .eq("id", row.school_grade_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const client = clientResult.data as {
@@ -132,6 +139,7 @@ export default async function ProntuarioPacientePage({
   } | null;
   const establishment = estResult.data as { name: string } | null;
   const teamMember = teamMemberResult.data as { full_name: string } | null;
+  const schoolGrade = schoolGradeResult.data as { name: string } | null;
 
   const backHref =
     row.establishment_id && row.client_id
@@ -265,6 +273,9 @@ export default async function ProntuarioPacientePage({
                   label="Estabelecimento"
                   value={establishment?.name ?? "—"}
                 />
+                {schoolGrade ? (
+                  <InfoRow label="Série" value={schoolGrade.name} />
+                ) : null}
                 <InfoRow
                   label="Profissional responsável"
                   value={teamMember?.full_name ?? "—"}

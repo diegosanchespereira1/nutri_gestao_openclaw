@@ -15,6 +15,7 @@ import {
 import type { TeamMemberSelectOption } from "@/lib/actions/team-members";
 import type { PatientSex } from "@/lib/types/patients";
 import type { ClientRow } from "@/lib/types/clients";
+import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,10 @@ export function PatientForm({
   establishmentsByClient,
   /** Lista de clientes PJ disponíveis para o seletor (só relevante em create sem clientId fixo). */
   clients,
+  /** Séries da escola já fixa (edit, ou create dentro do contexto de um cliente). */
+  schoolGrades,
+  /** Mapa clientId → séries (usado no selector de cliente em create sem clientId fixo). */
+  schoolGradesByClient,
   teamMembers = [],
   defaultPhotoUrl = null,
   defaults,
@@ -56,6 +61,8 @@ export function PatientForm({
   establishments?: { id: string; name: string }[];
   establishmentsByClient?: Record<string, { id: string; name: string }[]>;
   clients?: Pick<ClientRow, "id" | "legal_name" | "trade_name">[];
+  schoolGrades?: ClientSchoolGradeOption[];
+  schoolGradesByClient?: Record<string, ClientSchoolGradeOption[]>;
   teamMembers?: TeamMemberSelectOption[];
   defaultPhotoUrl?: string | null;
   defaults: {
@@ -67,6 +74,7 @@ export function PatientForm({
     email: string;
     notes: string;
     responsible_team_member_id: string | null;
+    school_grade_id?: string | null;
   };
 }) {
   const action =
@@ -121,6 +129,20 @@ export function PatientForm({
     establishmentId ?? "",
   );
 
+  // Seletor de série — cliente fixo (edit, ou create dentro do contexto de um cliente-escola)
+  const showSchoolGradeSelector = schoolGrades != null && schoolGrades.length > 0;
+  const [selectedGradeId, setSelectedGradeId] = useState<string>(
+    defaults.school_grade_id ?? "",
+  );
+
+  // Séries disponíveis para o cliente selecionado no selector de cliente (create sem clientId fixo)
+  const clientGrades =
+    schoolGradesByClient && selectedClientId
+      ? (schoolGradesByClient[selectedClientId] ?? [])
+      : [];
+  const showClientGradeSelector = clientGrades.length > 0;
+  const [selectedClientGradeId, setSelectedClientGradeId] = useState<string>("");
+
   return (
     <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
       {/* Campos ocultos de contexto */}
@@ -138,6 +160,13 @@ export function PatientForm({
         <input type="hidden" name="establishment_id" value={establishmentId} />
       ) : (
         <input type="hidden" name="establishment_id" value="" />
+      )}
+      {showSchoolGradeSelector ? (
+        <input type="hidden" name="school_grade_id" value={selectedGradeId} />
+      ) : showClientGradeSelector ? (
+        <input type="hidden" name="school_grade_id" value={selectedClientGradeId} />
+      ) : (
+        <input type="hidden" name="school_grade_id" value="" />
       )}
       {mode === "edit" && patientId ? (
         <input type="hidden" name="id" value={patientId} />
@@ -261,6 +290,7 @@ export function PatientForm({
                 onChange={(e) => {
                   setSelectedClientId(e.target.value);
                   setSelectedClientEstId("");
+                  setSelectedClientGradeId("");
                 }}
                 className={cn(
                   selectClass,
@@ -304,6 +334,28 @@ export function PatientForm({
                 </select>
               </div>
             ) : null}
+
+            {showClientGradeSelector ? (
+              <div className="space-y-2">
+                <Label htmlFor="patient-client-grade">Série (opcional)</Label>
+                <select
+                  id="patient-client-grade"
+                  value={selectedClientGradeId}
+                  onChange={(e) => setSelectedClientGradeId(e.target.value)}
+                  className={cn(
+                    selectClass,
+                    selectedClientGradeId === "" && "text-muted-foreground",
+                  )}
+                >
+                  <option value="">— Nenhuma —</option>
+                  {clientGrades.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </fieldset>
           <div className="border-t border-border" />
         </>
@@ -337,6 +389,28 @@ export function PatientForm({
                 ))}
               </select>
             </div>
+
+            {showSchoolGradeSelector ? (
+              <div className="space-y-2">
+                <Label htmlFor="patient-grade">Série (opcional)</Label>
+                <select
+                  id="patient-grade"
+                  value={selectedGradeId}
+                  onChange={(e) => setSelectedGradeId(e.target.value)}
+                  className={cn(
+                    selectClass,
+                    selectedGradeId === "" && "text-muted-foreground",
+                  )}
+                >
+                  <option value="">— Nenhuma —</option>
+                  {schoolGrades!.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
           </fieldset>
           <div className="border-t border-border" />
         </>

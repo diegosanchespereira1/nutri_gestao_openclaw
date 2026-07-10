@@ -89,6 +89,29 @@ async function resolveResponsibleTeamMemberId(
   return { ok: true, value: raw };
 }
 
+/** Valida a série (opcional) informada no formulário: só é aceite se o
+ *  paciente tiver cliente e a série pertencer a esse mesmo cliente. */
+async function resolveSchoolGradeId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clientId: string | null,
+  formData: FormData,
+): Promise<{ ok: true; value: string | null } | { ok: false; error: string }> {
+  const raw = String(formData.get("school_grade_id") ?? "").trim();
+  if (!raw) return { ok: true, value: null };
+  if (!clientId) {
+    return { ok: false, error: "Selecione um cliente antes de escolher a série." };
+  }
+  const { data } = await supabase
+    .from("client_school_grades")
+    .select("id, client_id")
+    .eq("id", raw)
+    .maybeSingle();
+  if (!data || data.client_id !== clientId) {
+    return { ok: false, error: "Série inválida para este cliente." };
+  }
+  return { ok: true, value: raw };
+}
+
 function parsePatientDocument(raw: string):
   | { ok: true; value: string | null }
   | { ok: false; error: string } {
@@ -494,6 +517,12 @@ export async function createPatientAction(
     return { ok: false, error: "Selecione primeiro um cliente para o estabelecimento." };
   }
 
+  const schoolGradeRes = await resolveSchoolGradeId(supabase, client_id, formData);
+  if (!schoolGradeRes.ok) {
+    return { ok: false, error: schoolGradeRes.error };
+  }
+  const school_grade_id = schoolGradeRes.value;
+
   const full_name = String(formData.get("full_name") ?? "").trim();
   if (!full_name) {
     return { ok: false, error: "Indique o nome do paciente." };
@@ -540,6 +569,7 @@ export async function createPatientAction(
       user_id: workspaceOwnerId,
       client_id,
       establishment_id,
+      school_grade_id,
       full_name,
       birth_date,
       document_id,
@@ -651,6 +681,12 @@ export async function updatePatientAction(
     establishment_id = null;
   }
 
+  const schoolGradeRes = await resolveSchoolGradeId(supabase, clientId, formData);
+  if (!schoolGradeRes.ok) {
+    return { ok: false, error: schoolGradeRes.error };
+  }
+  const school_grade_id = schoolGradeRes.value;
+
   const responsibleRes = await resolveResponsibleTeamMemberId(
     supabase,
     workspaceOwnerId,
@@ -716,6 +752,7 @@ export async function updatePatientAction(
       email,
       notes,
       establishment_id,
+      school_grade_id,
       responsible_team_member_id: responsibleRes.value,
       photo_storage_path: photoRes.path,
     })

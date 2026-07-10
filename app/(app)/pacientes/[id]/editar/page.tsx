@@ -20,6 +20,8 @@ import { loadPatientById } from "@/lib/actions/patients";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
 import { loadClientsForOwner } from "@/lib/actions/clients";
+import { loadGradesForClient } from "@/lib/actions/school-grades";
+import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
 import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
@@ -52,6 +54,7 @@ export default async function EditarPacientePage({
   let clientKind: string | null = null;
   let establishments: { id: string; name: string }[] = [];
   let pjClients: { id: string; legal_name: string; trade_name: string | null }[] = [];
+  let schoolGrades: ClientSchoolGradeOption[] = [];
 
   if (row.client_id) {
     const [{ data: clientRow }, { rows: estRows }] = await Promise.all([
@@ -64,6 +67,9 @@ export default async function EditarPacientePage({
     ]);
     clientKind = clientRow?.kind ?? null;
     establishments = estRows.map((e) => ({ id: e.id, name: e.name }));
+    if (clientKind === "pj") {
+      schoolGrades = await loadGradesForClient(row.client_id);
+    }
   } else {
     // Paciente independente — carrega clientes PJ para permitir associação
     const { rows } = await loadClientsForOwner({ kind: "pj", lifecycle: "ativo" });
@@ -154,6 +160,7 @@ export default async function EditarPacientePage({
             patientId={row.id}
             clientId={row.client_id}
             establishmentId={row.establishment_id}
+            schoolGrades={schoolGrades}
             teamMembers={teamMembers}
             defaultPhotoUrl={defaultPhotoUrl}
             defaults={{
@@ -166,6 +173,7 @@ export default async function EditarPacientePage({
               notes: row.notes ?? "",
               responsible_team_member_id:
                 row.responsible_team_member_id ?? null,
+              school_grade_id: row.school_grade_id ?? null,
             }}
           />
         </CardContent>

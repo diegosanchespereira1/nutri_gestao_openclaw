@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PatientForm } from "@/components/pacientes/patient-form";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
+import { loadGradesForClient } from "@/lib/actions/school-grades";
 import { createClient } from "@/lib/supabase/server";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export default async function NovoPacienteEstabelecimentoPage({
   }
 
   const row = est as EstablishmentRow;
+  const schoolGrades = await loadGradesForClient(clientId);
 
   return (
     <div className="space-y-6">
@@ -63,6 +65,7 @@ export default async function NovoPacienteEstabelecimentoPage({
         mode="create"
         clientId={clientId}
         establishmentId={estId}
+        schoolGrades={schoolGrades}
         teamMembers={teamMembers}
         defaults={{
           full_name: "",

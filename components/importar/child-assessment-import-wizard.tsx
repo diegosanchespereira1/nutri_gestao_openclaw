@@ -63,6 +63,7 @@ const inputClass =
 
 type ClientOption = { id: string; legal_name: string; trade_name: string | null };
 type EstablishmentOption = { id: string; name: string };
+type SchoolGradeOption = { id: string; name: string };
 
 /** Rótulos em PT-BR para o cabeçalho da tabela de pré-visualização (etapa 3). */
 const CHILD_ASSESSMENT_COLUMN_LABELS: Record<string, string> = Object.fromEntries(
@@ -103,12 +104,15 @@ function ImportStepIndicator({ step }: { step: WizardStep }) {
 export function ChildAssessmentImportWizard({
   clients = [],
   establishmentsByClient = {},
+  schoolGradesByClient = {},
   existingAssessmentDates = {},
 }: {
   /** Clientes do tenant, para o seletor de vínculo (não pede UUID ao usuário). */
   clients?: ClientOption[];
   /** Mapa clientId → estabelecimentos desse cliente (só clientes PJ têm entradas). */
   establishmentsByClient?: Record<string, EstablishmentOption[]>;
+  /** Mapa clientId → séries cadastradas desse cliente-escola (só quando houver). */
+  schoolGradesByClient?: Record<string, SchoolGradeOption[]>;
   /** Datas (AAAA-MM-DD) já registradas por paciente existente — chave via matchChildKey.
    *  Usado na pré-visualização para bloquear reenvio da mesma pesagem. */
   existingAssessmentDates?: Record<string, string[]>;
@@ -118,12 +122,18 @@ export function ChildAssessmentImportWizard({
   // Vínculo do lote (etapa 1) — "" = paciente independente
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedEstablishmentId, setSelectedEstablishmentId] = useState("");
+  const [selectedSchoolGradeId, setSelectedSchoolGradeId] = useState("");
   const [batchNote, setBatchNote] = useState(""); // ex.: "2026/1 Maternal"
 
   const clientEstablishments = selectedClientId
     ? (establishmentsByClient[selectedClientId] ?? [])
     : [];
   const requiresEstablishment = selectedClientId !== "" && clientEstablishments.length > 0;
+
+  const clientSchoolGrades = selectedClientId
+    ? (schoolGradesByClient[selectedClientId] ?? [])
+    : [];
+  const showSchoolGradeSelect = clientSchoolGrades.length > 0;
 
   const [upload, setUpload] = useState<UploadState | null>(null);
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
@@ -243,6 +253,7 @@ export function ChildAssessmentImportWizard({
           kind: "linked",
           clientId: selectedClientId,
           establishmentId: requiresEstablishment ? selectedEstablishmentId : null,
+          schoolGradeId: showSchoolGradeSelect && selectedSchoolGradeId ? selectedSchoolGradeId : null,
         }
       : { kind: "independent" };
 
@@ -300,6 +311,7 @@ export function ChildAssessmentImportWizard({
                     onChange={(e) => {
                       setSelectedClientId(e.target.value);
                       setSelectedEstablishmentId("");
+                      setSelectedSchoolGradeId("");
                     }}
                     className={selectClass}
                   >
@@ -343,13 +355,36 @@ export function ChildAssessmentImportWizard({
                       Este cliente ainda não tem estabelecimento cadastrado.
                     </p>
                   )}
+
+                  {showSchoolGradeSelect && (
+                    <div className="space-y-1.5 pt-1">
+                      <Label htmlFor="link-school-grade-select">Série (opcional)</Label>
+                      <select
+                        id="link-school-grade-select"
+                        value={selectedSchoolGradeId}
+                        onChange={(e) => setSelectedSchoolGradeId(e.target.value)}
+                        className={selectClass}
+                      >
+                        <option value="">— Nenhuma —</option>
+                        {clientSchoolGrades.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {g.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-muted-foreground text-xs">
+                        Aplicada a todos os pacientes novos desta importação (cadastre as
+                        séries desta escola na ficha do cliente).
+                      </p>
+                    </div>
+                  )}
                 </>
               )}
             </div>
 
             {/* Turma / período (opcional) */}
             <div className="space-y-1.5">
-              <Label htmlFor="batch-note-input">Turma / período (opcional)</Label>
+              <Label htmlFor="batch-note-input">Observação da turma (opcional)</Label>
               <input
                 id="batch-note-input"
                 type="text"

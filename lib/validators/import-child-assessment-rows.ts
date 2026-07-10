@@ -32,6 +32,7 @@ const linkedSchema = z.object({
   kind: z.literal("linked"),
   clientId: z.string().uuid(),
   establishmentId: z.union([z.string().uuid(), z.null()]),
+  schoolGradeId: z.union([z.string().uuid(), z.null()]).optional(),
 });
 
 const independentSchema = z.object({ kind: z.literal("independent") });

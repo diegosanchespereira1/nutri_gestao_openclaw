@@ -9,6 +9,7 @@ import { redirect } from "next/navigation";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { ChildAssessmentImportWizard } from "@/components/importar/child-assessment-import-wizard";
 import { matchChildKey } from "@/lib/import/child-assessment-match";
+import { loadGradesForClients } from "@/lib/actions/school-grades";
 
 export const metadata = {
   title: "Importar avaliações infantis | NutriGestão",
@@ -46,6 +47,8 @@ export default async function ImportarAvaliacoesInfantisPage() {
       establishmentsByClient[cid].push({ id: est.id as string, name: est.name as string });
     }
   }
+
+  const schoolGradesByClient = await loadGradesForClients(clientIds);
 
   // Datas de avaliação já registradas por paciente existente (nome + nascimento) —
   // usado na pré-visualização para bloquear reenvio da mesma pesagem sem criar nada.
@@ -106,6 +109,7 @@ export default async function ImportarAvaliacoesInfantisPage() {
       <ChildAssessmentImportWizard
         clients={clients}
         establishmentsByClient={establishmentsByClient}
+        schoolGradesByClient={schoolGradesByClient}
         existingAssessmentDates={existingAssessmentDates}
       />
     </main>

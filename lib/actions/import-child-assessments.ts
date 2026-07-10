@@ -55,9 +55,10 @@ export async function importChildAssessmentsAction(
   const parsed = parseImportChildAssessmentsPayload(rows, link);
   if (!parsed.ok) return { ok: false, error: parsed.error };
 
-  // ── Resolver vínculo (cliente/estabelecimento) para o lote inteiro ─────────
+  // ── Resolver vínculo (cliente/estabelecimento/série) para o lote inteiro ───
   let clientId: string | null = null;
   let establishmentId: string | null = null;
+  let schoolGradeId: string | null = null;
 
   if (parsed.link.kind === "linked") {
     const { data: clientRow } = await supabase
@@ -91,6 +92,19 @@ export async function importChildAssessmentsAction(
     }
 
     clientId = clientRow.id as string;
+
+    const gradeIdRaw = parsed.link.schoolGradeId ?? null;
+    if (gradeIdRaw) {
+      const { data: grade } = await supabase
+        .from("client_school_grades")
+        .select("id, client_id")
+        .eq("id", gradeIdRaw)
+        .maybeSingle();
+      if (!grade || grade.client_id !== clientId) {
+        return { ok: false, error: "Série inválida para este cliente." };
+      }
+      schoolGradeId = grade.id as string;
+    }
   }
 
   let patientsCreated = 0;
@@ -173,6 +187,7 @@ export async function importChildAssessmentsAction(
           user_id: workspaceOwnerId,
           client_id: clientId,
           establishment_id: establishmentId,
+          school_grade_id: schoolGradeId,
           full_name: row.full_name,
           birth_date: row.birth_date,
           sex: row.sex,

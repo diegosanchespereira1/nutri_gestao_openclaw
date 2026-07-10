@@ -14,6 +14,7 @@ import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
 import { DeleteClientButton } from "@/components/clientes/delete-client-button";
 import { EstablishmentsSection } from "@/components/clientes/establishments-section";
 import { EstablishmentAreasSection } from "@/components/clientes/establishment-areas-section";
+import { SchoolGradesSection } from "@/components/clientes/school-grades-section";
 import { PatientsSection } from "@/components/pacientes/patients-section";
 import {
   Card,
@@ -30,6 +31,7 @@ import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
+import { loadGradesForClient } from "@/lib/actions/school-grades";
 import { getClientLogoSignedUrl } from "@/lib/clientes/logo-sync";
 import { CLIENT_ROW_FULL_SELECT } from "@/lib/clientes/client-row-supabase-select";
 import {
@@ -226,6 +228,8 @@ async function ClientEditLoadedPanels({
   const estRow = (estRes.data as EstablishmentRow | null) ?? null;
   const establishmentAreas =
     row.kind === "pj" && estRow?.id ? await loadAreasForEstablishment(estRow.id) : [];
+  const isSchoolClient = row.kind === "pj" && row.business_segment === "escola";
+  const schoolGrades = isSchoolClient ? await loadGradesForClient(row.id) : [];
 
   const social = row.social_links ?? {};
   const tKey = todayKey(new Date(), tz);
@@ -306,6 +310,13 @@ async function ClientEditLoadedPanels({
             establishmentId={estRow.id}
             initialAreas={establishmentAreas}
           />
+        </>
+      ) : null}
+
+      {isSchoolClient ? (
+        <>
+          <Separator className="my-8" />
+          <SchoolGradesSection clientId={row.id} initialGrades={schoolGrades} />
         </>
       ) : null}
 

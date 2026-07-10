@@ -4,6 +4,7 @@ import { PatientForm } from "@/components/pacientes/patient-form";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
+import { loadGradesForClients } from "@/lib/actions/school-grades";
 import type { ClientRow } from "@/lib/types/clients";
 
 export default async function NovoPacientePage() {
@@ -29,6 +30,8 @@ export default async function NovoPacientePage() {
     establishmentsByClient[cid].push({ id: est.id, name: est.name });
   }
 
+  const schoolGradesByClient = await loadGradesForClients(clients.map((c) => c.id));
+
   return (
     <PageLayout variant="form">
       <PageHeader
@@ -40,6 +43,7 @@ export default async function NovoPacientePage() {
         mode="create"
         clients={clients}
         establishmentsByClient={establishmentsByClient}
+        schoolGradesByClient={schoolGradesByClient}
         teamMembers={teamMembers}
         defaults={{
           full_name: "",

@@ -9,6 +9,8 @@ export type PatientRow = {
   /** Nullable — paciente pode ser independente (sem cliente associado). */
   client_id: string | null;
   establishment_id: string | null;
+  /** Série/turma (opcional) — só faz sentido quando client_id é uma escola (PJ). */
+  school_grade_id: string | null;
   full_name: string;
   birth_date: string | null;
   document_id: string | null;

@@ -7,10 +7,17 @@
 import type { ChildSex } from "@/lib/nutrition/child/types";
 import type { FieldDef } from "@/lib/types/import";
 
-/** Vínculo do lote de importação inteiro (todas as linhas do arquivo). */
+/** Vínculo do lote de importação inteiro (todas as linhas do arquivo).
+ *  schoolGradeId é opcional — só faz sentido quando o cliente é uma escola
+ *  com séries cadastradas (aplica a mesma série a todas as linhas do lote). */
 export type ChildAssessmentImportLink =
   | { kind: "independent" }
-  | { kind: "linked"; clientId: string; establishmentId: string | null };
+  | {
+      kind: "linked";
+      clientId: string;
+      establishmentId: string | null;
+      schoolGradeId: string | null;
+    };
 
 /** Linha validada, pronta para ser enviada à Server Action. */
 export type ChildAssessmentImportRow = {

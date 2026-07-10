@@ -14,6 +14,8 @@ type Props = {
   rows: ParsedRow[];
   errorsByRow: Map<number, string>;
   fields: string[];
+  /** Rótulo de exibição (PT-BR) para cada campo — usa a chave quando ausente. */
+  fieldLabels?: Record<string, string>;
   /** Linhas ignoradas pelo usuário (índices dos dados, sem cabeçalho). */
   ignoredRows: Set<number>;
   onToggleIgnore: (rowIndex: number) => void;
@@ -23,6 +25,7 @@ export function PreviewTable({
   rows,
   errorsByRow,
   fields,
+  fieldLabels,
   ignoredRows,
   onToggleIgnore,
 }: Props) {
@@ -72,7 +75,7 @@ export function PreviewTable({
                   key={f}
                   className="text-foreground whitespace-nowrap px-3 py-2 text-left font-bold"
                 >
-                  {f}
+                  {fieldLabels?.[f] ?? f}
                 </th>
               ))}
               <th className="text-foreground px-3 py-2 text-left font-bold">

@@ -150,7 +150,7 @@ export default async function ProntuarioPacientePage({
   const descriptionParts = [
     age,
     row.sex ? SEX_LABEL[row.sex] : null,
-    client ? client.legal_name : "Paciente independente",
+    client ? client.legal_name : "Paciente particular",
   ].filter(Boolean);
 
   return (
@@ -258,7 +258,7 @@ export default async function ProntuarioPacientePage({
               <CardContent className="grid gap-4 pt-4 sm:grid-cols-3">
                 <InfoRow
                   label="Cliente"
-                  value={client?.legal_name ?? "—"}
+                  value={client?.legal_name ?? "Particular"}
                   sub={client?.trade_name ?? undefined}
                 />
                 <InfoRow

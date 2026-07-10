@@ -267,7 +267,7 @@ export function PatientForm({
                   selectedClientId === "" && "text-muted-foreground",
                 )}
               >
-                <option value="">— Nenhum (paciente independente) —</option>
+                <option value="">— Nenhum (paciente particular) —</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.legal_name}

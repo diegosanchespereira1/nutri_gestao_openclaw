@@ -86,7 +86,7 @@ export default async function PacientesPage({
               className="border-input bg-white ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none dark:bg-card"
             >
               <option value="all">Todos</option>
-              <option value="independente">Independentes (sem cliente)</option>
+              <option value="independente">Particulares (sem cliente)</option>
             </select>
           </div>
         </div>

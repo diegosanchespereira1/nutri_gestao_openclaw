@@ -41,7 +41,7 @@ export function PatientClientCard({
       <input type="hidden" name="patient_id" value={patientId} />
 
       <p className="text-sm text-muted-foreground">
-        Este paciente é independente. Atribua um cliente PJ para depois associar
+        Este paciente é particular. Atribua um cliente PJ para depois associar
         a um estabelecimento.
       </p>
 

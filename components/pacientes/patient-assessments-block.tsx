@@ -21,7 +21,7 @@ import {
   assessmentVisibilityForCategory,
   patientAgeCategory,
 } from "@/lib/pacientes/age-category";
-import { CHILD_COLOR_CLASSES } from "@/lib/nutrition/child/labels";
+import { CHILD_COLOR_CLASSES, CHILD_INDICATOR_UNIT } from "@/lib/nutrition/child/labels";
 import type { ChildColor, ChildIndicator } from "@/lib/nutrition/child/types";
 import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
 import {
@@ -212,16 +212,49 @@ function IndicatorCard({
   );
 }
 
-// Card de estado nutricional infantil (com cor do semáforo).
+/** "< P1" / "> P99" / "≈ P52" / "–" — mesmo formato usado em ChildAssessmentResultCards. */
+function fmtChildPercentile(r: {
+  percentile: number | null;
+  boundary: "below_p1" | "above_p99" | null;
+}): string {
+  if (r.boundary === "below_p1") return "< P1";
+  if (r.boundary === "above_p99") return "> P99";
+  if (r.percentile == null) return "–";
+  return `≈ P${Math.round(r.percentile)}`;
+}
+
+/** "Adequado: 14,2–24,3 kg" / "Adequado: ≥ 100,6 cm" — mesmo formato usado em ChildAssessmentResultCards. */
+function fmtAdequateRange(
+  r: { adequateLow: number | null; adequateHigh: number | null },
+  unit: string,
+): string | null {
+  if (r.adequateLow != null && r.adequateHigh != null) {
+    return `Adequado: ${fmt(r.adequateLow, 1)}–${fmt(r.adequateHigh, 1)} ${unit}`;
+  }
+  if (r.adequateLow != null) {
+    return `Adequado: ≥ ${fmt(r.adequateLow, 1)} ${unit}`;
+  }
+  return null;
+}
+
+// Card de estado nutricional infantil (com cor do semáforo + valor medido + faixa adequada).
 function ChildStatusCard({
   label,
   classification,
   color,
+  value,
+  unit,
+  percentileLabel,
+  range,
   date,
 }: {
   label: string;
   classification: string;
   color: ChildColor;
+  value: number | null;
+  unit: string;
+  percentileLabel: string;
+  range: string | null;
   date: string;
 }) {
   return (
@@ -230,6 +263,11 @@ function ChildStatusCard({
         {label}
       </p>
       <p className="mt-0.5 text-sm font-bold leading-tight">{classification}</p>
+      <p className="mt-0.5 font-mono text-xs tabular-nums opacity-90">
+        {value != null ? `${fmt(value, 1)} ${unit} · ` : ""}
+        {percentileLabel}
+      </p>
+      {range && <p className="mt-0.5 text-[10px] leading-snug opacity-70">{range}</p>}
       <p className="mt-1 text-[10px] opacity-70">{date}</p>
     </div>
   );
@@ -239,58 +277,108 @@ function AssessmentIndicatorStrip({
   adultRows,
   geriatricRows,
   childRows,
+  showAdult,
+  showGeriatric,
+  showChild,
 }: {
   adultRows: AdultNutritionAssessmentRow[];
   geriatricRows: Awaited<ReturnType<typeof loadGeriatricAssessmentsForPatient>>["rows"];
   childRows: ChildAssessmentRow[];
+  /** Categoria relevante para este paciente — mostra os cartões (com "–" se vazio)
+   *  mesmo sem nenhuma avaliação registrada ainda, para o profissional saber o que
+   *  esperar assim que fizer o primeiro registro. */
+  showAdult: boolean;
+  showGeriatric: boolean;
+  showChild: boolean;
 }) {
   const cards: React.ReactNode[] = [];
 
-  const latestAdult = adultRows[0] ?? null;
-  const latestGeriatric = geriatricRows[0] ?? null;
-  const latestAnthro = latestAdult ?? latestGeriatric;
+  // ── Adulto / geriátrico (peso estimado, IMC, necessidades, risco) ─────────
+  if (showAdult || showGeriatric) {
+    const latestAdult = adultRows[0] ?? null;
+    const latestGeriatric = geriatricRows[0] ?? null;
+    const latestAnthro = latestAdult ?? latestGeriatric;
 
-  if (latestAnthro) {
-    const date = fmtDate(latestAnthro.recorded_at);
-    const riskLabel = latestAnthro.nutritional_risk
-      ? NUTRITIONAL_RISK_LABELS[latestAnthro.nutritional_risk]?.split("—")[0].trim()
+    const date = latestAnthro ? fmtDate(latestAnthro.recorded_at) : undefined;
+    const riskLabel = latestAnthro?.nutritional_risk
+      ? NUTRITIONAL_RISK_LABELS[latestAnthro.nutritional_risk]?.split("—")[0].trim() ?? null
       : null;
 
-    if (latestAnthro.estimated_weight_kg != null)
-      cards.push(<IndicatorCard key="pe" label="Peso Estimado" value={fmt(latestAnthro.estimated_weight_kg)} unit="kg" date={date} />);
-    if (latestAnthro.bmi != null)
-      cards.push(<IndicatorCard key="imc-a" label="IMC" value={fmt(latestAnthro.bmi)} unit="kg/m²" date={date} accent />);
-    if (latestAnthro.energy_needs_kcal != null)
-      cards.push(<IndicatorCard key="ne" label="Nec. Energética" value={Math.round(latestAnthro.energy_needs_kcal).toLocaleString("pt-BR")} unit="kcal/dia" date={date} />);
-    if (latestAnthro.protein_needs_g != null)
-      cards.push(<IndicatorCard key="np" label="Nec. Proteica" value={fmt(latestAnthro.protein_needs_g, 1)} unit="g/dia" date={date} />);
-    if (riskLabel)
-      cards.push(<IndicatorCard key="risco" label="Risco Nutricional" value={riskLabel} date={date} accent />);
+    cards.push(
+      <IndicatorCard
+        key="pe"
+        label="Peso Estimado"
+        value={fmt(latestAnthro?.estimated_weight_kg)}
+        unit="kg"
+        date={date}
+      />,
+    );
+    cards.push(
+      <IndicatorCard key="imc-a" label="IMC" value={fmt(latestAnthro?.bmi)} unit="kg/m²" date={date} accent />,
+    );
+    cards.push(
+      <IndicatorCard
+        key="ne"
+        label="Nec. Energética"
+        value={
+          latestAnthro?.energy_needs_kcal != null
+            ? Math.round(latestAnthro.energy_needs_kcal).toLocaleString("pt-BR")
+            : "–"
+        }
+        unit="kcal/dia"
+        date={date}
+      />,
+    );
+    cards.push(
+      <IndicatorCard
+        key="np"
+        label="Nec. Proteica"
+        value={fmt(latestAnthro?.protein_needs_g, 1)}
+        unit="g/dia"
+        date={date}
+      />,
+    );
+    cards.push(
+      <IndicatorCard key="risco" label="Risco Nutricional" value={riskLabel ?? "–"} date={date} accent />,
+    );
   }
 
-  // Estado nutricional infantil (classificação da avaliação infantil mais recente)
-  const latestChild = childRows[0] ?? null;
-  if (latestChild) {
-    const date = fmtDate(latestChild.recorded_at);
-    const results = Array.isArray(latestChild.results) ? latestChild.results : [];
+  // ── Estado nutricional infantil (classificação da avaliação mais recente) ──
+  if (showChild) {
+    const latestChild = childRows[0] ?? null;
     const order: Array<{ indicator: ChildIndicator; label: string }> = [
       { indicator: "bmi_for_age", label: "IMC / Idade" },
       { indicator: "height_for_age", label: "Estatura / Idade" },
       { indicator: "weight_for_age", label: "Peso / Idade" },
       { indicator: "weight_for_height", label: "Peso / Estatura" },
     ];
-    for (const { indicator, label } of order) {
-      const r = results.find((x) => x.indicator === indicator);
-      if (r?.classification && r.color) {
+
+    if (latestChild) {
+      const date = fmtDate(latestChild.recorded_at);
+      const results = Array.isArray(latestChild.results) ? latestChild.results : [];
+      for (const { indicator, label } of order) {
+        const r = results.find((x) => x.indicator === indicator);
         cards.push(
-          <ChildStatusCard
-            key={`child-${indicator}`}
-            label={label}
-            classification={r.classification}
-            color={r.color}
-            date={date}
-          />,
+          r?.classification && r.color ? (
+            <ChildStatusCard
+              key={`child-${indicator}`}
+              label={label}
+              classification={r.classification}
+              color={r.color}
+              value={r.value}
+              unit={CHILD_INDICATOR_UNIT[indicator]}
+              percentileLabel={fmtChildPercentile(r)}
+              range={fmtAdequateRange(r, CHILD_INDICATOR_UNIT[indicator])}
+              date={date}
+            />
+          ) : (
+            <IndicatorCard key={`child-${indicator}`} label={label} value="–" date={date} />
+          ),
         );
+      }
+    } else {
+      for (const { indicator, label } of order) {
+        cards.push(<IndicatorCard key={`child-${indicator}`} label={label} value="–" />);
       }
     }
   }
@@ -339,15 +427,13 @@ function AdultTabContent({
 }) {
   return (
     <div className="space-y-6 pt-2">
-      {chartData.length >= 2 && (
-        <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
-            <TrendingUp className="size-3.5" aria-hidden />
-            Evolução
-          </p>
-          <AnthroEvolutionCharts data={chartData} />
-        </div>
-      )}
+      <div>
+        <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+          <TrendingUp className="size-3.5" aria-hidden />
+          Evolução
+        </p>
+        <AnthroEvolutionCharts data={chartData} />
+      </div>
 
       <div>
         <SectionHeader title="Histórico" count={rows.length} />
@@ -374,15 +460,13 @@ function GeriatricTabContent({
 }) {
   return (
     <div className="space-y-6 pt-2">
-      {chartData.length >= 2 && (
-        <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
-            <TrendingUp className="size-3.5" aria-hidden />
-            Evolução
-          </p>
-          <AnthroEvolutionCharts data={chartData} />
-        </div>
-      )}
+      <div>
+        <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+          <TrendingUp className="size-3.5" aria-hidden />
+          Evolução
+        </p>
+        <AnthroEvolutionCharts data={chartData} />
+      </div>
 
       <div>
         <SectionHeader title="Histórico" count={rows.length} />
@@ -429,15 +513,13 @@ function ChildTabContent({
         </div>
       )}
 
-      {chartData.length >= 2 && (
-        <div>
-          <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
-            <TrendingUp className="size-3.5" aria-hidden />
-            Evolução (percentil por indicador)
-          </p>
-          <ChildAssessmentEvolution data={chartData} />
-        </div>
-      )}
+      <div>
+        <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-widest text-foreground/70">
+          <TrendingUp className="size-3.5" aria-hidden />
+          Evolução (percentil por indicador)
+        </p>
+        <ChildAssessmentEvolution data={chartData} />
+      </div>
 
       <div>
         <SectionHeader title="Histórico" count={rows.length} />
@@ -532,6 +614,9 @@ export async function PatientAssessmentsBlock({
         adultRows={adultRows}
         geriatricRows={geriatricRows}
         childRows={childRows}
+        showAdult={showAdultTab}
+        showGeriatric={showGeriatricTab}
+        showChild={showChildTab}
       />
 
       <NutritionAssessmentsTabs

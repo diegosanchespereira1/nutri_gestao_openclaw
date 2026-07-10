@@ -72,84 +72,52 @@ function IndicatorCard({
   );
 }
 
+/** Sempre mostra os 5 cartões (Peso/Altura/IMC/Cintura/Atividade), com "–" para
+ *  o que faltar — mesmo sem nenhum registro ainda, ou com registro incompleto
+ *  (ex.: paciente criado via upload em massa, que só grava peso/altura). */
 function GeneralAssessmentIndicatorGrid({
   rows,
 }: {
   rows: NutritionAssessmentRow[];
 }) {
-  const latest = rows[0];
-  if (!latest) return null;
+  const latest = rows[0] ?? null;
 
-  const date = fmtDate(latest.recorded_at);
-  const h = latest.height_cm != null ? Number(latest.height_cm) : null;
-  const w = latest.weight_kg != null ? Number(latest.weight_kg) : null;
-  const waist = latest.waist_cm != null ? Number(latest.waist_cm) : null;
+  const date = latest ? fmtDate(latest.recorded_at) : undefined;
+  const h = latest?.height_cm != null ? Number(latest.height_cm) : null;
+  const w = latest?.weight_kg != null ? Number(latest.weight_kg) : null;
+  const waist = latest?.waist_cm != null ? Number(latest.waist_cm) : null;
   const bmi = h && w ? computeBmi(h, w) : null;
   const activity =
-    latest.activity_level &&
+    latest?.activity_level &&
     ACTIVITY_LEVELS.includes(latest.activity_level as ActivityLevel)
       ? activityLevelLabel[latest.activity_level as ActivityLevel]
       : null;
-
-  const cards: React.ReactNode[] = [];
-  if (w != null)
-    cards.push(
-      <IndicatorCard key="peso" label="Peso" value={fmt(w, 1)} unit="kg" date={date} />,
-    );
-  if (h != null)
-    cards.push(
-      <IndicatorCard key="altura" label="Altura" value={String(h)} unit="cm" date={date} />,
-    );
-  if (bmi != null)
-    cards.push(
-      <IndicatorCard
-        key="imc"
-        label="IMC"
-        value={fmt(bmi, 1)}
-        unit="kg/m²"
-        date={date}
-        accent
-      />,
-    );
-  if (waist != null)
-    cards.push(
-      <IndicatorCard
-        key="cintura"
-        label="Cintura"
-        value={fmt(waist, 1)}
-        unit="cm"
-        date={date}
-      />,
-    );
-  if (activity)
-    cards.push(
-      <IndicatorCard key="atividade" label="Atividade" value={activity} date={date} />,
-    );
-
-  if (cards.length === 0) return null;
 
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-      {cards}
+      <IndicatorCard label="Peso" value={w != null ? fmt(w, 1) : "–"} unit="kg" date={date} />
+      <IndicatorCard
+        label="Altura"
+        value={h != null ? String(h) : "–"}
+        unit="cm"
+        date={date}
+      />
+      <IndicatorCard
+        label="IMC"
+        value={bmi != null ? fmt(bmi, 1) : "–"}
+        unit="kg/m²"
+        date={date}
+        accent
+      />
+      <IndicatorCard
+        label="Cintura"
+        value={waist != null ? fmt(waist, 1) : "–"}
+        unit="cm"
+        date={date}
+      />
+      <IndicatorCard label="Atividade" value={activity ?? "–"} date={date} />
     </div>
   );
-}
-
-function hasGeneralAssessmentIndicators(rows: NutritionAssessmentRow[]): boolean {
-  const latest = rows[0];
-  if (!latest) return false;
-
-  const h = latest.height_cm != null ? Number(latest.height_cm) : null;
-  const w = latest.weight_kg != null ? Number(latest.weight_kg) : null;
-  const waist = latest.waist_cm != null ? Number(latest.waist_cm) : null;
-  const bmi = h && w ? computeBmi(h, w) : null;
-  const activity =
-    latest.activity_level &&
-    ACTIVITY_LEVELS.includes(latest.activity_level as ActivityLevel)
-      ? activityLevelLabel[latest.activity_level as ActivityLevel]
-      : null;
-
-  return w != null || h != null || bmi != null || waist != null || Boolean(activity);
 }
 
 export async function PatientGeneralAssessmentIndicatorsSection({
@@ -158,8 +126,6 @@ export async function PatientGeneralAssessmentIndicatorsSection({
   patientId: string;
 }) {
   const { rows } = await loadNutritionAssessmentsForPatient(patientId);
-
-  if (!hasGeneralAssessmentIndicators(rows)) return null;
 
   return (
     <Card aria-label="Indicadores de informações complementares">

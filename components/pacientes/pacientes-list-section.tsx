@@ -79,9 +79,11 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
       {rows.map((p) => {
         const clientCtx = p.clients?.legal_name;
         const estCtx = p.establishments?.name;
-        const contextLabel = estCtx
-          ? `${clientCtx} · ${estCtx}`
-          : clientCtx ?? null;
+        const contextLabel = clientCtx
+          ? estCtx
+            ? `${clientCtx} · ${estCtx}`
+            : clientCtx
+          : "Particular";
 
         const cpfDisplay = p.document_id ? formatCpfDisplay(p.document_id) : null;
         const birthDisplay = p.birth_date ? String(p.birth_date).slice(0, 10) : null;
@@ -110,7 +112,7 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
                   </span>
                   {!p.client_id ? (
                     <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      Independente
+                      Particular
                     </span>
                   ) : null}
                   {ageCat ? (

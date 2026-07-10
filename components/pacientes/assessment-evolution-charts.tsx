@@ -274,7 +274,7 @@ function EmptyChart() {
   return (
     <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20">
       <p className="text-center text-[11px] leading-relaxed text-muted-foreground px-3">
-        Mínimo 2 avaliações<br />para exibir gráfico
+        Sem avaliações<br />registradas ainda
       </p>
     </div>
   );
@@ -288,7 +288,7 @@ function MiniChart({
   config: MetricConfig;
 }) {
   const validCount = data.filter((d) => d[config.dataKey] != null).length;
-  if (validCount < 2) return <EmptyChart />;
+  if (validCount < 1) return <EmptyChart />;
 
   const domain = computeNumericDomain(data, config.dataKey, config.refLines);
   const yTickFormatter =

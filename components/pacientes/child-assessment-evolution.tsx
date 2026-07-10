@@ -64,13 +64,13 @@ function ChildYAxisPanel({ data, height }: { data: ChildEvolutionPoint[]; height
 }
 
 export function ChildAssessmentEvolution({ data }: { data: ChildEvolutionPoint[] }) {
-  if (data.length < 2) {
+  if (data.length < 1) {
     return (
       <div className="flex h-36 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20">
         <p className="text-center text-[11px] text-muted-foreground">
-          Mínimo 2 avaliações
+          Sem avaliações
           <br />
-          para exibir a evolução
+          registradas ainda
         </p>
       </div>
     );

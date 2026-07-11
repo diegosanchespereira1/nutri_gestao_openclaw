@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   canCurrentUserDeleteTeamMembers,
+  canCurrentUserManageTeamMembers,
   deleteTeamMemberAction,
   loadTeamMemberById,
 } from "@/lib/actions/team-members";
@@ -36,11 +37,13 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
   const { row } = await loadTeamMemberById(id);
   if (!row) notFound();
 
-  const { user, workspaceOwnerId } = await getServerContext();
+  const { user } = await getServerContext();
   if (!user) redirect("/login");
-  const isTeamMember = !!user && !!workspaceOwnerId && user.id !== workspaceOwnerId;
 
-  const canRemoveMember = await canCurrentUserDeleteTeamMembers();
+  const [canManageTeam, canRemoveMember] = await Promise.all([
+    canCurrentUserManageTeamMembers(),
+    canCurrentUserDeleteTeamMembers(),
+  ]);
 
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
@@ -61,14 +64,16 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
         </div>
       ) : null}
 
-      {isTeamMember ? (
+      {!canManageTeam ? (
         <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Você não tem permissão para editar dados de membros da equipe. Apenas o administrador pode fazer isso.
+          Você não tem permissão para editar dados de membros da equipe. Apenas
+          o titular, usuários com cargo Gestão ou administradores podem fazer
+          isso.
         </div>
       ) : null}
 
       {/* ── Seção 1: Dados do membro ────────────────────────── */}
-      {!isTeamMember ? (
+      {canManageTeam ? (
         <Card>
           <CardHeader className="border-b border-border pb-4">
             <CardTitle className="text-base">Dados do membro</CardTitle>

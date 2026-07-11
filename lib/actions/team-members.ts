@@ -188,8 +188,15 @@ export async function loadTeamMembersForOwner(): Promise<{
     .eq("owner_user_id", workspaceOwnerId)
     .order("full_name", { ascending: true });
 
-  if (error || !data) return { rows: [] };
-  return { rows: data as TeamMemberRow[] };
+  if (error) {
+    console.error("[loadTeamMembersForOwner] failed", {
+      workspaceOwnerId,
+      code: error.code,
+      message: error.message,
+    });
+    return { rows: [] };
+  }
+  return { rows: (data ?? []) as TeamMemberRow[] };
 }
 
 export async function loadTeamMemberById(

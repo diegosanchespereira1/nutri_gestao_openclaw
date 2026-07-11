@@ -3,11 +3,22 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 /**
  * UUID do titular da conta (tenant): o próprio utilizador ou o `owner_user_id`
  * da linha em `team_members` quando o login é de um membro da equipa.
+ *
+ * Preferência: RPC SECURITY DEFINER (evita falhas/silêncios de RLS na leitura
+ * de `team_members` e cookies desatualizados após mudança de vínculo).
  */
 export async function getWorkspaceAccountOwnerId(
   supabase: SupabaseClient,
   authUserId: string,
 ): Promise<string> {
+  const { data: rpcOwnerId, error: rpcError } = await supabase.rpc(
+    "workspace_account_owner_id",
+  );
+
+  if (!rpcError && typeof rpcOwnerId === "string" && rpcOwnerId.length > 0) {
+    return rpcOwnerId;
+  }
+
   const { data } = await supabase
     .from("team_members")
     .select("owner_user_id")

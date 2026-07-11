@@ -38,17 +38,19 @@ export const getServerUser = cache(async () => {
 
 /**
  * Auth + workspace owner ID, deduped once per request.
- * Preferência: cookie de perfil → fallback a queries Supabase.
+ * Cookie de perfil evita `auth.getUser`, mas o titular do workspace é sempre
+ * resolvido no banco (RPC) — o `workspaceOwnerId` em cache pode ficar stale
+ * após mudança de vínculo em `team_members` (ex.: gestão vs titular).
  */
 export const getServerContext = cache(async () => {
   const supabase = await createClient();
   const profileCtx = await readProfileContextFromCookies();
 
   if (profileCtx?.userId) {
-    const workspaceOwnerId =
-      profileCtx.workspaceOwnerId.length > 0
-        ? profileCtx.workspaceOwnerId
-        : profileCtx.userId;
+    const workspaceOwnerId = await getWorkspaceAccountOwnerId(
+      supabase,
+      profileCtx.userId,
+    );
     return {
       supabase,
       user: userFromId(profileCtx.userId),

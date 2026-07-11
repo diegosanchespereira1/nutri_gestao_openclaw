@@ -369,16 +369,32 @@ export async function updateSession(request: NextRequest) {
           pathname,
           error: error instanceof Error ? error.message : "unknown",
         });
+        // Não forçar workspaceOwnerId = user.id: para membros de equipe isso
+        // esvazia clientes/equipe até o próximo refresh. Preferir cache anterior.
+        const previousOwnerId =
+          cachedProfileCtx?.userId === user.id &&
+          cachedProfileCtx.workspaceOwnerId.length > 0
+            ? cachedProfileCtx.workspaceOwnerId
+            : null;
         profileCtx = {
           userId: user.id,
-          workspaceOwnerId: user.id,
-          role: null,
-          timeZone: "America/Sao_Paulo",
-          fullName: null,
+          workspaceOwnerId: previousOwnerId ?? user.id,
+          role: cachedProfileCtx?.userId === user.id ? cachedProfileCtx.role : null,
+          timeZone:
+            cachedProfileCtx?.userId === user.id
+              ? cachedProfileCtx.timeZone
+              : "America/Sao_Paulo",
+          fullName:
+            cachedProfileCtx?.userId === user.id
+              ? cachedProfileCtx.fullName
+              : null,
           lgpdBlocked: false,
           needsOnboarding: false,
           cachedAt: nowSec,
-          enabledModules: { ...DEFAULT_ENABLED_MODULES },
+          enabledModules:
+            cachedProfileCtx?.userId === user.id
+              ? cachedProfileCtx.enabledModules
+              : { ...DEFAULT_ENABLED_MODULES },
         };
       }
     }

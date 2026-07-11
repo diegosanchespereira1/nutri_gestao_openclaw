@@ -8,7 +8,10 @@ import { canAccessAdminArea } from "@/lib/roles";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
+import {
+  canManageTeamMembers,
+  getWorkspaceAccountOwnerId,
+} from "@/lib/workspace";
 import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
 
 function parseProfessionalArea(raw: unknown): ProfessionalArea | null {
@@ -244,6 +247,17 @@ export async function canCurrentUserDeleteTeamMembers(): Promise<boolean> {
   });
 }
 
+export async function canCurrentUserManageTeamMembers(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  return canManageTeamMembers(supabase, user.id, workspaceOwnerId);
+}
+
 export async function createTeamMemberAction(
   _prev: CreateTeamMemberResult | undefined,
   formData: FormData,
@@ -269,10 +283,15 @@ export async function createTeamMemberAction(
   }
 
   const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (accountOwnerId !== user.id) {
+  const canManage = await canManageTeamMembers(
+    supabase,
+    user.id,
+    accountOwnerId,
+  );
+  if (!canManage) {
     return createTeamMemberError(
       "auth_create",
-      "Apenas o titular da conta pode adicionar ou alterar membros da equipe.",
+      "Apenas o titular, usuários com cargo Gestão ou administradores podem adicionar membros da equipe.",
     );
   }
 
@@ -466,8 +485,12 @@ export async function updateTeamMemberAction(formData: FormData): Promise<void> 
   if (!user) redirect("/login");
 
   const accountOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-
-  if (isTeamMember(user.id, accountOwnerId)) redirect("/equipe?err=forbidden");
+  const canManage = await canManageTeamMembers(
+    supabase,
+    user.id,
+    accountOwnerId,
+  );
+  if (!canManage) redirect("/equipe?err=forbidden");
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/equipe?err=missing");

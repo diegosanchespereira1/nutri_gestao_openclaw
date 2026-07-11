@@ -25,3 +25,42 @@ export function isTeamMember(
 ): boolean {
   return authUserId !== workspaceOwnerId;
 }
+
+/** Membro da equipa com cargo Gestão no workspace atual. */
+export async function isWorkspaceGestaoMember(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+): Promise<boolean> {
+  if (authUserId === workspaceOwnerId) return false;
+
+  const { data } = await supabase
+    .from("team_members")
+    .select("id")
+    .eq("owner_user_id", workspaceOwnerId)
+    .eq("member_user_id", authUserId)
+    .eq("job_role", "gestao")
+    .maybeSingle();
+
+  return !!data?.id;
+}
+
+/** Titular, cargo Gestão ou admin/super_admin da plataforma podem gerir a equipe. */
+export async function canManageTeamMembers(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+): Promise<boolean> {
+  if (authUserId === workspaceOwnerId) return true;
+  if (await isWorkspaceGestaoMember(supabase, authUserId, workspaceOwnerId)) {
+    return true;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", authUserId)
+    .maybeSingle();
+
+  return profile?.role === "admin" || profile?.role === "super_admin";
+}

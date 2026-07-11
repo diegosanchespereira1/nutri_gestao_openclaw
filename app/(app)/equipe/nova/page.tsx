@@ -1,6 +1,9 @@
+import { redirect } from "next/navigation";
+
 import { TeamMemberForm } from "@/components/team/team-member-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { canCurrentUserManageTeamMembers } from "@/lib/actions/team-members";
 
 const errMessages: Record<string, string> = {
   missing:
@@ -22,6 +25,9 @@ type Props = {
 };
 
 export default async function NovaEquipePage({ searchParams }: Props) {
+  const canManageTeam = await canCurrentUserManageTeamMembers();
+  if (!canManageTeam) redirect("/equipe?err=forbidden");
+
   const { err, detail } = await searchParams;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
   const detailMsg = detail?.trim() ?? null;

@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { Separator } from "@/components/ui/separator";
 import {
+  canCurrentUserManageTeamMembers,
   loadResponsiblePortfolioByMemberId,
   loadTeamMembersForOwner,
 } from "@/lib/actions/team-members";
@@ -22,11 +23,12 @@ export default async function EquipePage({
   searchParams: Promise<{ portalErr?: string; portalOk?: string; email_err?: string }>;
 }) {
   const { portalErr, portalOk, email_err } = await searchParams;
-  const [{ rows }, { rows: portalUsers }, portfolioByMember] =
+  const [{ rows }, { rows: portalUsers }, portfolioByMember, canManageTeam] =
     await Promise.all([
       loadTeamMembersForOwner(),
       loadExternalPortalUsers(),
       loadResponsiblePortfolioByMemberId(),
+      canCurrentUserManageTeamMembers(),
     ]);
 
   return (
@@ -35,9 +37,11 @@ export default async function EquipePage({
         title="Equipe"
         description="Membros que pode atribuir a visitas agendadas. O CRN é obrigatório apenas para perfis na área da nutrição."
         actions={
-          <Link href="/equipe/nova" className={cn(buttonVariants(), "shrink-0")}>
-            Novo membro
-          </Link>
+          canManageTeam ? (
+            <Link href="/equipe/nova" className={cn(buttonVariants(), "shrink-0")}>
+              Novo membro
+            </Link>
+          ) : undefined
         }
       />
 
@@ -47,9 +51,11 @@ export default async function EquipePage({
           title="Nenhum membro ainda"
           description="Adicione colegas para os associar ao agendar visitas."
           action={
-            <Link href="/equipe/nova" className={cn(buttonVariants())}>
-              Cadastrar primeiro membro
-            </Link>
+            canManageTeam ? (
+              <Link href="/equipe/nova" className={cn(buttonVariants())}>
+                Cadastrar primeiro membro
+              </Link>
+            ) : undefined
           }
         />
       ) : (

@@ -13,7 +13,9 @@ import {
   addAdminNoteAction,
   deleteAdminNoteAction,
   recordPaymentEventAction,
+  toggleTeamMemberActiveAction,
 } from "@/lib/actions/admin-platform";
+import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -96,11 +98,14 @@ const OK_MESSAGES: Record<string, string> = {
   note_added: "Nota adicionada.",
   note_deleted: "Nota removida.",
   payment_recorded: "Pagamento registado.",
+  member_activated: "Acesso do membro reativado. Email de redefinição de senha enviado.",
+  member_deactivated: "Acesso do membro desativado.",
 };
 
 const ERR_MESSAGES: Record<string, string> = {
   invalid: "Dados inválidos.",
   save: "Erro ao salvar. Tente novamente.",
+  server_config: "Chave de serviço (service role) não configurada no servidor.",
 };
 
 export default async function TenantCockpitPage({ params, searchParams }: Props) {
@@ -110,7 +115,8 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
   const result = await loadTenantCockpitData(id);
   if ("error" in result) notFound();
 
-  const { profile, events, overrides, notes, plans, activityCounts } = result.data;
+  const { profile, loginEmail, events, overrides, notes, plans, teamMembers, activityCounts } =
+    result.data;
 
   const isLgpdBlocked =
     profile.lgpd_blocked_at != null && profile.lgpd_unblocked_at == null;
@@ -161,7 +167,8 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
             )}
           </div>
           <p className="text-muted-foreground mt-1 text-xs">
-            CRN: {profile.crn ?? "—"} · Tel: {profile.phone ?? "—"} · Registado em{" "}
+            Login: <strong className="text-foreground">{loginEmail ?? "—"}</strong> · CRN:{" "}
+            {profile.crn ?? "—"} · Tel: {profile.phone ?? "—"} · Registado em{" "}
             {formatDate(profile.created_at)}
             {profile.last_active_at &&
               ` · Último acesso ${formatDate(profile.last_active_at)}`}
@@ -186,6 +193,98 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
           {ERR_MESSAGES[err]}
         </p>
       ) : null}
+
+      {/* ─── Usuários ───────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">
+            Usuários ({1 + teamMembers.length})
+          </CardTitle>
+          <p className="text-muted-foreground text-xs">
+            Titular da conta (login usado como admin) e membros da equipe
+            cadastrados neste tenant.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-border divide-y text-sm">
+            {/* Titular */}
+            <li className="flex flex-col gap-1 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">
+                  {profile.full_name ?? "(sem nome)"}{" "}
+                  <span className="text-muted-foreground font-normal">— Titular</span>
+                </p>
+                <p className="text-muted-foreground text-xs">
+                  {loginEmail ?? "e-mail indisponível"}
+                </p>
+              </div>
+              <span
+                className={cn(
+                  "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                  statusBadge.cls,
+                )}
+              >
+                {statusBadge.label}
+              </span>
+            </li>
+
+            {/* Equipe */}
+            {teamMembers.length === 0 ? (
+              <li className="text-muted-foreground py-3 text-xs">
+                Nenhum membro de equipe cadastrado.
+              </li>
+            ) : (
+              teamMembers.map((member) => (
+                <li
+                  key={member.id}
+                  className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {member.full_name}{" "}
+                      <span className="text-muted-foreground font-normal">
+                        — {teamJobRoleLabel[member.job_role] ?? member.job_role}
+                      </span>
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      {member.email ?? "sem e-mail"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                        member.is_active
+                          ? "bg-green-500/10 text-green-700 border-green-500/30 dark:text-green-300"
+                          : "bg-destructive/10 text-destructive border-destructive/30",
+                      )}
+                    >
+                      {member.is_active ? "Ativo" : "Inativo"}
+                    </span>
+                    <form action={toggleTeamMemberActiveAction}>
+                      <input type="hidden" name="member_id" value={member.id} />
+                      <input type="hidden" name="profile_id" value={profile.id} />
+                      <input
+                        type="hidden"
+                        name="activate"
+                        value={member.is_active ? "false" : "true"}
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant={member.is_active ? "destructive" : "outline"}
+                        className="h-7 text-xs"
+                      >
+                        {member.is_active ? "Desativar" : "Reativar"}
+                      </Button>
+                    </form>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
+        </CardContent>
+      </Card>
 
       {/* ─── Grid principal ──────────────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-2">

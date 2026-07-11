@@ -1,3 +1,5 @@
+import { APP_PAGE_SCROLL_ID } from "@/components/app-page-scroll";
+
 /** Leva o utilizador ao topo da página (window + landmarks do shell). */
 export function scrollPageToTop(options?: { behavior?: ScrollBehavior }): void {
   if (typeof window === "undefined") return;
@@ -10,5 +12,10 @@ export function scrollPageToTop(options?: { behavior?: ScrollBehavior }): void {
   const main = document.getElementById("conteudo-principal");
   if (main) {
     main.scrollTop = 0;
+  }
+
+  const pageScroll = document.getElementById(APP_PAGE_SCROLL_ID);
+  if (pageScroll) {
+    pageScroll.scrollTop = 0;
   }
 }

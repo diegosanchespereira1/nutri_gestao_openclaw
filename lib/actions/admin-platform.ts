@@ -27,6 +27,7 @@ import {
   hasAnyModuleEnabled,
   parseEnabledModulesFromForm,
 } from "@/lib/types/modules";
+import type { TeamJobRole } from "@/lib/types/team-members";
 
 type AdminDb = SupabaseClient;
 
@@ -462,12 +463,24 @@ export type AdminTenantNote = {
   updated_at: string;
 };
 
+export type TenantTeamMemberRow = {
+  id: string;
+  member_user_id: string | null;
+  full_name: string;
+  email: string | null;
+  job_role: TeamJobRole;
+  is_active: boolean;
+  created_at: string;
+};
+
 export type TenantCockpitData = {
   profile: TenantDetailProfile;
+  loginEmail: string | null;
   events: SubscriptionEvent[];
   overrides: TenantFeatureOverride[];
   notes: AdminTenantNote[];
   plans: SubscriptionPlan[];
+  teamMembers: TenantTeamMemberRow[];
   activityCounts: {
     clients: number;
     establishments: number;
@@ -507,6 +520,7 @@ export async function loadTenantCockpitData(
     visitsResult,
     recipesResult,
     tokensResult,
+    teamMembersResult,
   ] = await Promise.all([
     authClient
       .from("subscription_events")
@@ -549,15 +563,40 @@ export async function loadTenantCockpitData(
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", tenantUserId)
       .is("revoked_at", null),
+    db
+      .from("team_members")
+      .select("id, member_user_id, full_name, email, job_role, is_active, created_at")
+      .eq("owner_user_id", tenantUserId)
+      .order("full_name", { ascending: true }),
   ]);
+
+  // E-mail de login do titular — só disponível em auth.users (não em profiles),
+  // por isso exige service role. Sem service role configurado, fica "—" no cockpit.
+  let loginEmail: string | null = null;
+  if (isServiceRoleConfigured()) {
+    try {
+      const { data: authUser, error: authUserErr } =
+        await db.auth.admin.getUserById(tenantUserId);
+      if (!authUserErr) {
+        loginEmail = authUser.user?.email ?? null;
+      }
+    } catch (e) {
+      console.error("[loadTenantCockpitData] getUserById falhou", {
+        tenantUserId,
+        error: e instanceof Error ? e.message : e,
+      });
+    }
+  }
 
   return {
     data: {
       profile: profile as TenantDetailProfile,
+      loginEmail,
       events: (eventsResult.data ?? []) as SubscriptionEvent[],
       overrides: (overridesResult.data ?? []) as TenantFeatureOverride[],
       notes: (notesResult.data ?? []) as AdminTenantNote[],
       plans: (plansResult.data ?? []) as SubscriptionPlan[],
+      teamMembers: (teamMembersResult.data ?? []) as TenantTeamMemberRow[],
       activityCounts: {
         clients: clientsResult.count ?? 0,
         establishments: establishmentsResult.count ?? 0,
@@ -641,6 +680,104 @@ export async function deleteAdminNoteAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/admin/tenants/${profileId}`);
   redirect(`/admin/tenants/${profileId}?ok=note_deleted`);
+}
+
+/**
+ * Ativa/desativa o acesso de um membro da equipe a partir do cockpit.
+ * - Desativar: bane o usuário em auth.users (banned_until) — a senha atual
+ *   deixa de funcionar imediatamente, mesmo mecanismo do bloqueio LGPD.
+ * - Reativar: desbane, troca a senha por uma aleatória (invalida a senha
+ *   antiga) e envia email de redefinição de senha.
+ */
+export async function toggleTeamMemberActiveAction(
+  formData: FormData,
+): Promise<void> {
+  await requireSuperAdmin();
+
+  const memberId = String(formData.get("member_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  const activate = formData.get("activate") === "true";
+
+  if (!memberId) redirect(`/admin/tenants/${profileId}?err=invalid`);
+
+  if (!isServiceRoleConfigured()) {
+    redirect(`/admin/tenants/${profileId}?err=server_config`);
+  }
+
+  const service = createServiceRoleClient();
+
+  const { data: member, error: memberErr } = await service
+    .from("team_members")
+    .select("id, member_user_id, email, full_name")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (memberErr || !member) {
+    redirect(`/admin/tenants/${profileId}?err=invalid`);
+  }
+
+  const memberUserId = member.member_user_id as string | null;
+
+  if (activate) {
+    if (memberUserId) {
+      const randomPassword = crypto.randomUUID().replace(/-/g, "");
+      const { error: authErr } = await service.auth.admin.updateUserById(
+        memberUserId,
+        { ban_duration: "none", password: randomPassword },
+      );
+      if (authErr) {
+        console.error("[toggleTeamMemberActiveAction] unban falhou", {
+          memberId,
+          memberUserId,
+          message: authErr.message,
+        });
+        redirect(`/admin/tenants/${profileId}?err=save`);
+      }
+      const email = member.email as string | null;
+      if (email) {
+        const sent = await sendPasswordRecoveryViaSupabase(service, email);
+        if (!sent.ok) {
+          console.error(
+            "[toggleTeamMemberActiveAction] email de redefinição falhou",
+            { memberId, email, error: sent.error },
+          );
+        }
+      }
+    }
+
+    const { error } = await service
+      .from("team_members")
+      .update({ is_active: true })
+      .eq("id", memberId);
+    if (error) redirect(`/admin/tenants/${profileId}?err=save`);
+
+    revalidatePath(`/admin/tenants/${profileId}`);
+    redirect(`/admin/tenants/${profileId}?ok=member_activated`);
+  }
+
+  if (memberUserId) {
+    const { error: authErr } = await service.auth.admin.updateUserById(
+      memberUserId,
+      { ban_duration: "876000h" },
+    );
+    if (authErr) {
+      console.error("[toggleTeamMemberActiveAction] ban falhou", {
+        memberId,
+        memberUserId,
+        message: authErr.message,
+      });
+      redirect(`/admin/tenants/${profileId}?err=save`);
+    }
+  }
+
+  const { error } = await service
+    .from("team_members")
+    .update({ is_active: false })
+    .eq("id", memberId);
+  if (error) redirect(`/admin/tenants/${profileId}?err=save`);
+
+  revalidatePath(`/admin/tenants/${profileId}`);
+  redirect(`/admin/tenants/${profileId}?ok=member_deactivated`);
 }
 
 export async function recordPaymentEventAction(

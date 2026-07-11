@@ -181,7 +181,7 @@ export async function loadTeamMembersForOwner(): Promise<{
 
   const { data, error } = await supabase
     .from("team_members")
-    .select("id, owner_user_id, member_user_id, full_name, job_role, email, phone, professional_area, crn, notes, created_at, updated_at")
+    .select("id, owner_user_id, member_user_id, full_name, job_role, email, phone, professional_area, crn, notes, is_active, created_at, updated_at")
     .eq("owner_user_id", workspaceOwnerId)
     .order("full_name", { ascending: true });
 

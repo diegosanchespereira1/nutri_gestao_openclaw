@@ -43,6 +43,7 @@ import { useSessionKeepAlive } from "@/hooks/use-session-keep-alive";
 import { cn } from "@/lib/utils";
 import {
   approveChecklistFillDossierAction,
+  deleteChecklistFillSessionAction,
   loadFillResponsesMapForSession,
   saveFillResponsesBatch,
   type FillActionResult,
@@ -814,6 +815,8 @@ export function ChecklistFillWizard({
   const [leaveActionBusy, setLeaveActionBusy] = useState(false);
   const [leaveActionError, setLeaveActionError] = useState<string | null>(null);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [discardBusy, setDiscardBusy] = useState(false);
+  const [discardError, setDiscardError] = useState<string | null>(null);
 
   /* ── Mantém a sessão Supabase renovada durante o preenchimento ── */
   useSessionKeepAlive();
@@ -1005,17 +1008,38 @@ export function ChecklistFillWizard({
     }
   }, [persistDraftForLeave, clearLeaveLinkTarget, cancelLeave, completeBrowserBack, router]);
 
-  const handleDiscardAndLeave = useCallback(() => {
-    const dest = leaveLinkTargetRef.current;
-    setDiscardConfirmOpen(false);
-    clearLeaveLinkTarget();
-    cancelLeave();
-    if (dest) {
-      router.push(dest);
-    } else {
-      completeBrowserBack();
+  const handleDiscardAndLeave = useCallback(async () => {
+    setDiscardBusy(true);
+    setDiscardError(null);
+    try {
+      // Sem isto, o "descartar" só navegava embora e a sessão ficava
+      // esquecida no servidor com status "em andamento" — precisa apagar
+      // o rascunho de verdade antes de sair.
+      const result = await deleteChecklistFillSessionAction(sessionId);
+      if (!result.ok) {
+        setDiscardError(result.error);
+        return;
+      }
+      const dest = leaveLinkTargetRef.current;
+      setDiscardConfirmOpen(false);
+      clearLeaveLinkTarget();
+      cancelLeave();
+      if (dest) {
+        router.push(dest);
+      } else {
+        completeBrowserBack();
+      }
+    } catch (err) {
+      console.error("[checklist-fill-wizard] descartar rascunho", err);
+      setDiscardError(
+        err instanceof Error
+          ? err.message
+          : "Erro inesperado ao apagar o rascunho. Tente de novo.",
+      );
+    } finally {
+      setDiscardBusy(false);
     }
-  }, [clearLeaveLinkTarget, cancelLeave, completeBrowserBack, router]);
+  }, [sessionId, clearLeaveLinkTarget, cancelLeave, completeBrowserBack, router]);
 
   /** Bloqueia navegação interna (sidebar, etc.) até confirmar gravação do rascunho. */
   useEffect(() => {
@@ -2014,7 +2038,10 @@ export function ChecklistFillWizard({
               size="sm"
               className="text-destructive hover:text-destructive hover:bg-destructive/10 mr-auto"
               disabled={leaveActionBusy}
-              onClick={() => setDiscardConfirmOpen(true)}
+              onClick={() => {
+                setDiscardError(null);
+                setDiscardConfirmOpen(true);
+              }}
             >
               Descartar alterações
             </Button>
@@ -2038,29 +2065,48 @@ export function ChecklistFillWizard({
       </Dialog>
 
       {/* Dialog de confirmação de descarte — irreversível */}
-      <Dialog open={discardConfirmOpen} onOpenChange={(open) => { if (!open) setDiscardConfirmOpen(false); }}>
+      <Dialog
+        open={discardConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && !discardBusy) {
+            setDiscardConfirmOpen(false);
+            setDiscardError(null);
+          }
+        }}
+      >
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Descartar alterações?</DialogTitle>
             <DialogDescription>
-              Todas as respostas e textos ainda não sincronizados serão perdidos permanentemente.
-              Esta ação é irreversível e não pode ser desfeita.
+              O checklist será apagado permanentemente (não fica "em andamento" no
+              histórico). Todas as respostas e textos ainda não sincronizados serão
+              perdidos. Esta ação é irreversível e não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
+          {discardError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {discardError}
+            </p>
+          ) : null}
           <div className="flex flex-wrap justify-end gap-2">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setDiscardConfirmOpen(false)}
+              disabled={discardBusy}
+              onClick={() => {
+                setDiscardConfirmOpen(false);
+                setDiscardError(null);
+              }}
             >
               Cancelar
             </Button>
             <Button
               type="button"
               variant="destructive"
-              onClick={handleDiscardAndLeave}
+              disabled={discardBusy}
+              onClick={() => void handleDiscardAndLeave()}
             >
-              Sim, descartar e sair
+              {discardBusy ? "Apagando…" : "Sim, descartar e sair"}
             </Button>
           </div>
         </DialogContent>

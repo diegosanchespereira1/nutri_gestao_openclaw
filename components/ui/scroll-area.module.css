@@ -1,0 +1,60 @@
+/* Barra de scroll do design system — usar com overflow-y-auto no elemento. */
+.scroll,
+.scrollGutter {
+  --scroll-area-size: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 45%, transparent)
+    transparent;
+}
+
+.scroll::-webkit-scrollbar,
+.scrollGutter::-webkit-scrollbar {
+  width: var(--scroll-area-size);
+}
+
+.scroll::-webkit-scrollbar-track,
+.scrollGutter::-webkit-scrollbar-track {
+  margin-block: 2px;
+  background: color-mix(in oklch, var(--muted) 55%, transparent);
+  border-radius: 9999px;
+}
+
+.scroll::-webkit-scrollbar-thumb,
+.scrollGutter::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--muted-foreground) 50%, transparent);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.scroll::-webkit-scrollbar-thumb:hover,
+.scrollGutter::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+}
+
+/* Reserva faixa à direita para a barra não sobrepor botões/conteúdo. */
+.scrollGutter {
+  scrollbar-gutter: stable;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  .scrollGutter {
+    padding-inline-end: calc(var(--scroll-area-size) + 0.25rem);
+  }
+}
+
+/* Telas grandes: barra mais visível (overflow-y definido via Tailwind nos consumidores). */
+@media (min-width: 1024px) {
+  .scrollGutter {
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 58%, transparent)
+      color-mix(in oklch, var(--muted) 72%, transparent);
+  }
+
+  .scrollGutter::-webkit-scrollbar-track {
+    background: color-mix(in oklch, var(--muted) 72%, transparent);
+  }
+
+  .scrollGutter::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--muted-foreground) 58%, transparent);
+  }
+}

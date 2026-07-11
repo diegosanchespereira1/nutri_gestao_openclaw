@@ -15,10 +15,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
+import { cn } from "@/lib/utils";
 
 type Props = {
   alerts: ChecklistValidityAlert[];
   timeZone: string;
+  /** Oculta o campo "Buscar empresa" — usado quando os alertas já estão
+   *  filtrados a um único cliente (ex.: página do cliente), onde a busca por
+   *  nome de empresa não faz sentido. Mantém o filtro de status e a paginação. */
+  hideCompanySearch?: boolean;
 };
 
 type StatusFilter = "todos" | "proximo" | "vencido";
@@ -45,7 +50,11 @@ function useGridColumnCount(): number {
   return columnCount;
 }
 
-export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
+export function ChecklistValidityAlertGroups({
+  alerts,
+  timeZone,
+  hideCompanySearch = false,
+}: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [page, setPage] = useState(1);
@@ -82,25 +91,32 @@ export function ChecklistValidityAlertGroups({ alerts, timeZone }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:grid-cols-2 sm:p-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="validity-company-search">Buscar empresa</Label>
-          <div className="relative">
-            <Search
-              className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
-              aria-hidden
-            />
-            <Input
-              id="validity-company-search"
-              type="search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Digite o nome da empresa"
-              className="pl-8"
-            />
+      <div
+        className={cn(
+          "grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:p-4",
+          hideCompanySearch ? "sm:grid-cols-1" : "sm:grid-cols-2",
+        )}
+      >
+        {hideCompanySearch ? null : (
+          <div className="space-y-1.5">
+            <Label htmlFor="validity-company-search">Buscar empresa</Label>
+            <div className="relative">
+              <Search
+                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2"
+                aria-hidden
+              />
+              <Input
+                id="validity-company-search"
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Digite o nome da empresa"
+                className="pl-8"
+              />
+            </div>
           </div>
-        </div>
-        <div className="space-y-1.5">
+        )}
+        <div className={cn("space-y-1.5", hideCompanySearch && "sm:max-w-xs")}>
           <Label htmlFor="validity-status-filter">Filtrar por status</Label>
           <Select
             value={statusFilter}

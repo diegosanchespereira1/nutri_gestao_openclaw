@@ -12,9 +12,11 @@ import {
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { useModuleGate } from "@/components/modules/module-gate-provider";
 import { Separator } from "@/components/ui/separator";
+import { PersistentScrollArea } from "@/components/ui/persistent-scroll-area";
 import { AndroidTopInset } from "@/components/mobile/android-top-inset";
 import { MobileBottomNav } from "@/components/mobile/mobile-bottom-nav";
 import { AppMainContent } from "@/components/app-main-content";
+import { AppPageScroll } from "@/components/app-page-scroll";
 import { AppRoutePrefetcher } from "@/components/app-route-prefetcher";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
@@ -163,10 +165,12 @@ export function AppShell({
 
         <Separator className="bg-sidebar-border opacity-40" />
 
-        <NavGroups
-          className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
-          showAdminNav={showAdminNav}
-        />
+        <PersistentScrollArea
+          controls="overflow-only"
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden"
+        >
+          <NavGroups showAdminNav={showAdminNav} />
+        </PersistentScrollArea>
 
         <Separator className="bg-sidebar-border opacity-40" />
 
@@ -184,7 +188,7 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden lg:pl-60">
+      <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden md:min-h-0 md:h-screen lg:pl-60">
         <AndroidTopInset className="shrink-0 lg:hidden" />
         {/* Header mobile / tablet */}
         <header
@@ -203,10 +207,12 @@ export function AppShell({
 
         <main
           id="conteudo-principal"
-          className="min-w-0 max-w-full flex-1 overflow-x-hidden p-4 pb-[calc(5.5rem+var(--safe-area-bottom))] md:p-6 lg:pb-6"
+          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden p-4 pb-[calc(5.5rem+var(--safe-area-bottom))] md:min-h-0 md:overflow-hidden md:p-6 lg:pb-6"
           tabIndex={-1}
         >
-          <AppMainContent>{children}</AppMainContent>
+          <AppPageScroll>
+            <AppMainContent>{children}</AppMainContent>
+          </AppPageScroll>
         </main>
 
         <MobileBottomNav

@@ -7,7 +7,7 @@ import { ChevronDownIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import scrollStyles from "@/components/ui/dropdown-menu-scroll.module.css";
+import scrollStyles from "@/components/ui/scroll-area.module.css";
 import {
   CLIENT_BUSINESS_SEGMENTS,
   clientBusinessSegmentLabel,
@@ -166,7 +166,7 @@ export function BusinessSegmentFilterDropdown({
             </div>
 
             <div
-              className={cn(scrollStyles.scroll, "max-h-60 py-0.5 pr-0.5")}
+              className={cn(scrollStyles.scroll, "max-h-60 overflow-y-auto py-0.5 pr-0.5")}
               style={{ maxHeight: panelPosition.maxHeight }}
             >
               {CLIENT_BUSINESS_SEGMENTS.map((segment) => (

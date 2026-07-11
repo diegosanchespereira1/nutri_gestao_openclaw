@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppBuildLabel, AppVersionGuard } from "@/components/app-version-guard";
+import { AppPageScroll } from "@/components/app-page-scroll";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Toaster } from "@/components/ui/sonner";
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
@@ -27,10 +28,10 @@ export default async function AdminAreaLayout({
   }
 
   return (
-    <div className="bg-background text-foreground min-h-screen">
+    <div className="bg-background text-foreground flex min-h-screen flex-col md:min-h-0 md:h-screen">
       <AppVersionGuard />
       <Toaster />
-      <header className="border-border flex h-14 items-center gap-4 border-b px-4 md:px-6">
+      <header className="border-border flex h-14 shrink-0 items-center gap-4 border-b px-4 md:px-6">
         <span className="font-heading text-base font-semibold tracking-tight">
           NutriGestão — Admin
         </span>
@@ -39,7 +40,9 @@ export default async function AdminAreaLayout({
           <AppBuildLabel />
         </div>
       </header>
-      <main className="p-4 md:p-6">{children}</main>
+      <main className="flex min-h-0 flex-1 flex-col overflow-x-hidden p-4 md:overflow-hidden md:p-6">
+        <AppPageScroll>{children}</AppPageScroll>
+      </main>
     </div>
   );
 }

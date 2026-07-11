@@ -3,7 +3,7 @@ import { CheckCircle2, Clock, ClipboardList, AlertTriangle, Star, MapPin } from 
 
 import { ChecklistSessionHistoryCard } from "@/components/checklists/checklist-session-history-card";
 import { ChecklistHistoryFilters } from "@/components/checklists/checklist-history-filters";
-import { ChecklistValidityAlertCard } from "@/components/dashboard/checklist-validity-alert-card";
+import { ChecklistValidityAlertGroups } from "@/components/dashboard/checklist-validity-alert-groups";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
   Card,
@@ -136,7 +136,7 @@ export async function ClientChecklistHistorySection({
         : DEFAULT_PROFILE_TIME_ZONE;
       const alerts = await loadChecklistValidityAlerts(t, {
         clientId,
-        limit: 24,
+        limit: 200,
       });
       return { alerts, tz: t };
     })(),
@@ -211,13 +211,13 @@ export async function ClientChecklistHistorySection({
             Sem itens vencidos ou a vencer neste período.
           </p>
         ) : (
-          <ul className="mt-4 space-y-3" aria-label="Validades de checklist do cliente">
-            {validityAlerts.map((alert) => (
-              <li key={alert.responseId}>
-                <ChecklistValidityAlertCard alert={alert} timeZone={tz} />
-              </li>
-            ))}
-          </ul>
+          <div className="mt-4">
+            <ChecklistValidityAlertGroups
+              alerts={validityAlerts}
+              timeZone={tz}
+              hideCompanySearch
+            />
+          </div>
         )}
       </div>
 

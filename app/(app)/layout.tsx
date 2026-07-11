@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { AppPageScroll } from "@/components/app-page-scroll";
 import { ModuleBlockedUrlHandler } from "@/components/modules/module-blocked-url-handler";
 import { ModuleGateProvider } from "@/components/modules/module-gate-provider";
 import { EnabledModulesProvider } from "@/components/providers/enabled-modules-provider";
@@ -49,7 +50,9 @@ export default async function AppAreaLayout({
             <ModuleBlockedUrlHandler />
           </Suspense>
           {onboardingOnly ? (
-            <div className="bg-background safe-top min-h-screen">{children}</div>
+            <div className="bg-background safe-top flex min-h-screen flex-col md:min-h-0 md:h-screen">
+              <AppPageScroll className="p-4 md:p-6">{children}</AppPageScroll>
+            </div>
           ) : (
             <AppShell
               showAdminNav={showAdminNav}

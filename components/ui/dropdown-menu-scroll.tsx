@@ -1,14 +1,11 @@
-"use client";
-
 import type { ComponentPropsWithoutRef } from "react";
 
+import { ScrollArea } from "./scroll-area";
 import { cn } from "@/lib/utils";
-
-import styles from "./dropdown-menu-scroll.module.css";
 
 export function DropdownMenuScroll({
   className,
   ...props
 }: ComponentPropsWithoutRef<"div">) {
-  return <div className={cn(styles.scroll, className)} {...props} />;
+  return <ScrollArea className={cn("overflow-y-auto", className)} {...props} />;
 }

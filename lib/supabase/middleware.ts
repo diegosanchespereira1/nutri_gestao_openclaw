@@ -333,7 +333,21 @@ export async function updateSession(request: NextRequest) {
     });
 
     if (canReuseCache && cachedProfileCtx) {
-      profileCtx = cachedProfileCtx;
+      // Reusa role/timezone/etc., mas sempre revalida o titular do workspace.
+      // Cookie stale (ex. após mudança em team_members) esvazia clientes/equipe.
+      try {
+        const workspaceOwnerId = await withTimeout(
+          getWorkspaceAccountOwnerId(supabase, user.id),
+          "workspace_account_owner_id_refresh",
+        );
+        profileCtx = {
+          ...cachedProfileCtx,
+          workspaceOwnerId,
+          cachedAt: nowSec,
+        };
+      } catch {
+        profileCtx = cachedProfileCtx;
+      }
     } else {
       try {
         const workspaceOwnerId = await withTimeout(

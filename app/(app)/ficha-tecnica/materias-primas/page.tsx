@@ -1,11 +1,13 @@
 import Link from "next/link";
+import { Coins, Plus, Upload } from "lucide-react";
 
-import {
-  deleteRawMaterialAction,
-  loadRawMaterialsForOwner,
-} from "@/lib/actions/raw-materials";
+import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
+import { countRecipesUsingRawMaterials } from "@/lib/technical-recipes/raw-material-recipe-impact";
+import { getServerContext } from "@/lib/supabase/get-server-user";
+import { DeleteRawMaterialButton } from "@/components/technical-sheets/delete-raw-material-button";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { Button } from "@/components/ui/button";
 import {
   RECIPE_LINE_UNIT_LABELS,
 } from "@/lib/constants/recipe-line-units";
@@ -26,7 +28,7 @@ function priceLabel(row: RawMaterialRow): string {
 
 const errMessages: Record<string, string> = {
   invalid: "Pedido inválido.",
-  save: "Não foi possível eliminar. Tente novamente.",
+  save: "Não foi possível apagar. Tente novamente.",
 };
 
 type Props = {
@@ -38,7 +40,15 @@ type Props = {
 };
 
 export default async function MateriasPrimasPage({ searchParams }: Props) {
-  const { rows } = await loadRawMaterialsForOwner();
+  const [{ rows }, { supabase }] = await Promise.all([
+    loadRawMaterialsForOwner(),
+    getServerContext(),
+  ]);
+  const impactByMaterialId = await countRecipesUsingRawMaterials(
+    supabase,
+    rows.map((r) => r.id),
+  );
+
   const sp = await searchParams;
   const { err, priceUpdated, recipes } = sp;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
@@ -47,30 +57,49 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
     priceUpdated === "1" && !errMsg && Number.isFinite(recipesN);
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <Link
-            href="/ficha-tecnica"
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground -ml-2 mb-2",
-            )}
+    <PageLayout>
+      <PageHeader
+        title="Matérias-primas"
+        description="Registe o custo unitário de compra; nas receitas, ligue cada linha a uma matéria-prima para ver o custo estimado da ficha."
+        back={{ href: "/ficha-tecnica", label: "Ficha técnica" }}
+        actions={
+          <div
+            className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"
+            role="toolbar"
+            aria-label="Ações — matérias-primas"
           >
-            ← Ficha técnica
-          </Link>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Matérias-primas
-          </h1>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Registe o custo unitário de compra; nas receitas, ligue cada linha a
-            uma matéria-prima para ver o custo estimado da ficha.
-          </p>
-        </div>
-        <Link href="/ficha-tecnica/materias-primas/nova" className={buttonVariants()}>
-          Nova matéria-prima
-        </Link>
-      </div>
+            <nav
+              className="flex flex-wrap items-center gap-2"
+              aria-label="Upload em massa"
+            >
+              <Link
+                href="/importar/materias-primas"
+                className={cn(buttonVariants({ variant: "outline", size: "default" }))}
+              >
+                <Upload data-icon="inline-start" className="size-4" aria-hidden />
+                Importar em massa
+              </Link>
+              <Link
+                href="/importar/materias-primas/atualizar-precos"
+                className={cn(buttonVariants({ variant: "outline", size: "default" }))}
+              >
+                <Coins data-icon="inline-start" className="size-4" aria-hidden />
+                Atualizar preços em massa
+              </Link>
+            </nav>
+
+            <div className="bg-border hidden h-6 w-px shrink-0 sm:block" aria-hidden />
+
+            <Link
+              href="/ficha-tecnica/materias-primas/nova"
+              className={cn(buttonVariants({ variant: "default", size: "default" }))}
+            >
+              <Plus data-icon="inline-start" className="size-4" aria-hidden />
+              Nova matéria-prima
+            </Link>
+          </div>
+        }
+      />
 
       {errMsg ? (
         <div
@@ -144,17 +173,11 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
                       >
                         Editar
                       </Link>
-                      <form action={deleteRawMaterialAction}>
-                        <input type="hidden" name="id" value={row.id} />
-                        <Button
-                          type="submit"
-                          variant="outline"
-                          size="sm"
-                          className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                        >
-                          Eliminar
-                        </Button>
-                      </form>
+                      <DeleteRawMaterialButton
+                        id={row.id}
+                        name={row.name}
+                        recipesCount={impactByMaterialId.get(row.id) ?? 0}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -163,6 +186,6 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
           </table>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 }

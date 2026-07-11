@@ -11,6 +11,7 @@ import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { RawMaterialRow } from "@/lib/types/raw-materials";
 import { countRecipesUsingRawMaterial } from "@/lib/technical-recipes/raw-material-recipe-impact";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { logRawMaterialChange } from "@/lib/actions/raw-material-history";
 
 const saveSchema = z.object({
   id: z.string().uuid().optional(),
@@ -110,6 +111,13 @@ export async function saveRawMaterialAction(
   const notesVal = notes?.trim() ? notes.trim() : null;
 
   if (id) {
+    const { data: beforeRow } = await supabase
+      .from("professional_raw_materials")
+      .select("name, price_unit, unit_price_brl, notes")
+      .eq("id", id)
+      .eq("owner_user_id", workspaceOwnerId)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("professional_raw_materials")
       .update({
@@ -125,6 +133,28 @@ export async function saveRawMaterialAction(
       redirect(
         `/ficha-tecnica/materias-primas/${id}/editar?err=save`,
       );
+    }
+
+    if (beforeRow) {
+      await logRawMaterialChange({
+        supabase,
+        ownerUserId: workspaceOwnerId,
+        actorUserId: user.id,
+        rawMaterialId: id,
+        before: {
+          name: String(beforeRow.name),
+          price_unit: String(beforeRow.price_unit),
+          unit_price_brl: Number(beforeRow.unit_price_brl),
+          notes: beforeRow.notes != null ? String(beforeRow.notes) : null,
+        },
+        after: {
+          name: name.trim(),
+          price_unit,
+          unit_price_brl,
+          notes: notesVal,
+        },
+        source: "manual_edit",
+      });
     }
 
     const { data: lineRows } = await supabase
@@ -164,18 +194,24 @@ export async function saveRawMaterialAction(
   redirect("/ficha-tecnica/materias-primas");
 }
 
+export type DeleteRawMaterialResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Apaga uma matéria-prima. Chamada diretamente pelo client component de
+ * confirmação (AlertDialog) — não usa FormData/redirect porque a confirmação
+ * já acontece antes, no diálogo (ver components/technical-sheets/delete-raw-material-button.tsx).
+ */
 export async function deleteRawMaterialAction(
-  formData: FormData,
-): Promise<void> {
+  id: string,
+): Promise<DeleteRawMaterialResult> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  const id = String(formData.get("id") ?? "").trim();
-  if (!id) redirect("/ficha-tecnica/materias-primas?err=invalid");
+  if (!id.trim()) return { ok: false, error: "Pedido inválido." };
 
   const { data: lineRowsDel } = await supabase
     .from("technical_recipe_lines")
@@ -192,7 +228,7 @@ export async function deleteRawMaterialAction(
     .eq("owner_user_id", workspaceOwnerId);
 
   if (error) {
-    redirect("/ficha-tecnica/materias-primas?err=save");
+    return { ok: false, error: "Não foi possível apagar. Tente novamente." };
   }
 
   for (const rid of recipeIdsDel) {
@@ -201,5 +237,6 @@ export async function deleteRawMaterialAction(
 
   revalidatePath("/ficha-tecnica/materias-primas");
   revalidatePath("/ficha-tecnica");
-  redirect("/ficha-tecnica/materias-primas");
+
+  return { ok: true };
 }

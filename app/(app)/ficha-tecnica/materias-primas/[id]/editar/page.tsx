@@ -1,10 +1,11 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { RawMaterialForm } from "@/components/technical-sheets/raw-material-form";
+import { RawMaterialChangeHistorySection } from "@/components/technical-sheets/raw-material-change-history-section";
 import { loadRawMaterialById } from "@/lib/actions/raw-materials";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
+import { loadRawMaterialChangeHistory } from "@/lib/actions/raw-material-history";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 
 const errMessages: Record<string, string> = {
   invalid: "Verifique nome e preço (maior que zero).",
@@ -26,23 +27,14 @@ export default async function EditarMateriaPrimaPage({
   if (!row) notFound();
 
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
+  const changeHistory = await loadRawMaterialChangeHistory(id);
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Link
-          href="/ficha-tecnica/materias-primas"
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground -ml-2 mb-2",
-          )}
-        >
-          ← Matérias-primas
-        </Link>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Editar matéria-prima
-        </h1>
-      </div>
+    <PageLayout variant="form">
+      <PageHeader
+        title="Editar matéria-prima"
+        back={{ href: "/ficha-tecnica/materias-primas", label: "Matérias-primas" }}
+      />
 
       {errMsg ? (
         <div
@@ -54,6 +46,8 @@ export default async function EditarMateriaPrimaPage({
       ) : null}
 
       <RawMaterialForm material={row} />
-    </div>
+
+      <RawMaterialChangeHistorySection events={changeHistory} />
+    </PageLayout>
   );
 }

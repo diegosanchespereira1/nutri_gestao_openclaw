@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, PackagePlus, PiggyBank } from "lucide-react";
 
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { ImportWizard } from "@/components/importar/import-wizard";
@@ -35,6 +35,34 @@ export default async function ImportarPage() {
           <span className="text-muted-foreground block text-xs mt-0.5">
             Para pesagens de turma — cria o cadastro do paciente e a avaliação nutricional
             juntos, com percentis recalculados automaticamente.
+          </span>
+        </span>
+      </Link>
+
+      <Link
+        href="/importar/materias-primas"
+        className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-muted/30 p-4 text-sm transition-colors hover:border-foreground/20 hover:bg-muted/50"
+      >
+        <PackagePlus className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        <span>
+          <span className="font-medium">Upload em massa de matérias-primas</span>
+          <span className="text-muted-foreground block text-xs mt-0.5">
+            Cadastra várias matérias-primas de uma vez — se o nome já existir, você
+            escolhe sobrescrever, criar um novo ou ignorar.
+          </span>
+        </span>
+      </Link>
+
+      <Link
+        href="/importar/materias-primas/atualizar-precos"
+        className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-muted/30 p-4 text-sm transition-colors hover:border-foreground/20 hover:bg-muted/50"
+      >
+        <PiggyBank className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+        <span>
+          <span className="font-medium">Atualização de preços em massa</span>
+          <span className="text-muted-foreground block text-xs mt-0.5">
+            Baixa a planilha com todas as suas matérias-primas, você ajusta os
+            preços e reenvia — o casamento é sempre pelo ID, nunca duplica.
           </span>
         </span>
       </Link>

@@ -8,11 +8,15 @@ import {
   type RawMaterialPriceExistingSnapshot,
   type RawMaterialPriceImportRow,
 } from "@/lib/types/raw-material-price-import";
+import type {
+  RawMaterialImportClientOption,
+  RawMaterialImportEstablishmentOption,
+} from "@/lib/types/raw-material-import";
 import {
   normalizeText,
   parseDecimalPtBr,
   parsePriceUnit,
-  rawMaterialNameKey,
+  rawMaterialScopeKey,
 } from "@/lib/import/raw-material-import-parser";
 
 const UUID_RE =
@@ -30,10 +34,24 @@ export function validateRawMaterialPriceRows(
   rows: ParsedRow[],
   /** ID → estado atual, só com itens deste tenant (carregado no servidor). */
   existingById: Map<string, RawMaterialPriceExistingSnapshot>,
+  clientOptions: RawMaterialImportClientOption[] = [],
+  establishmentOptions: RawMaterialImportEstablishmentOption[] = [],
 ): RawMaterialPriceValidationResult {
   const valid: RawMaterialPriceImportRow[] = [];
   const validRowIndex: number[] = [];
   const errors: RowError[] = [];
+
+  const clientIndex = new Map<string, RawMaterialImportClientOption>();
+  for (const c of clientOptions) {
+    const key = normalizeText(c.label);
+    if (!clientIndex.has(key)) clientIndex.set(key, c);
+  }
+  const establishmentIndex = new Map<string, RawMaterialImportEstablishmentOption>();
+  for (const e of establishmentOptions) {
+    const key = `${e.clientId}::${normalizeText(e.label)}`;
+    if (!establishmentIndex.has(key)) establishmentIndex.set(key, e);
+  }
+  const establishmentLabelById = new Map(establishmentOptions.map((e) => [e.id, e.label]));
 
   rows.forEach((row, i) => {
     const id = (row.id ?? "").trim();
@@ -82,11 +100,64 @@ export function validateRawMaterialPriceRows(
       return;
     }
 
+    const clientNameRaw = (row.client_name ?? "").trim();
+    if (!clientNameRaw) {
+      errors.push({ rowIndex: i, message: "Cliente é obrigatório." });
+      return;
+    }
+    const client = clientIndex.get(normalizeText(clientNameRaw));
+    if (!client) {
+      errors.push({
+        rowIndex: i,
+        message: `Cliente não encontrado: "${clientNameRaw}". Confira o nome exato do cliente cadastrado.`,
+      });
+      return;
+    }
+
+    const establishmentNameRaw = (row.establishment_name ?? "").trim();
+    let establishmentId: string | null = null;
+    if (establishmentNameRaw) {
+      const est = establishmentIndex.get(
+        `${client.id}::${normalizeText(establishmentNameRaw)}`,
+      );
+      if (!est) {
+        errors.push({
+          rowIndex: i,
+          message: `Estabelecimento não encontrado para ${client.label}: "${establishmentNameRaw}".`,
+        });
+        return;
+      }
+      establishmentId = est.id;
+    }
+
+    // Item já escopado: esta planilha nunca move de cliente/estabelecimento —
+    // só serve para conferência. Mismatch = rejeita a linha (mover é uma
+    // ação deliberada, fora deste fluxo, para nunca acontecer por acidente).
+    if (existing.client_id) {
+      if (
+        existing.client_id !== client.id ||
+        (existing.establishment_id ?? null) !== establishmentId
+      ) {
+        errors.push({
+          rowIndex: i,
+          message:
+            "Cliente/estabelecimento não bate com o já cadastrado — esta planilha não move o item de cliente. Edite pela tela de matéria-prima se isso for intencional.",
+        });
+        return;
+      }
+    }
+
     valid.push({
       id,
       name,
       price_unit,
       unit_price_brl,
+      client_id: client.id,
+      client_label: client.label,
+      establishment_id: establishmentId,
+      establishment_label: establishmentId
+        ? (establishmentLabelById.get(establishmentId) ?? null)
+        : null,
       notes: (row.notes ?? "").trim() || null,
     });
     validRowIndex.push(i);
@@ -113,19 +184,27 @@ export function validateRawMaterialPriceRows(
     }
   }
 
-  // ── Nome renomeado colide com outro item existente (ID diferente) ──────────
-  const nameKeyToId = new Map<string, string>();
+  // ── Nome renomeado colide com outro item existente do MESMO âmbito ─────────
+  // Escopado por cliente/estabelecimento — o mesmo nome em clientes diferentes
+  // não é colisão (ver invariante do plano de isolamento por cliente).
+  const scopeKeyToId = new Map<string, string>();
   for (const [id, snap] of existingById.entries()) {
-    nameKeyToId.set(rawMaterialNameKey(snap.name), id);
+    if (!snap.client_id) continue;
+    scopeKeyToId.set(
+      rawMaterialScopeKey(snap.client_id, snap.establishment_id, snap.name),
+      id,
+    );
   }
   valid.forEach((r, vi) => {
     if (excludedByDuplicateId.has(vi)) return;
-    const collidingId = nameKeyToId.get(rawMaterialNameKey(r.name));
+    const collidingId = scopeKeyToId.get(
+      rawMaterialScopeKey(r.client_id, r.establishment_id, r.name),
+    );
     if (collidingId && collidingId !== r.id) {
       excludedByDuplicateId.add(vi);
       errors.push({
         rowIndex: validRowIndex[vi],
-        message: `Já existe outra matéria-prima chamada "${r.name}" — escolha um nome diferente.`,
+        message: `Já existe outra matéria-prima chamada "${r.name}" para ${r.client_label} — escolha um nome diferente.`,
       });
     }
   });
@@ -154,6 +233,8 @@ export const RAW_MATERIAL_PRICE_TEMPLATE_HEADERS: { key: string; header: string 
   { key: "name", header: "Nome do produto" },
   { key: "price_unit", header: "Unidade (g, kg, ml, l ou un)" },
   { key: "unit_price_brl", header: "Preço unitário (R$)" },
+  { key: "client_name", header: "Cliente" },
+  { key: "establishment_name", header: "Estabelecimento (opcional)" },
   { key: "notes", header: "Observações" },
 ];
 
@@ -177,7 +258,23 @@ export function matchRawMaterialPriceColumn(fileColumn: string): string | null {
 // ── Planilha (.xlsx) para download, já com os dados reais do tenant ────────
 
 export async function downloadRawMaterialPriceXlsx(
-  rows: { id: string; name: string; price_unit: string; unit_price_brl: number; notes: string | null }[],
+  rows: {
+    id: string;
+    name: string;
+    price_unit: string;
+    unit_price_brl: number;
+    notes: string | null;
+    /** Nome do cliente já cadastrado — vazio para itens legados (ainda sem
+     *  cliente), forçando o usuário a preencher para migrar o item. */
+    client_name: string;
+    establishment_name: string;
+  }[],
+  /** Segunda aba com os nomes exatos aceitos — evita erro de digitação,
+   *  principalmente para os itens legados que precisam de preenchimento. */
+  reference?: {
+    clientOptions: RawMaterialImportClientOption[];
+    establishmentOptions: RawMaterialImportEstablishmentOption[];
+  },
 ): Promise<void> {
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
@@ -188,7 +285,15 @@ export async function downloadRawMaterialPriceXlsx(
   sheet.views = [{ state: "frozen", ySplit: 1 }];
 
   for (const r of rows) {
-    sheet.addRow([r.id, r.name, r.price_unit, r.unit_price_brl, r.notes ?? ""]);
+    sheet.addRow([
+      r.id,
+      r.name,
+      r.price_unit,
+      r.unit_price_brl,
+      r.client_name,
+      r.establishment_name,
+      r.notes ?? "",
+    ]);
   }
 
   sheet.getColumn(1).width = 38;
@@ -196,7 +301,25 @@ export async function downloadRawMaterialPriceXlsx(
   sheet.getColumn(2).width = 32;
   sheet.getColumn(3).width = 16;
   sheet.getColumn(4).width = 18;
-  sheet.getColumn(5).width = 30;
+  sheet.getColumn(5).width = 28;
+  sheet.getColumn(6).width = 28;
+  sheet.getColumn(7).width = 30;
+
+  if (reference && reference.clientOptions.length > 0) {
+    const refSheet = workbook.addWorksheet("Clientes e estabelecimentos");
+    refSheet.addRow(["Cliente", "Estabelecimento"]);
+    refSheet.getRow(1).font = { bold: true };
+    refSheet.columns.forEach((col) => {
+      col.width = 32;
+    });
+    for (const c of reference.clientOptions) {
+      refSheet.addRow([c.label, ""]);
+      const ests = reference.establishmentOptions.filter((e) => e.clientId === c.id);
+      for (const e of ests) {
+        refSheet.addRow([c.label, e.label]);
+      }
+    }
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

@@ -42,6 +42,7 @@ export const PROTECTED_PREFIXES = [
   "/importar",
   "/equipe",
   "/ficha-tecnica",
+  "/materias-primas",
   "/pops",
   "/definicoes",
   "/perfil",

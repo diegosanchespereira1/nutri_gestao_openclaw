@@ -37,7 +37,11 @@ const lineFactorSchema = z.preprocess(
 );
 
 const lineSchema = z.object({
-  ingredient_name: z.string().trim().min(1).max(500),
+  ingredient_name: z
+    .string()
+    .trim()
+    .min(1, "Cada ingrediente precisa de um nome.")
+    .max(500),
   quantity: z.coerce.number().positive("Quantidade deve ser maior que zero."),
   unit: z.enum(RECIPE_LINE_UNITS),
   notes: z.string().max(1000).optional(),
@@ -60,7 +64,7 @@ const saveDraftSchema = z
   establishmentId: uuidOpt,
   /** Receita ao nível do cliente PJ (sem estabelecimento; reutilizável). */
   clientId: uuidOpt,
-  name: z.string().trim().min(1).max(200),
+  name: z.string().trim().min(1, "Dê um nome para a receita.").max(200),
   classification: z.string().max(50).optional(),
   sector: z.string().max(100).optional(),
   portions_yield: z.coerce
@@ -135,6 +139,10 @@ function parseRawMaterialJoin(raw: unknown): RawMaterialRow | null {
     price_unit: o.price_unit as RecipeLineUnit,
     unit_price_brl: Number(o.unit_price_brl ?? 0),
     notes: o.notes != null ? String(o.notes) : null,
+    client_id: o.client_id != null ? String(o.client_id) : null,
+    establishment_id: o.establishment_id != null ? String(o.establishment_id) : null,
+    contexto:
+      o.contexto != null ? (String(o.contexto) as RawMaterialRow["contexto"]) : null,
     created_at: String(o.created_at ?? ""),
     updated_at: String(o.updated_at ?? ""),
   };
@@ -334,6 +342,10 @@ export async function loadTechnicalRecipesForOwner(opts?: {
   page?: number;
   pageSize?: number;
   filtros?: TechnicalRecipeListToggleFilter[];
+  /** Filtra por cliente — nunca mostra receitas de outro cliente do tenant junto. */
+  clientId?: string;
+  /** Filtra por estabelecimento específico (dentro do cliente selecionado). */
+  establishmentId?: string;
 }): Promise<LoadTechnicalRecipesResult> {
   const supabase = await createClient();
   const {
@@ -406,6 +418,16 @@ export async function loadTechnicalRecipesForOwner(opts?: {
     query = query.ilike("name", `%${q}%`);
   }
 
+  const clientId = opts?.clientId?.trim();
+  const establishmentId = opts?.establishmentId?.trim();
+  if (establishmentId) {
+    // Estabelecimento implica o cliente — não precisa dos dois juntos, e
+    // nunca deixa vazar receita de outro cliente/estabelecimento.
+    query = query.eq("establishment_id", establishmentId);
+  } else if (clientId) {
+    query = query.eq("client_id", clientId);
+  }
+
   const { data, error, count } = await query;
 
   if (error || !data) return { ...empty, page, pageSize };
@@ -466,6 +488,9 @@ export async function loadTechnicalRecipeById(
         price_unit,
         unit_price_brl,
         notes,
+        client_id,
+        establishment_id,
+        contexto,
         created_at,
         updated_at
       )

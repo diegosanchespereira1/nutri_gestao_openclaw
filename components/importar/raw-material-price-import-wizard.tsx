@@ -32,6 +32,10 @@ import {
   type RawMaterialPriceImportResult,
   type RawMaterialPriceImportRow,
 } from "@/lib/types/raw-material-price-import";
+import type {
+  RawMaterialImportClientOption,
+  RawMaterialImportEstablishmentOption,
+} from "@/lib/types/raw-material-import";
 import { RECIPE_LINE_UNIT_LABELS } from "@/lib/constants/recipe-line-units";
 import type { FieldMapping, ParsedRow } from "@/lib/types/import";
 import { Button } from "@/components/ui/button";
@@ -60,6 +64,10 @@ export type ExistingRawMaterialForPriceUpdate = {
   price_unit: RawMaterialPriceExistingSnapshot["price_unit"];
   unit_price_brl: number;
   notes: string | null;
+  client_id: string | null;
+  client_label: string | null;
+  establishment_id: string | null;
+  establishment_label: string | null;
 };
 
 const selectClass =
@@ -104,8 +112,12 @@ function ImportStepIndicator({ step }: { step: WizardStep }) {
 
 export function RawMaterialPriceImportWizard({
   existingRawMaterials = [],
+  pjClients = [],
+  establishments = [],
 }: {
   existingRawMaterials?: ExistingRawMaterialForPriceUpdate[];
+  pjClients?: RawMaterialImportClientOption[];
+  establishments?: RawMaterialImportEstablishmentOption[];
 }) {
   const [step, setStep] = useState<WizardStep>(1);
 
@@ -117,10 +129,14 @@ export function RawMaterialPriceImportWizard({
         price_unit: m.price_unit,
         unit_price_brl: m.unit_price_brl,
         notes: m.notes,
+        client_id: m.client_id,
+        establishment_id: m.establishment_id,
       });
     }
     return map;
   }, [existingRawMaterials]);
+
+  const legacyCount = existingRawMaterials.filter((m) => !m.client_id).length;
 
   const [upload, setUpload] = useState<UploadState | null>(null);
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
@@ -199,6 +215,8 @@ export function RawMaterialPriceImportWizard({
     const { errors, existingByRow: existingMap } = validateRawMaterialPriceRows(
       rows,
       existingById,
+      pjClients,
+      establishments,
     );
     setParsedRows(rows);
     setErrorsByRow(buildErrorMap(errors));
@@ -221,7 +239,12 @@ export function RawMaterialPriceImportWizard({
     setResult(null);
 
     const cleanRows = parsedRows.filter((_, i) => !errorsByRow.has(i) && !ignoredRows.has(i));
-    const { valid } = validateRawMaterialPriceRows(cleanRows, existingById);
+    const { valid } = validateRawMaterialPriceRows(
+      cleanRows,
+      existingById,
+      pjClients,
+      establishments,
+    );
 
     let res: RawMaterialPriceImportResult;
     try {
@@ -276,8 +299,15 @@ export function RawMaterialPriceImportWizard({
               <p className="text-muted-foreground text-xs">
                 {existingRawMaterials.length === 0
                   ? "Você ainda não tem matérias-primas cadastradas."
-                  : `Contém ${existingRawMaterials.length} matéria${existingRawMaterials.length !== 1 ? "s" : ""}-prima${existingRawMaterials.length !== 1 ? "s" : ""} — não apague nem edite a coluna ID, ela é o que garante que a atualização acerte o item certo.`}
+                  : `Contém ${existingRawMaterials.length} matéria${existingRawMaterials.length !== 1 ? "s" : ""}-prima${existingRawMaterials.length !== 1 ? "s" : ""} — não apague nem edite a coluna ID, ela é o que garante que a atualização acerte o item certo. A coluna Cliente é obrigatória em toda linha.`}
               </p>
+              {legacyCount > 0 ? (
+                <p className="text-amber-700 dark:text-amber-400 text-xs">
+                  {legacyCount} item{legacyCount !== 1 ? "s" : ""} ainda sem cliente
+                  definido — a coluna Cliente vem em branco para ele{legacyCount !== 1 ? "s" : ""}
+                  ; preencha para migrar (nunca fica visível para outro cliente depois disso).
+                </p>
+              ) : null}
               <Button
                 variant="outline"
                 size="sm"
@@ -285,7 +315,18 @@ export function RawMaterialPriceImportWizard({
                 onClick={async () => {
                   setDownloadingSheet(true);
                   try {
-                    await downloadRawMaterialPriceXlsx(existingRawMaterials);
+                    await downloadRawMaterialPriceXlsx(
+                      existingRawMaterials.map((m) => ({
+                        id: m.id,
+                        name: m.name,
+                        price_unit: m.price_unit,
+                        unit_price_brl: m.unit_price_brl,
+                        notes: m.notes,
+                        client_name: m.client_label ?? "",
+                        establishment_name: m.establishment_label ?? "",
+                      })),
+                      { clientOptions: pjClients, establishmentOptions: establishments },
+                    );
                   } finally {
                     setDownloadingSheet(false);
                   }
@@ -665,6 +706,17 @@ function RawMaterialPriceDiffTable({
                     />
                   ) : (
                     row.unit_price_brl || <span className="text-muted-foreground/50">—</span>
+                  )}
+                </td>
+                <td className="max-w-[160px] truncate px-3 py-2" title={row.client_name ?? ""}>
+                  {row.client_name || <span className="text-muted-foreground/50">—</span>}
+                </td>
+                <td
+                  className="max-w-[160px] truncate px-3 py-2"
+                  title={row.establishment_name ?? ""}
+                >
+                  {row.establishment_name || (
+                    <span className="text-muted-foreground/50">Todos</span>
                   )}
                 </td>
                 <td className="max-w-[180px] px-3 py-2">

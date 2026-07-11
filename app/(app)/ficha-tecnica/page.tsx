@@ -25,7 +25,13 @@ import { cn } from "@/lib/utils";
 
 // ── page ─────────────────────────────────────────────────────────────────────
 
-type SearchParams = Promise<{ q?: string; page?: string; filtro?: string }>;
+type SearchParams = Promise<{
+  q?: string;
+  page?: string;
+  filtro?: string;
+  cliente?: string;
+  estabelecimento?: string;
+}>;
 
 function emptyListMessage(
   q: string,
@@ -57,6 +63,8 @@ export default async function FichaTecnicaPage({
   const q = (params.q ?? "").trim();
   const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
   const filtros = parseTechnicalRecipeListFilters(params.filtro);
+  const clienteId = (params.cliente ?? "").trim();
+  const estabelecimentoId = (params.estabelecimento ?? "").trim();
 
   const [
     { rows: recipes, total, totalPages },
@@ -68,6 +76,8 @@ export default async function FichaTecnicaPage({
       page,
       pageSize: RECIPE_LIST_PAGE_SIZE,
       filtros,
+      clientId: clienteId || undefined,
+      establishmentId: estabelecimentoId || undefined,
     }),
     loadEstablishmentsForOwner(),
     loadClientsForOwner({ kind: "pj" }),
@@ -109,7 +119,7 @@ export default async function FichaTecnicaPage({
           <RecipeSearchInput />
         </Suspense>
         <Suspense fallback={null}>
-          <RecipeListFilters />
+          <RecipeListFilters pjClients={pjClients} establishments={establishments} />
         </Suspense>
       </div>
 

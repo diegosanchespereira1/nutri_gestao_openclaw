@@ -25,6 +25,10 @@ export const rawMaterialImportRowSchema = z.object({
   unit_price_brl: z.coerce.number().positive().max(1_000_000),
   notes: optionalText(2000),
   resolution: z.enum(["create", "overwrite", "create_new", "ignore"]),
+  // Resolvidos client-side a partir do nome na planilha — a Server Action
+  // sempre revalida posse/tipo antes de usar (nunca confia cegamente).
+  client_id: z.string().uuid(),
+  establishment_id: z.string().uuid().nullable().optional(),
 });
 
 export type RawMaterialImportRowInput = z.infer<typeof rawMaterialImportRowSchema>;

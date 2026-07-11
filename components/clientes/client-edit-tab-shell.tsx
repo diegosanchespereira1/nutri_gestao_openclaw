@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { ClipboardList } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -124,6 +126,15 @@ export function ClientEditTabShell({
             </button>
           );
         })}
+        {kind === "pj" ? (
+          <Link
+            href={`/ficha-tecnica?cliente=${encodeURIComponent(clientId)}`}
+            className={cn(TAB_BTN, "gap-1.5")}
+          >
+            <ClipboardList className="size-3.5" aria-hidden />
+            Ficha técnica
+          </Link>
+        ) : null}
       </nav>
 
       <div className={panelVisibleClass(tab, "dados")}>{panels.dados}</div>

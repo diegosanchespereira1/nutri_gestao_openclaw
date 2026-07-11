@@ -23,6 +23,10 @@ export const rawMaterialPriceImportRowSchema = z.object({
   price_unit: z.enum(RECIPE_LINE_UNITS),
   unit_price_brl: z.coerce.number().positive().max(1_000_000),
   notes: optionalText(2000),
+  // Resolvidos client-side a partir do nome na planilha — a Server Action
+  // sempre revalida posse e conferência de âmbito antes de usar.
+  client_id: z.string().uuid(),
+  establishment_id: z.string().uuid().nullable().optional(),
 });
 
 export type RawMaterialPriceImportRowInput = z.infer<typeof rawMaterialPriceImportRowSchema>;

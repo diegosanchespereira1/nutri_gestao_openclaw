@@ -6,6 +6,8 @@ import { loadRawMaterialById } from "@/lib/actions/raw-materials";
 import { loadRawMaterialChangeHistory } from "@/lib/actions/raw-material-history";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { loadClientsForOwner } from "@/lib/actions/clients";
+import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 
 const errMessages: Record<string, string> = {
   invalid: "Verifique nome e preço (maior que zero).",
@@ -27,13 +29,18 @@ export default async function EditarMateriaPrimaPage({
   if (!row) notFound();
 
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
-  const changeHistory = await loadRawMaterialChangeHistory(id);
+  const [changeHistory, { rows: pjClients }, { rows: establishments }] =
+    await Promise.all([
+      loadRawMaterialChangeHistory(id),
+      loadClientsForOwner({ kind: "pj" }),
+      loadEstablishmentsForOwner(),
+    ]);
 
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Editar matéria-prima"
-        back={{ href: "/ficha-tecnica/materias-primas", label: "Matérias-primas" }}
+        back={{ href: "/materias-primas", label: "Matérias-primas" }}
       />
 
       {errMsg ? (
@@ -45,7 +52,11 @@ export default async function EditarMateriaPrimaPage({
         </div>
       ) : null}
 
-      <RawMaterialForm material={row} />
+      <RawMaterialForm
+        material={row}
+        pjClients={pjClients}
+        establishments={establishments}
+      />
 
       <RawMaterialChangeHistorySection events={changeHistory} />
     </PageLayout>

@@ -1,6 +1,8 @@
 import { RawMaterialForm } from "@/components/technical-sheets/raw-material-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { loadClientsForOwner } from "@/lib/actions/clients";
+import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 
 const errMessages: Record<string, string> = {
   invalid: "Verifique nome e preço (maior que zero).",
@@ -15,11 +17,16 @@ export default async function NovaMateriaPrimaPage({ searchParams }: Props) {
   const { err } = await searchParams;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
+  const [{ rows: pjClients }, { rows: establishments }] = await Promise.all([
+    loadClientsForOwner({ kind: "pj" }),
+    loadEstablishmentsForOwner(),
+  ]);
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Nova matéria-prima"
-        back={{ href: "/ficha-tecnica/materias-primas", label: "Matérias-primas" }}
+        back={{ href: "/materias-primas", label: "Matérias-primas" }}
       />
 
       {errMsg ? (
@@ -31,7 +38,7 @@ export default async function NovaMateriaPrimaPage({ searchParams }: Props) {
         </div>
       ) : null}
 
-      <RawMaterialForm />
+      <RawMaterialForm pjClients={pjClients} establishments={establishments} />
     </PageLayout>
   );
 }

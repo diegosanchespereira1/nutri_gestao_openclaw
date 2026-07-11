@@ -28,6 +28,7 @@ import {
   saveTechnicalRecipeDraftAction,
   saveTechnicalRecipeImageAction,
 } from "@/lib/actions/technical-recipes";
+import { loadRawMaterialsForScope } from "@/lib/actions/raw-materials";
 import type { RecipeFormDraftV1 } from "@/lib/technical-recipes/recipe-form-draft";
 import {
   readRecipeFormDraftFromStorage,
@@ -51,6 +52,7 @@ import { RecipeFormIntroductionSections } from "@/components/technical-sheets/re
 import { TacoLineLinker } from "@/components/technical-sheets/taco-line-linker";
 import { CostSummaryPanel } from "@/components/technical-sheets/cost-summary-panel";
 import { RecipeTemplatePickerDialog } from "@/components/technical-sheets/recipe-template-picker-dialog";
+import { RawMaterialCreatePanel } from "@/components/technical-sheets/raw-material-create-panel";
 import { RecipeImageField } from "@/components/technical-sheets/recipe-image-field";
 import {
   Dialog,
@@ -291,6 +293,46 @@ export function RecipeForm({
     if (recipe && recipe.establishment_id == null) return "";
     return establishments[0]?.id ?? "";
   });
+
+  // Matérias-primas visíveis no seletor de ingredientes — escopadas pelo
+  // cliente/estabelecimento ATUAL da receita (nunca mistura clientes).
+  // Recarrega sempre que o âmbito muda, antes de salvar.
+  const activeClientId =
+    recipeScope === "org"
+      ? clientIdForOrg
+      : (establishments.find((e) => e.id === establishmentId)?.client_id ??
+        undefined);
+  const activeEstablishmentId =
+    recipeScope === "establishment" ? establishmentId : undefined;
+
+  const [scopedRawMaterials, setScopedRawMaterials] =
+    useState<RawMaterialRow[]>(rawMaterials);
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!activeClientId) {
+      setScopedRawMaterials(rawMaterials);
+      return;
+    }
+    loadRawMaterialsForScope({
+      clientId: activeClientId,
+      establishmentId: activeEstablishmentId || undefined,
+    }).then((res) => {
+      if (!cancelled) setScopedRawMaterials(res.rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeClientId, activeEstablishmentId, rawMaterials]);
+
+  // Painel de criação rápida de matéria-prima (aberto de dentro do seletor
+  // de ingredientes) — guarda qual linha disparou a abertura para selecionar
+  // o item recém-criado nela assim que o painel fecha.
+  const [createPanelOpen, setCreatePanelOpen] = useState(false);
+  const [createPanelLineKey, setCreatePanelLineKey] = useState<string | null>(
+    null,
+  );
+
   const [name, setName] = useState(recipe?.name ?? "");
   const [lines, setLines] = useState<LineDraft[]>(() =>
     recipe ? linesFromRecipe(recipe) : [newLine(INITIAL_LINE_KEY)],
@@ -876,6 +918,35 @@ export function RecipeForm({
         onSelectTemplate={applyTemplateFromPicker}
       />
 
+      <RawMaterialCreatePanel
+        open={createPanelOpen}
+        onOpenChange={(next) => {
+          setCreatePanelOpen(next);
+          if (!next) setCreatePanelLineKey(null);
+        }}
+        pjClients={pjClients}
+        establishments={establishments}
+        defaultClientId={activeClientId || undefined}
+        defaultEstablishmentId={activeEstablishmentId || undefined}
+        onCreated={(row) => {
+          setScopedRawMaterials((prev) => [...prev, row]);
+          if (createPanelLineKey) {
+            const targetLine = lines.find((l) => l.key === createPanelLineKey);
+            updateLine(createPanelLineKey, {
+              raw_material_id: row.id,
+              raw_material: row,
+              // Se o ingrediente ainda não tinha nome próprio, usa o nome da
+              // matéria-prima recém-criada — evita salvar a receita com uma
+              // linha sem nome (obrigatório) só porque o usuário criou a
+              // matéria-prima antes de digitar o nome do ingrediente.
+              ...(targetLine && targetLine.ingredient_name.trim().length === 0
+                ? { ingredient_name: row.name }
+                : {}),
+            });
+          }
+        }}
+      />
+
       <Dialog open={draftPreviewOpen} onOpenChange={setDraftPreviewOpen}>
         <DialogContent className="max-h-[min(90dvh,560px)] gap-0 overflow-hidden p-0 sm:max-w-md">
           <DialogHeader className="border-border shrink-0 border-b px-6 py-4">
@@ -1071,12 +1142,43 @@ export function RecipeForm({
             </div>
             <div className="space-y-2">
               {recipeScope === "org" ? (
-                // Repositório de Receitas — sem seleção de cliente.
-                // O client_id é preenchido automaticamente (FK obrigatória da BD)
-                // mas não é exposto ao utilizador: a receita fica acessível a todo o tenant.
-                <p className="text-muted-foreground pt-1 text-sm">
-                  Ficará disponível como modelo para todos os estabelecimentos.
-                </p>
+                // Repositório de Receitas — precisa de um cliente explícito.
+                // client_id nunca é escolhido às cegas: a receita fica presa a
+                // ESTE cliente e só aparece nos estabelecimentos DELE — nunca
+                // em outros clientes do mesmo tenant.
+                <>
+                  <Label htmlFor="recipe-org-client">Cliente</Label>
+                  {isEdit ? (
+                    <p id="recipe-org-client" className="text-foreground text-sm">
+                      {(() => {
+                        const c = pjClients.find((c) => c.id === clientIdForOrg);
+                        return c ? pjClientLabel(c) : clientIdForOrg;
+                      })()}
+                    </p>
+                  ) : (
+                    <select
+                      id="recipe-org-client"
+                      className={selectClassName}
+                      value={clientIdForOrg}
+                      onChange={(e) => setClientIdForOrg(e.target.value)}
+                      required
+                    >
+                      {pjClients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {pjClientLabel(c)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <p className="text-muted-foreground text-xs">
+                    Fica disponível em todos os estabelecimentos de{" "}
+                    {(() => {
+                      const c = pjClients.find((c) => c.id === clientIdForOrg);
+                      return c ? pjClientLabel(c) : "—";
+                    })()}{" "}
+                    — nunca em outros clientes.
+                  </p>
+                </>
               ) : (
                 <>
                   <Label
@@ -1200,7 +1302,7 @@ export function RecipeForm({
               <CardDescription>
                 Quantidade e unidade; associe{" "}
                 <Link
-                  href="/ficha-tecnica/materias-primas"
+                  href="/materias-primas"
                   className="text-primary font-medium underline-offset-4 hover:underline"
                 >
                   matéria-prima
@@ -1417,7 +1519,9 @@ export function RecipeForm({
                       onChange={(e) => {
                         const id = e.target.value;
                         const mat = id
-                          ? (rawMaterials.find((r) => r.id === id) ?? null)
+                          ? (scopedRawMaterials.find((r) => r.id === id) ??
+                            rawMaterials.find((r) => r.id === id) ??
+                            null)
                           : null;
                         updateLine(line.key, {
                           raw_material_id: id.length > 0 ? id : null,
@@ -1426,7 +1530,7 @@ export function RecipeForm({
                       }}
                     >
                       <option value="">— Nenhuma —</option>
-                      {rawMaterials.map((m) => (
+                      {scopedRawMaterials.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.name} ({formatBrl(m.unit_price_brl)} /{" "}
                           {RECIPE_LINE_UNIT_LABELS[m.price_unit]})
@@ -1434,17 +1538,17 @@ export function RecipeForm({
                       ))}
                     </select>
                   </div>
-                  {rawMaterials.length === 0 ? (
-                    <Link
-                      href="/ficha-tecnica/materias-primas/nova"
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })}
-                    >
-                      Criar matéria-prima
-                    </Link>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setCreatePanelLineKey(line.key);
+                      setCreatePanelOpen(true);
+                    }}
+                  >
+                    Criar matéria-prima
+                  </Button>
                 </div>
                 {line.raw_material
                   ? (() => {

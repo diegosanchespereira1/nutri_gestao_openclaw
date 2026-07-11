@@ -12,6 +12,7 @@ const MODULE_PATH_RULES: Array<{
   { prefix: "/checklists", gate: "assessoria_alimentacao" },
   { prefix: "/pops", gate: "assessoria_alimentacao" },
   { prefix: "/ficha-tecnica", gate: "assessoria_alimentacao" },
+  { prefix: "/materias-primas", gate: "assessoria_alimentacao" },
 ];
 
 export const MODULE_BLOCKED_QUERY_PARAM = "modulo_bloqueado";

@@ -91,8 +91,8 @@ describe("RLS: clients", () => {
   it("Tenant A não insere client com owner_user_id de Tenant B", async () => {
     const { error } = await clientA.from("clients").insert({
       owner_user_id: seed.tenantBId,
-      name: "Tentativa de injecção",
-      type: "pf",
+      legal_name: "Tentativa de injecção",
+      kind: "pf",
     });
     // Deve falhar: RLS WITH CHECK impede owner_user_id != auth.uid()
     expect(error).not.toBeNull();
@@ -101,7 +101,7 @@ describe("RLS: clients", () => {
   it("Tenant A não atualiza client de Tenant B", async () => {
     const { data } = await clientA
       .from("clients")
-      .update({ name: "Hacked" })
+      .update({ legal_name: "Hacked" })
       .eq("id", seed.ids.b_client_id)
       .select("id");
     expect(data).toHaveLength(0);
@@ -163,7 +163,7 @@ describe("RLS: patients", () => {
   it("Tenant A não atualiza patient de Tenant B", async () => {
     const { data } = await clientA
       .from("patients")
-      .update({ name: "Hacked" })
+      .update({ full_name: "Hacked" })
       .eq("id", seed.ids.b_patient_id)
       .select("id");
     expect(data).toHaveLength(0);
@@ -223,24 +223,104 @@ describe("RLS: professional_raw_materials", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. pop_templates
+// 5b. professional_raw_materials — isolamento cliente-a-cliente DENTRO do
+//     MESMO tenant (invariante do plano de isolamento por cliente/
+//     estabelecimento: "usar em todos os estabelecimentos" nunca cruza
+//     cliente, nem para outro cliente do mesmo tenant).
+//
+//     Importante: a RLS de professional_raw_materials autoriza acesso a
+//     QUALQUER cliente do tenant (via clients.owner_user_id) — ela não
+//     bloqueia por client_id. O isolamento cliente-a-cliente é aplicado na
+//     CAMADA DE APLICAÇÃO, pelo filtro `.or(...)` usado em
+//     loadRawMaterialsForScope (lib/actions/raw-materials.ts). Os testes
+//     abaixo replicam esse exato filtro para garantir que a consulta real
+//     usada pelo seletor de ingredientes/matérias-primas nunca mistura
+//     itens de clientes diferentes do mesmo tenant.
 // ---------------------------------------------------------------------------
-describe("RLS: pop_templates", () => {
-  it("Tenant A vê apenas os seus pop_templates", async () => {
-    await expectOwnOnly(
-      clientA,
-      "pop_templates",
-      seed.ids.a_pop_template_id,
-      seed.ids.b_pop_template_id,
+describe("RLS: professional_raw_materials — isolamento por cliente (mesmo tenant)", () => {
+  it("RLS por si só permite ao tenant ler item de qualquer cliente seu (não bloqueia por client_id)", async () => {
+    // Documenta o limite real da RLS: ela é por TENANT, não por cliente.
+    const { data, error } = await clientA
+      .from("professional_raw_materials")
+      .select("id")
+      .eq("id", seed.ids.a_raw_material_client2_id);
+    expect(error).toBeNull();
+    expect((data ?? []).map((r: { id: string }) => r.id)).toContain(
+      seed.ids.a_raw_material_client2_id,
     );
   });
 
-  it("Tenant A não acede a pop_template de Tenant B por ID", async () => {
-    await expectBlocked(clientA, "pop_templates", seed.ids.b_pop_template_id);
+  it("Consulta escopada ao cliente 1 (padrão de loadRawMaterialsForScope) não retorna item REPOSITORIO do cliente 2", async () => {
+    const clientId = seed.ids.a_client_id;
+    const establishmentId = seed.ids.a_establishment_id;
+    const { data, error } = await clientA
+      .from("professional_raw_materials")
+      .select("id")
+      .or(
+        `client_id.is.null,establishment_id.eq.${establishmentId},and(client_id.eq.${clientId},establishment_id.is.null)`,
+      );
+    expect(error).toBeNull();
+    const ids = (data ?? []).map((r: { id: string }) => r.id);
+
+    // Itens do próprio cliente 1 aparecem
+    expect(ids).toContain(seed.ids.a_raw_material_repo_id);
+    expect(ids).toContain(seed.ids.a_raw_material_estab_id);
+    // Item legado (client_id nulo) ainda aparece — comportamento de transição
+    expect(ids).toContain(seed.ids.a_raw_material_id);
+    // Item REPOSITORIO do cliente 2 NUNCA aparece na consulta escopada ao cliente 1
+    expect(ids).not.toContain(seed.ids.a_raw_material_client2_id);
   });
 
-  it("Tenant B não acede a pop_template de Tenant A por ID", async () => {
-    await expectBlocked(clientB, "pop_templates", seed.ids.a_pop_template_id);
+  it("Consulta escopada ao cliente 2 (repositório, sem estabelecimento) não retorna itens do cliente 1", async () => {
+    const client2Id = seed.ids.a_client2_id;
+    const { data, error } = await clientA
+      .from("professional_raw_materials")
+      .select("id")
+      .or(`client_id.is.null,and(client_id.eq.${client2Id},establishment_id.is.null)`);
+    expect(error).toBeNull();
+    const ids = (data ?? []).map((r: { id: string }) => r.id);
+
+    expect(ids).toContain(seed.ids.a_raw_material_client2_id);
+    expect(ids).toContain(seed.ids.a_raw_material_id); // legado, transição
+    expect(ids).not.toContain(seed.ids.a_raw_material_repo_id);
+    expect(ids).not.toContain(seed.ids.a_raw_material_estab_id);
+  });
+
+  it("Tenant B não acede a nenhum item escopado do Tenant A, em nenhum contexto", async () => {
+    await expectBlocked(
+      clientB,
+      "professional_raw_materials",
+      seed.ids.a_raw_material_repo_id,
+    );
+    await expectBlocked(
+      clientB,
+      "professional_raw_materials",
+      seed.ids.a_raw_material_estab_id,
+    );
+    await expectBlocked(
+      clientB,
+      "professional_raw_materials",
+      seed.ids.a_raw_material_client2_id,
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. pop_templates — catálogo GLOBAL (sem owner_user_id, sem isolamento por
+//    tenant por desenho: policy "pop_templates_select_authenticated" usa
+//    `using (true)`). Não faz sentido testar isolamento aqui — o teste
+//    correto é o oposto: confirmar que é visível a qualquer tenant.
+// ---------------------------------------------------------------------------
+describe("RLS: pop_templates (catálogo global, não isolado por tenant)", () => {
+  it("Tenant A e Tenant B veem exatamente os mesmos pop_templates", async () => {
+    const { data: forA, error: errA } = await clientA.from("pop_templates").select("id");
+    const { data: forB, error: errB } = await clientB.from("pop_templates").select("id");
+    expect(errA).toBeNull();
+    expect(errB).toBeNull();
+    const idsA = (forA ?? []).map((r: { id: string }) => r.id).sort();
+    const idsB = (forB ?? []).map((r: { id: string }) => r.id).sort();
+    expect(idsA).toEqual(idsB);
+    expect(idsA.length).toBeGreaterThan(0);
   });
 });
 
@@ -410,9 +490,9 @@ describe("RLS: patient_parental_consents", () => {
       .insert({
         owner_user_id: seed.tenantAId,
         patient_id: seed.ids.a_patient_id,
-        guardian_name: "Responsável A",
+        guardian_full_name: "Responsável A",
         guardian_relationship: "parent",
-        guardian_document: "999.999.999-99",
+        guardian_document_id: "999.999.999-99",
         consent_text: "Texto de consentimento de teste",
         consented_at: new Date().toISOString(),
       })
@@ -435,9 +515,9 @@ describe("RLS: patient_parental_consents", () => {
       .insert({
         owner_user_id: seed.tenantBId,
         patient_id: seed.ids.a_patient_id,
-        guardian_name: "Hacker",
+        guardian_full_name: "Hacker",
         guardian_relationship: "parent",
-        guardian_document: "000.000.000-00",
+        guardian_document_id: "000.000.000-00",
         consent_text: "Injecção maliciosa",
         consented_at: new Date().toISOString(),
       });
@@ -509,12 +589,12 @@ describe("RLS: cross-tenant via related queries", () => {
 // 14. Teste de injecção via owner_user_id explícito
 // ---------------------------------------------------------------------------
 describe("RLS: tentativa de injecção via owner_user_id explícito", () => {
-  it("Tenant A não acede a patients filtrando por owner_user_id de Tenant B", async () => {
+  it("Tenant A não acede a patients filtrando por user_id de Tenant B", async () => {
     const { data } = await clientA
       .from("patients")
       .select("id")
-      .eq("owner_user_id", seed.tenantBId);
-    // RLS bloqueia mesmo com filtro explícito no owner_user_id errado
+      .eq("user_id", seed.tenantBId);
+    // RLS bloqueia mesmo com filtro explícito no user_id errado
     expect(data).toHaveLength(0);
   });
 
@@ -526,11 +606,14 @@ describe("RLS: tentativa de injecção via owner_user_id explícito", () => {
     expect(data).toHaveLength(0);
   });
 
-  it("Tenant A não acede a technical_recipes filtrando por owner_user_id de Tenant B", async () => {
+  it("Tenant A não acede a technical_recipes filtrando por client_id de Tenant B", async () => {
+    // technical_recipes não tem coluna owner_user_id (ownership é via
+    // establishment_id/client_id → clients.owner_user_id) — o vetor de
+    // injecção equivalente aqui é filtrar por client_id de outro tenant.
     const { data } = await clientA
       .from("technical_recipes")
       .select("id")
-      .eq("owner_user_id", seed.tenantBId);
+      .eq("client_id", seed.ids.b_client_id);
     expect(data).toHaveLength(0);
   });
 });

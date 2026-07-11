@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileSpreadsheet, LayoutTemplate, Plus } from "lucide-react";
+import { LayoutTemplate, Plus } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ type Props = {
 /**
  * Barra de ações do módulo ficha técnica — alinhada ao PageHeader (DS 2.0).
  * Secundárias (navegação) à esquerda do grupo; primária «Nova receita» destacada.
+ * Matérias-primas tem página e navegação própria (/materias-primas) — não fica
+ * misturada aqui, por isso não há atalho para lá neste toolbar.
  */
 export function FichaTecnicaToolbar({ canCreateRecipe }: Props) {
   return (
@@ -30,13 +32,6 @@ export function FichaTecnicaToolbar({ canCreateRecipe }: Props) {
         >
           <LayoutTemplate data-icon="inline-start" className="size-4" aria-hidden />
           Templates
-        </Link>
-        <Link
-          href="/ficha-tecnica/materias-primas"
-          className={cn(buttonVariants({ variant: "outline", size: "default" }))}
-        >
-          <FileSpreadsheet data-icon="inline-start" className="size-4" aria-hidden />
-          Matérias-primas
         </Link>
       </nav>
 

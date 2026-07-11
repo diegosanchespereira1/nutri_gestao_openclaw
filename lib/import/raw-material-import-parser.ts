@@ -7,7 +7,9 @@
 import type { ParsedRow, RowError } from "@/lib/types/import";
 import {
   RAW_MATERIAL_IMPORT_FIELDS,
+  type RawMaterialImportClientOption,
   type RawMaterialImportConflict,
+  type RawMaterialImportEstablishmentOption,
   type RawMaterialImportRow,
 } from "@/lib/types/raw-material-import";
 import {
@@ -29,6 +31,16 @@ export function normalizeText(s: string): string {
  *  acento continuam sendo nomes diferentes; só normalizamos caixa e espaços). */
 export function rawMaterialNameKey(name: string): string {
   return name.trim().toLowerCase();
+}
+
+/** Chave de conflito/duplicidade escopada — nunca mistura clientes: o mesmo
+ *  nome em clientes (ou estabelecimentos) diferentes não é conflito. */
+export function rawMaterialScopeKey(
+  clientId: string,
+  establishmentId: string | null,
+  name: string,
+): string {
+  return `${clientId}::${establishmentId ?? ""}::${rawMaterialNameKey(name)}`;
 }
 
 const UNIT_SYNONYMS: Record<string, RecipeLineUnit> = {
@@ -80,12 +92,29 @@ export type RawMaterialValidationResult = {
 
 export function validateRawMaterialRows(
   rows: ParsedRow[],
-  /** Chave = rawMaterialNameKey(nome existente) → dados do item já cadastrado. */
-  existingByNameKey: Map<string, RawMaterialImportConflict>,
+  /** Chave = rawMaterialScopeKey(client_id, establishment_id, nome) → item já cadastrado.
+   *  Itens legados (sem cliente) nunca entram aqui — não têm chave escopada
+   *  para comparar, então nunca são detectados como conflito por este fluxo. */
+  existingByScopedKey: Map<string, RawMaterialImportConflict>,
+  clientOptions: RawMaterialImportClientOption[],
+  establishmentOptions: RawMaterialImportEstablishmentOption[],
 ): RawMaterialValidationResult {
   const valid: RawMaterialImportRow[] = [];
   const validRowIndex: number[] = [];
   const errors: RowError[] = [];
+
+  // Índices nome→id. Em caso de dois clientes com o mesmo nome de exibição,
+  // fica com o primeiro — caso raro, não tratado nesta primeira versão.
+  const clientIndex = new Map<string, RawMaterialImportClientOption>();
+  for (const c of clientOptions) {
+    const key = normalizeText(c.label);
+    if (!clientIndex.has(key)) clientIndex.set(key, c);
+  }
+  const establishmentIndex = new Map<string, RawMaterialImportEstablishmentOption>();
+  for (const e of establishmentOptions) {
+    const key = `${e.clientId}::${normalizeText(e.label)}`;
+    if (!establishmentIndex.has(key)) establishmentIndex.set(key, e);
+  }
 
   rows.forEach((row, i) => {
     const name = (row.name ?? "").trim();
@@ -116,21 +145,58 @@ export function validateRawMaterialRows(
       return;
     }
 
+    const clientNameRaw = (row.client_name ?? "").trim();
+    if (!clientNameRaw) {
+      errors.push({ rowIndex: i, message: "Cliente é obrigatório." });
+      return;
+    }
+    const client = clientIndex.get(normalizeText(clientNameRaw));
+    if (!client) {
+      errors.push({
+        rowIndex: i,
+        message: `Cliente não encontrado: "${clientNameRaw}". Confira o nome exato do cliente cadastrado.`,
+      });
+      return;
+    }
+
+    const establishmentNameRaw = (row.establishment_name ?? "").trim();
+    let establishmentId: string | null = null;
+    let establishmentLabel: string | null = null;
+    if (establishmentNameRaw) {
+      const est = establishmentIndex.get(
+        `${client.id}::${normalizeText(establishmentNameRaw)}`,
+      );
+      if (!est) {
+        errors.push({
+          rowIndex: i,
+          message: `Estabelecimento não encontrado para ${client.label}: "${establishmentNameRaw}".`,
+        });
+        return;
+      }
+      establishmentId = est.id;
+      establishmentLabel = est.label;
+    }
+
     valid.push({
       name,
       price_unit,
       unit_price_brl,
       notes: (row.notes ?? "").trim() || null,
+      client_id: client.id,
+      client_label: client.label,
+      establishment_id: establishmentId,
+      establishment_label: establishmentLabel,
     });
     validRowIndex.push(i);
   });
 
-  // ── Duplicados dentro do próprio arquivo (mesmo nome) ──────────────────────
+  // ── Duplicados dentro do próprio arquivo (mesmo nome, mesmo âmbito) ────────
   // Igual à importação de avaliações infantis: não decidimos sozinhos qual
-  // linha repetida está certa — o usuário corrige a planilha e reenvia.
+  // linha repetida está certa — o usuário corrige a planilha e reenvia. Nomes
+  // repetidos em clientes/estabelecimentos diferentes NÃO são duplicidade.
   const groups = new Map<string, number[]>();
   valid.forEach((r, vi) => {
-    const key = rawMaterialNameKey(r.name);
+    const key = rawMaterialScopeKey(r.client_id, r.establishment_id, r.name);
     const list = groups.get(key) ?? [];
     list.push(vi);
     groups.set(key, list);
@@ -145,7 +211,7 @@ export function validateRawMaterialRows(
       const otherLines = lineNumbers.filter((n) => n !== validRowIndex[vi] + 1);
       errors.push({
         rowIndex: validRowIndex[vi],
-        message: `Nome duplicado no arquivo — repete na${otherLines.length > 1 ? "s" : ""} linha${otherLines.length > 1 ? "s" : ""} ${otherLines.join(", ")}.`,
+        message: `Nome duplicado no arquivo para o mesmo cliente/estabelecimento — repete na${otherLines.length > 1 ? "s" : ""} linha${otherLines.length > 1 ? "s" : ""} ${otherLines.join(", ")}.`,
       });
     }
   }
@@ -153,10 +219,12 @@ export function validateRawMaterialRows(
   const dedupedValid = valid.filter((_, vi) => !excludedValidIndexes.has(vi));
   const dedupedValidRowIndex = validRowIndex.filter((_, vi) => !excludedValidIndexes.has(vi));
 
-  // ── Conflitos: nome já existe cadastrado no tenant ─────────────────────────
+  // ── Conflitos: nome já existe cadastrado no mesmo cliente/estabelecimento ──
   const conflictsByRow = new Map<number, RawMaterialImportConflict>();
   dedupedValid.forEach((r, vi) => {
-    const conflict = existingByNameKey.get(rawMaterialNameKey(r.name));
+    const conflict = existingByScopedKey.get(
+      rawMaterialScopeKey(r.client_id, r.establishment_id, r.name),
+    );
     if (conflict) {
       conflictsByRow.set(dedupedValidRowIndex[vi], conflict);
     }
@@ -176,6 +244,8 @@ export const RAW_MATERIAL_TEMPLATE_HEADERS: { key: string; header: string }[] = 
   { key: "name", header: "Nome do produto" },
   { key: "price_unit", header: "Unidade (g, kg, ml, l ou un)" },
   { key: "unit_price_brl", header: "Preço unitário (R$)" },
+  { key: "client_name", header: "Cliente" },
+  { key: "establishment_name", header: "Estabelecimento (opcional)" },
   { key: "notes", header: "Observações" },
 ];
 
@@ -201,7 +271,14 @@ export function matchRawMaterialColumn(fileColumn: string): string | null {
 // usuário sobre o que é dado real e o que é só ilustração. As instruções de
 // preenchimento ficam no tooltip da página (não dentro do arquivo).
 
-export async function downloadRawMaterialXlsxTemplate(): Promise<void> {
+export async function downloadRawMaterialXlsxTemplate(
+  /** Nomes exatos aceitos nas colunas Cliente/Estabelecimento — evita erro de
+   *  digitação. Opcional: sem isso, o template sai só com os cabeçalhos. */
+  reference?: {
+    clientOptions: RawMaterialImportClientOption[];
+    establishmentOptions: RawMaterialImportEstablishmentOption[];
+  },
+): Promise<void> {
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Matérias-primas");
@@ -212,6 +289,22 @@ export async function downloadRawMaterialXlsxTemplate(): Promise<void> {
   sheet.columns.forEach((col) => {
     col.width = 28;
   });
+
+  if (reference && reference.clientOptions.length > 0) {
+    const refSheet = workbook.addWorksheet("Clientes e estabelecimentos");
+    refSheet.addRow(["Cliente", "Estabelecimento"]);
+    refSheet.getRow(1).font = { bold: true };
+    refSheet.columns.forEach((col) => {
+      col.width = 32;
+    });
+    for (const c of reference.clientOptions) {
+      refSheet.addRow([c.label, ""]);
+      const ests = reference.establishmentOptions.filter((e) => e.clientId === c.id);
+      for (const e of ests) {
+        refSheet.addRow([c.label, e.label]);
+      }
+    }
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

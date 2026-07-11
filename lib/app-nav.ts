@@ -6,6 +6,7 @@ import {
   Ellipsis,
   HeartPulse,
   LayoutDashboard,
+  Package,
   Settings,
   Shield,
   Soup,
@@ -68,9 +69,10 @@ export const appNavGroups: AppNavGroup[] = [
     label: "Assessoria Alimentar",
     moduleGate: "assessoria_alimentacao",
     items: [
-      { href: "/checklists",    label: "Checklists",    icon: ClipboardCheck },
-      { href: "/pops",          label: "POPs",           icon: Soup },
-      { href: "/ficha-tecnica", label: "Ficha técnica", icon: UtensilsCrossed },
+      { href: "/checklists",      label: "Checklists",      icon: ClipboardCheck },
+      { href: "/pops",            label: "POPs",             icon: Soup },
+      { href: "/ficha-tecnica",   label: "Ficha técnica",   icon: UtensilsCrossed },
+      { href: "/materias-primas", label: "Matérias-primas", icon: Package },
     ],
   },
   {

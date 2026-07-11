@@ -15,6 +15,14 @@ export type RawMaterialPriceImportRow = {
   price_unit: RecipeLineUnit;
   unit_price_brl: number;
   notes: string | null;
+  /** Resolvido a partir da coluna "Cliente". Para item já escopado, precisa
+   *  bater exatamente com o cliente já cadastrado (esta planilha nunca move
+   *  matéria-prima de cliente). Para item legado (ainda sem cliente), vira a
+   *  primeira atribuição. */
+  client_id: string;
+  client_label: string;
+  establishment_id: string | null;
+  establishment_label: string | null;
 };
 
 export const RAW_MATERIAL_PRICE_IMPORT_FIELDS: FieldDef[] = [
@@ -22,6 +30,12 @@ export const RAW_MATERIAL_PRICE_IMPORT_FIELDS: FieldDef[] = [
   { key: "name", label: "Nome do produto", required: true },
   { key: "price_unit", label: "Unidade (g, kg, ml, l ou un)", required: true },
   { key: "unit_price_brl", label: "Preço unitário (R$)", required: true },
+  { key: "client_name", label: "Cliente", required: true },
+  {
+    key: "establishment_name",
+    label: "Estabelecimento (opcional — vazio = todos os estabelecimentos do cliente)",
+    required: false,
+  },
   { key: "notes", label: "Observações (opcional)", required: false },
 ];
 
@@ -31,6 +45,11 @@ export type RawMaterialPriceExistingSnapshot = {
   price_unit: RecipeLineUnit;
   unit_price_brl: number;
   notes: string | null;
+  /** NULL = item legado, ainda não migrado — a planilha pode atribuir o
+   *  cliente pela primeira vez. Não-nulo = âmbito já definido e imutável por
+   *  esta planilha (só serve para conferência, não para mover de cliente). */
+  client_id: string | null;
+  establishment_id: string | null;
 };
 
 export type RawMaterialPriceImportResult =

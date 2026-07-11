@@ -8,7 +8,17 @@ import { Input } from "@/components/ui/input";
 
 const DEBOUNCE_MS = 350;
 
-export function RecipeSearchInput() {
+type RecipeSearchInputProps = {
+  basePath?: string;
+  placeholder?: string;
+  "aria-label"?: string;
+};
+
+export function RecipeSearchInput({
+  basePath = "/ficha-tecnica",
+  placeholder = "Buscar receita por nome…",
+  "aria-label": ariaLabel = "Buscar ficha técnica por nome",
+}: RecipeSearchInputProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialQ = searchParams.get("q") ?? "";
@@ -31,9 +41,10 @@ export function RecipeSearchInput() {
       }
       // Reset to page 1 on new search
       params.delete("page");
-      router.push(`/ficha-tecnica?${params.toString()}`);
+      const qs = params.toString();
+      router.push(qs ? `${basePath}?${qs}` : basePath);
     },
-    [router, searchParams],
+    [basePath, router, searchParams],
   );
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -65,12 +76,12 @@ export function RecipeSearchInput() {
       />
       <Input
         type="search"
-        placeholder="Buscar receita por nome…"
+        placeholder={placeholder}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         className="pl-8 pr-8"
-        aria-label="Buscar ficha técnica por nome"
+        aria-label={ariaLabel}
       />
       {value.length > 0 && (
         <button

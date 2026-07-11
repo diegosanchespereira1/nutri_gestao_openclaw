@@ -24,14 +24,17 @@ import {
   RAW_MATERIAL_TEMPLATE_HEADERS,
   downloadRawMaterialXlsxTemplate,
   matchRawMaterialColumn,
-  rawMaterialNameKey,
+  rawMaterialScopeKey,
   validateRawMaterialRows,
 } from "@/lib/import/raw-material-import-parser";
 import {
   RAW_MATERIAL_IMPORT_FIELDS,
+  type RawMaterialImportClientOption,
   type RawMaterialImportConflict,
+  type RawMaterialImportEstablishmentOption,
   type RawMaterialImportResolution,
   type RawMaterialImportResult,
+  type RawMaterialImportRow,
   type RawMaterialImportSubmitRow,
 } from "@/lib/types/raw-material-import";
 import { RECIPE_LINE_UNIT_LABELS } from "@/lib/constants/recipe-line-units";
@@ -65,6 +68,8 @@ export type ExistingRawMaterialOption = {
   price_unit: RawMaterialImportConflict["existingPriceUnit"];
   unit_price_brl: number;
   notes: string | null;
+  client_id: string | null;
+  establishment_id: string | null;
 };
 
 // ── Helpers de estilo ────────────────────────────────────────────────────────
@@ -116,15 +121,23 @@ function ImportStepIndicator({ step }: { step: WizardStep }) {
 
 export function RawMaterialImportWizard({
   existingRawMaterials = [],
+  pjClients = [],
+  establishments = [],
 }: {
   existingRawMaterials?: ExistingRawMaterialOption[];
+  pjClients?: RawMaterialImportClientOption[];
+  establishments?: RawMaterialImportEstablishmentOption[];
 }) {
   const [step, setStep] = useState<WizardStep>(1);
 
-  const existingByNameKey = useMemo(() => {
+  const existingByScopedKey = useMemo(() => {
     const map = new Map<string, RawMaterialImportConflict>();
     for (const m of existingRawMaterials) {
-      map.set(rawMaterialNameKey(m.name), {
+      // Itens sem cliente (legado, ainda não migrado) não entram aqui — não
+      // há chave escopada para comparar, então nunca colidem com uma linha
+      // nova (que sempre traz cliente resolvido pela planilha).
+      if (!m.client_id) continue;
+      map.set(rawMaterialScopeKey(m.client_id, m.establishment_id, m.name), {
         existingId: m.id,
         existingPriceUnit: m.price_unit,
         existingUnitPriceBrl: m.unit_price_brl,
@@ -139,6 +152,9 @@ export function RawMaterialImportWizard({
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [errorsByRow, setErrorsByRow] = useState<Map<number, string>>(new Map());
   const [conflictsByRow, setConflictsByRow] = useState<Map<number, RawMaterialImportConflict>>(
+    new Map(),
+  );
+  const [resolvedByRow, setResolvedByRow] = useState<Map<number, RawMaterialImportRow>>(
     new Map(),
   );
   const [resolutions, setResolutions] = useState<Map<number, RawMaterialImportResolution>>(
@@ -197,6 +213,7 @@ export function RawMaterialImportWizard({
     setParsedRows([]);
     setErrorsByRow(new Map());
     setConflictsByRow(new Map());
+    setResolvedByRow(new Map());
     setResolutions(new Map());
     setResult(null);
     setFileError(null);
@@ -214,13 +231,18 @@ export function RawMaterialImportWizard({
   const handlePreview = () => {
     if (!upload) return;
     const rows = applyMappings(upload.rawRows, upload.headers, mappings);
-    const { errors, conflictsByRow: conflicts } = validateRawMaterialRows(
-      rows,
-      existingByNameKey,
-    );
+    const {
+      errors,
+      conflictsByRow: conflicts,
+      valid,
+      validRowIndex,
+    } = validateRawMaterialRows(rows, existingByScopedKey, pjClients, establishments);
     setParsedRows(rows);
     setErrorsByRow(buildErrorMap(errors));
     setConflictsByRow(conflicts);
+    const resolved = new Map<number, RawMaterialImportRow>();
+    valid.forEach((r, vi) => resolved.set(validRowIndex[vi], r));
+    setResolvedByRow(resolved);
     // Default seguro: linhas em conflito começam como "ignorar" — o usuário
     // precisa escolher explicitamente sobrescrever ou criar novo.
     const initialResolutions = new Map<number, RawMaterialImportResolution>();
@@ -255,8 +277,8 @@ export function RawMaterialImportWizard({
     const out: RawMaterialImportSubmitRow[] = [];
     parsedRows.forEach((row, i) => {
       if (errorsByRow.has(i)) return;
-      const name = (row.name ?? "").trim();
-      if (!name) return; // já coberto por errorsByRow, defensivo
+      const resolved = resolvedByRow.get(i);
+      if (!resolved) return; // já coberto por errorsByRow, defensivo
 
       const isConflict = conflictsByRow.has(i);
       const resolution: RawMaterialImportResolution = isConflict
@@ -264,15 +286,12 @@ export function RawMaterialImportWizard({
         : "create";
 
       out.push({
-        name,
-        price_unit: row.price_unit as RawMaterialImportSubmitRow["price_unit"],
-        unit_price_brl: Number(String(row.unit_price_brl).replace(",", ".")),
-        notes: (row.notes ?? "").trim() || null,
+        ...resolved,
         resolution,
       });
     });
     return out;
-  }, [parsedRows, errorsByRow, conflictsByRow, resolutions]);
+  }, [parsedRows, errorsByRow, resolvedByRow, conflictsByRow, resolutions]);
 
   const handleImport = async () => {
     setImporting(true);
@@ -435,6 +454,15 @@ export function RawMaterialImportWizard({
                         ponto — ex.: 6,90.
                       </li>
                       <li>
+                        <strong>Cliente:</strong> obrigatório — nome exato do cliente já
+                        cadastrado (veja a aba "Clientes e estabelecimentos" do modelo).
+                        A matéria-prima nunca aparece para outro cliente.
+                      </li>
+                      <li>
+                        <strong>Estabelecimento:</strong> opcional. Vazio = disponível em
+                        todos os estabelecimentos deste cliente.
+                      </li>
+                      <li>
                         <strong>Observações:</strong> opcional.
                       </li>
                     </ul>
@@ -443,8 +471,9 @@ export function RawMaterialImportWizard({
               </div>
               <p className="text-muted-foreground text-xs">
                 Baixe o modelo em Excel (.xlsx) com as colunas esperadas (nome, unidade,
-                preço unitário e observações) e preencha com seus dados — o arquivo vem
-                só com o cabeçalho, sem linhas de exemplo.
+                preço unitário, cliente e observações) e preencha com seus dados — o
+                arquivo vem só com o cabeçalho, sem linhas de exemplo, e traz uma segunda
+                aba com os nomes exatos de clientes e estabelecimentos aceitos.
               </p>
               <Button
                 variant="ghost"
@@ -453,7 +482,10 @@ export function RawMaterialImportWizard({
                 onClick={async () => {
                   setDownloadingTemplate(true);
                   try {
-                    await downloadRawMaterialXlsxTemplate();
+                    await downloadRawMaterialXlsxTemplate({
+                      clientOptions: pjClients,
+                      establishmentOptions: establishments,
+                    });
                   } finally {
                     setDownloadingTemplate(false);
                   }
@@ -774,6 +806,17 @@ function RawMaterialPreviewTable({
                 </td>
                 <td className="px-3 py-2">
                   {row.unit_price_brl || <span className="text-muted-foreground/50">—</span>}
+                </td>
+                <td className="max-w-[160px] truncate px-3 py-2" title={row.client_name ?? ""}>
+                  {row.client_name || <span className="text-muted-foreground/50">—</span>}
+                </td>
+                <td
+                  className="max-w-[160px] truncate px-3 py-2"
+                  title={row.establishment_name ?? ""}
+                >
+                  {row.establishment_name || (
+                    <span className="text-muted-foreground/50">Todos</span>
+                  )}
                 </td>
                 <td
                   className="max-w-[180px] truncate px-3 py-2"

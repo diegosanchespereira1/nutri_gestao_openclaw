@@ -897,9 +897,9 @@ export async function saveFillItemResponse(input: {
         revalidatePath(`/visitas/${vid}`);
         revalidatePath(`/visitas/${vid}/iniciar`);
       }
+      revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
     }
 
-    revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
     return { ok: true };
   }
 
@@ -1021,9 +1021,9 @@ export async function saveFillItemResponse(input: {
       revalidatePath(`/visitas/${vid}`);
       revalidatePath(`/visitas/${vid}/iniciar`);
     }
+    revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
   }
 
-  revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
   return { ok: true };
 }
 
@@ -1035,6 +1035,221 @@ type SaveFillBatchEntry = {
   validUntil: string | null;
 };
 
+type SaveBatchRpcResult = {
+  ok?: boolean;
+  error?: string;
+  detail?: string;
+  sqlstate?: string;
+  affected?: number;
+};
+
+function mapSaveBatchDbError(input: {
+  message?: string | null;
+  code?: string | null;
+  detail?: string | null;
+  sqlstate?: string | null;
+}): string {
+  const haystack = [
+    input.message,
+    input.detail,
+    input.code,
+    input.sqlstate,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    haystack.includes("57014") ||
+    haystack.includes("statement timeout") ||
+    haystack.includes("canceling statement")
+  ) {
+    return "O salvamento demorou demais. Toque em Salvar agora e tente de novo.";
+  }
+  if (haystack.includes("dossier") || haystack.includes("dossiê")) {
+    return "Dossiê já aprovado: não é possível alterar respostas (registro imutável, FR70).";
+  }
+  // Evitar falso positivo: "checklist_fill_sessions" contém "session".
+  if (
+    /\bjwt\b/.test(haystack) ||
+    haystack.includes("jwt expired") ||
+    haystack.includes("not authenticated") ||
+    haystack.includes("sessão expirada")
+  ) {
+    return "Sessão expirada.";
+  }
+  if (
+    haystack.includes("pgrst202") ||
+    haystack.includes("could not find the function") ||
+    haystack.includes("schema cache")
+  ) {
+    return "Não foi possível salvar.";
+  }
+  return "Não foi possível salvar.";
+}
+
+function isRpcMissingError(code?: string | null, message?: string | null): boolean {
+  const msg = (message ?? "").toLowerCase();
+  return (
+    code === "PGRST202" ||
+    msg.includes("could not find the function") ||
+    msg.includes("schema cache")
+  );
+}
+
+type SaveFillSupabase = Awaited<ReturnType<typeof createClient>>;
+
+/** Fallback quando a RPC batch ainda não está no schema cache do PostgREST. */
+async function saveFillResponsesBatchLegacy(
+  supabase: SaveFillSupabase,
+  input: {
+    sessionId: string;
+    itemColumn: "template_item_id" | "custom_item_id" | "workspace_item_id";
+    entries: SaveFillBatchEntry[];
+    persistMode: "full" | "merge";
+  },
+): Promise<{ error: unknown }> {
+  const { sessionId, itemColumn, entries, persistMode } = input;
+  const itemIds = Array.from(new Set(entries.map((e) => e.itemId).filter(Boolean)));
+
+  const { data: existingRows, error: selErr } = await supabase
+    .from("checklist_fill_item_responses")
+    .select(
+      "id, note, item_annotation, valid_until, template_item_id, custom_item_id, workspace_item_id",
+    )
+    .eq("session_id", sessionId)
+    .in(itemColumn, itemIds);
+  if (selErr) return { error: selErr };
+
+  const existingByItemId = new Map<
+    string,
+    {
+      id: string;
+      note: string | null;
+      item_annotation: string | null;
+      valid_until: string | null;
+    }
+  >();
+  for (const row of existingRows ?? []) {
+    const key =
+      (row.template_item_id as string | null) ??
+      (row.custom_item_id as string | null) ??
+      (row.workspace_item_id as string | null);
+    if (!key) continue;
+    existingByItemId.set(key, {
+      id: String(row.id),
+      note: (row.note as string | null) ?? null,
+      item_annotation: (row.item_annotation as string | null) ?? null,
+      valid_until: (row.valid_until as string | null) ?? null,
+    });
+  }
+
+  const deleteIds: string[] = [];
+  const updateOps: Array<{ id: string; payload: Record<string, unknown> }> = [];
+  const insertRows: Array<Record<string, unknown>> = [];
+
+  for (const entry of entries) {
+    const existing = existingByItemId.get(entry.itemId);
+    const normalizedValidUntil = (entry.validUntil ?? "").trim() || null;
+    const noteTrim = (entry.note ?? "").trim();
+    let annotationTrim = (entry.annotation ?? "").trim();
+    if (annotationTrim.length > MAX_CHECKLIST_ITEM_ANNOTATION_CHARS) {
+      annotationTrim = annotationTrim.slice(0, MAX_CHECKLIST_ITEM_ANNOTATION_CHARS);
+    }
+
+    if (entry.outcome === null) {
+      if (existing) deleteIds.push(existing.id);
+      continue;
+    }
+
+    if (existing) {
+      updateOps.push({
+        id: existing.id,
+        payload: buildResponseUpdatePayload({
+          outcome: entry.outcome,
+          noteTrim,
+          annotationTrim,
+          validUntil: normalizedValidUntil,
+          existingNote: existing.note,
+          existingAnnotation: existing.item_annotation,
+          existingValidUntil: existing.valid_until,
+          persistMode,
+        }),
+      });
+      continue;
+    }
+
+    const insertPayload: Record<string, unknown> = {
+      session_id: sessionId,
+      template_item_id: null,
+      custom_item_id: null,
+      workspace_item_id: null,
+      outcome: entry.outcome,
+      note: noteTrim.length > 0 ? noteTrim : null,
+      item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
+      valid_until: normalizedValidUntil,
+    };
+    insertPayload[itemColumn] = entry.itemId;
+    insertRows.push(insertPayload);
+  }
+
+  if (deleteIds.length > 0) {
+    const { error } = await supabase
+      .from("checklist_fill_item_responses")
+      .delete()
+      .in("id", deleteIds);
+    if (error) return { error };
+  }
+
+  if (insertRows.length > 0) {
+    const { error } = await supabase.from("checklist_fill_item_responses").insert(insertRows);
+    if (error && error.code !== "23505") return { error };
+    if (error?.code === "23505") {
+      for (const row of insertRows) {
+        const itemId = String(row[itemColumn]);
+        const { data: race } = await supabase
+          .from("checklist_fill_item_responses")
+          .select("id, note, item_annotation, valid_until")
+          .eq("session_id", sessionId)
+          .eq(itemColumn, itemId)
+          .maybeSingle();
+        if (!race) {
+          const { error: retryErr } = await supabase
+            .from("checklist_fill_item_responses")
+            .insert(row);
+          if (retryErr && retryErr.code !== "23505") return { error: retryErr };
+          continue;
+        }
+        const payload = buildResponseUpdatePayload({
+          outcome: row.outcome as ChecklistFillOutcome,
+          noteTrim: (row.note as string | null) ?? "",
+          annotationTrim: (row.item_annotation as string | null) ?? "",
+          validUntil: (row.valid_until as string | null) ?? null,
+          existingNote: race.note as string | null,
+          existingAnnotation: race.item_annotation as string | null,
+          existingValidUntil: race.valid_until as string | null,
+          persistMode,
+        });
+        const { error: updErr } = await supabase
+          .from("checklist_fill_item_responses")
+          .update(payload)
+          .eq("id", race.id);
+        if (updErr) return { error: updErr };
+      }
+    }
+  }
+
+  for (const { id, payload } of updateOps) {
+    const { error } = await supabase
+      .from("checklist_fill_item_responses")
+      .update(payload)
+      .eq("id", id);
+    if (error) return { error };
+  }
+
+  return { error: null };
+}
+
 export async function saveFillResponsesBatch(input: {
   sessionId: string;
   itemResponseSource: "global" | "custom" | "workspace";
@@ -1042,9 +1257,11 @@ export async function saveFillResponsesBatch(input: {
   persistMode?: "full" | "merge";
   withRevalidate?: boolean;
 }): Promise<FillActionResult> {
-  const supabase = await createClient();
-  const auth = await requireWorkspaceAuthContext(supabase);
-  if (!auth.ok) return { ok: false, error: auth.error };
+  const startedAt = Date.now();
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) {
+    return { ok: false, error: "Sessão expirada." };
+  }
 
   const { sessionId, itemResponseSource } = input;
   const persistMode = input.persistMode ?? "full";
@@ -1068,7 +1285,7 @@ export async function saveFillResponsesBatch(input: {
 
   const estOwned = await assertEstablishmentOwned(
     supabase,
-    auth.workspaceOwnerId,
+    workspaceOwnerId,
     sess.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
@@ -1088,13 +1305,6 @@ export async function saveFillResponsesBatch(input: {
   if (sessionOrigin !== itemResponseSource) {
     return { ok: false, error: "Tipo de item incompatível com a sessão." };
   }
-
-  const itemColumn =
-    itemResponseSource === "global"
-      ? "template_item_id"
-      : itemResponseSource === "custom"
-        ? "custom_item_id"
-        : "workspace_item_id";
 
   const structureIds = new Set<string>();
   const validItemIds = new Set<string>();
@@ -1171,207 +1381,137 @@ export async function saveFillResponsesBatch(input: {
   }
 
   const itemIds = Array.from(new Set(entries.map((entry) => entry.itemId).filter(Boolean)));
-
   for (const itemId of itemIds) {
     if (!validItemIds.has(itemId)) {
       return { ok: false, error: "Item inválido para este modelo." };
     }
   }
 
-  const { data: existingRows } = await supabase
-    .from("checklist_fill_item_responses")
-    .select("id, note, item_annotation, valid_until, template_item_id, custom_item_id, workspace_item_id")
-    .eq("session_id", sessionId)
-    .in(itemColumn, itemIds);
+  const itemColumn =
+    itemResponseSource === "global"
+      ? "template_item_id"
+      : itemResponseSource === "custom"
+        ? "custom_item_id"
+        : "workspace_item_id";
 
-  const existingByItemId = new Map<
-    string,
-    {
-      id: string;
-      note: string | null;
-      item_annotation: string | null;
-      valid_until: string | null;
+  const rpcEntries = entries.map((entry) => {
+    let annotation = (entry.annotation ?? "").trim();
+    if (annotation.length > MAX_CHECKLIST_ITEM_ANNOTATION_CHARS) {
+      annotation = annotation.slice(0, MAX_CHECKLIST_ITEM_ANNOTATION_CHARS);
     }
-  >();
-  for (const row of existingRows ?? []) {
-    const key =
-      (row.template_item_id as string | null) ??
-      (row.custom_item_id as string | null) ??
-      (row.workspace_item_id as string | null);
-    if (!key) continue;
-    existingByItemId.set(key, {
-      id: String(row.id),
-      note: (row.note as string | null) ?? null,
-      item_annotation: (row.item_annotation as string | null) ?? null,
-      valid_until: (row.valid_until as string | null) ?? null,
-    });
-  }
-
-  // Classify entries into batches to avoid N+1 round-trips
-  const deleteIds: string[] = [];
-  const updateOps: Array<{ id: string; payload: Record<string, unknown> }> = [];
-  const insertRows: Array<Record<string, unknown>> = [];
-
-  for (const entry of entries) {
-    const itemId = entry.itemId;
-    const existing = existingByItemId.get(itemId);
-    const normalizedValidUntil = (entry.validUntil ?? "").trim() || null;
-    const noteTrim = (entry.note ?? "").trim();
-    let annotationTrim = (entry.annotation ?? "").trim();
-    if (annotationTrim.length > MAX_CHECKLIST_ITEM_ANNOTATION_CHARS) {
-      annotationTrim = annotationTrim.slice(0, MAX_CHECKLIST_ITEM_ANNOTATION_CHARS);
-    }
-
-    if (entry.outcome === null) {
-      if (existing) deleteIds.push(existing.id);
-      continue;
-    }
-
-    if (existing) {
-      const payload = buildResponseUpdatePayload({
-        outcome: entry.outcome,
-        noteTrim,
-        annotationTrim,
-        validUntil: normalizedValidUntil,
-        existingNote: existing.note,
-        existingAnnotation: existing.item_annotation,
-        existingValidUntil: existing.valid_until,
-        persistMode,
-      });
-      updateOps.push({ id: existing.id, payload });
-      continue;
-    }
-
-    const insertPayload: Record<string, unknown> = {
-      session_id: sessionId,
-      template_item_id: null,
-      custom_item_id: null,
-      workspace_item_id: null,
+    return {
+      item_id: entry.itemId,
       outcome: entry.outcome,
-      note: noteTrim.length > 0 ? noteTrim : null,
-      item_annotation: annotationTrim.length > 0 ? annotationTrim : null,
-      valid_until: normalizedValidUntil,
+      note: entry.note,
+      annotation,
+      valid_until: (entry.validUntil ?? "").trim() || null,
     };
-    insertPayload[itemColumn] = itemId;
-    insertRows.push(insertPayload);
-  }
+  });
 
-  /**
-   * INSERT com recuperação de corrida (23505): se outro save concorrente
-   * (blur + autosave, outro separador/dispositivo) inseriu a mesma resposta
-   * entre o SELECT e o INSERT, converte as linhas em conflito para UPDATE
-   * em vez de devolver "Não foi possível salvar." ao utilizador.
-   */
-  const runInsertsWithConflictRecovery = async (): Promise<{ error: unknown }> => {
-    if (insertRows.length === 0) return { error: null };
-    const { error } = await supabase
-      .from("checklist_fill_item_responses")
-      .insert(insertRows);
-    if (!error || error.code !== "23505") return { error };
+  const { data: rpcData, error: rpcError } = await supabase.rpc(
+    "save_checklist_fill_responses_batch",
+    {
+      p_session_id: sessionId,
+      p_item_source: itemResponseSource,
+      p_persist_mode: persistMode,
+      p_entries: rpcEntries,
+    },
+  );
 
-    const insertItemIds = insertRows.map((row) => String(row[itemColumn]));
-    const { data: raceRows, error: raceSelErr } = await supabase
-      .from("checklist_fill_item_responses")
-      .select("id, note, item_annotation, valid_until, template_item_id, custom_item_id, workspace_item_id")
-      .eq("session_id", sessionId)
-      .in(itemColumn, insertItemIds);
-    if (raceSelErr) return { error: raceSelErr };
-
-    const raceByItemId = new Map<
-      string,
-      { id: string; note: string | null; item_annotation: string | null; valid_until: string | null }
-    >();
-    for (const row of raceRows ?? []) {
-      const key =
-        (row.template_item_id as string | null) ??
-        (row.custom_item_id as string | null) ??
-        (row.workspace_item_id as string | null);
-      if (!key) continue;
-      raceByItemId.set(key, {
-        id: String(row.id),
-        note: (row.note as string | null) ?? null,
-        item_annotation: (row.item_annotation as string | null) ?? null,
-        valid_until: (row.valid_until as string | null) ?? null,
-      });
-    }
-
-    for (const row of insertRows) {
-      const itemId = String(row[itemColumn]);
-      const existing = raceByItemId.get(itemId);
-      if (!existing) {
-        const { error: retryInsErr } = await supabase
-          .from("checklist_fill_item_responses")
-          .insert(row);
-        if (retryInsErr && retryInsErr.code !== "23505") return { error: retryInsErr };
-        continue;
-      }
-      const payload = buildResponseUpdatePayload({
-        outcome: row.outcome as ChecklistFillOutcome,
-        noteTrim: (row.note as string | null) ?? "",
-        annotationTrim: (row.item_annotation as string | null) ?? "",
-        validUntil: (row.valid_until as string | null) ?? null,
-        existingNote: existing.note,
-        existingAnnotation: existing.item_annotation,
-        existingValidUntil: existing.valid_until,
+  let durationMs = Date.now() - startedAt;
+  if (rpcError) {
+    if (isRpcMissingError(rpcError.code, rpcError.message)) {
+      console.warn(
+        "[saveFillResponsesBatch] RPC missing in schema cache — using legacy path",
+        JSON.stringify({
+          sessionId,
+          entries: rpcEntries.length,
+          code: rpcError.code,
+          message: rpcError.message,
+        }),
+      );
+      const legacy = await saveFillResponsesBatchLegacy(supabase, {
+        sessionId,
+        itemColumn,
+        entries,
         persistMode,
       });
-      const { error: raceUpdErr } = await supabase
-        .from("checklist_fill_item_responses")
-        .update(payload)
-        .eq("id", existing.id);
-      if (raceUpdErr) return { error: raceUpdErr };
-    }
-    return { error: null };
-  };
-
-  // Em sequência (não Promise.all): vários UPDATEs em paralelo disputavam o mesmo
-  // lock em checklist_fill_sessions via trigger touch_session.
-  if (deleteIds.length > 0) {
-    const { error: delErr } = await supabase
-      .from("checklist_fill_item_responses")
-      .delete()
-      .in("id", deleteIds);
-    if (delErr) {
+      durationMs = Date.now() - startedAt;
+      if (legacy.error) {
+        const err = legacy.error as { message?: string; code?: string; details?: string };
+        console.error(
+          "[saveFillResponsesBatch] legacy DB error",
+          JSON.stringify({
+            sessionId,
+            entries: rpcEntries.length,
+            durationMs,
+            error: legacy.error,
+          }),
+        );
+        return {
+          ok: false,
+          error: mapSaveBatchDbError({
+            message: err.message,
+            code: err.code,
+            detail: err.details,
+          }),
+        };
+      }
+    } else {
+      const mapped = mapSaveBatchDbError({
+        message: rpcError.message,
+        code: rpcError.code,
+        detail: rpcError.details,
+      });
       console.error(
-        "[saveFillResponsesBatch] DB error",
+        "[saveFillResponsesBatch] RPC error",
         JSON.stringify({
           sessionId,
-          ops: [`DELETE ids=[${deleteIds.join(",")}]`],
-          error: delErr,
+          entries: rpcEntries.length,
+          durationMs,
+          code: rpcError.code,
+          message: rpcError.message,
+          details: rpcError.details,
+          hint: rpcError.hint,
         }),
       );
-      return { ok: false, error: "Não foi possível salvar." };
+      return { ok: false, error: mapped };
     }
-  }
-
-  const insertErrResult = await runInsertsWithConflictRecovery();
-  if (insertErrResult.error) {
-    console.error(
-      "[saveFillResponsesBatch] DB error",
-      JSON.stringify({
-        sessionId,
-        ops: insertRows.length > 0 ? [`INSERT rows=${insertRows.length}`] : [],
-        error: insertErrResult.error,
-      }),
-    );
-    return { ok: false, error: "Não foi possível salvar." };
-  }
-
-  for (const { id, payload } of updateOps) {
-    const { error: updErr } = await supabase
-      .from("checklist_fill_item_responses")
-      .update(payload)
-      .eq("id", id);
-    if (updErr) {
+  } else {
+    const result = (rpcData ?? {}) as SaveBatchRpcResult;
+    if (result.ok === false) {
+      const mapped = mapSaveBatchDbError({
+        message: result.error,
+        detail: result.detail,
+        sqlstate: result.sqlstate,
+      });
       console.error(
-        "[saveFillResponsesBatch] DB error",
+        "[saveFillResponsesBatch] RPC returned error",
         JSON.stringify({
           sessionId,
-          ops: [`UPDATE id=${id}`],
-          error: updErr,
+          entries: rpcEntries.length,
+          durationMs,
+          error: result.error,
+          detail: result.detail,
+          sqlstate: result.sqlstate,
         }),
       );
-      return { ok: false, error: "Não foi possível salvar." };
+      return {
+        ok: false,
+        error: result.error?.includes("Dossiê") ? result.error : mapped,
+      };
+    }
+
+    if (durationMs > 3000) {
+      console.warn(
+        "[saveFillResponsesBatch] slow save",
+        JSON.stringify({
+          sessionId,
+          entries: rpcEntries.length,
+          durationMs,
+          affected: result.affected ?? null,
+        }),
+      );
     }
   }
 
@@ -1383,9 +1523,10 @@ export async function saveFillResponsesBatch(input: {
       revalidatePath(`/visitas/${vid}`);
       revalidatePath(`/visitas/${vid}/iniciar`);
     }
+    // Só invalida alertas em flush completo (não em autosave).
+    revalidateTag(checklistValidityAlertsCacheTag(workspaceOwnerId), "max");
   }
 
-  revalidateTag(checklistValidityAlertsCacheTag(auth.workspaceOwnerId), "max");
   return { ok: true };
 }
 

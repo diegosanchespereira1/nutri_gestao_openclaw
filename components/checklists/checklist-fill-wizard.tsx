@@ -121,6 +121,27 @@ const EMPTY_ITEM_PHOTOS: ChecklistFillPhotoView[] = [];
 const SAVE_BATCH_RESCHEDULE_MS = 500;
 /** Limite de re-tentativas automáticas por falha de rede (sem redirecionar para login). */
 const MAX_SAVE_RESCHEDULE_ATTEMPTS = 5;
+/** Timeout do cliente para um save batch — evita UI presa se o servidor/DB travar. */
+const SAVE_CLIENT_TIMEOUT_MS = 45_000;
+const SAVE_CLIENT_TIMEOUT_MESSAGE =
+  "O salvamento demorou demais. Toque em Salvar agora e tente de novo.";
+
+async function withSaveClientTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("SAVE_CLIENT_TIMEOUT")),
+          SAVE_CLIENT_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /* ── Visualização de assinaturas após aprovação ─────────────────────── */
 /** Cabeçalho de subseção (sem avaliação nem fotos). */
@@ -870,15 +891,26 @@ export function ChecklistFillWizard({
         annotation: cur?.annotation ?? null,
         validUntil: cur?.validUntil ?? null,
       }));
-      const { result, needsReauth } = await executeWithSessionRecovery(() =>
-        saveFillResponsesBatch({
-          sessionId,
-          itemResponseSource,
-          entries,
-          persistMode,
-          withRevalidate: false,
-        }),
-      );
+      let result: FillActionResult;
+      let needsReauth = false;
+      try {
+        ({ result, needsReauth } = await withSaveClientTimeout(
+          executeWithSessionRecovery(() =>
+            saveFillResponsesBatch({
+              sessionId,
+              itemResponseSource,
+              entries,
+              persistMode,
+              withRevalidate: false,
+            }),
+          ),
+        ));
+      } catch (err) {
+        if (err instanceof Error && err.message === "SAVE_CLIENT_TIMEOUT") {
+          return { ok: false, error: SAVE_CLIENT_TIMEOUT_MESSAGE };
+        }
+        throw err;
+      }
       if (needsReauth) {
         if (intentionalLeaveRef.current) {
           return { ok: false, error: "Sessão expirada." };
@@ -1248,14 +1280,16 @@ export function ChecklistFillWizard({
           };
         });
         try {
-          const { result, needsReauth } = await executeWithSessionRecovery(() =>
-            saveFillResponsesBatch({
-              sessionId,
-              itemResponseSource,
-              entries,
-              persistMode: "full",
-              withRevalidate: false,
-            }),
+          const { result, needsReauth } = await withSaveClientTimeout(
+            executeWithSessionRecovery(() =>
+              saveFillResponsesBatch({
+                sessionId,
+                itemResponseSource,
+                entries,
+                persistMode: "full",
+                withRevalidate: false,
+              }),
+            ),
           );
           if (opEpoch !== saveOpEpochRef.current || intentionalLeaveRef.current) {
             return;
@@ -1287,6 +1321,10 @@ export function ChecklistFillWizard({
           reportSaved();
         } catch (err) {
           if (!mountedRef.current) return;
+          if (err instanceof Error && err.message === "SAVE_CLIENT_TIMEOUT") {
+            reportSaveError(SAVE_CLIENT_TIMEOUT_MESSAGE);
+            return;
+          }
           if (isStaleServerActionError(err)) {
             suspendNavigationGuardOnce();
             window.location.reload();
@@ -2058,7 +2096,7 @@ export function ChecklistFillWizard({
               disabled={leaveActionBusy}
               onClick={() => void handleConfirmLeaveDialog()}
             >
-              {leaveActionBusy ? "A gravar…" : "Sim, gravar e sair"}
+              {leaveActionBusy ? "Salvando…" : "Sim, gravar e sair"}
             </Button>
           </div>
         </DialogContent>

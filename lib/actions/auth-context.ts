@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export type WorkspaceAuthContext =
@@ -10,10 +11,21 @@ export type WorkspaceAuthContext =
 /**
  * Resolve autenticação e titular do workspace em um único helper
  * para reduzir duplicação de `auth.getUser()` + resolução de owner.
+ * Prefere `getServerContext` (cookie de perfil) para evitar /auth/v1/user.
  */
 export async function requireWorkspaceAuthContext(
   supabase: Awaited<ReturnType<typeof createClient>>,
 ): Promise<WorkspaceAuthContext> {
+  // Tenta contexto com cookie primeiro (evita round-trip lento a Auth).
+  const ctx = await getServerContext();
+  if (ctx.user && ctx.workspaceOwnerId) {
+    return {
+      ok: true,
+      userId: ctx.user.id,
+      workspaceOwnerId: ctx.workspaceOwnerId,
+    };
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser();

@@ -92,7 +92,12 @@ function isExpectedRpcFailure(errorMessage: string): boolean {
     msg.includes("504") ||
     msg.includes("econnrefused") ||
     msg.includes("fetch failed") ||
-    msg.includes("network error")
+    msg.includes("network error") ||
+    msg.includes("statement timeout") ||
+    msg.includes("canceling statement") ||
+    msg.includes("57014") ||
+    msg.includes("timed out") ||
+    msg.includes("timeout")
   );
 }
 
@@ -156,6 +161,16 @@ async function loadChecklistValidityAlertsViaRpc(
         "[loadChecklistValidityAlerts] RPC",
         summarizeSupabaseError(error.message),
       );
+    } else if (
+      error.message.toLowerCase().includes("timeout") ||
+      error.message.toLowerCase().includes("57014")
+    ) {
+      console.warn(
+        "[loadChecklistValidityAlerts] RPC timeout — fail-soft",
+        summarizeSupabaseError(error.message),
+      );
+      // Timeout: não cair no legado (também pesado); devolve lista vazia.
+      return [];
     }
     return null;
   }

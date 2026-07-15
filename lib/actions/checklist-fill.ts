@@ -55,6 +55,28 @@ export type FillActionResult =
   | { ok: true }
   | { ok: false; error: string };
 
+/** Após editar sessão já aprovada: recalcula score, invalida hash e supersede PDFs. */
+async function refreshApprovedSessionAfterEdit(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+): Promise<void> {
+  await supabase.rpc("calculate_and_store_session_score", {
+    p_session_id: sessionId,
+  });
+  await supabase
+    .from("checklist_fill_sessions")
+    .update({ document_hash: null })
+    .eq("id", sessionId)
+    .not("dossier_approved_at", "is", null);
+  const nowIso = new Date().toISOString();
+  await supabase
+    .from("checklist_fill_pdf_exports")
+    .update({ superseded_at: nowIso })
+    .eq("session_id", sessionId)
+    .eq("status", "ready")
+    .is("superseded_at", null);
+}
+
 async function assertEstablishmentOwned(
   supabase: Awaited<ReturnType<typeof createClient>>,
   workspaceOwnerId: string,
@@ -482,13 +504,20 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   // loadChecklistTemplateBundleByIdDirect usa o mesmo cliente — sem round-trip extra de auth.
   // loadWorkspaceTemplateBundle / loadCustomTemplateUnified ainda criam o próprio cliente
   // mas correm em paralelo com as outras queries, não adicionando ao caminho crítico.
+  // includeArchivedItems: itens removidos do modelo continuam visíveis no dossiê/histórico.
   const templatePromise: Promise<ChecklistTemplateWithSections | null> =
     row.workspace_template_id
-      ? loadWorkspaceTemplateBundle(row.workspace_template_id)
+      ? loadWorkspaceTemplateBundle(row.workspace_template_id, {
+          includeArchivedItems: true,
+        })
       : row.custom_template_id
-        ? loadCustomTemplateUnified(row.custom_template_id)
+        ? loadCustomTemplateUnified(row.custom_template_id, {
+            includeArchivedItems: true,
+          })
         : row.template_id
-          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id)
+          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
+              includeArchivedItems: true,
+            })
           : Promise.resolve(null);
 
   const [
@@ -665,7 +694,7 @@ export async function loadFillResponsesMapForSession(
 
   const { data: sess } = await supabase
     .from("checklist_fill_sessions")
-    .select("establishment_id, dossier_approved_at")
+    .select("establishment_id")
     .eq("id", sessionId)
     .maybeSingle();
 
@@ -677,10 +706,6 @@ export async function loadFillResponsesMapForSession(
     sess.establishment_id as string,
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
-
-  if (sess.dossier_approved_at) {
-    return { ok: false, error: "Dossiê já aprovado." };
-  }
 
   const { data: respRows } = await supabase
     .from("checklist_fill_item_responses")
@@ -791,13 +816,7 @@ export async function saveFillItemResponse(input: {
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
 
-  if (sess.dossier_approved_at) {
-    return {
-      ok: false,
-      error:
-        "Dossiê já aprovado: não é possível alterar respostas (registro imutável, FR70).",
-    };
-  }
+  const sessionWasApproved = Boolean(sess.dossier_approved_at);
 
   const sessionOrigin: "global" | "custom" | "workspace" = sess.workspace_template_id
     ? "workspace"
@@ -1006,6 +1025,10 @@ export async function saveFillItemResponse(input: {
     }
   }
 
+  if (sessionWasApproved) {
+    await refreshApprovedSessionAfterEdit(supabase, sessionId);
+  }
+
   if (withRevalidate) {
     revalidatePath(`/checklists/preencher/${sessionId}`);
 
@@ -1065,9 +1088,6 @@ function mapSaveBatchDbError(input: {
     haystack.includes("canceling statement")
   ) {
     return "O salvamento demorou demais. Toque em Salvar agora e tente de novo.";
-  }
-  if (haystack.includes("dossier") || haystack.includes("dossiê")) {
-    return "Dossiê já aprovado: não é possível alterar respostas (registro imutável, FR70).";
   }
   // Evitar falso positivo: "checklist_fill_sessions" contém "session".
   if (
@@ -1290,12 +1310,7 @@ export async function saveFillResponsesBatch(input: {
   );
   if (!estOwned) return { ok: false, error: "Sem permissão para este rascunho." };
 
-  if (sess.dossier_approved_at) {
-    return {
-      ok: false,
-      error: "Dossiê já aprovado: não é possível alterar respostas (registro imutável, FR70).",
-    };
-  }
+  const sessionWasApproved = Boolean(sess.dossier_approved_at);
 
   const sessionOrigin: "global" | "custom" | "workspace" = sess.workspace_template_id
     ? "workspace"
@@ -1419,6 +1434,7 @@ export async function saveFillResponsesBatch(input: {
   );
 
   let durationMs = Date.now() - startedAt;
+  let usedLegacyPath = false;
   if (rpcError) {
     if (isRpcMissingError(rpcError.code, rpcError.message)) {
       console.warn(
@@ -1430,6 +1446,7 @@ export async function saveFillResponsesBatch(input: {
           message: rpcError.message,
         }),
       );
+      usedLegacyPath = true;
       const legacy = await saveFillResponsesBatchLegacy(supabase, {
         sessionId,
         itemColumn,
@@ -1498,7 +1515,7 @@ export async function saveFillResponsesBatch(input: {
       );
       return {
         ok: false,
-        error: result.error?.includes("Dossiê") ? result.error : mapped,
+        error: mapped,
       };
     }
 
@@ -1513,6 +1530,11 @@ export async function saveFillResponsesBatch(input: {
         }),
       );
     }
+  }
+
+  // Caminho legacy não passa pela RPC (score/hash/PDF); refresh explícito.
+  if (sessionWasApproved && usedLegacyPath) {
+    await refreshApprovedSessionAfterEdit(supabase, sessionId);
   }
 
   if (withRevalidate) {
@@ -2050,11 +2072,17 @@ async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
 
   const templatePromise: Promise<ChecklistTemplateWithSections | null> =
     row.workspace_template_id
-      ? loadWorkspaceTemplateBundle(row.workspace_template_id)
+      ? loadWorkspaceTemplateBundle(row.workspace_template_id, {
+          includeArchivedItems: true,
+        })
       : row.custom_template_id
-        ? loadCustomTemplateUnified(row.custom_template_id)
+        ? loadCustomTemplateUnified(row.custom_template_id, {
+            includeArchivedItems: true,
+          })
         : row.template_id
-          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id)
+          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
+              includeArchivedItems: true,
+            })
           : Promise.resolve(null);
 
   const [template, respResult] = await Promise.all([

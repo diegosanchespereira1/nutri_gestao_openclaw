@@ -45,8 +45,12 @@ export async function loadChecklistPageData(input?: {
         : Promise.resolve(null),
     ]);
 
-  const workspaceTemplates = workspaceTemplateRows.filter((row) => !row.is_draft);
-  const customTemplates = customTemplateRows;
+  // Catálogo (/checklists) mostra apenas modelos ativos. Os arquivados ficam
+  // acessíveis somente nas páginas de gerenciar modelos (equipe/personalizados).
+  const workspaceTemplates = workspaceTemplateRows.filter(
+    (row) => !row.is_draft && !row.is_archived,
+  );
+  const customTemplates = customTemplateRows.filter((row) => !row.is_archived);
   const recentEstablishments = preselected
     ? [preselected, ...recentRaw.filter((r) => r.id !== preselected.id)].slice(0, 3)
     : recentRaw;

@@ -165,7 +165,8 @@ async function fetchWorkspaceTemplatesForCatalogRows(
     const { data: itemRows } = await supabase
       .from("checklist_workspace_items")
       .select("workspace_section_id, is_required")
-      .in("workspace_section_id", sectionIds);
+      .in("workspace_section_id", sectionIds)
+      .is("archived_at", null);
 
     for (const item of itemRows ?? []) {
       const tid = sectionToTemplate.get(String(item.workspace_section_id));
@@ -226,7 +227,8 @@ async function fetchWorkspaceTemplatesForCatalogLightRows(
     const { data: itemRows } = await supabase
       .from("checklist_workspace_items")
       .select("workspace_section_id, is_required")
-      .in("workspace_section_id", sectionIds);
+      .in("workspace_section_id", sectionIds)
+      .is("archived_at", null);
 
     for (const item of itemRows ?? []) {
       const tid = sectionToTemplate.get(String(item.workspace_section_id));
@@ -335,6 +337,7 @@ async function loadWorkspaceTemplateForEditWithClient(
           .from("checklist_workspace_items")
           .select("id, workspace_section_id, description, is_required, position")
           .in("workspace_section_id", sectionIds)
+          .is("archived_at", null)
           .order("position", { ascending: true })
       : { data: [] as Record<string, unknown>[] };
 
@@ -362,12 +365,14 @@ async function loadWorkspaceTemplateForEditWithClient(
     archived_at: template.archived_at as string | null,
     published_at: (template.published_at as string | null) ?? null,
     is_draft: template.published_at === null,
-    sections: (sections ?? []).map((sec) => ({
-      id: String(sec.id),
-      title: String(sec.title),
-      position: Number(sec.position),
-      items: itemsBySection.get(String(sec.id)) ?? [],
-    })),
+    sections: (sections ?? [])
+      .map((sec) => ({
+        id: String(sec.id),
+        title: String(sec.title),
+        position: Number(sec.position),
+        items: itemsBySection.get(String(sec.id)) ?? [],
+      }))
+      .filter((sec) => sec.items.length > 0),
   };
 }
 
@@ -404,6 +409,7 @@ export async function loadWorkspaceTemplatePreviewAction(
 /** Carrega no formato unificado para reusar o wizard de preenchimento. */
 export async function loadWorkspaceTemplateBundle(
   id: string,
+  options?: { includeArchivedItems?: boolean },
 ): Promise<ChecklistTemplateWithSections | null> {
   const supabase = await createClient();
   const {
@@ -411,7 +417,9 @@ export async function loadWorkspaceTemplateBundle(
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Sem filtrar por archived_at: sessões antigas devem continuar abrindo o dossiê
+  const includeArchivedItems = options?.includeArchivedItems === true;
+
+  // Sem filtrar por archived_at do TEMPLATE: sessões antigas devem continuar abrindo o dossiê
   // mesmo após o template ser arquivado (regra de soft-delete).
   const { data: template } = await supabase
     .from("checklist_workspace_templates")
@@ -428,14 +436,20 @@ export async function loadWorkspaceTemplateBundle(
     .order("position", { ascending: true });
 
   const sectionIds = (sections ?? []).map((s) => String(s.id));
-  const { data: items } =
+  let itemsQuery =
     sectionIds.length > 0
-      ? await supabase
+      ? supabase
           .from("checklist_workspace_items")
           .select("*")
           .in("workspace_section_id", sectionIds)
           .order("position", { ascending: true })
-      : { data: [] as Record<string, unknown>[] };
+      : null;
+  if (itemsQuery && !includeArchivedItems) {
+    itemsQuery = itemsQuery.is("archived_at", null);
+  }
+  const { data: items } = itemsQuery
+    ? await itemsQuery
+    : { data: [] as Record<string, unknown>[] };
 
   const itemsBySection = new Map<string, typeof items>();
   for (const it of items ?? []) {

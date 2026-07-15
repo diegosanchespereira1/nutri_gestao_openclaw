@@ -178,6 +178,7 @@ export async function loadCustomTemplateEditData(
           .from("checklist_custom_items")
           .select("*")
           .in("custom_section_id", sectionIds)
+          .is("archived_at", null)
           .order("position", { ascending: true })
       : { data: [] as Record<string, unknown>[] };
 
@@ -196,12 +197,14 @@ export async function loadCustomTemplateEditData(
     itemsBySection.set(sid, list);
   }
 
-  const mappedSections: CustomEditSection[] = (sections ?? []).map((sec) => ({
-    id: String(sec.id),
-    title: String(sec.title),
-    position: Number(sec.position),
-    items: itemsBySection.get(String(sec.id)) ?? [],
-  }));
+  const mappedSections: CustomEditSection[] = (sections ?? [])
+    .map((sec) => ({
+      id: String(sec.id),
+      title: String(sec.title),
+      position: Number(sec.position),
+      items: itemsBySection.get(String(sec.id)) ?? [],
+    }))
+    .filter((sec) => sec.items.length > 0);
 
   return {
     name: String(ct.name),
@@ -275,12 +278,15 @@ export async function loadCustomTemplatePreviewAction(
 /** Constrói o mesmo formato do catálogo global para reutilizar o wizard de preenchimento. */
 export async function loadCustomTemplateUnified(
   customTemplateId: string,
+  options?: { includeArchivedItems?: boolean },
 ): Promise<ChecklistTemplateWithSections | null> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return null;
+
+  const includeArchivedItems = options?.includeArchivedItems === true;
 
   const { data: ct, error: cErr } = await supabase
     .from("checklist_custom_templates")
@@ -305,14 +311,20 @@ export async function loadCustomTemplateUnified(
     .order("position", { ascending: true });
 
   const sectionIds = (sections ?? []).map((s) => String(s.id));
-  const { data: items } =
+  let itemsQuery =
     sectionIds.length > 0
-      ? await supabase
+      ? supabase
           .from("checklist_custom_items")
           .select("*")
           .in("custom_section_id", sectionIds)
           .order("position", { ascending: true })
-      : { data: [] as Record<string, unknown>[] };
+      : null;
+  if (itemsQuery && !includeArchivedItems) {
+    itemsQuery = itemsQuery.is("archived_at", null);
+  }
+  const { data: items } = itemsQuery
+    ? await itemsQuery
+    : { data: [] as Record<string, unknown>[] };
 
   const itemsBySection = new Map<string, typeof items>();
   for (const it of items ?? []) {
@@ -594,16 +606,20 @@ export async function addCustomSectionAction(formData: FormData): Promise<void> 
   revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
 }
 
-export async function deleteCustomItemAction(formData: FormData): Promise<void> {
+export async function deleteCustomItemAction(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
 
   const customItemId = String(formData.get("custom_item_id") ?? "").trim();
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
-  if (!customItemId || !customTemplateId) return;
+  if (!customItemId || !customTemplateId) {
+    return { ok: false, error: "Dados inválidos." };
+  }
 
   // Qualquer membro do workspace pode editar (não apenas o criador original)
   const ok = await assertCustomTemplateWorkspaceAccess(
@@ -611,7 +627,7 @@ export async function deleteCustomItemAction(formData: FormData): Promise<void> 
     customTemplateId,
     user.id,
   );
-  if (!ok) return;
+  if (!ok) return { ok: false, error: "Sem permissão para editar este modelo." };
 
   // Verifica que o item pertence a uma seção desse template
   const { data: it } = await supabase
@@ -623,23 +639,43 @@ export async function deleteCustomItemAction(formData: FormData): Promise<void> 
   const secRef = it?.checklist_custom_sections as unknown as
     | { custom_template_id: string }
     | null;
-  if (!it || secRef?.custom_template_id !== customTemplateId) return;
+  if (!it || secRef?.custom_template_id !== customTemplateId) {
+    return { ok: false, error: "Item não encontrado neste modelo." };
+  }
 
-  await supabase.from("checklist_custom_items").delete().eq("id", customItemId);
+  // Soft-delete: arquiva o item para preservar histórico de preenchimentos.
+  const { error } = await supabase
+    .from("checklist_custom_items")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", customItemId)
+    .is("archived_at", null);
+
+  if (error) {
+    return {
+      ok: false,
+      error:
+        "Este item já foi usado em checklists aplicados e foi arquivado quando possível (não removido do histórico).",
+    };
+  }
 
   revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
+  return { ok: true };
 }
 
-export async function deleteCustomSectionAction(formData: FormData): Promise<void> {
+export async function deleteCustomSectionAction(
+  formData: FormData,
+): Promise<{ ok: boolean; error?: string }> {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
 
   const customSectionId = String(formData.get("custom_section_id") ?? "").trim();
   const customTemplateId = String(formData.get("custom_template_id") ?? "").trim();
-  if (!customSectionId || !customTemplateId) return;
+  if (!customSectionId || !customTemplateId) {
+    return { ok: false, error: "Dados inválidos." };
+  }
 
   // Qualquer membro do workspace pode editar (não apenas o criador original)
   const ok = await assertCustomTemplateWorkspaceAccess(
@@ -647,7 +683,7 @@ export async function deleteCustomSectionAction(formData: FormData): Promise<voi
     customTemplateId,
     user.id,
   );
-  if (!ok) return;
+  if (!ok) return { ok: false, error: "Sem permissão para editar este modelo." };
 
   // Verifica que a seção pertence ao template
   const { data: sec } = await supabase
@@ -656,20 +692,51 @@ export async function deleteCustomSectionAction(formData: FormData): Promise<voi
     .eq("id", customSectionId)
     .eq("custom_template_id", customTemplateId)
     .maybeSingle();
-  if (!sec) return;
+  if (!sec) return { ok: false, error: "Seção não encontrada neste modelo." };
 
-  // Exclui todos os itens da seção primeiro
-  await supabase
+  const { data: sectionItems } = await supabase
     .from("checklist_custom_items")
-    .delete()
+    .select("id")
+    .eq("custom_section_id", customSectionId)
+    .is("archived_at", null);
+
+  const activeItemIds = (sectionItems ?? []).map((row) => String(row.id));
+  if (activeItemIds.length > 0) {
+    const { error: archiveErr } = await supabase
+      .from("checklist_custom_items")
+      .update({ archived_at: new Date().toISOString() })
+      .in("id", activeItemIds)
+      .is("archived_at", null);
+    if (archiveErr) {
+      return {
+        ok: false,
+        error:
+          "Não foi possível arquivar os itens da seção. O histórico de checklists aplicados continua preservado.",
+      };
+    }
+  }
+
+  const { count: remainingItems } = await supabase
+    .from("checklist_custom_items")
+    .select("id", { count: "exact", head: true })
     .eq("custom_section_id", customSectionId);
 
-  await supabase
-    .from("checklist_custom_sections")
-    .delete()
-    .eq("id", customSectionId);
+  if ((remainingItems ?? 0) === 0) {
+    const { error } = await supabase
+      .from("checklist_custom_sections")
+      .delete()
+      .eq("id", customSectionId);
+    if (error) {
+      return {
+        ok: false,
+        error:
+          "Itens arquivados, mas a seção ainda não pôde ser removida (histórico preservado).",
+      };
+    }
+  }
 
   revalidatePath(`/checklists/personalizados/${customTemplateId}/editar`);
+  return { ok: true };
 }
 
 export async function addCustomItemAction(formData: FormData): Promise<void> {
@@ -709,7 +776,8 @@ export async function addCustomItemAction(formData: FormData): Promise<void> {
   const { count } = await supabase
     .from("checklist_custom_items")
     .select("*", { count: "exact", head: true })
-    .eq("custom_section_id", customSectionId);
+    .eq("custom_section_id", customSectionId)
+    .is("archived_at", null);
 
   const position = count ?? 0;
 

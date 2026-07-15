@@ -65,28 +65,57 @@ export function CustomChecklistEditor({
   }
 
   // ── Itens e seções ────────────────────────────────────────────────────
+  const [structuralError, setStructuralError] = useState<string | null>(null);
+
   function handleDeleteItem(itemId: string) {
+    const confirmed = window.confirm(
+      "Remover este item do modelo ativo?\n\nChecklists já aplicados continuam no histórico com este item.",
+    );
+    if (!confirmed) return;
     const fd = new FormData();
     fd.append("custom_item_id", itemId);
     fd.append("custom_template_id", customTemplateId);
-    startTransition(() => deleteCustomItemAction(fd));
+    setStructuralError(null);
+    startTransition(async () => {
+      const result = await deleteCustomItemAction(fd);
+      if (!result.ok) {
+        setStructuralError(
+          result.error ??
+            "Este item já foi usado em checklists aplicados e foi arquivado quando possível (não removido do histórico).",
+        );
+      }
+    });
   }
 
   function handleDeleteSection(sectionId: string, sectionTitle: string) {
     const confirmed = window.confirm(
-      `Excluir a seção "${sectionTitle}"?\n\nTodos os itens desta seção também serão excluídos. Esta ação não pode ser desfeita.`,
+      `Remover a seção "${sectionTitle}"?\n\nOs itens saem do modelo ativo. Checklists já aplicados continuam no histórico.`,
     );
     if (!confirmed) return;
     const fd = new FormData();
     fd.append("custom_section_id", sectionId);
     fd.append("custom_template_id", customTemplateId);
-    startTransition(() => deleteCustomSectionAction(fd));
+    setStructuralError(null);
+    startTransition(async () => {
+      const result = await deleteCustomSectionAction(fd);
+      if (!result.ok) {
+        setStructuralError(
+          result.error ??
+            "Não foi possível remover a seção. O histórico de checklists aplicados continua preservado.",
+        );
+      }
+    });
   }
 
   const nameChanged = name.trim() !== savedName;
 
   return (
     <div className="space-y-8">
+      {structuralError && (
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
+          <p className="text-sm text-destructive">{structuralError}</p>
+        </div>
+      )}
 
       {/* ── Cabeçalho: nome editável + criador ── */}
       <div className="border-border rounded-xl border bg-background p-4 shadow-xs space-y-3">

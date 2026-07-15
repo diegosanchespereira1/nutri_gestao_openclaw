@@ -38,7 +38,9 @@ function assembleTemplates(
   templatesRaw: Record<string, unknown>[],
   sectionsRaw: Record<string, unknown>[],
   itemsRaw: Record<string, unknown>[],
+  options?: { includeArchivedItems?: boolean },
 ): ChecklistTemplateWithSections[] {
+  const includeArchivedItems = options?.includeArchivedItems === true;
   const sectionsByTemplate = new Map<string, ChecklistTemplateSectionRow[]>();
   for (const s of sectionsRaw) {
     const templateId = String(s.template_id);
@@ -59,6 +61,14 @@ function assembleTemplates(
 
   const itemsBySection = new Map<string, ChecklistTemplateItemRow[]>();
   for (const it of itemsRaw) {
+    // Catálogo / modelo ativo: itens arquivados não entram em novos preenchimentos.
+    if (
+      !includeArchivedItems &&
+      it.archived_at != null &&
+      String(it.archived_at).trim() !== ""
+    ) {
+      continue;
+    }
     const sectionId = String(it.section_id);
     const item: ChecklistTemplateItemRow = {
       id: String(it.id),
@@ -191,9 +201,10 @@ async function queryActiveChecklistCatalogSummary(
     const { data: itemRows } = await supabase
       .from("checklist_template_items")
       .select(
-        "is_required, is_structure_only, checklist_template_sections!inner(template_id)",
+        "is_required, is_structure_only, archived_at, checklist_template_sections!inner(template_id)",
       )
-      .in("checklist_template_sections.template_id", templateIds);
+      .in("checklist_template_sections.template_id", templateIds)
+      .is("archived_at", null);
 
     for (const row of itemRows ?? []) {
       const nested = row.checklist_template_sections as
@@ -313,11 +324,17 @@ export async function loadChecklistTemplateBundleById(
  * Variante sem verificação de autenticação — usa cliente Supabase fornecido pelo chamador.
  * Paralleliza template + sections; items dependem dos section IDs.
  * Usar quando o contexto autenticado já foi verificado antes da chamada.
+ *
+ * @param options.includeArchivedItems — true ao reabrir sessão/dossiê antigo
+ *   (itens removidos do modelo ainda aparecem no histórico). Default: false (catálogo / novo fill).
  */
 export async function loadChecklistTemplateBundleByIdDirect(
   supabase: SupabaseClient,
   templateId: string,
+  options?: { includeArchivedItems?: boolean },
 ): Promise<ChecklistTemplateWithSections | null> {
+  const includeArchivedItems = options?.includeArchivedItems === true;
+
   // Busca template metadata + sections em paralelo (items dependem de section IDs)
   const [{ data: t, error: tErr }, { data: sectionsRaw }] = await Promise.all([
     supabase
@@ -335,19 +352,26 @@ export async function loadChecklistTemplateBundleByIdDirect(
   if (tErr || !t) return null;
 
   const sectionIds = (sectionsRaw ?? []).map((r) => String(r.id));
-  const { data: itemsRaw } =
+  let itemsQuery =
     sectionIds.length > 0
-      ? await supabase
+      ? supabase
           .from("checklist_template_items")
           .select("*")
           .in("section_id", sectionIds)
           .order("position", { ascending: true })
-      : { data: [] as Record<string, unknown>[] };
+      : null;
+  if (itemsQuery && !includeArchivedItems) {
+    itemsQuery = itemsQuery.is("archived_at", null);
+  }
+  const { data: itemsRaw } = itemsQuery
+    ? await itemsQuery
+    : { data: [] as Record<string, unknown>[] };
 
   const assembled = assembleTemplates(
     [t as Record<string, unknown>],
     (sectionsRaw ?? []) as Record<string, unknown>[],
     (itemsRaw ?? []) as Record<string, unknown>[],
+    { includeArchivedItems },
   );
   return assembled[0] ?? null;
 }

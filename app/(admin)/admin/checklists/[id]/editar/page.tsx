@@ -22,10 +22,18 @@ const OK_MESSAGES: Record<string, string> = {
   meta_saved: "Alterações salvas.",
   section_added: "Seção adicionada.",
   section_saved: "Seção atualizada.",
-  section_deleted: "Seção removida.",
+  section_deleted: "Seção removida do modelo ativo (histórico preservado).",
   item_added: "Item adicionado.",
   item_saved: "Item atualizado.",
-  item_deleted: "Item removido.",
+  item_deleted: "Item removido do modelo ativo. Checklists já aplicados continuam no histórico.",
+};
+
+const ERR_MESSAGES: Record<string, string> = {
+  invalid: "Dados inválidos. Verifique os campos e tente novamente.",
+  save: "Erro ao guardar. Verifique os campos obrigatórios e tente novamente.",
+  item_in_use:
+    "Não foi possível remover. O item/seção permanece no histórico dos checklists já aplicados.",
+  sem_permissao: "Sem permissão para editar checklists.",
 };
 
 export default async function ChecklistEditPage({
@@ -40,7 +48,7 @@ export default async function ChecklistEditPage({
   if (!template) notFound();
 
   const okMsg = sp.ok ? OK_MESSAGES[sp.ok] : null;
-  const hasError = !!sp.err;
+  const errMsg = sp.err ? ERR_MESSAGES[sp.err] ?? ERR_MESSAGES.save : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -97,11 +105,9 @@ export default async function ChecklistEditPage({
           <p className="text-sm text-green-800">{okMsg}</p>
         </div>
       )}
-      {hasError && (
+      {errMsg && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3">
-          <p className="text-sm text-destructive">
-            Erro ao guardar. Verifique os campos obrigatórios e tente novamente.
-          </p>
+          <p className="text-sm text-destructive">{errMsg}</p>
         </div>
       )}
 

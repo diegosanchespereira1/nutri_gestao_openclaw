@@ -92,35 +92,39 @@ export async function loadTemplateForAdmin(templateId: string): Promise<{
           .from("checklist_template_items")
           .select("*")
           .in("section_id", sectionIds)
+          .is("archived_at", null)
           .order("position", { ascending: true })
       : { data: [] as Record<string, unknown>[] };
 
-  const sections = (sectionsRaw ?? []).map((s: Record<string, unknown>) => {
-    const items = (itemsRaw ?? [])
-      .filter(
-        (it: Record<string, unknown>) =>
-          String(it.section_id) === String(s.id),
-      )
-      .map((it: Record<string, unknown>) => ({
-        id: String(it.id),
-        section_id: String(it.section_id),
-        description: String(it.description),
-        is_required: Boolean(it.is_required),
-        position: Number(it.position),
-        peso: it.peso != null ? Number(it.peso) : 1,
-        is_structure_only: Boolean(it.is_structure_only),
-        created_at: String(it.created_at),
-      }));
+  const sections = (sectionsRaw ?? [])
+    .map((s: Record<string, unknown>) => {
+      const items = (itemsRaw ?? [])
+        .filter(
+          (it: Record<string, unknown>) =>
+            String(it.section_id) === String(s.id),
+        )
+        .map((it: Record<string, unknown>) => ({
+          id: String(it.id),
+          section_id: String(it.section_id),
+          description: String(it.description),
+          is_required: Boolean(it.is_required),
+          position: Number(it.position),
+          peso: it.peso != null ? Number(it.peso) : 1,
+          is_structure_only: Boolean(it.is_structure_only),
+          created_at: String(it.created_at),
+        }));
 
-    return {
-      id: String(s.id),
-      template_id: String(s.template_id),
-      title: String(s.title),
-      position: Number(s.position),
-      created_at: String(s.created_at),
-      items,
-    };
-  });
+      return {
+        id: String(s.id),
+        template_id: String(s.template_id),
+        title: String(s.title),
+        position: Number(s.position),
+        created_at: String(s.created_at),
+        items,
+      };
+    })
+    // Seções cujos itens foram todos arquivados somem do editor.
+    .filter((s) => s.items.length > 0);
 
   const allItems = sections.flatMap((s) => s.items);
   const required_item_count = allItems.filter(
@@ -254,18 +258,30 @@ export async function deleteChecklistSectionAction(
   if (!templateId || !sectionId)
     redirect(`/admin/checklists/${templateId}/editar?err=invalid`);
 
-  await supabase
+  const archivedAt = new Date().toISOString();
+  const { error: archiveErr } = await supabase
     .from("checklist_template_items")
-    .delete()
+    .update({ archived_at: archivedAt })
+    .eq("section_id", sectionId)
+    .is("archived_at", null);
+
+  if (archiveErr) redirect(`/admin/checklists/${templateId}/editar?err=item_in_use`);
+
+  const { count: remainingItems } = await supabase
+    .from("checklist_template_items")
+    .select("id", { count: "exact", head: true })
     .eq("section_id", sectionId);
 
-  const { error } = await supabase
-    .from("checklist_template_sections")
-    .delete()
-    .eq("id", sectionId)
-    .eq("template_id", templateId);
+  if ((remainingItems ?? 0) === 0) {
+    const { error } = await supabase
+      .from("checklist_template_sections")
+      .delete()
+      .eq("id", sectionId)
+      .eq("template_id", templateId);
+    if (error) redirect(`/admin/checklists/${templateId}/editar?err=save`);
+  }
 
-  if (error) redirect(`/admin/checklists/${templateId}/editar?err=save`);
+  await bumpVersionIfApplied(supabase, templateId);
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
@@ -296,6 +312,7 @@ export async function addChecklistItemAction(
     .from("checklist_template_items")
     .select("position")
     .eq("section_id", sectionId)
+    .is("archived_at", null)
     .order("position", { ascending: false })
     .limit(1);
 
@@ -396,10 +413,13 @@ export async function deleteChecklistItemAction(
 
   const { error } = await supabase
     .from("checklist_template_items")
-    .delete()
-    .eq("id", itemId);
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", itemId)
+    .is("archived_at", null);
 
-  if (error) redirect(`/admin/checklists/${templateId}/editar?err=save`);
+  if (error) redirect(`/admin/checklists/${templateId}/editar?err=item_in_use`);
+
+  await bumpVersionIfApplied(supabase, templateId);
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
@@ -448,18 +468,36 @@ export async function deleteSectionQuickAction(payload: {
   const { templateId, sectionId } = payload;
   if (!templateId || !sectionId) return { ok: false, error: "invalid" };
 
-  await supabase
+  const archivedAt = new Date().toISOString();
+  const { error: archiveErr } = await supabase
     .from("checklist_template_items")
-    .delete()
+    .update({ archived_at: archivedAt })
+    .eq("section_id", sectionId)
+    .is("archived_at", null);
+
+  if (archiveErr) {
+    return {
+      ok: false,
+      error:
+        "Não foi possível arquivar os itens da seção. Se já foram usados em checklists aplicados, o histórico continua preservado.",
+    };
+  }
+
+  const { count: remainingItems } = await supabase
+    .from("checklist_template_items")
+    .select("id", { count: "exact", head: true })
     .eq("section_id", sectionId);
 
-  const { error } = await supabase
-    .from("checklist_template_sections")
-    .delete()
-    .eq("id", sectionId)
-    .eq("template_id", templateId);
+  if ((remainingItems ?? 0) === 0) {
+    const { error } = await supabase
+      .from("checklist_template_sections")
+      .delete()
+      .eq("id", sectionId)
+      .eq("template_id", templateId);
+    if (error) return { ok: false, error: error.message };
+  }
 
-  if (error) return { ok: false, error: error.message };
+  await bumpVersionIfApplied(supabase, templateId);
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
@@ -492,6 +530,7 @@ export async function addItemQuickAction(payload: {
     .from("checklist_template_items")
     .select("position")
     .eq("section_id", sectionId)
+    .is("archived_at", null)
     .order("position", { ascending: false })
     .limit(1);
 
@@ -523,12 +562,26 @@ export async function deleteItemQuickAction(payload: {
   const { templateId, itemId } = payload;
   if (!templateId || !itemId) return { ok: false, error: "invalid" };
 
-  const { error } = await supabase
+  const { data: updated, error } = await supabase
     .from("checklist_template_items")
-    .delete()
-    .eq("id", itemId);
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", itemId)
+    .is("archived_at", null)
+    .select("id")
+    .maybeSingle();
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    return {
+      ok: false,
+      error:
+        "Este item já foi usado em checklists aplicados e não pôde ser arquivado. O histórico continua preservado.",
+    };
+  }
+  if (!updated) {
+    return { ok: true };
+  }
+
+  await bumpVersionIfApplied(supabase, templateId);
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");

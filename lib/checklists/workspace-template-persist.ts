@@ -55,21 +55,10 @@ export async function persistWorkspaceTemplateStructure(
           .from("checklist_workspace_items")
           .select("id")
           .in("workspace_section_id", oldSectionIds)
+          .is("archived_at", null)
       : { data: [] as { id: string }[] };
 
   const oldItemIds = (oldItems ?? []).map((i) => String(i.id));
-  const usedItemIds = new Set<string>();
-
-  if (!options.isDraft && oldItemIds.length > 0) {
-    const { data: usedRefs } = await supabase
-      .from("checklist_fill_item_responses")
-      .select("workspace_item_id")
-      .in("workspace_item_id", oldItemIds);
-    for (const ref of usedRefs ?? []) {
-      const itemId = ref.workspace_item_id as string | null;
-      if (itemId) usedItemIds.add(itemId);
-    }
-  }
 
   const payloadSectionIds = new Set(
     input.sections.map((sec) => sec.id).filter((id): id is string => Boolean(id)),
@@ -124,6 +113,7 @@ export async function persistWorkspaceTemplateStructure(
             description: it.description,
             is_required: it.is_required,
             position: itemPos,
+            archived_at: null,
           })
           .eq("id", it.id);
         if (itemErr) {
@@ -165,23 +155,30 @@ export async function persistWorkspaceTemplateStructure(
     sectionPos += 1;
   }
 
-  const removableItemIds = oldItemIds.filter(
-    (id) => !payloadItemIds.has(id) && !usedItemIds.has(id),
-  );
+  const removableItemIds = oldItemIds.filter((id) => !payloadItemIds.has(id));
   if (removableItemIds.length > 0) {
+    // Soft-delete: preserva histórico se o item já foi usado em fills.
     await supabase
       .from("checklist_workspace_items")
-      .delete()
-      .in("id", removableItemIds);
+      .update({ archived_at: new Date().toISOString() })
+      .in("id", removableItemIds)
+      .is("archived_at", null);
   }
 
   for (const sectionId of oldSectionIds) {
     if (payloadSectionIds.has(sectionId)) continue;
-    const { count: itemCount } = await supabase
+    const { count: activeItemCount } = await supabase
+      .from("checklist_workspace_items")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_section_id", sectionId)
+      .is("archived_at", null);
+    if ((activeItemCount ?? 0) > 0) continue;
+
+    const { count: anyItemCount } = await supabase
       .from("checklist_workspace_items")
       .select("id", { count: "exact", head: true })
       .eq("workspace_section_id", sectionId);
-    if ((itemCount ?? 0) === 0) {
+    if ((anyItemCount ?? 0) === 0) {
       await supabase
         .from("checklist_workspace_sections")
         .delete()

@@ -62,6 +62,7 @@ export function ChecklistEditor({ sections, templateId }: Props) {
   const [addFormsKey, setAddFormsKey] = useState(0);
   const [structuralPending, setStructuralPending] = useState(false);
   const [structuralError, setStructuralError] = useState<string | null>(null);
+  const [structuralSuccess, setStructuralSuccess] = useState<string | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -129,12 +130,20 @@ export function ChecklistEditor({ sections, templateId }: Props) {
   };
 
   const runStructural = useCallback(
-    async (op: () => Promise<{ ok: boolean; error?: string }>) => {
+    async (
+      op: () => Promise<{ ok: boolean; error?: string }>,
+      successMessage?: string,
+    ) => {
       setStructuralPending(true);
       setStructuralError(null);
+      setStructuralSuccess(null);
       const result = await op();
       setStructuralPending(false);
       if (result.ok) {
+        if (successMessage) {
+          setStructuralSuccess(successMessage);
+          setTimeout(() => setStructuralSuccess(null), 4000);
+        }
         router.refresh();
         setAddFormsKey((k) => k + 1);
       } else {
@@ -233,12 +242,14 @@ export function ChecklistEditor({ sections, templateId }: Props) {
           </p>
         </div>
       )}
-      {saveSuccess && (
+      {(saveSuccess || structuralSuccess) && (
         <div
           className="rounded-lg border border-green-200 bg-green-50 px-4 py-3"
           role="status"
         >
-          <p className="text-sm text-green-800">Alterações salvas.</p>
+          <p className="text-sm text-green-800">
+            {structuralSuccess ?? "Alterações salvas."}
+          </p>
         </div>
       )}
 
@@ -304,12 +315,18 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                     type="button"
                     disabled={structuralPending}
                     onClick={() => {
+                      const confirmed = window.confirm(
+                        `Remover a seção "${section.title}"?\n\nOs itens saem do modelo ativo. Checklists já aplicados continuam no histórico.`,
+                      );
+                      if (!confirmed) return;
                       const itemIds = section.items.map((it) => it.id);
-                      runStructural(() =>
-                        deleteSectionQuickAction({
-                          templateId,
-                          sectionId: section.id,
-                        }),
+                      runStructural(
+                        () =>
+                          deleteSectionQuickAction({
+                            templateId,
+                            sectionId: section.id,
+                          }),
+                        "Seção removida do modelo ativo. Histórico de checklists aplicados preservado.",
                       ).then((ok) => {
                         if (ok) {
                           setSectionDrafts((prev) => {
@@ -537,12 +554,18 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                                   <button
                                     type="button"
                                     disabled={structuralPending}
-                                    onClick={() =>
-                                      runStructural(() =>
-                                        deleteItemQuickAction({
-                                          templateId,
-                                          itemId: item.id,
-                                        }),
+                                    onClick={() => {
+                                      const confirmed = window.confirm(
+                                        "Remover este item do modelo ativo?\n\nChecklists já aplicados continuam no histórico com este item.",
+                                      );
+                                      if (!confirmed) return;
+                                      runStructural(
+                                        () =>
+                                          deleteItemQuickAction({
+                                            templateId,
+                                            itemId: item.id,
+                                          }),
+                                        "Item removido do modelo ativo. Histórico de checklists aplicados preservado.",
                                       ).then((ok) => {
                                         if (ok) {
                                           setItemDrafts((prev) => {
@@ -556,8 +579,8 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                                             return n;
                                           });
                                         }
-                                      })
-                                    }
+                                      });
+                                    }}
                                     className="flex items-center gap-1 text-xs text-destructive hover:underline disabled:cursor-not-allowed disabled:opacity-40"
                                   >
                                     <Trash2 className="size-3" aria-hidden />

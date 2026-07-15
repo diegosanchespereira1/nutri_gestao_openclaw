@@ -1,7 +1,7 @@
 import { Info } from "lucide-react";
+import dynamic from "next/dynamic";
 import { notFound, redirect } from "next/navigation";
 
-import { ChecklistFillWizard } from "@/components/checklists/checklist-fill-wizard";
 import { PageHelpHint } from "@/components/help/page-help-hint";
 import {
   getChecklistReopenEligibility,
@@ -13,6 +13,14 @@ import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { getProfileSignatureDataUrl } from "@/lib/profile/signature-sync";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
+
+const ChecklistFillWizard = dynamic(
+  () =>
+    import("@/components/checklists/checklist-fill-wizard").then(
+      (mod) => mod.ChecklistFillWizard,
+    ),
+  { loading: () => null },
+);
 
 export default async function ChecklistPreencherPage({
   params,

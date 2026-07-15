@@ -333,21 +333,9 @@ export async function updateSession(request: NextRequest) {
     });
 
     if (canReuseCache && cachedProfileCtx) {
-      // Reusa role/timezone/etc., mas sempre revalida o titular do workspace.
-      // Cookie stale (ex. após mudança em team_members) esvazia clientes/equipe.
-      try {
-        const workspaceOwnerId = await withTimeout(
-          getWorkspaceAccountOwnerId(supabase, user.id),
-          "workspace_account_owner_id_refresh",
-        );
-        profileCtx = {
-          ...cachedProfileCtx,
-          workspaceOwnerId,
-          cachedAt: nowSec,
-        };
-      } catch {
-        profileCtx = cachedProfileCtx;
-      }
+      // Cache fresco: reutiliza workspaceOwnerId e modules (sem RPC).
+      // Mudanças em team_members invalidam no próximo TTL / nova sessão.
+      profileCtx = cachedProfileCtx;
     } else {
       try {
         const workspaceOwnerId = await withTimeout(

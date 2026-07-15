@@ -1,7 +1,9 @@
 "use server";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
 
+import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { addCalendarDays, calendarDaysUntilDueDate, todayKey } from "@/lib/datetime/calendar-tz";
 import {
   balanceValidityAlerts,
@@ -10,6 +12,7 @@ import {
   VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT,
 } from "@/lib/checklists/validity-alerts-balance";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
 
 type RpcAlertRow = {
@@ -191,17 +194,15 @@ async function loadChecklistValidityAlertsResolved(
     timeZone,
     options,
   );
-  if (viaRpc && viaRpc.length > 0) return viaRpc;
+  // null = RPC indisponível → legado; [] = sucesso sem alertas (não cair no legado pesado)
+  if (viaRpc !== null) return viaRpc;
 
-  const legacy = await loadChecklistValidityAlertsLegacy(
+  return loadChecklistValidityAlertsLegacy(
     supabase,
     workspaceOwnerId,
     timeZone,
     options,
   );
-  if (legacy.length > 0) return legacy;
-
-  return viaRpc ?? legacy;
 }
 
 /** Fallback até a migração `20260805150000_perf_navigation_queries.sql` estar aplicada. */
@@ -401,6 +402,36 @@ async function loadChecklistValidityAlertsLegacy(
   return balanceValidityAlerts(alerts, Math.max(1, limit));
 }
 
+function getCachedChecklistValidityAlerts(
+  workspaceOwnerId: string,
+  timeZone: string,
+  withinDays: number,
+  limit: number,
+  clientId: string | null,
+): Promise<ChecklistValidityAlert[]> {
+  return unstable_cache(
+    () =>
+      loadChecklistValidityAlertsResolved(
+        createServiceRoleClient(),
+        workspaceOwnerId,
+        timeZone,
+        { withinDays, limit, clientId },
+      ),
+    [
+      "checklist-validity-alerts-v1",
+      workspaceOwnerId,
+      timeZone,
+      String(withinDays),
+      String(limit),
+      clientId ?? "",
+    ],
+    {
+      revalidate: 90,
+      tags: [checklistValidityAlertsCacheTag(workspaceOwnerId)],
+    },
+  )();
+}
+
 export async function loadChecklistValidityAlerts(
   timeZone: string,
   options?: { withinDays?: number; limit?: number; clientId?: string | null },
@@ -408,10 +439,24 @@ export async function loadChecklistValidityAlerts(
   const { supabase, workspaceOwnerId } = await getServerContext();
   if (!workspaceOwnerId) return [];
 
-  return loadChecklistValidityAlertsResolved(
-    supabase,
-    workspaceOwnerId,
-    timeZone,
-    options,
-  );
+  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
+  const clientId = options?.clientId ?? null;
+
+  try {
+    return await getCachedChecklistValidityAlerts(
+      workspaceOwnerId,
+      timeZone,
+      withinDays,
+      limit,
+      clientId,
+    );
+  } catch {
+    return loadChecklistValidityAlertsResolved(
+      supabase,
+      workspaceOwnerId,
+      timeZone,
+      { withinDays, limit, clientId },
+    );
+  }
 }

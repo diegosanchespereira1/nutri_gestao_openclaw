@@ -1611,49 +1611,48 @@ export async function checkExistingOpenFillSession(input: {
   }
   if (scopedSessions.length === 0) return null;
 
-  // Para cada sessão, verificar se tem ao menos 1 resposta salva.
-  for (const sess of scopedSessions) {
-    const { count } = await supabase
-      .from("checklist_fill_item_responses")
-      .select("id", { count: "exact", head: true })
-      .eq("session_id", sess.id);
+  const sessionIds = scopedSessions.map((s) => s.id);
+  const { data: responseRows } = await supabase
+    .from("checklist_fill_item_responses")
+    .select("session_id")
+    .in("session_id", sessionIds);
 
-    const responseCount = count ?? 0;
-    if (responseCount > 0) {
-      const isMine = sess.user_id === auth.userId;
-      let startedByName: string | null = null;
-      if (!isMine) {
-        // Busca pelo team_members do workspace (RLS permite leitura via owner_user_id).
-        // O member_user_id liga o registro de membro ao auth.uid() de quem iniciou a sessão.
-        const { data: member } = await supabase
-          .from("team_members")
-          .select("full_name")
-          .eq("owner_user_id", auth.workspaceOwnerId)
-          .eq("member_user_id", sess.user_id)
-          .maybeSingle();
-        startedByName = member?.full_name ?? null;
-
-        // Fallback: profiles (funciona quando o próprio criador é o owner do workspace)
-        if (!startedByName) {
-          const { data: profile } = await supabase
-            .from("profiles")
-            .select("full_name")
-            .eq("user_id", sess.user_id)
-            .maybeSingle();
-          startedByName = profile?.full_name ?? null;
-        }
-      }
-      return {
-        id: sess.id,
-        updated_at: sess.updated_at,
-        response_count: responseCount,
-        started_by_me: isMine,
-        started_by_name: startedByName,
-      };
-    }
+  const counts = new Map<string, number>();
+  for (const row of responseRows ?? []) {
+    const sid = String((row as { session_id: string }).session_id);
+    counts.set(sid, (counts.get(sid) ?? 0) + 1);
   }
 
-  return null;
+  const sess = scopedSessions.find((s) => (counts.get(s.id) ?? 0) > 0);
+  if (!sess) return null;
+
+  const responseCount = counts.get(sess.id) ?? 0;
+  const isMine = sess.user_id === auth.userId;
+  let startedByName: string | null = null;
+  if (!isMine) {
+    const [{ data: member }, { data: profile }] = await Promise.all([
+      supabase
+        .from("team_members")
+        .select("full_name")
+        .eq("owner_user_id", auth.workspaceOwnerId)
+        .eq("member_user_id", sess.user_id)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", sess.user_id)
+        .maybeSingle(),
+    ]);
+    startedByName = member?.full_name ?? profile?.full_name ?? null;
+  }
+
+  return {
+    id: sess.id,
+    updated_at: sess.updated_at,
+    response_count: responseCount,
+    started_by_me: isMine,
+    started_by_name: startedByName,
+  };
 }
 
 /* ─── startChecklistFillBatch ─────────────────────────────────────────── */

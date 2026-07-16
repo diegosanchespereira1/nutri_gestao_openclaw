@@ -32,6 +32,7 @@ type Props = {
   customSegments?: ClientCustomSegment[];
   className?: string;
   describedBy?: string;
+  disabled?: boolean;
 };
 
 export function BusinessSegmentSelect({
@@ -41,6 +42,7 @@ export function BusinessSegmentSelect({
   customSegments = [],
   className,
   describedBy,
+  disabled = false,
 }: Props) {
   const selectValue = value || EMPTY_VALUE;
 
@@ -49,6 +51,7 @@ export function BusinessSegmentSelect({
       <input type="hidden" name="business_segment" value={value} />
       <Select
         value={selectValue}
+        disabled={disabled}
         onValueChange={(next) => {
           if (!next || next === EMPTY_VALUE) {
             onChange("");

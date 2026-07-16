@@ -1,7 +1,5 @@
 "use server";
 
-import { APP_DASHBOARD_PATH } from "@/lib/routes";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -14,7 +12,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, isTeamMember, canDeleteWorkspaceMasterData } from "@/lib/workspace";
 import type {
   ClientBusinessSegment,
   ClientKind,
@@ -567,22 +565,24 @@ export async function createClientAction(
     await appendClientExamUploads(supabase, workspaceOwnerId, newId, formData);
   }
 
-  revalidatePathsAfterClientMutation(newId);
+  revalidatePathsAfterClientSave(newId, {
+    touchedEstablishment: kind === "pj",
+  });
   if (teamMember) {
     redirect("/clientes?ok=created");
   }
   redirect(`/clientes/${newId}/editar`);
 }
 
-function revalidatePathsAfterClientMutation(clientId: string) {
+function revalidatePathsAfterClientSave(
+  clientId: string,
+  opts?: { touchedEstablishment?: boolean },
+) {
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${clientId}/editar`);
-  revalidatePath("/visitas/nova");
-  revalidatePath("/visitas");
-  revalidatePath("/pacientes");
-  revalidatePath(APP_DASHBOARD_PATH);
-  revalidatePath("/estabelecimentos");
-  revalidatePath("/checklists");
+  if (opts?.touchedEstablishment) {
+    revalidatePath("/estabelecimentos");
+  }
 }
 
 export async function updateClientAction(
@@ -765,7 +765,9 @@ export async function updateClientAction(
     await appendClientExamUploads(supabase, workspaceOwnerId, id, formData);
   }
 
-  revalidatePathsAfterClientMutation(id);
+  revalidatePathsAfterClientSave(id, {
+    touchedEstablishment: kind === "pj",
+  });
   return { ok: true };
 }
 
@@ -778,7 +780,9 @@ export async function deleteClientAction(formData: FormData) {
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  if (isTeamMember(user.id, workspaceOwnerId)) redirect("/clientes");
+  if (!(await canDeleteWorkspaceMasterData(supabase, user.id, workspaceOwnerId))) {
+    redirect("/clientes");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/clientes");
@@ -803,10 +807,6 @@ export async function deleteClientAction(formData: FormData) {
     .eq("owner_user_id", workspaceOwnerId);
 
   revalidatePath("/clientes");
-  revalidatePath("/pacientes");
-  revalidatePath("/visitas/nova");
-  revalidatePath("/visitas");
-  revalidatePath(APP_DASHBOARD_PATH);
   redirect("/clientes");
 }
 

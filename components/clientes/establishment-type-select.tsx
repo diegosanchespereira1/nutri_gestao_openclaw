@@ -20,6 +20,7 @@ type Props = {
   onChange: (value: EstablishmentType) => void;
   className?: string;
   placeholder?: string;
+  disabled?: boolean;
 };
 
 export function EstablishmentTypeSelect({
@@ -29,10 +30,12 @@ export function EstablishmentTypeSelect({
   onChange,
   className,
   placeholder = "Selecione",
+  disabled = false,
 }: Props) {
   return (
     <Select
       value={value || null}
+      disabled={disabled}
       onValueChange={(next) => {
         if (next) onChange(next as EstablishmentType);
       }}

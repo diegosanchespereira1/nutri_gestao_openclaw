@@ -28,6 +28,7 @@ type Props = {
   required?: boolean;
   className?: string;
   describedBy?: string;
+  disabled?: boolean;
 };
 
 export function EstablishmentCategorySelect({
@@ -36,18 +37,21 @@ export function EstablishmentCategorySelect({
   onChange,
   className,
   describedBy,
+  disabled = false,
 }: Props) {
   const enabledModules = useEnabledModules();
 
   useEffect(() => {
+    if (disabled) return;
     if (value && !isEstablishmentCategoryEnabled(value, enabledModules)) {
       onChange("");
     }
-  }, [enabledModules, onChange, value]);
+  }, [disabled, enabledModules, onChange, value]);
 
   return (
     <Select
       value={value || null}
+      disabled={disabled}
       onValueChange={(next) =>
         onChange((next ?? "") as EstablishmentCategory | "")
       }

@@ -21,6 +21,7 @@ import {
 } from "@/lib/actions/compliance-deadlines";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { canDeleteWorkspaceMasterData } from "@/lib/workspace";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 
 export default async function EditarEstabelecimentoPage({
@@ -36,7 +37,9 @@ export default async function EditarEstabelecimentoPage({
     typeof sp.blocked === "string" ? sp.blocked === "patients" : false;
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user) redirect("/login");
-  const isTeamMember = !!user && !!workspaceOwnerId && user.id !== workspaceOwnerId;
+  const canDelete =
+    !!workspaceOwnerId &&
+    (await canDeleteWorkspaceMasterData(supabase, user.id, workspaceOwnerId));
 
   const { data: client } = await supabase
     .from("clients")
@@ -173,7 +176,7 @@ export default async function EditarEstabelecimentoPage({
       </Card>
 
       {/* ── Seção 5: Zona de perigo ────────────────────────── */}
-      {!isTeamMember ? (
+      {canDelete ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
           <h2 className="text-sm font-semibold text-destructive">
             Zona de perigo

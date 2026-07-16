@@ -9,11 +9,13 @@ import {
   ImageIcon,
   Loader2,
   MapPin,
+  Pencil,
   Plus,
   StickyNote,
   UserCircle,
   Users,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import {
   useActionState,
   useEffect,
@@ -109,6 +111,7 @@ const PJ_ONLY_TABS: ClientFormTab[] = [
 export function ClientForm({
   mode,
   clientId,
+  canEdit = true,
   defaultKind,
   lockKind = false,
   defaultLegalName,
@@ -165,6 +168,8 @@ export function ClientForm({
 }: {
   mode: "create" | "edit";
   clientId?: string;
+  /** Em modo edit: mostra ícone Editar e permite gravar. Create ignora. */
+  canEdit?: boolean;
   defaultKind: ClientKind;
   /** Quando true, o toggle PF/PJ fica oculto e o kind é fixado em defaultKind.
    *  Usar nas páginas de Clientes (apenas PJ). */
@@ -226,9 +231,13 @@ export function ClientForm({
   initialFormTab?: "pj-estabelecimento";
   children?: ReactNode;
 }) {
+  const router = useRouter();
   const action =
     mode === "create" ? createClientAction : updateClientAction;
   const [state, formAction, isPending] = useActionState(action, initial);
+  const [isEditing, setIsEditing] = useState(mode === "create");
+  const [formEpoch, setFormEpoch] = useState(0);
+  const fieldsLocked = mode === "edit" && !isEditing;
   const [kind, setKind] = useState<ClientKind>(defaultKind);
   const [tab, setTab] = useState<ClientFormTab>(() => {
     if (
@@ -281,6 +290,30 @@ export function ClientForm({
     return () => window.clearTimeout(id);
   }, [state]);
 
+  useEffect(() => {
+    if (mode !== "edit" || state?.ok !== true) return;
+    setIsEditing(false);
+    setFormEpoch((n) => n + 1);
+    router.refresh();
+  }, [mode, state, router]);
+
+  useEffect(() => {
+    if (isEditing) return;
+    setKind(defaultKind);
+    setSegmentValue(defaultBusinessSegment);
+    setResponsibleValue(defaultResponsibleTeamMemberId ?? "");
+    setSexValue(defaultSex);
+    setEstCategory(defaultEstType ? categoryFromType(defaultEstType) : "");
+    setEstType(defaultEstType ?? "");
+  }, [
+    isEditing,
+    defaultKind,
+    defaultBusinessSegment,
+    defaultResponsibleTeamMemberId,
+    defaultSex,
+    defaultEstType,
+  ]);
+
   function handleCreateSegment() {
     setNewSegmentError(null);
     startSegmentTransition(async () => {
@@ -313,13 +346,34 @@ export function ClientForm({
 
   const hasLogoPreview = Boolean(defaultLogoPreviewUrl);
 
+  function enterEditMode() {
+    setIsEditing(true);
+  }
+
+  function cancelEditMode() {
+    setIsEditing(false);
+    setFormEpoch((n) => n + 1);
+    setKind(defaultKind);
+    setSegmentValue(defaultBusinessSegment);
+    setResponsibleValue(defaultResponsibleTeamMemberId ?? "");
+    setSexValue(defaultSex);
+    setEstCategory(initialEstCategory);
+    setEstType(defaultEstType ?? "");
+    setEstValidationError(false);
+  }
+
   return (
     <>
     <Card className="max-w-3xl">
       <form
+        key={formEpoch}
         action={formAction}
         onReset={(e) => e.preventDefault()}
         onSubmit={(e) => {
+          if (!isEditing) {
+            e.preventDefault();
+            return;
+          }
           if (kind === "pj" && !estType) {
             e.preventDefault();
             setEstValidationError(true);
@@ -327,9 +381,40 @@ export function ClientForm({
             setTab("pj-estabelecimento");
           }
         }}
+        className={cn(
+          fieldsLocked &&
+            "[&_input:not([type=hidden]):not([type=file])]:pointer-events-none [&_input:not([type=hidden]):not([type=file])]:bg-muted/40 [&_textarea]:pointer-events-none [&_textarea]:bg-muted/40 [&_[data-slot=select-trigger]]:pointer-events-none [&_[data-slot=select-trigger]]:bg-muted/40 [&_input[type=file]]:hidden",
+        )}
       >
         {mode === "edit" && clientId ? (
           <input type="hidden" name="id" value={clientId} />
+        ) : null}
+
+        {mode === "edit" ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-foreground/10 px-6 py-3">
+            {fieldsLocked && canEdit ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={enterEditMode}
+              >
+                <Pencil className="size-3.5" aria-hidden />
+                Editar dados
+              </Button>
+            ) : null}
+            {isEditing ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={cancelEditMode}
+                disabled={isPending}
+              >
+                Cancelar
+              </Button>
+            ) : null}
+          </div>
         ) : null}
 
         <CardContent className="pt-6">
@@ -475,7 +560,7 @@ export function ClientForm({
                     id="client-trade-name"
                     name="trade_name"
                     defaultValue={defaultTradeName}
-                    disabled={kind === "pf"}
+                    disabled={kind === "pf" || fieldsLocked}
                     placeholder={kind === "pj" ? "Ex.: Unidade Centro" : "—"}
                     className="disabled:opacity-60"
                   />
@@ -497,22 +582,25 @@ export function ClientForm({
                         onChange={setSegmentValue}
                         customSegments={customSegments}
                         className="min-w-0 flex-1"
+                        disabled={fieldsLocked}
                       />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        className="shrink-0"
-                        title="Criar nova categoria"
-                        aria-label="Criar nova categoria de negócio"
-                        onClick={() => {
-                          setNewSegmentLabel("");
-                          setNewSegmentError(null);
-                          setSegmentDialogOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                      {!fieldsLocked ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="shrink-0"
+                          title="Criar nova categoria"
+                          aria-label="Criar nova categoria de negócio"
+                          onClick={() => {
+                            setNewSegmentLabel("");
+                            setNewSegmentError(null);
+                            setSegmentDialogOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
                     <p className="text-muted-foreground text-xs">
                       Aparece na lista de clientes (ex.: padaria, escola,
@@ -575,6 +663,7 @@ export function ClientForm({
                     />
                     <Select
                       value={responsibleValue || EMPTY_SELECT_VALUE}
+                      disabled={fieldsLocked}
                       onValueChange={(next) => {
                         setResponsibleValue(
                           !next || next === EMPTY_SELECT_VALUE ? "" : next,
@@ -656,6 +745,7 @@ export function ClientForm({
                         <Select
                           name="lifecycle_status"
                           defaultValue={defaultLifecycleStatus}
+                          disabled={fieldsLocked}
                         >
                           <SelectTrigger id="lifecycle-status" className="w-full">
                             <SelectValue placeholder="Selecione o estado">
@@ -741,6 +831,7 @@ export function ClientForm({
                     value={estCategory}
                     onChange={handleEstCategoryChange}
                     className="w-full"
+                    disabled={fieldsLocked}
                   />
                 </div>
 
@@ -764,6 +855,7 @@ export function ClientForm({
                       }}
                       placeholder="Selecione o tipo…"
                       className="w-full"
+                      disabled={fieldsLocked}
                     />
                   </div>
                 ) : null}
@@ -888,6 +980,7 @@ export function ClientForm({
                         <input type="hidden" name="sex" value={sexValue} />
                         <Select
                           value={sexValue || EMPTY_SELECT_VALUE}
+                          disabled={fieldsLocked}
                           onValueChange={(next) => {
                             setSexValue(
                               !next || next === EMPTY_SELECT_VALUE
@@ -1333,28 +1426,32 @@ export function ClientForm({
             <span className="text-muted-foreground hidden text-sm sm:block">
               {mode === "create"
                 ? "Depois de criar, pode continuar a editar e carregar exames."
-                : null}
+                : fieldsLocked
+                  ? "Dados do cliente. Clique em Editar dados para alterar."
+                  : null}
             </span>
           )}
-          {state?.ok === true ? (
+          {state?.ok === true && fieldsLocked ? (
             <p className="text-muted-foreground text-sm sm:order-first" role="status">
               Alterações guardadas.
             </p>
           ) : null}
-          <div className="flex flex-wrap justify-end gap-2 sm:ms-auto">
-            <Button type="submit" className="min-w-[9rem]" disabled={isPending}>
-              {isPending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
-                  {mode === "create" ? "Cadastrando…" : "Salvando…"}
-                </>
-              ) : mode === "create" ? (
-                "Criar cliente"
-              ) : (
-                "Salvar alterações"
-              )}
-            </Button>
-          </div>
+          {isEditing ? (
+            <div className="flex flex-wrap justify-end gap-2 sm:ms-auto">
+              <Button type="submit" className="min-w-[9rem]" disabled={isPending}>
+                {isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    {mode === "create" ? "Cadastrando…" : "Salvando…"}
+                  </>
+                ) : mode === "create" ? (
+                  "Criar cliente"
+                ) : (
+                  "Salvar alterações"
+                )}
+              </Button>
+            </div>
+          ) : null}
         </CardFooter>
       </form>
     </Card>

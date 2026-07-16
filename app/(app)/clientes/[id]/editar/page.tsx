@@ -44,7 +44,9 @@ import { formatBRLFromCents } from "@/lib/dashboard/financial-pending";
 import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
-import { isTeamMember as checkIsTeamMember } from "@/lib/workspace";
+import {
+  canDeleteWorkspaceMasterData,
+} from "@/lib/workspace";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 import type { ClientRow } from "@/lib/types/clients";
 import { cn } from "@/lib/utils";
@@ -193,7 +195,8 @@ async function ClientEditLoadedPanels({
   row,
   logoPreviewUrl,
   sp,
-  isTeamMember,
+  canDelete,
+  canEdit,
   contractErr,
   activeTab,
 }: {
@@ -202,7 +205,8 @@ async function ClientEditLoadedPanels({
   row: ClientRow;
   logoPreviewUrl: string | null;
   sp: EditSearchParams;
-  isTeamMember: boolean;
+  canDelete: boolean;
+  canEdit: boolean;
   contractErr?: string;
   activeTab: ClientEditTabValue;
 }) {
@@ -240,6 +244,7 @@ async function ClientEditLoadedPanels({
       <ClientFormLazy
         mode="edit"
         clientId={row.id}
+        canEdit={canEdit}
         defaultKind={row.kind}
         lockKind={row.kind === "pj"}
         initialFormTab={
@@ -329,7 +334,7 @@ async function ClientEditLoadedPanels({
         </>
       ) : null}
 
-      {!isTeamMember ? (
+      {!canDelete ? null : (
         <>
           <Separator className="my-8" />
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
@@ -343,7 +348,7 @@ async function ClientEditLoadedPanels({
             </div>
           </div>
         </>
-      ) : null}
+      )}
     </>
   );
 
@@ -496,7 +501,12 @@ export default async function EditarClientePage({
   }
 
   const activeTab = resolveClientEditTab(sp.tab, shell.kind);
-  const isTeamMember = checkIsTeamMember(user.id, workspaceOwnerId);
+  const canDelete = await canDeleteWorkspaceMasterData(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+  );
+  const canEdit = true;
 
   const statusLabel =
     shell.lifecycle_status === "ativo"
@@ -534,7 +544,8 @@ export default async function EditarClientePage({
             status: sp.status,
             page: sp.page,
           }}
-          isTeamMember={isTeamMember}
+          canDelete={canDelete}
+          canEdit={canEdit}
           contractErr={sp.contractErr}
           activeTab={activeTab}
         />

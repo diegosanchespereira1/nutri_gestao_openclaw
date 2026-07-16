@@ -12,7 +12,7 @@ import {
 import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
-import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, canDeleteWorkspaceMasterData } from "@/lib/workspace";
 import type {
   EstablishmentPickerOption,
   EstablishmentRow,
@@ -565,7 +565,9 @@ export async function deleteEstablishmentAction(formData: FormData) {
   if (!user) redirect("/login");
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (isTeamMember(user.id, workspaceOwnerId)) redirect("/clientes");
+  if (!(await canDeleteWorkspaceMasterData(supabase, user.id, workspaceOwnerId))) {
+    redirect("/clientes");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();
@@ -590,7 +592,6 @@ export async function deleteEstablishmentAction(formData: FormData) {
     .eq("id", id)
     .eq("client_id", clientId);
 
-  revalidatePath("/pacientes");
   revalidateClientEstablishmentPaths(clientId);
   redirect(`/clientes/${clientId}/editar`);
 }

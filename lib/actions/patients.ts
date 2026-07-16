@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
-import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, canDeleteWorkspaceMasterData } from "@/lib/workspace";
 import {
   deletePatientPhotoAtPathIfAny,
   mapPatientPhotoUpdateError,
@@ -37,15 +37,6 @@ function revalidatePatientPaths(
   revalidatePath("/pacientes");
   if (clientId) {
     revalidatePath(`/clientes/${clientId}/editar`);
-    revalidatePath(`/clientes/${clientId}/pacientes/novo`);
-    if (establishmentId) {
-      revalidatePath(
-        `/clientes/${clientId}/estabelecimentos/${establishmentId}/editar`,
-      );
-      revalidatePath(
-        `/clientes/${clientId}/estabelecimentos/${establishmentId}/pacientes/novo`,
-      );
-    }
   }
   if (patientId) {
     revalidatePath(`/pacientes/${patientId}/editar`);
@@ -631,10 +622,6 @@ export async function updatePatientAction(
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  if (isTeamMember(user.id, workspaceOwnerId)) {
-    return { ok: false, error: "Sem permissão. Apenas o administrador pode editar pacientes." };
-  }
-
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     return { ok: false, error: "Identificador em falta." };
@@ -811,7 +798,9 @@ export async function deletePatientAction(formData: FormData) {
   if (!user) redirect("/login");
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (isTeamMember(user.id, workspaceOwnerId)) redirect("/pacientes");
+  if (!(await canDeleteWorkspaceMasterData(supabase, user.id, workspaceOwnerId))) {
+    redirect("/pacientes");
+  }
 
   const id = String(formData.get("id") ?? "").trim();
   if (!id) redirect("/pacientes");

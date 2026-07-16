@@ -24,6 +24,7 @@ import { loadGradesForClient } from "@/lib/actions/school-grades";
 import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
 import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { canDeleteWorkspaceMasterData } from "@/lib/workspace";
 import { cn } from "@/lib/utils";
 
 export default async function EditarPacientePage({
@@ -47,8 +48,10 @@ export default async function EditarPacientePage({
     loadPatientById(id),
     loadTeamMembersForSelect(),
   ]);
-  const isTeamMember = !!user && !!workspaceOwnerId && user.id !== workspaceOwnerId;
   if (!row) notFound();
+  const canDelete =
+    !!workspaceOwnerId &&
+    (await canDeleteWorkspaceMasterData(supabase, user.id, workspaceOwnerId));
 
   // Carrega kind do cliente e estabelecimentos (só relevante para PJ)
   let clientKind: string | null = null;
@@ -235,7 +238,7 @@ export default async function EditarPacientePage({
       </Card>
 
       {/* ── Seção 3: Zona de perigo ─────────────────────────────── */}
-      {!isTeamMember ? (
+      {canDelete ? (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-5">
           <h2 className="text-sm font-semibold text-destructive">
             Zona de perigo

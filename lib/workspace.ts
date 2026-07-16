@@ -56,8 +56,8 @@ export async function isWorkspaceGestaoMember(
   return !!data?.id;
 }
 
-/** Titular, cargo Gestão ou admin/super_admin da plataforma podem gerir a equipe. */
-export async function canManageTeamMembers(
+/** Titular, cargo Gestão ou admin/super_admin da plataforma. */
+async function isOwnerGestaoOrPlatformAdmin(
   supabase: SupabaseClient,
   authUserId: string,
   workspaceOwnerId: string,
@@ -74,4 +74,25 @@ export async function canManageTeamMembers(
     .maybeSingle();
 
   return profile?.role === "admin" || profile?.role === "super_admin";
+}
+
+/** Titular, cargo Gestão ou admin/super_admin da plataforma podem gerir a equipe. */
+export async function canManageTeamMembers(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+): Promise<boolean> {
+  return isOwnerGestaoOrPlatformAdmin(supabase, authUserId, workspaceOwnerId);
+}
+
+/**
+ * Pode apagar clientes, estabelecimentos e pacientes do workspace
+ * (titular, cargo Gestão ou admin/super_admin).
+ */
+export async function canDeleteWorkspaceMasterData(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+): Promise<boolean> {
+  return isOwnerGestaoOrPlatformAdmin(supabase, authUserId, workspaceOwnerId);
 }

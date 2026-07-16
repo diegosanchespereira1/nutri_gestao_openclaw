@@ -8,11 +8,8 @@
 import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId, isTeamMember } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
-
-const OWNER_ONLY_ERROR =
-  "Sem permissão. Apenas o titular da conta pode gerenciar séries.";
 
 export type SchoolGradeActionResult = { ok: true } | { ok: false; error: string };
 
@@ -153,9 +150,6 @@ export async function createGradeAction(
   if (nameTrim.length > 80) return { ok: false, error: "Nome muito longo (máx. 80 caracteres)." };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (isTeamMember(user.id, workspaceOwnerId)) {
-    return { ok: false, error: OWNER_ONLY_ERROR };
-  }
 
   const owned = await assertClientOwned(supabase, workspaceOwnerId, clientId);
   if (!owned.ok) return owned;
@@ -206,9 +200,6 @@ export async function renameGradeAction(
   if (nameTrim.length > 80) return { ok: false, error: "Nome muito longo (máx. 80 caracteres)." };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (isTeamMember(user.id, workspaceOwnerId)) {
-    return { ok: false, error: OWNER_ONLY_ERROR };
-  }
 
   const owned = await assertGradeOwned(supabase, workspaceOwnerId, gradeId);
   if (!owned) return { ok: false, error: "Série não encontrada." };
@@ -246,9 +237,6 @@ export async function deleteGradeAction(gradeId: string): Promise<SchoolGradeAct
   if (!user) return { ok: false, error: "Sessão expirada." };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (isTeamMember(user.id, workspaceOwnerId)) {
-    return { ok: false, error: OWNER_ONLY_ERROR };
-  }
 
   const owned = await assertGradeOwned(supabase, workspaceOwnerId, gradeId);
   if (!owned) return { ok: false, error: "Série não encontrada." };

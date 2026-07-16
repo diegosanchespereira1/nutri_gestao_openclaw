@@ -480,9 +480,6 @@ export async function updateEstablishmentAction(
   if (!user) redirect("/login");
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  if (isTeamMember(user.id, workspaceOwnerId)) {
-    return { ok: false, error: "Sem permissão. Apenas o administrador pode editar estabelecimentos." };
-  }
 
   const id = String(formData.get("id") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();

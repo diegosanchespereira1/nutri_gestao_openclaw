@@ -50,8 +50,8 @@ export default async function ClientesPage({
           className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
           role="status"
         >
-          Cliente criado com sucesso. Apenas o administrador da conta pode
-          editar os dados depois do cadastro.
+          Cliente criado com sucesso. Pode continuar a editar os dados na ficha
+          do cliente.
         </p>
       ) : null}
 

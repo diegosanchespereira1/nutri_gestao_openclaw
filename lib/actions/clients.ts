@@ -597,10 +597,6 @@ export async function updateClientAction(
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  if (isTeamMember(user.id, workspaceOwnerId)) {
-    return { ok: false, error: "Sem permissão. Apenas o administrador pode editar clientes." };
-  }
-
   const id = String(formData.get("id") ?? "").trim();
   if (!id) {
     return { ok: false, error: "Identificador em falta." };
@@ -745,6 +741,10 @@ export async function updateClientAction(
         .eq("id", existingEst.id);
       if (estErr) {
         console.error("[updateClientAction] establishment update failed:", estErr.message);
+        return {
+          ok: false,
+          error: "Cliente atualizado, mas não foi possível guardar o estabelecimento.",
+        };
       }
     } else {
       const { error: estErr } = await supabase.from("establishments").insert({
@@ -753,6 +753,10 @@ export async function updateClientAction(
       });
       if (estErr) {
         console.error("[updateClientAction] establishment insert failed:", estErr.message);
+        return {
+          ok: false,
+          error: "Cliente atualizado, mas não foi possível guardar o estabelecimento.",
+        };
       }
     }
   }

@@ -77,6 +77,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 - Opcionalmente, cada **cliente** e cada **paciente** pode referenciar um `team_members.id` do mesmo workspace (`responsible_team_member_id`), com validação em trigger antes de gravar.
 - É **independente** da atribuição operacional em **visitas agendadas** (`scheduled_visits.assigned_team_member_id`): a visita descreve quem executa aquele evento; o campo na carteira descreve quem é o responsável de continuidade do atendimento.
 - A **área Equipe** lista, por membro, os clientes e pacientes em que esse membro está definido como responsável.
+- **Permissões de carteira:** membros do workspace podem **atualizar** clientes, estabelecimentos e pacientes do tenant; **eliminar** esses registos fica reservado ao titular, ao cargo `gestao`, ou a admin/super_admin da plataforma. Detalhe e migrations: [docs/architecture/workspace-permissions.md](../../docs/architecture/workspace-permissions.md).
 - **Auditoria:** mutações em `clients` geram linhas em `audit_log` com payload focado; mutações em `patients` continuam a usar o trigger genérico (com mascaramento). A coluna `audit_log.actor_user_id` regista o utilizador da sessão quando `auth.uid()` está disponível no trigger (`SECURITY DEFINER`); `audit_log.user_id` mantém-se como chave de tenant (titular).
 
 ## Preferências Técnicas (Confirmadas)

@@ -61,6 +61,15 @@ npm run test:rls:watch
 
 ## O que é testado
 
+### Modelo de permissões (mesmo tenant)
+
+Os testes desta pasta focam **isolamento entre tenants**. No mesmo workspace:
+
+- **UPDATE** de `clients` / `establishments` / `patients` — permitido a titular e membros (`workspace_member_user_ids`).
+- **DELETE** — titular, `job_role = gestao`, ou admin/super_admin (`workspace_can_delete_master_data`).
+
+Documentação: [docs/architecture/workspace-permissions.md](../../docs/architecture/workspace-permissions.md). Helpers cobertos por testes unitários em `lib/workspace.test.ts`.
+
 ### Tabelas cobertas (16)
 | Tabela | Testes |
 |--------|--------|

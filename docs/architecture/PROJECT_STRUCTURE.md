@@ -8,7 +8,7 @@ Este documento descreve o layout intencional do projeto e o que **não** deve se
 |---------|-----------|
 | `app/` | App Router (rotas, layouts, API routes) |
 | `components/` | Componentes React por domínio + `components/ui/` (shadcn) |
-| `lib/` | Lógica, server actions (`lib/actions/`), Supabase, utilitários. Domínio **clientes**: helpers em `lib/clientes/` (logo, enriquecimento de lista, normalização de linha). |
+| `lib/` | Lógica, server actions (`lib/actions/`), Supabase, utilitários. Domínio **clientes**: helpers em `lib/clientes/` (logo, enriquecimento de lista, normalização de linha). Workspace multi-tenant: [`lib/workspace.ts`](../../lib/workspace.ts) (titular, equipa, `canDeleteWorkspaceMasterData`). |
 | `hooks/` | React hooks partilhados |
 | `public/` | Ficheiros estáticos servidos pelo Next (inclui `public/fonts/` referenciados em código) |
 | `supabase/` | Migrações, `config.toml`, seeds |
@@ -20,6 +20,7 @@ Este documento descreve o layout intencional do projeto e o que **não** deve se
 - `lib/actions/` — Server Actions (Next.js `"use server"`).
 - `lib/types/` — Tipos TypeScript partilhados entre domínios.
 - `lib/<domínio>/` — Lógica pura do domínio (ex.: `lib/clientes/`, `lib/checklists/`).
+- `lib/workspace.ts` — Resolução do titular e permissões de carteira (editar vs apagar). Ver [workspace-permissions.md](workspace-permissions.md).
 - `components/<domínio>/` — UI alinhada ao mesmo domínio (ex.: `components/clientes/`).
 - Testes unitários co-localizados: `lib/**/*.test.ts` (configurado em `vitest.config.ts`).
 

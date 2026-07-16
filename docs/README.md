@@ -4,7 +4,7 @@
 
 | Pasta | Conteúdo |
 |-------|----------|
-| [architecture/](architecture/) | Estrutura do repositório e convenções |
+| [architecture/](architecture/) | Estrutura do repositório, convenções e [permissões do workspace](architecture/workspace-permissions.md) |
 | [deployment/](deployment/) | Docker, Portainer, checklist de produção |
 | [security/](security/) | Auditorias, relatórios de segurança |
 | [mobile/](mobile/) | Publicação e testes do app Capacitor |

@@ -293,9 +293,66 @@ export function ClientForm({
   useEffect(() => {
     if (mode !== "edit" || state?.ok !== true) return;
     setIsEditing(false);
-    setFormEpoch((n) => n + 1);
     router.refresh();
   }, [mode, state, router]);
+
+  const defaultsSignature = [
+    defaultLegalName,
+    defaultTradeName,
+    defaultDocumentId,
+    defaultEmail,
+    defaultPhone,
+    defaultNotes,
+    defaultAttendedFullName,
+    defaultBirthDate,
+    defaultSex,
+    defaultDietaryRestrictions,
+    defaultChronicMedications,
+    defaultGuardianFullName,
+    defaultGuardianDocumentId,
+    defaultGuardianEmail,
+    defaultGuardianPhone,
+    defaultGuardianRelationship,
+    defaultLifecycleStatus,
+    defaultActivatedAt,
+    defaultStateRegistration,
+    defaultMunicipalRegistration,
+    defaultSanitaryLicense,
+    defaultWebsiteUrl,
+    defaultSocialInstagram,
+    defaultSocialFacebook,
+    defaultSocialLinkedin,
+    defaultSocialWhatsapp,
+    defaultSocialOther,
+    defaultLegalRepFullName,
+    defaultLegalRepDocumentId,
+    defaultLegalRepRole,
+    defaultLegalRepEmail,
+    defaultLegalRepPhone,
+    defaultTechnicalRepFullName,
+    defaultTechnicalRepProfessionalId,
+    defaultTechnicalRepEmail,
+    defaultTechnicalRepPhone,
+    defaultBusinessSegment,
+    defaultResponsibleTeamMemberId ?? "",
+    defaultEstName,
+    defaultEstType ?? "",
+    defaultEstAddressLine1,
+    defaultEstAddressLine2,
+    defaultEstCity,
+    defaultEstState,
+    defaultEstPostalCode,
+    defaultLogoPreviewUrl ?? "",
+  ].join("\u0001");
+
+  // key no mesmo render que os default* mudam — evita aviso Base UI
+  // (FieldControl uncontrolled) de defaultValue a mudar após o mount.
+  const formInstanceKey =
+    mode === "create"
+      ? "create"
+      : isEditing
+        ? `edit-${formEpoch}`
+        : `view-${defaultsSignature}`;
 
   useEffect(() => {
     if (isEditing) return;
@@ -366,7 +423,7 @@ export function ClientForm({
     <>
     <Card className="max-w-3xl">
       <form
-        key={formEpoch}
+        key={formInstanceKey}
         action={formAction}
         onReset={(e) => e.preventDefault()}
         onSubmit={(e) => {
@@ -388,33 +445,6 @@ export function ClientForm({
       >
         {mode === "edit" && clientId ? (
           <input type="hidden" name="id" value={clientId} />
-        ) : null}
-
-        {mode === "edit" ? (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-foreground/10 px-6 py-3">
-            {fieldsLocked && canEdit ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={enterEditMode}
-              >
-                <Pencil className="size-3.5" aria-hidden />
-                Editar dados
-              </Button>
-            ) : null}
-            {isEditing ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={cancelEditMode}
-                disabled={isPending}
-              >
-                Cancelar
-              </Button>
-            ) : null}
-          </div>
         ) : null}
 
         <CardContent className="pt-6">
@@ -524,9 +554,21 @@ export function ClientForm({
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-foreground text-sm font-semibold">
-                    Titular do contrato
-                  </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-foreground text-sm font-semibold">
+                      Titular do contrato
+                    </p>
+                    {mode === "edit" && fieldsLocked && canEdit ? (
+                      <button
+                        type="button"
+                        onClick={enterEditMode}
+                        className="text-primary hover:text-primary/80 inline-flex shrink-0 cursor-pointer items-center gap-1.5 text-sm font-medium transition-colors"
+                      >
+                        <Pencil className="size-3.5 shrink-0" aria-hidden />
+                        Editar dados
+                      </button>
+                    ) : null}
+                  </div>
                   <p className="text-muted-foreground mt-1 text-xs">
                     {kind === "pf"
                       ? "Quem assina ou paga o serviço. Se for a mesma pessoa que vem à consulta, pode deixar o nome da pessoa atendida em branco no outro separador."
@@ -1438,6 +1480,16 @@ export function ClientForm({
           ) : null}
           {isEditing ? (
             <div className="flex flex-wrap justify-end gap-2 sm:ms-auto">
+              {mode === "edit" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={cancelEditMode}
+                  disabled={isPending}
+                >
+                  Cancelar
+                </Button>
+              ) : null}
               <Button type="submit" className="min-w-[9rem]" disabled={isPending}>
                 {isPending ? (
                   <>

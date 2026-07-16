@@ -1,7 +1,7 @@
 # Revisão de Segurança — NutriGestão
 
 > Documento vivo. Atualizar a cada ciclo de revisão.
-> Última revisão: 2026-07-01
+> Última revisão: 2026-07-16
 
 ---
 
@@ -81,6 +81,18 @@ A revisão cobre as seguintes categorias (baseada em OWASP Top 10 + contexto Saa
   - `security-audit.sh` — reconhece `proxy.ts` (Next.js 16) como middleware de rotas.
 - **Warnings remanescentes (aceites):** funções `SECURITY DEFINER`; source maps; `dangerouslySetInnerHTML` em bootstrap/preview.
 - **Verificado em:** 2026-07-01
+
+---
+
+### 7. UPDATE de carteira pela equipa; DELETE só gestão+ (2026-07-16)
+
+- **Contexto:** Policies e Server Actions tinham restringido UPDATE/DELETE de clientes (e depois pacientes) ao titular. A equipa podia criar clientes mas falhava ao guardar edições (“Sem permissão…”), enquanto o formulário continuava a mostrar Salvar.
+- **Correção:**
+  - RLS: UPDATE de `clients` / `establishments` / `patients` para membros do workspace (`workspace_member_user_ids`).
+  - DELETE: função `workspace_can_delete_master_data()` + helper `canDeleteWorkspaceMasterData` — titular, `job_role = gestao`, ou admin/super_admin.
+  - Migrations: `20260830210000_allow_workspace_team_update_clients.sql`, `20260830220000_workspace_team_edit_patients_delete_gestao.sql`.
+- **Documentação:** [docs/architecture/workspace-permissions.md](../architecture/workspace-permissions.md)
+- **Verificado em:** 2026-07-16
 
 ---
 

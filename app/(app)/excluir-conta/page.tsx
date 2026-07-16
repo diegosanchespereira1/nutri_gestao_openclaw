@@ -40,6 +40,8 @@ export default function ExcluirContaPage() {
   };
 
   useEffect(() => {
+    // Busca inicial do estado de exclusão ao montar a página.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadStatus();
   }, []);
 

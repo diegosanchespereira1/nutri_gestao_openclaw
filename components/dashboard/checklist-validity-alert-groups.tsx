@@ -79,16 +79,6 @@ export function ChecklistValidityAlertGroups({
   const from = total === 0 ? 0 : offset + 1;
   const to = Math.min(offset + pageSize, total);
 
-  useEffect(() => {
-    setPage(1);
-  }, [searchTerm, statusFilter]);
-
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
   return (
     <div className="space-y-4">
       <div
@@ -109,7 +99,10 @@ export function ChecklistValidityAlertGroups({
                 id="validity-company-search"
                 type="search"
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setPage(1);
+                }}
                 placeholder="Digite o nome da empresa"
                 className="pl-8"
               />

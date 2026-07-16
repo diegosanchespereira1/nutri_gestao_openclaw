@@ -126,7 +126,7 @@ export async function importRawMaterialsAction(
       skipped += 1;
       continue;
     }
-    let establishmentId: string | null = row.establishment_id ?? null;
+    const establishmentId: string | null = row.establishment_id ?? null;
     if (establishmentId) {
       if (establishmentClientById.get(establishmentId) !== row.client_id) {
         skipped += 1;

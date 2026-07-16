@@ -53,7 +53,7 @@ export function PersistentScrollArea({
   });
   const [isScrollable, setIsScrollable] = useState(false);
 
-  const syncThumb = useCallback(() => {
+  const syncThumb = useCallback(function syncThumbImpl() {
     const viewport = viewportRef.current;
     const track = trackRef.current;
     if (!viewport) return;
@@ -69,7 +69,7 @@ export function PersistentScrollArea({
     }
 
     if (controls === "full" && !track) {
-      requestAnimationFrame(() => syncThumb());
+      requestAnimationFrame(() => syncThumbImpl());
       return;
     }
 

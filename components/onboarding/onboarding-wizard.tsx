@@ -295,6 +295,8 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
 
     const digits = cepDigits(postalCode);
     if (digits.length !== 8) {
+      // Limpa estado de busca de CEP quando o valor digitado é incompleto.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCepError(null);
       setCepLoading(false);
       lastFetchedCep.current = null;

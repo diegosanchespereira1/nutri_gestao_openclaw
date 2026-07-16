@@ -292,7 +292,9 @@ export function ClientForm({
 
   useEffect(() => {
     if (mode !== "edit" || state?.ok !== true) return;
-    setIsEditing(false);
+    // Sai do modo de edição após salvar com sucesso; adiado para fora do
+    // corpo síncrono do efeito.
+    queueMicrotask(() => setIsEditing(false));
     router.refresh();
   }, [mode, state, router]);
 
@@ -356,6 +358,9 @@ export function ClientForm({
 
   useEffect(() => {
     if (isEditing) return;
+    // Sincroniza estado local com os valores vindos das props quando não
+    // está em edição (fora de edição, o formulário reflete os dados do servidor).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setKind(defaultKind);
     setSegmentValue(defaultBusinessSegment);
     setResponsibleValue(defaultResponsibleTeamMemberId ?? "");

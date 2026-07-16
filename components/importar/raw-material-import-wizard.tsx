@@ -455,7 +455,7 @@ export function RawMaterialImportWizard({
                       </li>
                       <li>
                         <strong>Cliente:</strong> obrigatório — nome exato do cliente já
-                        cadastrado (veja a aba "Clientes e estabelecimentos" do modelo).
+                        cadastrado (veja a aba &quot;Clientes e estabelecimentos&quot; do modelo).
                         A matéria-prima nunca aparece para outro cliente.
                       </li>
                       <li>

@@ -310,6 +310,8 @@ export function MobileBottomNav({
   useEffect(() => {
     if (!activeNavId || reduceMotion) return;
 
+    // Dispara a animação de "pop" do indicador ao trocar de aba ativa.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIndicatorPop(true);
     const timer = window.setTimeout(() => setIndicatorPop(false), 420);
     return () => window.clearTimeout(timer);
@@ -317,6 +319,8 @@ export function MobileBottomNav({
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    // Lê a preferência de movimento reduzido do sistema ao montar.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setReduceMotion(mq.matches);
     const onChange = () => setReduceMotion(mq.matches);
     mq.addEventListener("change", onChange);
@@ -324,6 +328,8 @@ export function MobileBottomNav({
   }, []);
 
   useEffect(() => {
+    // Fecha o menu "mais" ao navegar para outra rota.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMoreOpen(false);
   }, [pathname]);
 
@@ -357,6 +363,8 @@ export function MobileBottomNav({
   }, []);
 
   useLayoutEffect(() => {
+    // Recalcula a posição do indicador com base na medição do DOM após o layout.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updateIndicator();
   }, [updateIndicator, primary.length]);
 

@@ -2116,7 +2116,7 @@ export function ChecklistFillWizard({
           <DialogHeader>
             <DialogTitle>Descartar alterações?</DialogTitle>
             <DialogDescription>
-              O checklist será apagado permanentemente (não fica "em andamento" no
+              O checklist será apagado permanentemente (não fica &quot;em andamento&quot; no
               histórico). Todas as respostas e textos ainda não sincronizados serão
               perdidos. Esta ação é irreversível e não pode ser desfeita.
             </DialogDescription>

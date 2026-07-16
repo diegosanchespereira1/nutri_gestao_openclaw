@@ -180,7 +180,8 @@ export async function createRawMaterialInlineAction(
   }
 
   const { name, price_unit, unit_price_brl, notes } = parsed.data;
-  let { client_id: clientId, establishment_id: establishmentId } = parsed.data;
+  const { establishment_id: establishmentId } = parsed.data;
+  let { client_id: clientId } = parsed.data;
   const notesVal = notes?.trim() ? notes.trim() : null;
 
   // Nunca confia no client_id/establishment_id do formulário — mesma
@@ -296,7 +297,8 @@ export async function saveRawMaterialAction(
   }
 
   const { id, name, price_unit, unit_price_brl, notes } = parsed.data;
-  let { client_id: clientId, establishment_id: establishmentId } = parsed.data;
+  const { establishment_id: establishmentId } = parsed.data;
+  let { client_id: clientId } = parsed.data;
   const notesVal = notes?.trim() ? notes.trim() : null;
 
   // Estabelecimento sempre implica o cliente dele — nunca confia no client_id

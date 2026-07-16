@@ -25,6 +25,8 @@ export function ExcluirContaConfirmarClient() {
     const action = searchParams.get("action");
 
     if (!token || (action !== "confirm" && action !== "cancel")) {
+      // Link inválido: não há requisição a fazer, apenas exibir o erro.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLoading(false);
       setError("Link inválido ou incompleto.");
       return;

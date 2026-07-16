@@ -118,13 +118,17 @@ export function PerfilForm({
 
   useEffect(() => {
     if (state?.ok !== true) return;
-    setIsEditing(false);
-    setRemovePhotoChecked(false);
-    if (photoInputRef.current) photoInputRef.current.value = "";
-    setPhotoPreviewUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return null;
+    // Reseta o formulário para o modo de visualização após salvar com
+    // sucesso; adiado para fora do corpo síncrono do efeito.
+    queueMicrotask(() => {
+      setIsEditing(false);
+      setRemovePhotoChecked(false);
+      setPhotoPreviewUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
     });
+    if (photoInputRef.current) photoInputRef.current.value = "";
     router.refresh();
     const frameId = window.requestAnimationFrame(() => {
       setToast({
@@ -138,6 +142,9 @@ export function PerfilForm({
 
   useEffect(() => {
     if (isEditing) return;
+    // Sincroniza estado local com os valores vindos das props quando não
+    // está em edição (fora de edição, o formulário reflete os dados do servidor).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setFullNameValue(defaultFullName);
     setEmailValue(defaultEmail);
     setPhoneValue(formatBrazilPhoneInput(defaultPhone));

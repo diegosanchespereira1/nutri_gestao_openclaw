@@ -106,6 +106,8 @@ export function PatientForm({
 
   useEffect(() => {
     if (state?.ok !== true) return;
+    // Limpa a seleção de foto pendente após salvar com sucesso.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingPhoto(null);
     setRemovePhoto(false);
   }, [state]);

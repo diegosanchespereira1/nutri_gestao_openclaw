@@ -116,6 +116,8 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
     const planSlug = (
       form.elements.namedItem("plan_slug") as HTMLInputElement | null
     )?.value;
+    // Sincroniza estado local com o rascunho salvo após erro do servidor.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (planSlug) setRestoredPlanSlug(planSlug);
 
     setFormRestoreVersion((version) => version + 1);

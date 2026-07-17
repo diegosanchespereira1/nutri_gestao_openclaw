@@ -7,11 +7,38 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
 import { NextRequest } from 'next/server';
 
+/**
+ * Upstash configurado? Sem URL/token, o cliente lançaria
+ * "Failed to parse URL from /pipeline" em TODA chamada e, com o catch
+ * fail-closed abaixo, bloquearia auth callback (convites, confirmação de
+ * email, reset de senha) permanentemente. Nesse caso operamos fail-open
+ * (sem rate limiting) com aviso único no boot.
+ */
+const isRateLimitConfigured = Boolean(
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
+);
+
+if (!isRateLimitConfigured) {
+  console.warn(
+    '[rate-limit] UPSTASH_REDIS_REST_URL/TOKEN ausentes — rate limiting DESATIVADO (fail-open). Configure o Upstash em produção para proteger login contra brute force.',
+  );
+}
+
 // Create Ratelimit instance
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || '',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
+  url: process.env.UPSTASH_REDIS_REST_URL || 'https://unconfigured.invalid',
+  token: process.env.UPSTASH_REDIS_REST_TOKEN || 'unconfigured',
 });
+
+/** Resposta fail-open (permite a requisição) quando o Upstash não está configurado. */
+function rateLimitDisabled() {
+  return {
+    success: true,
+    remaining: Number.MAX_SAFE_INTEGER,
+    reset: 0,
+    retryAfter: null as number | null,
+  };
+}
 
 /**
  * Rate limiter para login/signup (5 tentativas por minuto por IP)
@@ -89,6 +116,7 @@ function rateLimitUnavailable(retryAfterSeconds: number) {
  * Returns { success, remaining, reset, retryAfter }
  */
 export async function checkAuthRateLimit(request: NextRequest) {
+  if (!isRateLimitConfigured) return rateLimitDisabled();
   const ip = getClientIp(request);
 
   try {
@@ -109,6 +137,7 @@ export async function checkAuthRateLimit(request: NextRequest) {
  * Check password reset rate limit
  */
 export async function checkPasswordResetRateLimit(email: string) {
+  if (!isRateLimitConfigured) return rateLimitDisabled();
   try {
     const { success, remaining, reset } = await passwordResetRatelimit.limit(
       `pwd-reset:${email}`
@@ -129,6 +158,7 @@ export async function checkPasswordResetRateLimit(email: string) {
  * Check API rate limit (for authenticated users)
  */
 export async function checkApiRateLimit(userId: string) {
+  if (!isRateLimitConfigured) return rateLimitDisabled();
   try {
     const { success, remaining, reset } = await apiRatelimit.limit(
       `api:${userId}`
@@ -160,6 +190,7 @@ export async function checkAccountClosureRequestRateLimit(
   email: string,
   ip: string,
 ) {
+  if (!isRateLimitConfigured) return rateLimitDisabled();
   try {
     const [emailLimit, ipLimit] = await Promise.all([
       accountClosureRequestRatelimit.limit(`closure:${email.toLowerCase().trim()}`),

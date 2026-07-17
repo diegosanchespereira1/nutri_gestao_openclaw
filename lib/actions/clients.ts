@@ -693,14 +693,31 @@ export async function updateClientAction(
     Object.assign(baseUpdate, pfOnlyClearPayload(), { logo_storage_path: logoPath });
   }
 
-  const { error } = await supabase
+  const { data: updatedRows, error } = await supabase
     .from("clients")
     .update(baseUpdate)
     .eq("id", id)
-    .eq("owner_user_id", workspaceOwnerId);
+    .eq("owner_user_id", workspaceOwnerId)
+    .select("id");
 
   if (error) {
+    console.error("[updateClientAction] update failed:", error.message);
     return { ok: false, error: "Não foi possível salvar as alterações." };
+  }
+
+  // RLS silencioso: sem .select(), o PostgREST retorna sucesso mesmo quando a
+  // política filtra a linha (0 rows). Detectamos e reportamos em vez de
+  // fingir sucesso sem gravar nada.
+  if (!updatedRows || updatedRows.length === 0) {
+    console.error(
+      "[updateClientAction] update retornou 0 linhas (bloqueado por RLS?)",
+      { clientId: id, workspaceOwnerId, userId: user.id },
+    );
+    return {
+      ok: false,
+      error:
+        "Sem permissão para salvar as alterações deste cliente. Contate o titular da conta.",
+    };
   }
 
   if (kind === "pj") {

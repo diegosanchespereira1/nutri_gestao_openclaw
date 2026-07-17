@@ -211,12 +211,16 @@ export async function associatePatientToEstablishmentAction(
     return { ok: false, error: "Este paciente já está associado a outro estabelecimento." };
   }
 
-  const { error } = await supabase
+  const { data: assocRows, error } = await supabase
     .from("patients")
     .update({ establishment_id: establishmentId })
-    .eq("id", patientId);
+    .eq("id", patientId)
+    .select("id");
 
   if (error) return { ok: false, error: "Não foi possível associar o paciente." };
+  if (!assocRows || assocRows.length === 0) {
+    return { ok: false, error: "Sem permissão para associar este paciente." };
+  }
 
   revalidatePatientPaths(est.client_id as string, establishmentId, patientId);
   return { ok: true };
@@ -263,12 +267,16 @@ export async function associatePatientPageAction(
     return { ok: false, error: "Este paciente já está associado a outro estabelecimento." };
   }
 
-  const { error } = await supabase
+  const { data: assocRows, error } = await supabase
     .from("patients")
     .update({ establishment_id: establishmentId })
-    .eq("id", patientId);
+    .eq("id", patientId)
+    .select("id");
 
   if (error) return { ok: false, error: "Não foi possível associar o paciente." };
+  if (!assocRows || assocRows.length === 0) {
+    return { ok: false, error: "Sem permissão para associar este paciente." };
+  }
 
   revalidatePatientPaths(clientId, establishmentId, patientId);
   redirect(`/clientes/${clientId}/estabelecimentos/${establishmentId}/pacientes`);
@@ -310,12 +318,16 @@ export async function updatePatientEstablishmentAction(
     }
   }
 
-  const { error } = await supabase
+  const { data: estRows, error } = await supabase
     .from("patients")
     .update({ establishment_id })
-    .eq("id", patientId);
+    .eq("id", patientId)
+    .select("id");
 
   if (error) return { ok: false, error: "Não foi possível guardar." };
+  if (!estRows || estRows.length === 0) {
+    return { ok: false, error: "Sem permissão para alterar este paciente." };
+  }
 
   revalidatePatientPaths(clientId, existing.establishment_id as string | null, patientId);
   if (establishment_id !== (existing.establishment_id as string | null)) {
@@ -369,12 +381,16 @@ export async function updatePatientClientAction(
     }
   }
 
-  const { error } = await supabase
+  const { data: clientRows, error } = await supabase
     .from("patients")
     .update({ client_id })
-    .eq("id", patientId);
+    .eq("id", patientId)
+    .select("id");
 
   if (error) return { ok: false, error: "Não foi possível guardar." };
+  if (!clientRows || clientRows.length === 0) {
+    return { ok: false, error: "Sem permissão para alterar este paciente." };
+  }
 
   revalidatePatientPaths(client_id, null, patientId);
   revalidatePath(`/pacientes/${patientId}/editar`);
@@ -728,7 +744,7 @@ export async function updatePatientAction(
     return { ok: false, error: photoRes.error };
   }
 
-  const { error } = await supabase
+  const { data: updatedRows, error } = await supabase
     .from("patients")
     .update({
       full_name,
@@ -743,7 +759,19 @@ export async function updatePatientAction(
       responsible_team_member_id: responsibleRes.value,
       photo_storage_path: photoRes.path,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id");
+
+  if (!error && (!updatedRows || updatedRows.length === 0)) {
+    // RLS silencioso: PostgREST retorna sucesso com 0 linhas quando a política
+    // bloqueia o UPDATE. Reportar em vez de fingir que salvou.
+    console.error("[updatePatientAction] update retornou 0 linhas (RLS?)", { id });
+    return {
+      ok: false,
+      error:
+        "Sem permissão para salvar as alterações deste paciente. Contate o titular da conta.",
+    };
+  }
 
   if (error) {
     console.error("[updatePatientAction] patients update failed", {

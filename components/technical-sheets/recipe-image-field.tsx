@@ -6,6 +6,7 @@ import { ImageIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MAX_TECHNICAL_RECIPE_IMAGE_BYTES } from "@/lib/constants/technical-recipe-images-storage";
+import { prepareImageForUpload } from "@/lib/images/prepare-image-upload";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -18,6 +19,8 @@ export function RecipeImageField({ defaultUrl, onChange, className }: Props) {
   const [remove, setRemove] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -29,7 +32,28 @@ export function RecipeImageField({ defaultUrl, onChange, className }: Props) {
 
   const displayUrl = remove ? null : (previewUrl ?? defaultUrl);
 
-  function handleFileChange(next: File | null) {
+  async function handleFileChange(picked: File | null) {
+    setPrepareError(null);
+
+    let next: File | null = null;
+    if (picked) {
+      // Converte HEIC/AVIF, redimensiona e comprime no cliente.
+      setPreparing(true);
+      try {
+        const prepared = await prepareImageForUpload(picked, {
+          maxDimension: 1600,
+          maxBytes: MAX_TECHNICAL_RECIPE_IMAGE_BYTES,
+        });
+        if (!prepared.ok) {
+          setPrepareError(prepared.error);
+          return;
+        }
+        next = prepared.file;
+      } finally {
+        setPreparing(false);
+      }
+    }
+
     if (previewUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(previewUrl);
     }
@@ -54,9 +78,14 @@ export function RecipeImageField({ defaultUrl, onChange, className }: Props) {
       <div className="space-y-1">
         <Label htmlFor="recipe-image">Imagem da receita</Label>
         <p className="text-muted-foreground text-xs">
-          Foto do prato ou da preparação. PNG, JPEG ou WebP até{" "}
-          {MAX_TECHNICAL_RECIPE_IMAGE_BYTES / 1024 / 1024} MB.
+          Foto do prato ou da preparação. JPEG, PNG, WebP, HEIC ou AVIF — a
+          imagem é otimizada automaticamente.
         </p>
+        {prepareError ? (
+          <p className="text-destructive text-xs" role="alert">
+            {prepareError}
+          </p>
+        ) : null}
       </div>
 
       {displayUrl ? (
@@ -84,11 +113,13 @@ export function RecipeImageField({ defaultUrl, onChange, className }: Props) {
             <Input
               id="recipe-image"
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
+              accept="image/*"
+              disabled={preparing}
               className="border-input bg-transparent text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
               onChange={(e) => {
                 const next = e.target.files?.[0] ?? null;
-                handleFileChange(next);
+                e.target.value = "";
+                void handleFileChange(next);
               }}
             />
           </div>
@@ -105,11 +136,13 @@ export function RecipeImageField({ defaultUrl, onChange, className }: Props) {
           <Input
             id="recipe-image"
             type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
+            accept="image/*"
+            disabled={preparing}
             className="sr-only"
             onChange={(e) => {
               const next = e.target.files?.[0] ?? null;
-              handleFileChange(next);
+              e.target.value = "";
+              void handleFileChange(next);
             }}
           />
         </label>

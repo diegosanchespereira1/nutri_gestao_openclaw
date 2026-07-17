@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { prepareImageInputInPlace } from "@/lib/images/prepare-image-upload";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { formatBrazilPhoneInput } from "@/lib/validators/br-phone";
@@ -98,6 +99,9 @@ export function PerfilForm({
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
+  const [photoPrepareError, setPhotoPrepareError] = useState<string | null>(
+    null,
+  );
   const [removePhotoChecked, setRemovePhotoChecked] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [toast, setToast] = useState<{
@@ -169,12 +173,21 @@ export function PerfilForm({
     return () => window.clearTimeout(cleanupId);
   }, [toast]);
 
-  function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget;
+    setPhotoPrepareError(null);
     if (photoPreviewUrl) {
       URL.revokeObjectURL(photoPreviewUrl);
       setPhotoPreviewUrl(null);
     }
+    // Converte HEIC/AVIF e reduz para avatar (512px) no cliente — grava o
+    // resultado de volta no input para o submit do form enviar já otimizado.
+    const res = await prepareImageInputInPlace(input, { maxDimension: 512 });
+    if (!res.ok) {
+      setPhotoPrepareError(res.error);
+      return;
+    }
+    const file = input.files?.[0];
     if (!file) return;
     setRemovePhotoChecked(false);
     setPhotoPreviewUrl(URL.createObjectURL(file));
@@ -265,11 +278,16 @@ export function PerfilForm({
           id="perfil-photo"
           name="photo"
           type="file"
-          accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
+          accept="image/*"
           className="sr-only"
-          onChange={handlePhotoChange}
+          onChange={(e) => void handlePhotoChange(e)}
           aria-describedby={state?.ok === false ? "perfil-err" : undefined}
         />
+        {photoPrepareError ? (
+          <p className="text-destructive text-sm" role="alert">
+            {photoPrepareError}
+          </p>
+        ) : null}
         {hasStoredPhoto && removePhotoChecked && !photoPreviewUrl ? (
           <input type="hidden" name="remove_photo" value="1" />
         ) : null}

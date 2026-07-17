@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MAX_TENANT_LOGO_BYTES } from "@/lib/constants/tenant-logos-storage";
+import { prepareImageInputInPlace } from "@/lib/images/prepare-image-upload";
 
 const initial: UpdateTenantLogoResult | undefined = undefined;
 const TOAST_AUTO_DISMISS_MS = 4000;
@@ -28,7 +29,31 @@ export function TenantLogoForm({
   const [tenantName, setTenantName] = useState(defaultTenantName);
   const [logoFileName, setLogoFileName] = useState("");
   const [removeChecked, setRemoveChecked] = useState(false);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoChange = async (input: HTMLInputElement) => {
+    setPrepareError(null);
+    setPreparing(true);
+    try {
+      // Converte HEIC/AVIF, redimensiona e comprime no cliente; PNG é
+      // preservado para manter transparência do logotipo.
+      const res = await prepareImageInputInPlace(input, {
+        maxDimension: 1024,
+        maxBytes: MAX_TENANT_LOGO_BYTES,
+        preservePng: true,
+      });
+      if (!res.ok) {
+        setPrepareError(res.error);
+        setLogoFileName("");
+        return;
+      }
+      setLogoFileName(res.empty ? "" : input.value);
+    } finally {
+      setPreparing(false);
+    }
+  };
 
   const dirty =
     tenantName.trim() !== defaultTenantName.trim() ||
@@ -128,9 +153,9 @@ export function TenantLogoForm({
               {hasLogo ? "Substituir logotipo" : "Enviar logotipo"}
             </Label>
             <p className="text-muted-foreground text-xs">
-              PNG, JPEG ou WebP até {Math.round(MAX_TENANT_LOGO_BYTES / 1024 / 1024)} MB.
-              Recomendamos formato com fundo transparente e proporção
-              horizontal.
+              PNG, JPEG, WebP, HEIC ou AVIF — a imagem é otimizada
+              automaticamente. Recomendamos formato com fundo transparente e
+              proporção horizontal.
             </p>
 
             {hasLogo ? (
@@ -161,9 +186,9 @@ export function TenantLogoForm({
               id="tenant-logo-file"
               name="logo"
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
-              disabled={!canManage}
-              onChange={(e) => setLogoFileName(e.target.value)}
+              accept="image/*"
+              disabled={!canManage || preparing}
+              onChange={(e) => void handleLogoChange(e.currentTarget)}
               className="border-input bg-background text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
               aria-invalid={state?.ok === false}
               aria-describedby={
@@ -176,6 +201,12 @@ export function TenantLogoForm({
                 : "Você não tem permissão para alterar o logotipo neste momento."}
             </p>
           </div>
+
+          {prepareError ? (
+            <p className="text-destructive text-sm" role="alert">
+              {prepareError}
+            </p>
+          ) : null}
 
           {state?.ok === false ? (
             <p

@@ -32,6 +32,10 @@ import {
 } from "@/lib/actions/clients";
 import type { TeamMemberSelectOption } from "@/lib/actions/team-members";
 import {
+  prepareImageInputInPlace,
+  prepareMixedFilesInputInPlace,
+} from "@/lib/images/prepare-image-upload";
+import {
   type ClientCustomSegment,
   createCustomSegmentAction,
 } from "@/lib/actions/client-segments";
@@ -258,6 +262,19 @@ export function ClientForm({
   const [estCategory, setEstCategory] = useState<EstablishmentCategory | "">(initialEstCategory);
   const [estType, setEstType] = useState<EstablishmentType | "">(defaultEstType ?? "");
   const [estValidationError, setEstValidationError] = useState(false);
+  const [logoPrepareError, setLogoPrepareError] = useState<string | null>(null);
+  const [examPrepareError, setExamPrepareError] = useState<string | null>(null);
+
+  const handleExamFilesChange = (input: HTMLInputElement) => {
+    setExamPrepareError(null);
+    // PDFs/DOCs passam intactos; fotos (HEIC/AVIF/JPEG grandes) são
+    // convertidas e comprimidas no cliente antes do submit.
+    void prepareMixedFilesInputInPlace(input, { maxDimension: 2048 }).then(
+      (res) => {
+        if (!res.ok) setExamPrepareError(res.error);
+      },
+    );
+  };
   const [estValidationDialogOpen, setEstValidationDialogOpen] = useState(false);
 
   function handleEstCategoryChange(cat: EstablishmentCategory | "") {
@@ -1194,6 +1211,7 @@ export function ClientForm({
                       type="file"
                       multiple
                       accept="application/pdf,image/*,.doc,.docx"
+                      onChange={(e) => handleExamFilesChange(e.currentTarget)}
                       className="border-input bg-background text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
                     />
                   </div>
@@ -1206,8 +1224,14 @@ export function ClientForm({
                       type="file"
                       multiple
                       accept="application/pdf,image/*,.doc,.docx"
+                      onChange={(e) => handleExamFilesChange(e.currentTarget)}
                       className="border-input bg-background text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
                     />
+                    {examPrepareError ? (
+                      <p className="text-destructive text-xs" role="alert">
+                        {examPrepareError}
+                      </p>
+                    ) : null}
                   </div>
                 </TabsContent>
               </>
@@ -1346,9 +1370,25 @@ export function ClientForm({
                       id="client-logo"
                       name="logo"
                       type="file"
-                      accept="image/png,image/jpeg,image/jpg,image/webp,.png,.jpg,.jpeg,.webp"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const input = e.currentTarget;
+                        setLogoPrepareError(null);
+                        // HEIC/AVIF → JPEG/PNG + compressão no cliente.
+                        void prepareImageInputInPlace(input, {
+                          maxDimension: 1024,
+                          preservePng: true,
+                        }).then((res) => {
+                          if (!res.ok) setLogoPrepareError(res.error);
+                        });
+                      }}
                       className="border-input bg-background text-muted-foreground file:text-foreground h-auto rounded-md border px-3 py-2 text-sm file:mr-3 file:rounded file:border-0 file:bg-secondary file:px-3 file:py-1.5"
                     />
+                    {logoPrepareError ? (
+                      <p className="text-destructive text-xs" role="alert">
+                        {logoPrepareError}
+                      </p>
+                    ) : null}
                   </div>
                 </TabsContent>
 

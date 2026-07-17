@@ -6,10 +6,7 @@ import { Camera, Images, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { MAX_PATIENT_PHOTO_BYTES } from "@/lib/constants/patient-photos-storage";
-import {
-  convertHeicToJpegFile,
-  fileLooksLikeHeic,
-} from "@/lib/images/heic-client";
+import { prepareImageForUpload } from "@/lib/images/prepare-image-upload";
 import { openNativeCamera, openNativeGallery } from "@/lib/mobile/camera";
 import { isNativeApp } from "@/lib/mobile/platform";
 import { cn } from "@/lib/utils";
@@ -63,25 +60,17 @@ export function PatientPhotoField({
 
       setProcessing(true);
       try {
-        let nextFile = file;
-
-        if (await fileLooksLikeHeic(file)) {
-          try {
-            nextFile = await convertHeicToJpegFile(file);
-          } catch {
-            setError(
-              "Não foi possível converter HEIC. Use JPEG/PNG ou ative «Mais compatível» na câmera do iPhone.",
-            );
-            return;
-          }
-        }
-
-        if (nextFile.size > MAX_PATIENT_PHOTO_BYTES) {
-          setError(
-            `A foto deve ter no máximo ${MAX_PATIENT_PHOTO_BYTES / 1024 / 1024} MB.`,
-          );
+        // Converte HEIC/AVIF/etc., redimensiona e comprime no dispositivo —
+        // fotos de 12–48MP deixam de estourar o limite do servidor.
+        const prepared = await prepareImageForUpload(file, {
+          maxDimension: 1600,
+          maxBytes: MAX_PATIENT_PHOTO_BYTES,
+        });
+        if (!prepared.ok) {
+          setError(prepared.error);
           return;
         }
+        const nextFile = prepared.file;
 
         setRemovePhotoChecked(false);
         setPreviewUrl((prev) => {
@@ -149,8 +138,8 @@ export function PatientPhotoField({
       <div className="space-y-1">
         <Label>Foto do paciente</Label>
         <p className="text-muted-foreground text-xs">
-          Opcional. PNG, JPEG, WebP ou HEIC (iPhone) até{" "}
-          {MAX_PATIENT_PHOTO_BYTES / 1024 / 1024} MB.
+          Opcional. JPEG, PNG, WebP, HEIC (iPhone/Samsung) ou AVIF — a foto é
+          otimizada automaticamente antes do envio.
         </p>
       </div>
 

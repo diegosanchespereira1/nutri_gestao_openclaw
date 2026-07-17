@@ -72,44 +72,6 @@ import {
 } from "@/lib/checklists/save-batch";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 
-/** Funde texto vazio no cliente com valores já persistidos (mesmo outcome). */
-function mergeClientResponsesWithServer(
-  client: FillResponsesMap,
-  server: FillResponsesMap,
-  template: ChecklistTemplateWithSections,
-): FillResponsesMap {
-  const out: FillResponsesMap = { ...client };
-  for (const sec of template.sections) {
-    for (const item of sec.items) {
-      if (isStructureOnlyItem(item)) continue;
-      const c = out[item.id];
-      const s = server[item.id];
-      if (!c?.outcome || !s?.outcome) continue;
-      if (c.outcome !== s.outcome) continue;
-      let next: FillItemResponseState = { ...c };
-      if (c.outcome === "nc") {
-        const cNote = (c.note ?? "").trim();
-        const sNote = (s.note ?? "").trim();
-        if (cNote.length === 0 && sNote.length > 0) {
-          next = { ...next, note: s.note };
-        }
-      }
-      const cAnn = (next.annotation ?? "").trim();
-      const sAnn = (s.annotation ?? "").trim();
-      if (cAnn.length === 0 && sAnn.length > 0) {
-        next = { ...next, annotation: s.annotation };
-      }
-      const cValidUntil = (next.validUntil ?? "").trim();
-      const sValidUntil = (s.validUntil ?? "").trim();
-      if (cValidUntil.length === 0 && sValidUntil.length > 0) {
-        next = { ...next, validUntil: s.validUntil };
-      }
-      out[item.id] = next;
-    }
-  }
-  return out;
-}
-
 const textareaClass =
   "border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring mt-2 flex min-h-[72px] w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -123,10 +85,15 @@ const SAVE_BATCH_RESCHEDULE_MS = 500;
 const MAX_SAVE_RESCHEDULE_ATTEMPTS = 5;
 /** Timeout do cliente para um save batch — evita UI presa se o servidor/DB travar. */
 const SAVE_CLIENT_TIMEOUT_MS = 45_000;
+/** Espera máxima por um autosave já em curso antes de reconciliar (não bloquear aprovação). */
+const WAIT_INFLIGHT_SAVE_MS = 8_000;
 const SAVE_CLIENT_TIMEOUT_MESSAGE =
   "O salvamento demorou demais. Toque em Salvar agora e tente de novo.";
 
-async function withSaveClientTimeout<T>(promise: Promise<T>): Promise<T> {
+async function withSaveClientTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number = SAVE_CLIENT_TIMEOUT_MS,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -134,7 +101,7 @@ async function withSaveClientTimeout<T>(promise: Promise<T>): Promise<T> {
       new Promise<T>((_, reject) => {
         timer = setTimeout(
           () => reject(new Error("SAVE_CLIENT_TIMEOUT")),
-          SAVE_CLIENT_TIMEOUT_MS,
+          timeoutMs,
         );
       }),
     ]);
@@ -514,7 +481,7 @@ type Props = {
   recurringNcSessionCountByItemId?: Record<string, number>;
   /** Fotos por item (URLs assinadas). */
   initialItemPhotos?: Record<string, ChecklistFillPhotoView[]>;
-  /** Se já aprovado (servidor), abre diretamente o dossiê em leitura. */
+  /** Se já aprovado (servidor). Respostas continuam editáveis. */
   initialDossierApprovedAt?: string | null;
   /** Último job de exportação PDF (se existir). */
   initialPdfExport?: ChecklistFillPdfExportRow | null;
@@ -617,9 +584,7 @@ export function ChecklistFillWizard({
   const [finalizeDialogError, setFinalizeDialogError] = useState<string | null>(null);
   const [finalizeDialogOpen, setFinalizeDialogOpen] = useState(false);
   const [finalizeBusy, setFinalizeBusy] = useState(false);
-  const [dossierPreviewConfirmed, setDossierPreviewConfirmed] = useState(() =>
-    Boolean(initialDossierApprovedAt),
-  );
+  const [dossierPreviewConfirmed, setDossierPreviewConfirmed] = useState(false);
   const [dossierApprovedAt, setDossierApprovedAt] = useState<string | null>(
     () => initialDossierApprovedAt ?? null,
   );
@@ -709,6 +674,10 @@ export function ChecklistFillWizard({
   const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dirtyItemIdsRef = useRef<Set<string>>(new Set());
   const saveBatchInFlightRef = useRef(false);
+  /** Promise do autosave em curso — finalize/aprovar aguarda em vez de regravar tudo. */
+  const saveBatchPromiseRef = useRef<Promise<void> | null>(null);
+  /** IP pré-buscado ao abrir o diálogo de assinatura (evita espera na confirmação). */
+  const deviceIpPrefetchRef = useRef<Promise<string | null> | null>(null);
   const saveRescheduleAttemptsRef = useRef(0);
   const saveOpEpochRef = useRef(0);
   const mountedRef = useRef(true);
@@ -824,7 +793,7 @@ export function ChecklistFillWizard({
     }
   }, []);
 
-  const formLocked = dossierPreviewConfirmed || Boolean(dossierApprovedAt);
+  const formLocked = dossierPreviewConfirmed;
   const formLockedRef = useRef(formLocked);
   useEffect(() => {
     formLockedRef.current = formLocked;
@@ -854,8 +823,8 @@ export function ChecklistFillWizard({
   }, [leaveDialogOpen]);
 
   const showDossierPeekButton = useMemo(
-    () => !dossierApprovedAt && !dossierPreviewConfirmed,
-    [dossierApprovedAt, dossierPreviewConfirmed],
+    () => !dossierPreviewConfirmed,
+    [dossierPreviewConfirmed],
   );
   const [livePhotos, setLivePhotos] = useState<Record<string, ChecklistFillPhotoView[]>>(
     () => ({ ...initialItemPhotos }),
@@ -882,15 +851,28 @@ export function ChecklistFillWizard({
     async (
       snapshot?: FillResponsesMap,
       persistMode: "full" | "merge" = "merge",
+      options?: {
+        entries?: Array<{
+          itemId: string;
+          outcome: FillItemResponseState["outcome"];
+          note: string | null;
+          annotation: string | null;
+          validUntil: string | null;
+        }>;
+        timeoutMs?: number;
+      },
     ): Promise<FillActionResult> => {
       const data = snapshot ?? responsesRef.current;
-      const entries = Object.entries(data).map(([itemId, cur]) => ({
-        itemId,
-        outcome: cur?.outcome ?? null,
-        note: cur?.note ?? null,
-        annotation: cur?.annotation ?? null,
-        validUntil: cur?.validUntil ?? null,
-      }));
+      const entries =
+        options?.entries ??
+        Object.entries(data).map(([itemId, cur]) => ({
+          itemId,
+          outcome: cur?.outcome ?? null,
+          note: cur?.note ?? null,
+          annotation: cur?.annotation ?? null,
+          validUntil: cur?.validUntil ?? null,
+        }));
+      if (entries.length === 0) return { ok: true };
       let result: FillActionResult;
       let needsReauth = false;
       try {
@@ -904,6 +886,7 @@ export function ChecklistFillWizard({
               withRevalidate: false,
             }),
           ),
+          options?.timeoutMs ?? SAVE_CLIENT_TIMEOUT_MS,
         ));
       } catch (err) {
         if (err instanceof Error && err.message === "SAVE_CLIENT_TIMEOUT") {
@@ -932,76 +915,91 @@ export function ChecklistFillWizard({
       if (result.ok) {
         clearFillSessionDraft(sessionId);
         saveRescheduleAttemptsRef.current = 0;
+        clearDirtyItems(entries.map((entry) => entry.itemId));
       }
       return result;
     },
-    [sessionId, itemResponseSource],
+    [sessionId, itemResponseSource, clearDirtyItems],
   );
 
-  /** Reconcilia com BD, grava com modo merge e valida o que ficou persistido. */
+  /** Persiste só o necessário e valida localmente — sem reload round-trip extra. */
   const runReconcileThenSync = useCallback(async (): Promise<FillActionResult> => {
-    const remote = await loadFillResponsesMapForSession(sessionId, { template });
-    if (!remote.ok) {
-      if (redirectIfSessionExpired(remote.error)) {
+    const inflight = saveBatchPromiseRef.current;
+    if (inflight) {
+      await Promise.race([
+        inflight,
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, WAIT_INFLIGHT_SAVE_MS);
+        }),
+      ]);
+    }
+
+    const dirtyIds = Array.from(dirtyItemIdsRef.current);
+    // Caminho rápido: nada pendente → só valida o estado local (0 round-trips de save).
+    if (dirtyIds.length === 0) {
+      const issues = validateChecklistTemplate(sections, responsesRef.current);
+      if (issues.length > 0) {
         return {
           ok: false,
-          error: "Não foi possível sincronizar. Toque em Salvar agora e tente de novo.",
+          error: buildIssueMessageWithSectionAndItem(sections, issues[0]),
         };
       }
-      return remote;
-    }
-    const merged = mergeClientResponsesWithServer(
-      responsesRef.current,
-      remote.responses,
-      template,
-    );
-    setResponses(merged);
-    responsesRef.current = merged;
-
-    const synced = await syncAllResponsesToServer(merged, "merge");
-    if (!synced.ok) return synced;
-
-    const verify = await loadFillResponsesMapForSession(sessionId, { template });
-    if (!verify.ok) {
-      if (redirectIfSessionExpired(verify.error)) {
-        return {
-          ok: false,
-          error: "Não foi possível validar as respostas. Toque em Salvar agora e tente de novo.",
-        };
-      }
-      return verify;
-    }
-    const postIssues = validateChecklistTemplate(sections, verify.responses);
-    if (postIssues.length > 0) {
-      return { ok: false, error: postIssues[0].message };
-    }
-    return { ok: true };
-  }, [sessionId, template, sections, syncAllResponsesToServer, redirectIfSessionExpired]);
-
-  /** Grava rascunho completo no servidor sem exigir validação do template (saída segura). */
-  const persistDraftForLeave = useCallback(async (): Promise<FillActionResult> => {
-    if (dossierApprovedAt) {
       return { ok: true };
     }
-    const remote = await loadFillResponsesMapForSession(sessionId, { template });
-    if (!remote.ok) {
-      if (redirectIfSessionExpired(remote.error)) {
-        return {
-          ok: false,
-          error: "Não foi possível gravar o rascunho. Tente novamente.",
-        };
-      }
-      return remote;
+
+    const entries = dirtyIds.map((itemId) => {
+      const cur = responsesRef.current[itemId];
+      return {
+        itemId,
+        outcome: cur?.outcome ?? null,
+        note: cur?.note ?? null,
+        annotation: cur?.annotation ?? null,
+        validUntil: cur?.validUntil ?? null,
+      };
+    });
+
+    const synced = await syncAllResponsesToServer(responsesRef.current, "merge", {
+      entries,
+    });
+    if (!synced.ok) return synced;
+
+    const postIssues = validateChecklistTemplate(sections, responsesRef.current);
+    if (postIssues.length > 0) {
+      return {
+        ok: false,
+        error: buildIssueMessageWithSectionAndItem(sections, postIssues[0]),
+      };
     }
-    const merged = mergeClientResponsesWithServer(
-      responsesRef.current,
-      remote.responses,
-      template,
-    );
-    setResponses(merged);
-    responsesRef.current = merged;
-    return syncAllResponsesToServer(merged, "merge");
-  }, [sessionId, template, syncAllResponsesToServer, redirectIfSessionExpired, dossierApprovedAt]);
+    return { ok: true };
+  }, [sections, syncAllResponsesToServer]);
+
+  /** Grava rascunho no servidor sem exigir validação (saída segura). */
+  const persistDraftForLeave = useCallback(async (): Promise<FillActionResult> => {
+    const inflight = saveBatchPromiseRef.current;
+    if (inflight) {
+      await Promise.race([
+        inflight,
+        new Promise<void>((resolve) => {
+          window.setTimeout(resolve, WAIT_INFLIGHT_SAVE_MS);
+        }),
+      ]);
+    }
+
+    const dirtyIds = Array.from(dirtyItemIdsRef.current);
+    if (dirtyIds.length === 0) return { ok: true };
+
+    const entries = dirtyIds.map((itemId) => {
+      const cur = responsesRef.current[itemId];
+      return {
+        itemId,
+        outcome: cur?.outcome ?? null,
+        note: cur?.note ?? null,
+        annotation: cur?.annotation ?? null,
+        validUntil: cur?.validUntil ?? null,
+      };
+    });
+    return syncAllResponsesToServer(responsesRef.current, "merge", { entries });
+  }, [syncAllResponsesToServer]);
 
   const clearLeaveLinkTarget = useCallback(() => {
     leaveLinkTargetRef.current = null;
@@ -1267,7 +1265,8 @@ export function ChecklistFillWizard({
 
       saveBatchInFlightRef.current = true;
       const opEpoch = saveOpEpochRef.current;
-      startTransition(async () => {
+      const batchSlot: { promise: Promise<void> | null } = { promise: null };
+      batchSlot.promise = (async () => {
         reportSaving();
         const entries = itemIds.map((itemId) => {
           const cur = responsesRef.current[itemId];
@@ -1341,8 +1340,17 @@ export function ChecklistFillWizard({
           reportSaveError("Falha de conexão ao salvar. Tentando novamente…");
           rescheduleSave(scope, forceAll, 4000);
         } finally {
-          saveBatchInFlightRef.current = false;
+          if (opEpoch === saveOpEpochRef.current) {
+            saveBatchInFlightRef.current = false;
+          }
+          if (saveBatchPromiseRef.current === batchSlot.promise) {
+            saveBatchPromiseRef.current = null;
+          }
         }
+      })();
+      saveBatchPromiseRef.current = batchSlot.promise;
+      startTransition(() => {
+        void batchSlot.promise;
       });
     },
     [clearDirtyItems, itemResponseSource, section, sessionId, rescheduleSave],
@@ -1434,93 +1442,6 @@ export function ChecklistFillWizard({
     );
   }
 
-  if (dossierApprovedAt && !viewOnlyDossier) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-muted-foreground text-sm">{establishmentLabel}</p>
-            <h2 className="text-foreground text-xl font-semibold tracking-tight">
-              {template.name}
-            </h2>
-            {areaName ? (
-              <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-primary shadow-xs">
-                <MapPin className="size-4 shrink-0" aria-hidden />
-                {areaName}
-              </div>
-            ) : null}
-            <p className="text-muted-foreground mt-1 text-sm">
-              Este checklist já foi finalizado. Visualize abaixo o dossiê aprovado.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <ChecklistReopenDialog
-              sessionId={sessionId}
-              canReopen={canReopenDossier}
-              onReopened={handleDossierReopened}
-            />
-            <Link
-              href={backHref}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              {backLabel}
-            </Link>
-          </div>
-        </div>
-
-        {initialReopenEvents.length > 0 ? (
-          <div className="bg-muted/30 rounded-lg border p-4 text-sm">
-            <p className="text-foreground font-medium">Histórico de reaberturas</p>
-            <ul className="text-foreground/85 mt-2 space-y-2 text-xs">
-              {initialReopenEvents.map((ev) => (
-                <li key={ev.id} className="border-border/60 border-b pb-2 last:border-0 last:pb-0">
-                  <p>
-                    {formatDossierApprovedLabel(ev.created_at)} — {ev.reopened_by_label} (
-                    {ev.reopened_by_role === "owner"
-                      ? "Titular"
-                      : ev.reopened_by_role === "gestao"
-                        ? "Gestão"
-                        : "Administrador"})
-                  </p>
-                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">
-                    Justificativa: {ev.justification}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <ChecklistFillDossierPreview
-          template={template}
-          responses={responses}
-          itemPhotos={livePhotos}
-          reviewEditable={false}
-          dossierApprovedAt={dossierApprovedAt}
-          heading="Dossiê aprovado"
-          intro="Relatório aprovado e em modo somente leitura."
-          professionalSignatureDataUrl={savedProfessionalSig}
-          clientSignatureDataUrl={savedClientSig}
-          clientSignerName={savedClientSignerName}
-          professionalName={professionalName}
-          professionalCrn={professionalCrn}
-          clientLabel={clientLabel}
-          documentHash={savedDocumentHash}
-          dossierApprovedClientIp={savedApprovedClientIp}
-          reopenEvents={initialReopenEvents}
-        />
-
-        <ChecklistFillDossierPdfCard
-          sessionId={sessionId}
-          dossierApprovedAt={dossierApprovedAt}
-          initialJob={initialPdfExport ?? null}
-          pdfExportHistory={pdfExportHistory}
-          dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
-        />
-      </div>
-    );
-  }
-
   if (viewOnlyDossier) {
     return (
       <div className="space-y-6">
@@ -1538,25 +1459,28 @@ export function ChecklistFillWizard({
             ) : null}
             <p className="text-muted-foreground mt-1 text-sm">
               {dossierApprovedAt
-                ? "Dossiê aprovado — somente leitura."
+                ? "Dossiê aprovado. Você pode editar as respostas a qualquer momento."
                 : "Visualização do dossiê desta sessão."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={
+                backHref && backHref !== "/checklists"
+                  ? `/checklists/preencher/${sessionId}?returnTo=${encodeURIComponent(backHref)}`
+                  : `/checklists/preencher/${sessionId}`
+              }
+              className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}
+            >
+              <Pencil className="size-4 shrink-0" aria-hidden />
+              Editar respostas
+            </Link>
             {dossierApprovedAt ? (
               <ChecklistReopenDialog
                 sessionId={sessionId}
                 canReopen={canReopenDossier}
                 onReopened={handleDossierReopened}
               />
-            ) : null}
-            {!dossierApprovedAt ? (
-              <Link
-                href={`/checklists/preencher/${sessionId}`}
-                className={cn(buttonVariants({ size: "sm" }), "inline-flex")}
-              >
-                Continuar preenchendo
-              </Link>
             ) : null}
             <Link
               href={backHref}
@@ -1599,8 +1523,8 @@ export function ChecklistFillWizard({
           heading={dossierApprovedAt ? "Dossiê aprovado" : "Dossiê em andamento"}
           intro={
             dossierApprovedAt
-              ? "Este dossiê já foi aprovado e está em modo somente leitura."
-              : "Modo de visualização. Use \"Continuar preenchendo\" para editar esta sessão."
+              ? "Dossiê aprovado. Use \"Editar respostas\" para alterar itens a qualquer momento."
+              : "Modo de visualização. Use \"Editar respostas\" para continuar o preenchimento."
           }
           professionalSignatureDataUrl={savedProfessionalSig}
           clientSignatureDataUrl={savedClientSig}
@@ -1650,6 +1574,13 @@ export function ChecklistFillWizard({
             </div>
           ) : (
             <>
+              {dossierApprovedAt ? (
+                <p className="text-muted-foreground mt-2 text-sm">
+                  Dossiê aprovado em {formatDossierApprovedLabel(dossierApprovedAt)}. Você
+                  pode alterar respostas normalmente; o PDF vigente será atualizado na
+                  próxima geração.
+                </p>
+              ) : null}
               <div className="mt-2 border-l-2 border-primary pl-3">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                   Seção {sectionIndex + 1} de {sections.length}
@@ -1860,9 +1791,9 @@ export function ChecklistFillWizard({
           />
           <div className="border-border space-y-3 rounded-lg border bg-muted/20 p-4">
             <p className="text-muted-foreground text-xs">
-              Após aprovar, o relatório fica registrado e deixa de ser editável. Novas
-              alterações no produto seguirão o fluxo de nova versão do relatório
-              (FR70).
+              Após aprovar, o relatório fica registrado com assinaturas e PDF. Você ainda
+              poderá editar respostas depois; gere o PDF novamente se precisar da versão
+              atualizada.
             </p>
             {approveError ? (
               <p className="text-destructive text-sm" role="alert">
@@ -1874,6 +1805,11 @@ export function ChecklistFillWizard({
               disabled={isApprovePending}
               onClick={() => {
                 setApproveError(null);
+                // Enquanto o utilizador assina: flush dirty + pré-busca do IP.
+                if (dirtyItemIdsRef.current.size > 0) {
+                  saveProgressBatchRef.current("all", false);
+                }
+                deviceIpPrefetchRef.current = resolveDeviceIpForDossierApproval();
                 setSignatureDialogOpen(true);
               }}
             >
@@ -1937,29 +1873,61 @@ export function ChecklistFillWizard({
             >
               {sectionNavLoading ? "Carregando..." : "Próxima seção"}
             </Button>
-            <Button
-              type="button"
-              variant={isLast ? "default" : "secondary"}
-              disabled={sectionNavLoading}
-              onClick={() => {
-                setAdvanceError(null);
-                setFinalizeDialogError(null);
-                setFinalizeBusy(false);
-                setFinalizeDialogOpen(true);
-              }}
-            >
-              Finalizar e ver dossiê
-            </Button>
+            {dossierApprovedAt ? (
+              <Link
+                href={
+                  backHref && backHref !== "/checklists"
+                    ? `/checklists/preencher/${sessionId}?view=dossie&returnTo=${encodeURIComponent(backHref)}`
+                    : `/checklists/preencher/${sessionId}?view=dossie`
+                }
+                className={cn(buttonVariants({ variant: "secondary" }), "gap-1.5")}
+              >
+                <Eye className="size-4 shrink-0" aria-hidden />
+                Ver dossiê
+              </Link>
+            ) : (
+              <Button
+                type="button"
+                variant={isLast ? "default" : "secondary"}
+                disabled={sectionNavLoading}
+                onClick={() => {
+                  setAdvanceError(null);
+                  setFinalizeDialogError(null);
+                  setFinalizeBusy(false);
+                  setFinalizeDialogOpen(true);
+                }}
+              >
+                Finalizar e ver dossiê
+              </Button>
+            )}
           </div>
           <p className="text-muted-foreground max-w-xl text-xs">
             As respostas só são gravadas no servidor ao usar{" "}
-            <span className="text-foreground font-medium">Salvar agora</span>, ao
-            confirmar{" "}
-            <span className="text-foreground font-medium">Finalizar e ver dossiê</span>, ao
-            aprovar o dossiê ou ao sair da página escolhendo gravar o rascunho.
+            <span className="text-foreground font-medium">Salvar agora</span>
+            {dossierApprovedAt ? (
+              <>
+                , ao mudar de seção ou ao sair da página escolhendo gravar o rascunho.
+              </>
+            ) : (
+              <>
+                , ao confirmar{" "}
+                <span className="text-foreground font-medium">Finalizar e ver dossiê</span>, ao
+                aprovar o dossiê ou ao sair da página escolhendo gravar o rascunho.
+              </>
+            )}
           </p>
         </div>
       )}
+
+      {dossierApprovedAt && !formLocked ? (
+        <ChecklistFillDossierPdfCard
+          sessionId={sessionId}
+          dossierApprovedAt={dossierApprovedAt}
+          initialJob={initialPdfExport ?? null}
+          pdfExportHistory={pdfExportHistory}
+          dossierEmailDeliveryConfigured={dossierEmailDeliveryConfigured}
+        />
+      ) : null}
 
       {/* Dialog de finalização */}
       <Dialog
@@ -2167,7 +2135,7 @@ export function ChecklistFillWizard({
               </DialogTitle>
               <DialogDescription>
                 {dossierApprovedAt ? (
-                  "Relatório aprovado e imutável."
+                  "Relatório aprovado. Alterações nas respostas atualizam o registro."
                 ) : dossierPreviewConfirmed ? (
                   <>
                     Leitura do dossiê compilado. Para ajustar textos antes de aprovar, edite
@@ -2292,13 +2260,19 @@ export function ChecklistFillWizard({
           setApproveError(null);
           startApproveTransition(async () => {
             try {
-              const synced = await runReconcileThenSync();
+              // Sync + IP em paralelo (IP pode já estar em prefetch desde "Aprovar dossiê").
+              const ipPromise =
+                deviceIpPrefetchRef.current ?? resolveDeviceIpForDossierApproval();
+              deviceIpPrefetchRef.current = null;
+              const [synced, deviceIp] = await Promise.all([
+                runReconcileThenSync(),
+                ipPromise,
+              ]);
               if (!synced.ok) {
                 setApproveError(synced.error);
                 setPendingSignatures(null);
                 return;
               }
-              const deviceIp = await resolveDeviceIpForDossierApproval();
               const r = await approveChecklistFillDossierAction(
                 sessionId,
                 {

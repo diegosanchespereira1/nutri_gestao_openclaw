@@ -1259,12 +1259,15 @@ async function saveFillResponsesBatchLegacy(
     }
   }
 
-  for (const { id, payload } of updateOps) {
-    const { error } = await supabase
-      .from("checklist_fill_item_responses")
-      .update(payload)
-      .eq("id", id);
-    if (error) return { error };
+  if (updateOps.length > 0) {
+    const updateResults = await Promise.all(
+      updateOps.map(({ id, payload }) =>
+        supabase.from("checklist_fill_item_responses").update(payload).eq("id", id),
+      ),
+    );
+    for (const { error } of updateResults) {
+      if (error) return { error };
+    }
   }
 
   return { error: null };

@@ -42,14 +42,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME || vars.DOCKERHUB_USERNAME || secrets.DOCKER_HUB_USERNAME || vars.DOCKER_HUB_USERNAME || secrets.DOCKER_USERNAME || vars.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN || secrets.DOCKER_HUB_TOKEN || secrets.DOCKER_HUB_PASSWORD || secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Extract metadata
+      # Tags locais (sem docker/metadata-action): evita falha quando a API do
+      # GitHub devolve Unicorn/503 — o metadata-action depende dessa API.
+      - name: Image tags
         id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: stratostech/nutricao-stratostech
-          tags: |
-            type=raw,value=latest
-            type=sha,prefix=,format=short
+        run: |
+          short_sha="${GITHUB_SHA:0:7}"
+          {
+            echo "tags<<EOF"
+            echo "stratostech/nutricao-stratostech:latest"
+            echo "stratostech/nutricao-stratostech:${short_sha}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Read app version
         id: appver
@@ -62,7 +66,6 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
             NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}

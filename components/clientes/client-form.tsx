@@ -238,6 +238,9 @@ export function ClientForm({
   const [isEditing, setIsEditing] = useState(mode === "create");
   const [formEpoch, setFormEpoch] = useState(0);
   const fieldsLocked = mode === "edit" && !isEditing;
+  // Fecha o overlay assim que a action devolve resultado. Evita popup preso
+  // quando isPending fica true após router.refresh() (deadlock Next.js).
+  const savingDialogOpen = isPending && state?.ok !== true;
   const [kind, setKind] = useState<ClientKind>(defaultKind);
   const [tab, setTab] = useState<ClientFormTab>(() => {
     if (
@@ -295,7 +298,13 @@ export function ClientForm({
     // Sai do modo de edição após salvar com sucesso; adiado para fora do
     // corpo síncrono do efeito.
     queueMicrotask(() => setIsEditing(false));
-    router.refresh();
+    // revalidatePath na action já invalida a página; o refresh no cliente
+    // só atualiza default*. Atrasar evita descartar a transition da action
+    // e deixar isPending=true para sempre (Unicorn/deadlock do App Router).
+    const refreshId = window.setTimeout(() => {
+      router.refresh();
+    }, 100);
+    return () => window.clearTimeout(refreshId);
   }, [mode, state, router]);
 
   const defaultsSignature = [
@@ -1490,13 +1499,13 @@ export function ClientForm({
                   type="button"
                   variant="ghost"
                   onClick={cancelEditMode}
-                  disabled={isPending}
+                  disabled={savingDialogOpen}
                 >
                   Cancelar
                 </Button>
               ) : null}
-              <Button type="submit" className="min-w-[9rem]" disabled={isPending}>
-                {isPending ? (
+              <Button type="submit" className="min-w-[9rem]" disabled={savingDialogOpen}>
+                {savingDialogOpen ? (
                   <>
                     <Loader2 className="size-4 animate-spin" aria-hidden />
                     {mode === "create" ? "Cadastrando…" : "Salvando…"}
@@ -1513,7 +1522,7 @@ export function ClientForm({
       </form>
     </Card>
 
-    <Dialog open={isPending}>
+    <Dialog open={savingDialogOpen}>
       <DialogContent
         showCloseButton={false}
         className="sm:max-w-md"

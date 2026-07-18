@@ -87,6 +87,30 @@ describe("isWorkspaceGestaoMember", () => {
       isWorkspaceGestaoMember(supabase, "member-1", "owner-1"),
     ).resolves.toBe(false);
   });
+
+  it("consulta inclui filtro is_active=true", async () => {
+    const eqs: Array<[string, unknown]> = [];
+    const supabase = {
+      from: (table: string) => {
+        if (table !== "team_members") throw new Error(`unexpected ${table}`);
+        const chain = {
+          select: () => chain,
+          eq: (col: string, val: unknown) => {
+            eqs.push([col, val]);
+            return chain;
+          },
+          maybeSingle: async () => ({ data: { id: "tm-1" } }),
+        };
+        return chain;
+      },
+    } as never;
+
+    await expect(
+      isWorkspaceGestaoMember(supabase, "member-1", "owner-1"),
+    ).resolves.toBe(true);
+    expect(eqs).toContainEqual(["is_active", true]);
+    expect(eqs).toContainEqual(["job_role", "gestao"]);
+  });
 });
 
 describe("canManageTeamMembers / canDeleteWorkspaceMasterData", () => {

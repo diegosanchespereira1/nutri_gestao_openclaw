@@ -23,6 +23,7 @@ export async function getWorkspaceAccountOwnerId(
     .from("team_members")
     .select("owner_user_id")
     .eq("member_user_id", authUserId)
+    .eq("is_active", true)
     .maybeSingle();
 
   if (data?.owner_user_id) return data.owner_user_id as string;
@@ -51,6 +52,7 @@ export async function isWorkspaceGestaoMember(
     .eq("owner_user_id", workspaceOwnerId)
     .eq("member_user_id", authUserId)
     .eq("job_role", "gestao")
+    .eq("is_active", true)
     .maybeSingle();
 
   return !!data?.id;

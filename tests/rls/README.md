@@ -63,10 +63,12 @@ npm run test:rls:watch
 
 ### Modelo de permissões (mesmo tenant)
 
-Os testes desta pasta focam **isolamento entre tenants**. No mesmo workspace:
+Os testes desta pasta cobrem **isolamento entre tenants** (`isolation.test.ts`) e
+**permissões same-workspace** (`workspace-team.test.ts`):
 
-- **UPDATE** de `clients` / `establishments` / `patients` — permitido a titular e membros (`workspace_member_user_ids`).
-- **DELETE** — titular, `job_role = gestao`, ou admin/super_admin (`workspace_can_delete_master_data`).
+- **UPDATE** de `clients` / `establishments` / `patients` — titular e membros **ativos**.
+- **DELETE** — titular, `job_role = gestao` ativo, ou admin/super_admin (`workspace_can_delete_master_data`).
+- **Membro `is_active=false`** — fora de `workspace_member_user_ids()` (SELECT/UPDATE bloqueados).
 
 Documentação: [docs/architecture/workspace-permissions.md](../../docs/architecture/workspace-permissions.md). Helpers cobertos por testes unitários em `lib/workspace.test.ts`.
 

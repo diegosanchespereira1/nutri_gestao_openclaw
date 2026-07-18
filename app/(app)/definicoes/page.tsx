@@ -1,8 +1,17 @@
 import Link from "next/link";
-import { Building2, CalendarClock, Camera, ChevronRight, Globe, Lock, Tag, UserCircle } from "lucide-react";
+import {
+  Building2,
+  CalendarClock,
+  Camera,
+  Globe,
+  Lock,
+  Tag,
+  UserCircle,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { cn } from "@/lib/utils";
 
 const settingsItems = [
   {
@@ -49,40 +58,39 @@ const settingsItems = [
     label: "Segurança e 2FA",
     description: "Autenticação em dois fatores e gestão de senha.",
   },
-];
+] as const;
 
 export default function DefinicoesPage() {
   return (
-    <PageLayout variant="form">
+    <PageLayout>
       <PageHeader
         title="Definições"
         description="Configure o seu perfil, região e preferências de segurança."
       />
 
-      <ul className="divide-border divide-y overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {settingsItems.map(({ href, icon: Icon, label, description }) => (
-          <li key={href}>
-            <Link
-              href={href}
-              className="hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-4 px-5 py-4 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            >
-              <div className="bg-primary/10 flex size-10 shrink-0 items-center justify-center rounded-lg">
-                <Icon className="text-primary size-5" aria-hidden />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-foreground text-sm font-medium">{label}</p>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  {description}
-                </p>
-              </div>
-              <ChevronRight
-                className="text-muted-foreground size-4 shrink-0"
-                aria-hidden
-              />
-            </Link>
-          </li>
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "bg-card flex flex-col rounded-xl border border-border p-5 shadow-sm",
+              "transition-colors hover:bg-muted/40",
+              "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+            )}
+          >
+            <div className="bg-primary/10 mb-4 flex size-10 shrink-0 items-center justify-center rounded-lg">
+              <Icon className="text-primary size-5" aria-hidden />
+            </div>
+            <h2 className="text-foreground mb-1 text-sm font-semibold">
+              {label}
+            </h2>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              {description}
+            </p>
+          </Link>
         ))}
-      </ul>
+      </div>
     </PageLayout>
   );
 }

@@ -7,15 +7,23 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { createClient } from "@/lib/supabase/server";
 import { loadPatientsForScope } from "@/lib/actions/patients";
+import {
+  buildCurrentUrl,
+  getReturnToParam,
+  resolveBackNavigation,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 import type { PatientRow } from "@/lib/types/patients";
 
 export default async function EstabelecimentoPacientesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; estId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id: clientId, estId } = await params;
+  const [{ id: clientId, estId }, sp] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
 
   const { data: establishment } = await supabase
@@ -40,23 +48,33 @@ export default async function EstabelecimentoPacientesPage({
     establishmentId: estId,
   });
 
+  const pagePath = `/clientes/${clientId}/estabelecimentos/${estId}/pacientes`;
+  const returnToOrigin = buildCurrentUrl(pagePath, sp);
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/clientes/${clientId}/estabelecimentos/${estId}/editar`,
+    fallbackLabel: client?.legal_name ?? "Estabelecimento",
+    currentPath: pagePath,
+  });
+
   const novoHref = `/clientes/${clientId}/estabelecimentos/${estId}/pacientes/novo`;
-  const associarHref = `/clientes/${clientId}/estabelecimentos/${estId}/pacientes/associar`;
+  const associarHref = withReturnTo(
+    `/clientes/${clientId}/estabelecimentos/${estId}/pacientes/associar`,
+    returnToOrigin,
+  );
 
   return (
     <PageLayout variant="form">
       <PageHeader
         title={`Pacientes — ${establishment.name}`}
         description="Selecione um paciente para ver ou registar avaliações nutricionais."
-        back={{
-          href: `/clientes/${clientId}/estabelecimentos/${estId}/editar`,
-          label: client?.legal_name ?? "Estabelecimento",
-        }}
+        back={back}
       />
 
       <EstablishmentPatientsList
         patients={rows as PatientRow[]}
         novoHref={novoHref}
+        returnToOrigin={returnToOrigin}
         associateSlot={
           <Link
             href={associarHref}

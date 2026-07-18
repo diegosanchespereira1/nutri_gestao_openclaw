@@ -12,6 +12,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
 import {
+  buildCurrentUrl,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
+import {
   RECIPE_LINE_UNIT_LABELS,
 } from "@/lib/constants/recipe-line-units";
 import { getServerContext } from "@/lib/supabase/get-server-user";
@@ -57,13 +61,15 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
   const recipesN = parseInt(String(recipes ?? "0"), 10);
   const showPriceBanner =
     priceUpdated === "1" && !errMsg && Number.isFinite(recipesN);
+  const returnToOrigin = buildCurrentUrl("/materias-primas", sp);
+  const novaHref = withReturnTo("/materias-primas/nova", returnToOrigin);
 
   return (
     <PageLayout>
       <PageHeader
         title="Matérias-primas"
         description="Registe o custo unitário de compra; nas receitas, ligue cada linha a uma matéria-prima para ver o custo estimado da ficha."
-        actions={<MateriasPrimasToolbar />}
+        actions={<MateriasPrimasToolbar novaHref={novaHref} />}
       />
 
       {errMsg ? (
@@ -141,7 +147,7 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
                   Importar
                 </Link>
                 <Link
-                  href="/materias-primas/nova"
+                  href={novaHref}
                   className={cn(buttonVariants({ size: "default" }))}
                 >
                   Nova matéria-prima
@@ -187,7 +193,10 @@ export default async function MateriasPrimasPage({ searchParams }: Props) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex flex-wrap justify-end gap-2">
                       <Link
-                        href={`/materias-primas/${row.id}/editar`}
+                        href={withReturnTo(
+                          `/materias-primas/${row.id}/editar`,
+                          returnToOrigin,
+                        )}
                         className={buttonVariants({
                           variant: "outline",
                           size: "sm",

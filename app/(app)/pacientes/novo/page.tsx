@@ -5,9 +5,18 @@ import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadGradesForClients } from "@/lib/actions/school-grades";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import type { ClientRow } from "@/lib/types/clients";
 
-export default async function NovoPacientePage() {
+export default async function NovoPacientePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const [{ rows: clientRows }, { rows: estRows }, teamMembers] =
     await Promise.all([
       loadClientsForOwner({ kind: "pj" }),
@@ -32,12 +41,19 @@ export default async function NovoPacientePage() {
 
   const schoolGradesByClient = await loadGradesForClients(clients.map((c) => c.id));
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/pacientes",
+    fallbackLabel: "Pacientes",
+    currentPath: "/pacientes/novo",
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Novo paciente"
         description="Pessoa física. A associação a cliente ou estabelecimento é opcional — pode ser feita depois."
-        back={{ href: "/pacientes", label: "Pacientes" }}
+        back={back}
       />
       <PatientForm
         mode="create"

@@ -7,12 +7,21 @@ import {
   CLIENT_BUSINESS_SEGMENTS,
   clientBusinessSegmentLabel,
 } from "@/lib/constants/client-business-segment";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { canAccessAdminArea } from "@/lib/roles";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 
 export const dynamic = "force-dynamic";
 
-export default async function DefinicoesCategoriasPage() {
+export default async function DefinicoesCategoriasPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user || !workspaceOwnerId) redirect("/login");
 
@@ -51,12 +60,19 @@ export default async function DefinicoesCategoriasPage() {
     isOverridden: overrideMap.has(key),
   }));
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/definicoes",
+    fallbackLabel: "Definições",
+    currentPath: "/definicoes/categorias",
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Categorias de negócio"
         description="Gerencie as categorias usadas para classificar os seus clientes."
-        back={{ href: "/definicoes", label: "Definições" }}
+        back={back}
       />
       <CustomSegmentsManager
         initial={customSegments}

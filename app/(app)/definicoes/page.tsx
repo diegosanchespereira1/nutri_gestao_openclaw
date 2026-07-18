@@ -11,6 +11,10 @@ import {
 
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import {
+  buildCurrentUrl,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 
 const settingsItems = [
@@ -60,7 +64,14 @@ const settingsItems = [
   },
 ] as const;
 
-export default function DefinicoesPage() {
+export default async function DefinicoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
+  const returnToOrigin = buildCurrentUrl("/definicoes", sp);
+
   return (
     <PageLayout>
       <PageHeader
@@ -72,7 +83,7 @@ export default function DefinicoesPage() {
         {settingsItems.map(({ href, icon: Icon, label, description }) => (
           <Link
             key={href}
-            href={href}
+            href={withReturnTo(href, returnToOrigin)}
             className={cn(
               "bg-card flex flex-col rounded-xl border border-border p-5 shadow-sm",
               "transition-colors hover:bg-muted/40",

@@ -7,13 +7,19 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { loadConsolidatedNutritionHistory } from "@/lib/actions/patient-history";
 import { loadPatientResponsibleHistory } from "@/lib/actions/patient-responsible-history";
 import { loadPatientById } from "@/lib/actions/patients";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 
 export default async function HistoricoPacientePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { row } = await loadPatientById(id);
   if (!row) notFound();
 
@@ -41,12 +47,19 @@ export default async function HistoricoPacientePage({
       ? "Só existe uma ficha com este CPF. Se criar outra com o mesmo documento noutro estabelecimento, as avaliações passam a aparecer juntas aqui."
       : "Sem CPF na ficha: vê apenas avaliações deste registo. Adicione o CPF para unir o histórico entre estabelecimentos (mesmo documento na sua conta).";
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/pacientes/${id}`,
+    fallbackLabel: "Prontuário",
+    currentPath: `/pacientes/${id}/historico`,
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Histórico consolidado"
         description={`${patientFullName} · ${contextMessage}`}
-        back={{ href: `/pacientes/${id}`, label: "Prontuário" }}
+        back={back}
       />
 
       <PatientResponsibleHistorySection

@@ -10,6 +10,7 @@ import {
   nativeSelectClass,
   nativeSelectValueClass,
 } from "@/components/forms/form-section";
+import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type AdultNutritionAssessmentFormResult,
   createAdultNutritionAssessmentAction,
@@ -169,6 +170,7 @@ export function AdultNutritionAssessmentForm({
       onReset={(e) => e.preventDefault()}
       className="space-y-6"
     >
+      <ReturnToHiddenField />
       <input type="hidden" name="patient_id" value={patientId} />
       <input type="hidden" name="has_amputation" value={String(hasAmputation)} />
       <input

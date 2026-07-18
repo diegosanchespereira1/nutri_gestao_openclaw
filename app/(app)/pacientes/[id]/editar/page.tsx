@@ -22,6 +22,12 @@ import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadGradesForClient } from "@/lib/actions/school-grades";
 import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
+import {
+  buildCurrentUrl,
+  getReturnToParam,
+  resolveBackNavigation,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { canDeleteWorkspaceMasterData } from "@/lib/workspace";
@@ -107,8 +113,18 @@ export default async function EditarPacientePage({
     ? await getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
     : null;
 
-  const backHref = `/pacientes/${row.id}`;
-  const backLabel = "Prontuário";
+  const pagePath = `/pacientes/${row.id}/editar`;
+  const currentUrl = buildCurrentUrl(pagePath, sp);
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/pacientes/${row.id}`,
+    fallbackLabel: "Prontuário",
+    currentPath: pagePath,
+  });
+  const historicoHref = withReturnTo(
+    `/pacientes/${row.id}/historico`,
+    currentUrl,
+  );
 
   return (
     <PageLayout variant="form">
@@ -116,10 +132,10 @@ export default async function EditarPacientePage({
       <PageHeader
         title={row.full_name}
         description="Dados cadastrais e avaliações nutricionais do paciente."
-        back={{ href: backHref, label: backLabel }}
+        back={back}
         actions={
           <Link
-            href={`/pacientes/${row.id}/historico`}
+            href={historicoHref}
             className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
           >
             Ver histórico

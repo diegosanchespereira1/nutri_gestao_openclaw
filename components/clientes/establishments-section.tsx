@@ -1,16 +1,19 @@
 import Link from "next/link";
 
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
-import type { EstablishmentRow } from "@/lib/types/establishments";
 import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
+import { withReturnTo } from "@/lib/navigation/return-to";
+import type { EstablishmentRow } from "@/lib/types/establishments";
 
 export async function EstablishmentsSection({
   clientId,
   establishment: preloadedEstablishment,
+  returnToOrigin,
 }: {
   clientId: string;
   /** Evita round-trip extra quando a página já carregou o estabelecimento. */
   establishment?: EstablishmentRow | null;
+  returnToOrigin: string;
 }) {
   const establishment =
     preloadedEstablishment !== undefined
@@ -45,7 +48,10 @@ export async function EstablishmentsSection({
       ) : (
         <div className="border-border overflow-hidden rounded-lg border bg-white">
           <Link
-            href={`/clientes/${clientId}/estabelecimentos/${establishment.id}/editar`}
+            href={withReturnTo(
+              `/clientes/${clientId}/estabelecimentos/${establishment.id}/editar`,
+              returnToOrigin,
+            )}
             className="hover:bg-muted/50 focus-visible:ring-ring block px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           >
             <span className="text-foreground font-medium">{establishment.name}</span>

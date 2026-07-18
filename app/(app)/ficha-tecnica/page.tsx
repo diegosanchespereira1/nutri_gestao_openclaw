@@ -21,6 +21,10 @@ import {
   type TechnicalRecipeListToggleFilter,
 } from "@/lib/constants/recipe-list";
 import { loadTechnicalRecipesForOwner } from "@/lib/actions/technical-recipes";
+import {
+  buildCurrentUrl,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 
 // ── page ─────────────────────────────────────────────────────────────────────
@@ -85,6 +89,8 @@ export default async function FichaTecnicaPage({
 
   const hasEstablishments = establishments.length > 0;
   const canCreateRecipe = hasEstablishments || pjClients.length > 0;
+  const returnToOrigin = buildCurrentUrl("/ficha-tecnica", params);
+  const templatesHref = withReturnTo("/ficha-tecnica/templates", returnToOrigin);
 
   return (
     <PageLayout>
@@ -92,7 +98,10 @@ export default async function FichaTecnicaPage({
         title="Ficha técnica"
         description="Receitas com ingredientes, TACO e custo por matéria-prima. Exporte PDF a partir de cada linha ou na edição da receita."
         actions={
-          <FichaTecnicaToolbar canCreateRecipe={canCreateRecipe} />
+          <FichaTecnicaToolbar
+            canCreateRecipe={canCreateRecipe}
+            templatesHref={templatesHref}
+          />
         }
       />
 
@@ -139,7 +148,7 @@ export default async function FichaTecnicaPage({
             action={
               <div className="flex flex-col items-center gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
                 <Link
-                  href="/ficha-tecnica/templates"
+                  href={templatesHref}
                   className={cn(buttonVariants({ variant: "outline", size: "default" }))}
                 >
                   Ver templates

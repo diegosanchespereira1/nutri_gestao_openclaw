@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 type Props = {
   /** Permite «Nova receita» com estabelecimento ou só com cliente PJ (catálogo). */
   canCreateRecipe: boolean;
+  templatesHref?: string;
 };
 
 /**
@@ -15,7 +16,10 @@ type Props = {
  * Matérias-primas tem página e navegação própria (/materias-primas) — não fica
  * misturada aqui, por isso não há atalho para lá neste toolbar.
  */
-export function FichaTecnicaToolbar({ canCreateRecipe }: Props) {
+export function FichaTecnicaToolbar({
+  canCreateRecipe,
+  templatesHref = "/ficha-tecnica/templates",
+}: Props) {
   return (
     <div
       className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"
@@ -27,7 +31,7 @@ export function FichaTecnicaToolbar({ canCreateRecipe }: Props) {
         aria-label="Recursos do módulo"
       >
         <Link
-          href="/ficha-tecnica/templates"
+          href={templatesHref}
           className={cn(buttonVariants({ variant: "outline", size: "default" }))}
         >
           <LayoutTemplate data-icon="inline-start" className="size-4" aria-hidden />

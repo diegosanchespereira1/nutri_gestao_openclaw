@@ -13,6 +13,10 @@ import {
   assessmentVisibilityForCategory,
   patientAgeCategory,
 } from "@/lib/pacientes/age-category";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 
 function calcDefaultAge(isoDate: string): number {
   return Math.floor(
@@ -22,10 +26,12 @@ function calcDefaultAge(isoDate: string): number {
 
 export default async function NovaAvaliacaoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const { row } = await loadPatientById(id);
   if (!row) notFound();
 
@@ -37,12 +43,19 @@ export default async function NovaAvaliacaoPage({
   const childSex: ChildSex | null =
     row.sex === "female" || row.sex === "male" ? row.sex : null;
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/pacientes/${id}`,
+    fallbackLabel: "Prontuário",
+    currentPath: `/pacientes/${id}/avaliacao/nova`,
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Realizar avaliação especializada"
         description={`${row.full_name} — informações complementares no prontuário`}
-        back={{ href: `/pacientes/${id}`, label: "Prontuário" }}
+        back={back}
       />
 
       <Card>

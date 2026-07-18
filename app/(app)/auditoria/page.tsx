@@ -8,6 +8,10 @@ import { buttonVariants } from '@/components/ui/button-variants';
 import { AuditLogViewer } from '@/components/auditoria/audit-log-viewer';
 import { getServerContext } from '@/lib/supabase/get-server-user';
 import { loadAuditLogs } from '@/lib/actions/audit';
+import {
+  buildCurrentUrl,
+  withReturnTo,
+} from '@/lib/navigation/return-to';
 import { cn } from '@/lib/utils';
 
 export const metadata = {
@@ -37,6 +41,8 @@ export default async function AuditoriaPage({
   ];
 
   const activeTable = tableName ?? 'all';
+  const returnToOrigin = buildCurrentUrl('/auditoria', sp);
+  const dsarHref = withReturnTo('/auditoria/dsar', returnToOrigin);
 
   return (
     <PageLayout>
@@ -127,7 +133,7 @@ export default async function AuditoriaPage({
           específicos para atender solicitações de direitos LGPD:
         </p>
         <Link
-          href="/auditoria/dsar"
+          href={dsarHref}
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
         >
           <Eye className="mr-2 size-4" />

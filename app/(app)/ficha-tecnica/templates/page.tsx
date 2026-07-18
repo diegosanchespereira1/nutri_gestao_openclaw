@@ -8,6 +8,10 @@ import { RecipePagination } from "@/components/technical-sheets/recipe-paginatio
 import { RecipeSearchInput } from "@/components/technical-sheets/recipe-search-input";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadTemplatesForOwner } from "@/lib/actions/technical-recipes";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { RECIPE_LIST_PAGE_SIZE } from "@/lib/constants/recipe-list";
 import {
   recipeClientIdForListRow,
@@ -25,16 +29,17 @@ function formatUpdatedAt(iso: string): string {
   }
 }
 
-type SearchParams = Promise<{ q?: string; page?: string }>;
-
 export default async function TemplatesPage({
   searchParams,
 }: {
-  searchParams: SearchParams;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const q = (params.q ?? "").trim();
-  const page = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
+  const q = (typeof params.q === "string" ? params.q : "").trim();
+  const page = Math.max(
+    1,
+    parseInt(typeof params.page === "string" ? params.page : "1", 10) || 1,
+  );
 
   const [{ rows: templates, total, totalPages }, { rows: establishments }] =
     await Promise.all([
@@ -44,12 +49,19 @@ export default async function TemplatesPage({
 
   const hasEstablishments = establishments.length > 0;
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(params),
+    fallbackHref: "/ficha-tecnica",
+    fallbackLabel: "Ficha técnica",
+    currentPath: "/ficha-tecnica/templates",
+  });
+
   return (
     <PageLayout>
       <PageHeader
         title="Repositório de Receitas"
         description="Receitas genéricas e reutilizáveis. Use como modelo para criar uma nova receita num estabelecimento — os dados são copiados e ficam independentes."
-        back={{ href: "/ficha-tecnica", label: "Ficha técnica" }}
+        back={back}
       />
 
       {/* ── Barra de busca ── */}

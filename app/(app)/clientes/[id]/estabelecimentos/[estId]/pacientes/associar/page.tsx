@@ -3,15 +3,21 @@ import { notFound } from "next/navigation";
 import { AssociatePatientSearch } from "@/components/pacientes/associate-patient-search";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
-import { createClient } from "@/lib/supabase/server";
 import { loadUnassociatedPatientsForClient } from "@/lib/actions/patients";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AssociarPacientePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; estId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id: clientId, estId } = await params;
+  const [{ id: clientId, estId }, sp] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
 
   const { data: establishment } = await supabase
@@ -32,6 +38,14 @@ export default async function AssociarPacientePage({
 
   const { rows: candidates } = await loadUnassociatedPatientsForClient(clientId);
 
+  const fallbackHref = `/clientes/${clientId}/estabelecimentos/${estId}/pacientes`;
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref,
+    fallbackLabel: `Pacientes — ${establishment.name}`,
+    currentPath: `/clientes/${clientId}/estabelecimentos/${estId}/pacientes/associar`,
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
@@ -41,10 +55,7 @@ export default async function AssociarPacientePage({
             ? `Selecione um paciente de ${client.legal_name} para associar a ${establishment.name}.`
             : `Selecione um paciente do cliente para associar a ${establishment.name}.`
         }
-        back={{
-          href: `/clientes/${clientId}/estabelecimentos/${estId}/pacientes`,
-          label: `Pacientes — ${establishment.name}`,
-        }}
+        back={back}
       />
 
       <AssociatePatientSearch

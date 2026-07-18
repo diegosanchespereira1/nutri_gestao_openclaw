@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  getReturnToFromFormData,
+  hrefWithOptionalReturnTo,
+} from "@/lib/navigation/return-to";
 import { createClient } from "@/lib/supabase/server";
 import type {
   GeriatricAssessmentRow,
@@ -150,7 +154,12 @@ export async function createGeriatricAssessmentAction(
 
   revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`);
+  redirect(
+    hrefWithOptionalReturnTo(
+      `/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`,
+      getReturnToFromFormData(formData),
+    ),
+  );
 }
 
 // ── Helpers de permissão ──────────────────────────────────────────────────────

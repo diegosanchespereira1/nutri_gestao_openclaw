@@ -13,6 +13,10 @@ import {
   loadTeamMembersForOwner,
 } from "@/lib/actions/team-members";
 import { loadExternalPortalUsers } from "@/lib/actions/external-portal";
+import {
+  buildCurrentUrl,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import type { TeamJobRole } from "@/lib/types/team-members";
 import { cn } from "@/lib/utils";
@@ -20,9 +24,14 @@ import { cn } from "@/lib/utils";
 export default async function EquipePage({
   searchParams,
 }: {
-  searchParams: Promise<{ portalErr?: string; portalOk?: string; email_err?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { portalErr, portalOk, email_err } = await searchParams;
+  const sp = await searchParams;
+  const portalErr = typeof sp.portalErr === "string" ? sp.portalErr : undefined;
+  const portalOk = typeof sp.portalOk === "string" ? sp.portalOk : undefined;
+  const email_err = typeof sp.email_err === "string" ? sp.email_err : undefined;
+  const returnToOrigin = buildCurrentUrl("/equipe", sp);
+  const novaHref = withReturnTo("/equipe/nova", returnToOrigin);
   const [{ rows }, { rows: portalUsers }, portfolioByMember, canManageTeam] =
     await Promise.all([
       loadTeamMembersForOwner(),
@@ -38,7 +47,7 @@ export default async function EquipePage({
         description="Membros que pode atribuir a visitas agendadas. O CRN é obrigatório apenas para perfis na área da nutrição."
         actions={
           canManageTeam ? (
-            <Link href="/equipe/nova" className={cn(buttonVariants(), "shrink-0")}>
+            <Link href={novaHref} className={cn(buttonVariants(), "shrink-0")}>
               Novo membro
             </Link>
           ) : undefined
@@ -52,7 +61,7 @@ export default async function EquipePage({
           description="Adicione colegas para os associar ao agendar visitas."
           action={
             canManageTeam ? (
-              <Link href="/equipe/nova" className={cn(buttonVariants())}>
+              <Link href={novaHref} className={cn(buttonVariants())}>
                 Cadastrar primeiro membro
               </Link>
             ) : undefined
@@ -66,7 +75,7 @@ export default async function EquipePage({
           {rows.map((m) => (
             <li key={m.id}>
               <Link
-                href={`/equipe/${m.id}/editar`}
+                href={withReturnTo(`/equipe/${m.id}/editar`, returnToOrigin)}
                 className="hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-3 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 {/* Avatar inicial */}
@@ -127,7 +136,7 @@ export default async function EquipePage({
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="font-medium">{m.full_name}</span>
                     <Link
-                      href={`/equipe/${m.id}/editar`}
+                      href={withReturnTo(`/equipe/${m.id}/editar`, returnToOrigin)}
                       className="text-muted-foreground hover:text-foreground text-xs underline"
                     >
                       Editar membro

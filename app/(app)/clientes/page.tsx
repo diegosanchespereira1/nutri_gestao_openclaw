@@ -8,6 +8,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { isClientBusinessSegment } from "@/lib/constants/client-business-segment";
+import {
+  buildCurrentUrl,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import type { ClientBusinessSegment } from "@/lib/types/clients";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +36,7 @@ export default async function ClientesPage({
   const segmentos = parseSegmentos(sp.segmentos);
   const pageKey = typeof sp.page === "string" ? sp.page : "1";
   const suspenseKey = `${q}|${situacaoRaw ?? "all"}|${segmentos.join(",")}|${pageKey}`;
+  const novoHref = withReturnTo("/clientes/novo", buildCurrentUrl("/clientes", sp));
 
   return (
     <PageLayout>
@@ -39,7 +44,7 @@ export default async function ClientesPage({
         title="Clientes"
         description="Carteira de clientes — empresas, hospitais e clínicas."
         actions={
-          <Link href="/clientes/novo" prefetch className={cn(buttonVariants())}>
+          <Link href={novoHref} prefetch className={cn(buttonVariants())}>
             Novo cliente
           </Link>
         }

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AGE_CATEGORY_LABELS, parseAgeCategory } from "@/lib/pacientes/age-category";
+import { buildCurrentUrl, withReturnTo } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 
 function parseSituacao(raw: string | undefined): "independente" | "all" {
@@ -46,6 +47,10 @@ export default async function PacientesPage({
   const categoria = parseAgeCategory(
     typeof sp.categoria === "string" ? sp.categoria : undefined,
   );
+  const novoHref = withReturnTo(
+    "/pacientes/novo",
+    buildCurrentUrl("/pacientes", sp),
+  );
 
   return (
     <PageLayout>
@@ -53,7 +58,7 @@ export default async function PacientesPage({
         title="Pacientes"
         description="Registo de pacientes — pessoas físicas."
         actions={
-          <Link href="/pacientes/novo" prefetch className={cn(buttonVariants())}>
+          <Link href={novoHref} prefetch className={cn(buttonVariants())}>
             Novo paciente
           </Link>
         }

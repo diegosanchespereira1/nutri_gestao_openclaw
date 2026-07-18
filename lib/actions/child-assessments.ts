@@ -3,9 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { createClient } from "@/lib/supabase/server";
 import { assessChild } from "@/lib/nutrition/child/assess";
 import { ageInMonthsFromISO } from "@/lib/nutrition/child/age";
+import {
+  getReturnToFromFormData,
+  hrefWithOptionalReturnTo,
+} from "@/lib/navigation/return-to";
+import { createClient } from "@/lib/supabase/server";
 import type {
   ChildSex,
   ClassificationMethod,
@@ -165,7 +169,12 @@ export async function createChildAssessmentAction(
 
   revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`);
+  redirect(
+    hrefWithOptionalReturnTo(
+      `/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`,
+      getReturnToFromFormData(formData),
+    ),
+  );
 }
 
 async function assertChildOwner(

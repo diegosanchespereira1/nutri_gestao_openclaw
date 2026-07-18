@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 
+import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type GeriatricAssessmentFormResult,
   createGeriatricAssessmentAction,
@@ -178,6 +179,7 @@ export function GeriatricAssessmentForm({
 
   return (
     <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
+      <ReturnToHiddenField />
       {/* ── Campos ocultos: identificação + valores calculados ───────────── */}
       <input type="hidden" name="patient_id"          value={patientId} />
       <input type="hidden" name="has_amputation"      value={String(hasAmputation)} />

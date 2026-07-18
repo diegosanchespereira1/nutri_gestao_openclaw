@@ -3,16 +3,22 @@ import { notFound } from "next/navigation";
 
 import { PatientForm } from "@/components/pacientes/patient-form";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 
 export default async function NovoPacienteClientePfPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { id: clientId } = await params;
+  const [{ id: clientId }, sp] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
   const teamMembers = await loadTeamMembersForSelect();
   const { data: client } = await supabase
@@ -25,16 +31,23 @@ export default async function NovoPacienteClientePfPage({
     notFound();
   }
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/clientes/${clientId}/editar`,
+    fallbackLabel: client.legal_name,
+    currentPath: `/clientes/${clientId}/pacientes/novo`,
+  });
+
   return (
     <div className="space-y-6">
       <Link
-        href={`/clientes/${clientId}/editar`}
+        href={back.href}
         className={cn(
           buttonVariants({ variant: "ghost", size: "sm" }),
           "text-muted-foreground hover:text-foreground -ml-2 h-auto px-2 py-1",
         )}
       >
-        ← {client.legal_name}
+        ← {back.label}
       </Link>
       <div>
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">

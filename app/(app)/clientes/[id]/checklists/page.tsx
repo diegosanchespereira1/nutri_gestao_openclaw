@@ -6,6 +6,10 @@ import { ClientChecklistHistorySection } from "@/components/clientes/client-chec
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 
 export default async function ClientChecklistHistoryPage({
@@ -38,12 +42,19 @@ export default async function ClientChecklistHistoryPage({
   if (!client || client.kind !== "pj") notFound();
   if (client.owner_user_id !== workspaceOwnerId) notFound();
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/clientes/${clientId}/editar?tab=checklists`,
+    fallbackLabel: client.legal_name,
+    currentPath: `/clientes/${clientId}/checklists`,
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title={`Histórico de Checklists — ${client.legal_name}`}
         description="Todos os preenchimentos realizados nos estabelecimentos deste cliente."
-        back={{ href: `/clientes/${clientId}/editar?tab=checklists`, label: client.legal_name }}
+        back={back}
       />
 
       {scoreHistory.byTemplate.length > 0 && (

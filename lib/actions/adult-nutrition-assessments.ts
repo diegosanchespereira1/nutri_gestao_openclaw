@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  getReturnToFromFormData,
+  hrefWithOptionalReturnTo,
+} from "@/lib/navigation/return-to";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdultNutritionAssessmentRow,
@@ -163,5 +167,10 @@ export async function createAdultNutritionAssessmentAction(
 
   revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`);
+  redirect(
+    hrefWithOptionalReturnTo(
+      `/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`,
+      getReturnToFromFormData(formData),
+    ),
+  );
 }

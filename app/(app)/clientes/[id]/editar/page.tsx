@@ -42,6 +42,11 @@ import { resolveClientEditTab, type ClientEditTabValue } from "@/lib/clientes/cl
 import { todayKey } from "@/lib/datetime/calendar-tz";
 import { formatBRLFromCents } from "@/lib/dashboard/financial-pending";
 import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status";
+import {
+  buildCurrentUrl,
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import {
@@ -199,6 +204,7 @@ async function ClientEditLoadedPanels({
   canEdit,
   contractErr,
   activeTab,
+  returnToOrigin,
 }: {
   supabase: SupabaseClient;
   user: ServerUser | null;
@@ -209,6 +215,7 @@ async function ClientEditLoadedPanels({
   canEdit: boolean;
   contractErr?: string;
   activeTab: ClientEditTabValue;
+  returnToOrigin: string;
 }) {
   const shell = shellFromClientRow(row);
   const needEstablishment = row.kind === "pj";
@@ -304,7 +311,11 @@ async function ClientEditLoadedPanels({
         defaultEstPostalCode={estRow?.postal_code ?? ""}
       >
         {row.kind === "pj" ? (
-          <EstablishmentsSection clientId={row.id} establishment={estRow} />
+          <EstablishmentsSection
+            clientId={row.id}
+            establishment={estRow}
+            returnToOrigin={returnToOrigin}
+          />
         ) : null}
       </ClientFormLazy>
 
@@ -330,7 +341,11 @@ async function ClientEditLoadedPanels({
           <Separator className="my-8" />
           <ClientExamDocumentList clientId={row.id} />
           <Separator className="my-8" />
-          <PatientsSection variant="client_pf" clientId={row.id} />
+          <PatientsSection
+            variant="client_pf"
+            clientId={row.id}
+            returnToOrigin={returnToOrigin}
+          />
         </>
       ) : null}
 
@@ -519,6 +534,14 @@ export default async function EditarClientePage({
     ? await getClientLogoSignedUrl(supabase, row.logo_storage_path)
     : null;
 
+  const returnToOrigin = buildCurrentUrl(`/clientes/${id}/editar`, sp);
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/clientes",
+    fallbackLabel: "Clientes",
+    currentPath: `/clientes/${id}/editar`,
+  });
+
   return (
     <PageLayout variant="form">
       <div className="flex flex-wrap items-start gap-4">
@@ -526,7 +549,7 @@ export default async function EditarClientePage({
         <PageHeader
           title={shell.legal_name}
           description={`${shell.kind === "pf" ? "Pessoa física" : "Pessoa jurídica"}${shell.kind === "pj" ? ` · ${statusLabel}` : ""}`}
-          back={{ href: "/clientes", label: "Clientes" }}
+          back={back}
           className="flex-1 min-w-0"
         />
       </div>
@@ -548,6 +571,7 @@ export default async function EditarClientePage({
           canEdit={canEdit}
           contractErr={sp.contractErr}
           activeTab={activeTab}
+          returnToOrigin={returnToOrigin}
         />
       </Suspense>
     </PageLayout>

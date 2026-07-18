@@ -6,11 +6,20 @@ import { ChecklistPdfSettingsForm } from "@/components/definicoes/checklist-pdf-
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { getPdfSettingsAction } from "@/lib/actions/checklist-pdf-settings";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChecklistFotosDefinicoesPage() {
+export default async function ChecklistFotosDefinicoesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const { user, workspaceOwnerId } = await getServerContext();
   if (!user) redirect("/login");
 
@@ -19,12 +28,19 @@ export default async function ChecklistFotosDefinicoesPage() {
 
   const pdfSettings = await getPdfSettingsAction();
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/definicoes",
+    fallbackLabel: "Definições",
+    currentPath: "/definicoes/checklist-fotos",
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Checklist e fotos"
         description="Preferências de fotos, GPS, assinaturas e personalização visual do PDF de dossiê."
-        back={{ href: "/definicoes", label: "Definições" }}
+        back={back}
       />
 
       {/* GPS nas fotos */}

@@ -30,6 +30,7 @@ import {
 } from "@/lib/types/geriatric-assessments";
 import type { AdultNutritionAssessmentRow } from "@/lib/types/adult-nutrition-assessments";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { withReturnTo } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 
 function fmtDate(iso: string): string {
@@ -542,9 +543,11 @@ function ChildTabContent({
 export async function PatientAssessmentsBlock({
   patientId,
   birthDate = null,
+  returnToOrigin,
 }: {
   patientId: string;
   birthDate?: string | null;
+  returnToOrigin: string;
 }) {
   const [
     { rows: adultRows },
@@ -602,7 +605,10 @@ export async function PatientAssessmentsBlock({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <Link
-          href={`/pacientes/${patientId}/avaliacao/nova`}
+          href={withReturnTo(
+            `/pacientes/${patientId}/avaliacao/nova`,
+            returnToOrigin,
+          )}
           className={cn(buttonVariants({ size: "sm" }))}
         >
           <ClipboardList className="mr-1.5 size-3.5" aria-hidden />

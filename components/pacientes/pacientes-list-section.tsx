@@ -12,6 +12,7 @@ import {
   parseAgeCategory,
   patientAgeCategory,
 } from "@/lib/pacientes/age-category";
+import { buildCurrentUrl, withReturnTo } from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ type Props = {
 };
 
 export async function PacientesListSection({ searchParams: sp }: Props) {
+  const returnOrigin = buildCurrentUrl("/pacientes", sp);
   const q = typeof sp.q === "string" ? sp.q : "";
   const situacao = parseSituacao(
     typeof sp.situacao === "string" ? sp.situacao : undefined,
@@ -63,7 +65,10 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
         title="Nenhum paciente ainda"
         description="Adicione pacientes pessoas físicas. Pode associar a um cliente depois, se necessário."
         action={
-          <Link href="/pacientes/novo" className={cn(buttonVariants())}>
+          <Link
+            href={withReturnTo("/pacientes/novo", returnOrigin)}
+            className={cn(buttonVariants())}
+          >
             Criar paciente
           </Link>
         }
@@ -95,7 +100,7 @@ export async function PacientesListSection({ searchParams: sp }: Props) {
         return (
           <li key={p.id}>
             <Link
-              href={`/pacientes/${p.id}`}
+              href={withReturnTo(`/pacientes/${p.id}`, returnOrigin)}
               prefetch
               className="hover:bg-muted/50 focus-visible:ring-ring flex items-start gap-3 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >

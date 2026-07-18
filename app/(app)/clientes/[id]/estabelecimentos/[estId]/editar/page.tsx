@@ -20,6 +20,12 @@ import {
   loadComplianceDeadlinesForEstablishment,
 } from "@/lib/actions/compliance-deadlines";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
+import {
+  buildCurrentUrl,
+  getReturnToParam,
+  resolveBackNavigation,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { canDeleteWorkspaceMasterData } from "@/lib/workspace";
 import type { EstablishmentRow } from "@/lib/types/establishments";
@@ -72,12 +78,27 @@ export default async function EditarEstabelecimentoPage({
     label: `${t.name} (${t.portaria_ref})`,
   }));
 
+  const returnToOrigin = buildCurrentUrl(
+    `/clientes/${clientId}/estabelecimentos/${estId}/editar`,
+    sp,
+  );
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: `/clientes/${clientId}/editar`,
+    fallbackLabel: client.legal_name,
+    currentPath: `/clientes/${clientId}/estabelecimentos/${estId}/editar`,
+  });
+  const pacientesListHref = withReturnTo(
+    `/clientes/${clientId}/estabelecimentos/${row.id}/pacientes`,
+    returnToOrigin,
+  );
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title={row.name}
         description="Dados do estabelecimento, prazos de compliance e pacientes associados."
-        back={{ href: `/clientes/${clientId}/editar`, label: client.legal_name }}
+        back={back}
       />
 
       {/* ── Seção 1: Dados do estabelecimento ──────────────── */}
@@ -152,7 +173,7 @@ export default async function EditarEstabelecimentoPage({
               </CardDescription>
             </div>
             <Link
-              href={`/clientes/${clientId}/estabelecimentos/${row.id}/pacientes`}
+              href={pacientesListHref}
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
               Pacientes
@@ -171,6 +192,7 @@ export default async function EditarEstabelecimentoPage({
             clientId={clientId}
             establishmentId={row.id}
             establishmentName={row.name}
+            returnToOrigin={returnToOrigin}
           />
         </CardContent>
       </Card>

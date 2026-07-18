@@ -9,6 +9,7 @@ import {
   formGridClass,
   nativeSelectValueClass,
 } from "@/components/forms/form-section";
+import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type NutritionAssessmentFormResult,
   createNutritionAssessmentAction,
@@ -40,6 +41,7 @@ export function NutritionAssessmentForm({ patientId }: { patientId: string }) {
 
   return (
     <form action={formAction} className="space-y-6">
+      <ReturnToHiddenField />
       <input type="hidden" name="patient_id" value={patientId} />
 
       <FormSection title="Antropometria">

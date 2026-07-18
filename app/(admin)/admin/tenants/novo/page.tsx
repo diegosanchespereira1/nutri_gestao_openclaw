@@ -2,6 +2,10 @@
 import { AlertCircle } from "lucide-react";
 
 import { loadSubscriptionPlans } from "@/lib/actions/admin-platform";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { CreateTenantWizard } from "@/components/admin/create-tenant-wizard";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -20,16 +24,24 @@ const ERR_MESSAGES: Record<string, string> = {
 export default async function NovoTenantPage({
   searchParams,
 }: {
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const { err } = await searchParams;
+  const sp = await searchParams;
+  const err = typeof sp.err === "string" ? sp.err : undefined;
   const { rows: plans } = await loadSubscriptionPlans();
   const activePlans = plans.filter((p) => p.is_active);
+
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/admin/tenants",
+    fallbackLabel: "Tenants",
+    currentPath: "/admin/tenants/novo",
+  });
 
   return (
     <PageLayout className="mx-auto w-full max-w-4xl">
       <PageHeader
-        back={{ href: "/admin/tenants", label: "Tenants" }}
+        back={back}
         title="Criar novo tenant"
         description="Siga as etapas para configurar a conta, os módulos de atividade e o plano do novo cliente."
       />

@@ -3,19 +3,35 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 
-export default async function NovoClientePage() {
+export default async function NovoClientePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const [customSegments, teamMembersForSelect] = await Promise.all([
     loadCustomSegmentsAction(),
     loadTeamMembersForSelect(),
   ]);
+
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/clientes",
+    fallbackLabel: "Clientes",
+    currentPath: "/clientes/novo",
+  });
 
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Novo cliente"
         description="Empresa, hospital ou clínica (pessoa jurídica). Estabelecimentos e pacientes associam-se depois. Para pacientes individuais, use o módulo Pacientes."
-        back={{ href: "/clientes", label: "Clientes" }}
+        back={back}
       />
       <ClientForm
         mode="create"

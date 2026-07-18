@@ -17,6 +17,10 @@ import {
   deleteTeamMemberAction,
   loadTeamMemberById,
 } from "@/lib/actions/team-members";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 
 const errMessages: Record<string, string> = {
@@ -28,12 +32,13 @@ const errMessages: Record<string, string> = {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function EditarEquipePage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { err } = await searchParams;
+  const sp = await searchParams;
+  const err = typeof sp.err === "string" ? sp.err : undefined;
   const { row } = await loadTeamMemberById(id);
   if (!row) notFound();
 
@@ -47,12 +52,19 @@ export default async function EditarEquipePage({ params, searchParams }: Props) 
 
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/equipe",
+    fallbackLabel: "Equipe",
+    currentPath: `/equipe/${id}/editar`,
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title={row.full_name}
         description="Dados profissionais e área de atuação do membro da equipe."
-        back={{ href: "/equipe", label: "Equipe" }}
+        back={back}
       />
 
       {errMsg ? (

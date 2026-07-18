@@ -3,6 +3,10 @@ import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 
 const errMessages: Record<string, string> = {
   invalid: "Verifique nome e preço (maior que zero).",
@@ -10,11 +14,12 @@ const errMessages: Record<string, string> = {
 };
 
 type Props = {
-  searchParams: Promise<{ err?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function NovaMateriaPrimaPage({ searchParams }: Props) {
-  const { err } = await searchParams;
+  const sp = await searchParams;
+  const err = typeof sp.err === "string" ? sp.err : undefined;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
 
   const [{ rows: pjClients }, { rows: establishments }] = await Promise.all([
@@ -22,11 +27,18 @@ export default async function NovaMateriaPrimaPage({ searchParams }: Props) {
     loadEstablishmentsForOwner(),
   ]);
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/materias-primas",
+    fallbackLabel: "Matérias-primas",
+    currentPath: "/materias-primas/nova",
+  });
+
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Nova matéria-prima"
-        back={{ href: "/materias-primas", label: "Matérias-primas" }}
+        back={back}
       />
 
       {errMsg ? (

@@ -2,6 +2,7 @@
 
 import { useState, useActionState } from "react";
 
+import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type AssociatePatientResult,
   associatePatientPageAction,
@@ -111,6 +112,7 @@ export function AssociatePatientSearch({
                 onSubmit={() => setPendingId(c.id)}
                 className="shrink-0"
               >
+                <ReturnToHiddenField />
                 <input type="hidden" name="patient_id" value={c.id} />
                 <input type="hidden" name="establishment_id" value={establishmentId} />
                 <input type="hidden" name="client_id" value={clientId} />

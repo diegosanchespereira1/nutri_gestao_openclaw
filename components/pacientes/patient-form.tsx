@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 
+import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   PatientPhotoField,
   type PatientPhotoFieldChange,
@@ -147,6 +148,7 @@ export function PatientForm({
 
   return (
     <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
+      <ReturnToHiddenField />
       {/* Campos ocultos de contexto */}
       {clientId ? (
         <input type="hidden" name="client_id" value={clientId} />

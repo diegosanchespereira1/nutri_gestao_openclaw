@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { parseActivityLevel } from "@/lib/constants/activity-levels";
+import {
+  getReturnToFromFormData,
+  hrefWithOptionalReturnTo,
+} from "@/lib/navigation/return-to";
 import { createClient } from "@/lib/supabase/server";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -115,7 +119,12 @@ export async function createNutritionAssessmentAction(
 
   revalidatePath(`/pacientes/${patientId}`);
   revalidatePath(`/pacientes/${patientId}/editar`);
-  redirect(`/pacientes/${patientId}?avaliacao=ok`);
+  redirect(
+    hrefWithOptionalReturnTo(
+      `/pacientes/${patientId}?avaliacao=ok`,
+      getReturnToFromFormData(formData),
+    ),
+  );
 }
 
 // ── Helpers de permissão ──────────────────────────────────────────────────────

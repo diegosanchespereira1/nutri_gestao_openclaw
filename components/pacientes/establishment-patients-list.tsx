@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { formatCpfDisplay } from "@/lib/format/br-document";
+import { withReturnTo } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 import type { PatientRow } from "@/lib/types/patients";
 
@@ -23,13 +24,17 @@ function calcAge(birthDate: string): string {
 export function EstablishmentPatientsList({
   patients,
   novoHref,
+  returnToOrigin,
   associateSlot,
 }: {
   patients: PatientRow[];
   novoHref: string;
+  /** URL actual da página (path+query) para o botão voltar. */
+  returnToOrigin: string;
   associateSlot?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
+  const novoHrefWithReturn = withReturnTo(novoHref, returnToOrigin);
 
   const filtered = query.trim()
     ? patients.filter((p) =>
@@ -50,7 +55,7 @@ export function EstablishmentPatientsList({
         />
         <div className="flex flex-wrap gap-2">
           {associateSlot}
-          <Link href={novoHref} className={cn(buttonVariants())}>
+          <Link href={novoHrefWithReturn} className={cn(buttonVariants())}>
             Novo paciente
           </Link>
         </div>
@@ -63,7 +68,10 @@ export function EstablishmentPatientsList({
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             {associateSlot}
-            <Link href={novoHref} className={cn(buttonVariants(), "inline-flex")}>
+            <Link
+              href={novoHrefWithReturn}
+              className={cn(buttonVariants(), "inline-flex")}
+            >
               Adicionar paciente
             </Link>
           </div>
@@ -82,7 +90,7 @@ export function EstablishmentPatientsList({
           {filtered.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/pacientes/${p.id}`}
+                href={withReturnTo(`/pacientes/${p.id}`, returnToOrigin)}
                 className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <div>

@@ -19,6 +19,10 @@ import type {
   PatientWithContext,
 } from "@/lib/types/patients";
 import {
+  getReturnToFromFormData,
+  hrefWithOptionalReturnTo,
+} from "@/lib/navigation/return-to";
+import {
   isValidCpf,
   onlyDigits,
 } from "@/lib/validators/br-document";
@@ -279,7 +283,12 @@ export async function associatePatientPageAction(
   }
 
   revalidatePatientPaths(clientId, establishmentId, patientId);
-  redirect(`/clientes/${clientId}/estabelecimentos/${establishmentId}/pacientes`);
+  redirect(
+    hrefWithOptionalReturnTo(
+      `/clientes/${clientId}/estabelecimentos/${establishmentId}/pacientes`,
+      getReturnToFromFormData(formData),
+    ),
+  );
 }
 
 /** Atualiza apenas o establishment_id de um paciente (card dedicado). */
@@ -623,7 +632,12 @@ export async function createPatientAction(
   });
 
   revalidatePatientPaths(client_id, establishment_id, data.id);
-  redirect(`/pacientes/${data.id}/editar`);
+  redirect(
+    hrefWithOptionalReturnTo(
+      `/pacientes/${data.id}/editar`,
+      getReturnToFromFormData(formData),
+    ),
+  );
 }
 
 export async function updatePatientAction(

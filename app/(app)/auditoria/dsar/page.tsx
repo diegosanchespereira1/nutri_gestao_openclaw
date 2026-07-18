@@ -2,6 +2,10 @@ import { redirect } from 'next/navigation';
 
 import { PageHeader } from '@/components/layout/page-header';
 import { PageLayout } from '@/components/layout/page-layout';
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from '@/lib/navigation/return-to';
 import { getServerContext } from '@/lib/supabase/get-server-user';
 import { DsarForm } from '@/components/auditoria/dsar-form';
 
@@ -9,9 +13,21 @@ export const metadata = {
   title: 'Relatório DSAR | NutriGestão',
 };
 
-export default async function DsarPage() {
+export default async function DsarPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const sp = await searchParams;
   const { supabase, user } = await getServerContext();
   if (!user) redirect('/login');
+
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: '/auditoria',
+    fallbackLabel: 'Auditoria',
+    currentPath: '/auditoria/dsar',
+  });
 
   // Carregar lista de pacientes do utilizador
   const { data: patients, error } = await supabase
@@ -25,7 +41,7 @@ export default async function DsarPage() {
         <PageHeader
           title="Relatório DSAR"
           description="Gerar relatório de acesso a dados de paciente"
-          back={{ href: '/auditoria', label: 'Auditoria' }}
+          back={back}
         />
         <div className="border-border bg-muted/30 rounded-lg border border-dashed p-8 text-center">
           <p className="text-muted-foreground text-sm">
@@ -41,7 +57,7 @@ export default async function DsarPage() {
       <PageHeader
         title="Relatório DSAR"
         description="Data Subject Access Request — Gere um relatório de quem acedeu aos dados de um paciente específico. Necessário para cumprir direitos LGPD Art. 18."
-        back={{ href: '/auditoria', label: 'Auditoria' }}
+        back={back}
       />
 
       <div className="border-border space-y-4 rounded-lg border bg-blue-50 p-4">

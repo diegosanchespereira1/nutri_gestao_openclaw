@@ -17,6 +17,7 @@ import { loadClientsForOwner } from "@/lib/actions/clients";
 import { clientLifecycleBadgeLabel } from "@/lib/constants/client-lifecycle";
 import { getClientLogoSignedUrls } from "@/lib/clientes/logo-sync";
 import { loadLatestClientChecklistScores } from "@/lib/clientes/list-enrichment";
+import { buildCurrentUrl, withReturnTo } from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { cn } from "@/lib/utils";
 import type {
@@ -190,6 +191,7 @@ function ClientesTableView({
   totalPages,
   searchParams: sp,
 }: TableViewProps) {
+  const returnToOrigin = buildCurrentUrl("/clientes", sp);
   return (
     <>
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm md:hidden">
@@ -199,13 +201,17 @@ function ClientesTableView({
             const life = lifecycleMeta[row.lifecycle_status];
             const statusLabel = clientLifecycleBadgeLabel[row.lifecycle_status];
             const score = clientScores.get(row.id) ?? null;
+            const editHref = withReturnTo(
+              `/clientes/${row.id}/editar`,
+              returnToOrigin,
+            );
             return (
               <div
                 key={row.id}
                 className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
               >
                 <Link
-                  href={`/clientes/${row.id}/editar`}
+                  href={editHref}
                   prefetch
                   className="flex min-w-0 flex-1 items-center gap-3"
                 >
@@ -251,7 +257,10 @@ function ClientesTableView({
                     </div>
                   </div>
                 </Link>
-                <ClientRowActions clientId={row.id} />
+                <ClientRowActions
+                  clientId={row.id}
+                  returnToOrigin={returnToOrigin}
+                />
               </div>
             );
           })}
@@ -298,10 +307,14 @@ function ClientesTableView({
               const life = lifecycleMeta[row.lifecycle_status];
               const statusLabel = clientLifecycleBadgeLabel[row.lifecycle_status];
               const score = clientScores.get(row.id) ?? null;
+              const editHref = withReturnTo(
+                `/clientes/${row.id}/editar`,
+                returnToOrigin,
+              );
               return (
                 <ClickableTableRow
                   key={row.id}
-                  href={`/clientes/${row.id}/editar`}
+                  href={editHref}
                   className="border-b border-foreground/5 last:border-0"
                 >
                   <td className="px-4 py-3">
@@ -358,7 +371,10 @@ function ClientesTableView({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <ClientRowActions clientId={row.id} />
+                    <ClientRowActions
+                      clientId={row.id}
+                      returnToOrigin={returnToOrigin}
+                    />
                   </td>
                 </ClickableTableRow>
               );

@@ -3,16 +3,18 @@ import Link from "next/link";
 import { loadPatientsForScope } from "@/lib/actions/patients";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { formatCpfDisplay } from "@/lib/format/br-document";
+import { withReturnTo } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 
 export async function PatientsSection(
   props:
-    | { variant: "client_pf"; clientId: string }
+    | { variant: "client_pf"; clientId: string; returnToOrigin: string }
     | {
         variant: "establishment";
         clientId: string;
         establishmentId: string;
         establishmentName: string;
+        returnToOrigin: string;
       },
 ) {
   const { rows } = await loadPatientsForScope(
@@ -25,14 +27,19 @@ export async function PatientsSection(
         },
   );
 
-  const novoHref =
+  const novoHref = withReturnTo(
     props.variant === "client_pf"
       ? `/clientes/${props.clientId}/pacientes/novo`
-      : `/clientes/${props.clientId}/estabelecimentos/${props.establishmentId}/pacientes/novo`;
+      : `/clientes/${props.clientId}/estabelecimentos/${props.establishmentId}/pacientes/novo`,
+    props.returnToOrigin,
+  );
 
   const associarHref =
     props.variant === "establishment"
-      ? `/clientes/${props.clientId}/estabelecimentos/${props.establishmentId}/pacientes/associar`
+      ? withReturnTo(
+          `/clientes/${props.clientId}/estabelecimentos/${props.establishmentId}/pacientes/associar`,
+          props.returnToOrigin,
+        )
       : null;
 
   const title =
@@ -90,7 +97,7 @@ export async function PatientsSection(
           {rows.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/pacientes/${p.id}`}
+                href={withReturnTo(`/pacientes/${p.id}`, props.returnToOrigin)}
                 className="hover:bg-muted/50 focus-visible:ring-ring flex items-center justify-between px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 <div>

@@ -1,18 +1,24 @@
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button-variants";
+import { withReturnTo } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
 
 type Props = {
   /** Página atual — o link correspondente fica oculto para evitar redundância. */
   current?: "catalog" | "equipe" | "personalizados";
   className?: string;
+  returnToOrigin?: string;
 };
 
 export function ChecklistModelsNav({
   current = "catalog",
   className,
+  returnToOrigin,
 }: Props) {
+  const href = (path: string) =>
+    returnToOrigin ? withReturnTo(path, returnToOrigin) : path;
+
   return (
     <nav
       aria-label="Navegação de modelos de checklist"
@@ -20,7 +26,7 @@ export function ChecklistModelsNav({
     >
       {current !== "catalog" ? (
         <Link
-          href="/checklists"
+          href={href("/checklists")}
           prefetch
           className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
@@ -29,7 +35,7 @@ export function ChecklistModelsNav({
       ) : null}
       {current !== "equipe" ? (
         <Link
-          href="/checklists/equipe"
+          href={href("/checklists/equipe")}
           prefetch
           className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >
@@ -38,7 +44,7 @@ export function ChecklistModelsNav({
       ) : null}
       {current !== "personalizados" ? (
         <Link
-          href="/checklists/personalizados"
+          href={href("/checklists/personalizados")}
           prefetch
           className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
         >

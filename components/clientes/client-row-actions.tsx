@@ -5,8 +5,16 @@ import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { deleteClientAction } from "@/lib/actions/clients";
+import { withReturnTo } from "@/lib/navigation/return-to";
 
-export function ClientRowActions({ clientId }: { clientId: string }) {
+export function ClientRowActions({
+  clientId,
+  returnToOrigin,
+}: {
+  clientId: string;
+  returnToOrigin: string;
+}) {
+  const editHref = withReturnTo(`/clientes/${clientId}/editar`, returnToOrigin);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -22,7 +30,7 @@ export function ClientRowActions({ clientId }: { clientId: string }) {
   return (
     <div ref={ref} className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
       <Link
-        href={`/clientes/${clientId}/editar`}
+        href={editHref}
         aria-label="Editar cliente"
         className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >

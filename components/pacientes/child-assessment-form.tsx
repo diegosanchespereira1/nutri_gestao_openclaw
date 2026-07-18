@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 
+import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type ChildAssessmentFormResult,
   createChildAssessmentAction,
@@ -119,6 +120,7 @@ export function ChildAssessmentForm({
 
   return (
     <form action={formAction} className="space-y-6">
+      <ReturnToHiddenField />
       <input type="hidden" name="patient_id" value={patientId} />
       <input type="hidden" name="sex" value={sex} />
       <input type="hidden" name="birth_date" value={birthDate} />

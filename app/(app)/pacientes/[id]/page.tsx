@@ -19,6 +19,12 @@ import { PatientAssessmentsBlock } from "@/components/pacientes/patient-assessme
 import { PatientProntuarioTabs } from "@/components/pacientes/patient-prontuario-tabs";
 import { loadPatientById } from "@/lib/actions/patients";
 import { formatCpfDisplay } from "@/lib/format/br-document";
+import {
+  buildCurrentUrl,
+  getReturnToParam,
+  resolveBackNavigation,
+  withReturnTo,
+} from "@/lib/navigation/return-to";
 import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
@@ -141,19 +147,28 @@ export default async function ProntuarioPacientePage({
   const teamMember = teamMemberResult.data as { full_name: string } | null;
   const schoolGrade = schoolGradeResult.data as { name: string } | null;
 
-  const backHref =
+  const fallbackHref =
     row.establishment_id && row.client_id
       ? `/clientes/${row.client_id}/estabelecimentos/${row.establishment_id}/pacientes`
       : row.client_id
         ? `/clientes/${row.client_id}/editar`
         : "/pacientes";
 
-  const backLabel =
+  const fallbackLabel =
     row.establishment_id && row.client_id
       ? "Estabelecimento"
       : row.client_id
         ? "Cliente"
         : "Pacientes";
+
+  const currentUrl = buildCurrentUrl(`/pacientes/${row.id}`, sp);
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref,
+    fallbackLabel,
+    currentPath: `/pacientes/${row.id}`,
+  });
+  const editarHref = withReturnTo(`/pacientes/${row.id}/editar`, currentUrl);
 
   const descriptionParts = [
     age,
@@ -174,10 +189,10 @@ export default async function ProntuarioPacientePage({
         }
         title={row.full_name}
         description={descriptionParts.join(" · ")}
-        back={{ href: backHref, label: backLabel }}
+        back={back}
         actions={
           <Link
-            href={`/pacientes/${row.id}/editar`}
+            href={editarHref}
             className={cn(buttonVariants({ size: "sm" }))}
           >
             <Pencil className="mr-1.5 size-3.5" aria-hidden />
@@ -320,6 +335,7 @@ export default async function ProntuarioPacientePage({
               <PatientAssessmentsBlock
                 patientId={row.id}
                 birthDate={row.birth_date}
+                returnToOrigin={currentUrl}
               />
             </CardContent>
           </Card>

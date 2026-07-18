@@ -4,6 +4,10 @@ import { TeamMemberForm } from "@/components/team/team-member-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { canCurrentUserManageTeamMembers } from "@/lib/actions/team-members";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 
 const errMessages: Record<string, string> = {
   missing:
@@ -21,23 +25,32 @@ const errMessages: Record<string, string> = {
 };
 
 type Props = {
-  searchParams: Promise<{ err?: string; detail?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 export default async function NovaEquipePage({ searchParams }: Props) {
   const canManageTeam = await canCurrentUserManageTeamMembers();
   if (!canManageTeam) redirect("/equipe?err=forbidden");
 
-  const { err, detail } = await searchParams;
+  const sp = await searchParams;
+  const err = typeof sp.err === "string" ? sp.err : undefined;
+  const detail = typeof sp.detail === "string" ? sp.detail : undefined;
   const errMsg = err && errMessages[err] ? errMessages[err] : null;
   const detailMsg = detail?.trim() ?? null;
+
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/equipe",
+    fallbackLabel: "Equipe",
+    currentPath: "/equipe/nova",
+  });
 
   return (
     <PageLayout variant="form">
       <PageHeader
         title="Novo membro da equipe"
         description="Use os mesmos dados do cadastro normal e o vínculo com a sua equipe será criado automaticamente."
-        back={{ href: "/equipe", label: "Equipe" }}
+        back={back}
       />
 
       {errMsg ? (

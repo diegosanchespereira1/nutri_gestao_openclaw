@@ -13,7 +13,12 @@ const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
     serverActions: {
-      bodySizeLimit: "210mb",
+      // Auditoria 2026-07: era 210mb — com 512M–2G de RAM no container, um
+      // único upload grande era bufferizado inteiro em memória e derrubava o
+      // processo (OOM). Com a compressão de imagem no CLIENTE
+      // (lib/images/prepare-image-upload.ts), fotos chegam com ~300–800KB;
+      // 50mb cobre lotes de exames em PDF com folga.
+      bodySizeLimit: "50mb",
     },
   },
   async redirects() {
@@ -48,11 +53,20 @@ const nextConfig: NextConfig = {
       value: buildContentSecurityPolicyValue(),
     });
 
+    // Cache dos HTML (auditoria 2026-07):
+    // - padrão: no-store — o Android WebView (Capacitor) nunca guarda nada
+    //   (comportamento histórico; evita servir versão velha após deploy).
+    // - HTML_CACHE_RELAXED=1: "private, no-cache" — browser/WebView PODE
+    //   guardar a resposta, mas é obrigado a revalidar no servidor antes de
+    //   reutilizar (não serve página velha após deploy; melhora back/forward
+    //   e reduz re-renders). ATIVAR PRIMEIRO EM DEV e validar no app Android
+    //   real antes de habilitar em produção.
+    const relaxedHtmlCache = process.env.HTML_CACHE_RELAXED === "1";
     const noStoreHtml = {
       key: "Cache-Control",
-      // no-store + Pragma: no-cache garante que o Android WebView (Capacitor)
-      // não sirva versão em cache das páginas HTML
-      value: "no-store, no-cache, must-revalidate, proxy-revalidate",
+      value: relaxedHtmlCache
+        ? "private, no-cache, must-revalidate"
+        : "no-store, no-cache, must-revalidate, proxy-revalidate",
     };
 
     const pragmaNoCache = {

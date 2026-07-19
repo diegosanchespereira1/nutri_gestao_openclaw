@@ -159,6 +159,12 @@ Infra real: VPS única "HMLStratosTech" **8GB RAM / 4 vCPU**, compartilhada com 
 | F5 | **Latência VPS → Supabase Cloud ~50–90ms/request** × queries sequenciais nas server actions | `curl -w` (5 amostras) | Lentidão geral de salvamentos e navegação |
 | F6 | **Banco no compute Nano** (menor tier do Supabase Cloud, ~0,5GB RAM, CPU compartilhada) | Informado pelo usuário | Queries lentas, agravadas por RLS caro |
 
+### Atualização 18/07 — causa raiz da indisponibilidade CONFIRMADA e mitigada
+
+Diagnóstico de rede (`scripts/perf/diagnostico-rede-vps.sh`): conntrack em 0,05% do limite, 0 falhas de DNS em 90 consultas, latência estável ~50–65ms, 0 descartes. A rede nunca esteve mal configurada — as falhas eram **episódicas, causadas por pressão de memória do host**: o vazamento do cAdvisor (2,3GB) empurrava a VPS para swap, os stalls estouravam os timeouts de DNS/TCP do Node (`EAI_AGAIN`/`ConnectTimeout`) e o app ficava indisponível sem o container cair.
+
+Mitigado em 17–18/07: cAdvisor limitado a 400MB (`docker service update --limit-memory`) e `vm.swappiness=10`. Resultado: **0 erros de rede nas 20h seguintes** nos dois apps de produção. Prevenção pendente: definir limites de memória para todos os stacks vizinhos (n8n, Odoo, MongoDB, Supabase dev, monitor) no Portainer.
+
 ### Correções imediatas (ordem de execução)
 
 1. **DNS da VPS**: configurar resolvers confiáveis (`1.1.1.1`, `8.8.8.8`) no `/etc/docker/daemon.json` e/ou systemd-resolved. Elimina F1.

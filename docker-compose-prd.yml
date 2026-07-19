@@ -25,10 +25,12 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
     healthcheck:
+      # /api/app-version: endpoint leve (sem render de página, sem query ao
+      # banco) — /login renderizava a página completa a cada 90s.
       test:
         [
           "CMD-SHELL",
-          'node -e "fetch(\"http://127.0.0.1:3000/login\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+          'node -e "fetch(\"http://127.0.0.1:3000/api/app-version\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
         ]
       interval: 90s
       timeout: 5s
@@ -37,12 +39,14 @@ services:
     deploy:
       replicas: 1
       resources:
+        # Auditoria 2026-07: 512M causava OOM kill (exit 137) com upload de
+        # fotos + geração de PDF. Alinhado ao stack em produção (2G).
         limits:
-          cpus: "1.00"
-          memory: 512M
+          cpus: "2.00"
+          memory: 2G
         reservations:
           cpus: "0.25"
-          memory: 128M
+          memory: 256M
       restart_policy:
         condition: on-failure
         delay: 5s

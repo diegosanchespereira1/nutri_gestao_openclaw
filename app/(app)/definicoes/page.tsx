@@ -5,6 +5,7 @@ import {
   Camera,
   Globe,
   Lock,
+  Store,
   Tag,
   UserCircle,
 } from "lucide-react";
@@ -55,6 +56,13 @@ const settingsItems = [
     icon: Tag,
     label: "Categorias de negócio",
     description: "Edite ou elimine categorias personalizadas criadas pela sua equipa.",
+  },
+  {
+    href: "/definicoes/tipos-estabelecimento",
+    icon: Store,
+    label: "Tipos de estabelecimento",
+    description:
+      "Crie tipos personalizados por categoria (Atendimento ou Assessoria).",
   },
   {
     href: "/definicoes/seguranca",

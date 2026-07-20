@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { parseEstablishmentType } from "@/lib/constants/establishment-types";
-import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
+import {
+  labelForEstablishmentType,
+} from "@/lib/constants/establishment-types";
+import { resolveWorkspaceEstablishmentType } from "@/lib/actions/establishment-custom-types";
 import {
   establishmentTypeDisabledMessage,
   isEstablishmentTypeAllowedForModules,
@@ -43,15 +45,20 @@ function pickClientJoin(
 
 function mapRowToPickerOption(
   row: EstablishmentPickerDbRow,
+  customLabels?: ReadonlyArray<{ slug: string; label: string }>,
 ): EstablishmentPickerOption | null {
   const client = pickClientJoin(row.clients);
   if (!client) return null;
 
   const uf = row.state?.toUpperCase() ?? "UF não definida";
   const clientLabel = client.trade_name?.trim() || client.legal_name;
+  const typeLabel = labelForEstablishmentType(
+    row.establishment_type,
+    customLabels,
+  );
   return {
     id: row.id,
-    label: `${row.name} — ${clientLabel} (${uf} · ${establishmentTypeLabel[row.establishment_type]})`,
+    label: `${row.name} — ${clientLabel} (${uf} · ${typeLabel})`,
     state: row.state,
     establishment_type: row.establishment_type,
   };
@@ -198,7 +205,7 @@ export async function loadOwnerChecklistEstablishmentsDropdownAction(params?: {
   }
 
   const rows = (data as unknown as EstablishmentPickerDbRow[])
-    .map(mapRowToPickerOption)
+    .map((row) => mapRowToPickerOption(row))
     .filter((row): row is EstablishmentPickerOption => Boolean(row));
 
   return { rows, total: count ?? rows.length };
@@ -398,23 +405,32 @@ export async function createEstablishmentAction(
     };
   }
 
-  const establishment_type = parseEstablishmentType(
+  const resolved = await resolveWorkspaceEstablishmentType(
     formData.get("establishment_type"),
+    workspaceOwnerId,
   );
-  if (!establishment_type) {
+  if (!resolved) {
     return { ok: false, error: "Selecione o tipo de estabelecimento." };
   }
+  const establishment_type = resolved.slug;
 
   const enabledModules = await loadWorkspaceEnabledModules(
     supabase,
     workspaceOwnerId,
   );
   if (
-    !isEstablishmentTypeAllowedForModules(establishment_type, enabledModules)
+    !isEstablishmentTypeAllowedForModules(
+      establishment_type,
+      enabledModules,
+      resolved.category,
+    )
   ) {
     return {
       ok: false,
-      error: establishmentTypeDisabledMessage(establishment_type),
+      error: establishmentTypeDisabledMessage(
+        establishment_type,
+        resolved.category,
+      ),
     };
   }
 
@@ -487,23 +503,32 @@ export async function updateEstablishmentAction(
     return { ok: false, error: "Dados em falta." };
   }
 
-  const establishment_type = parseEstablishmentType(
+  const resolved = await resolveWorkspaceEstablishmentType(
     formData.get("establishment_type"),
+    workspaceOwnerId,
   );
-  if (!establishment_type) {
+  if (!resolved) {
     return { ok: false, error: "Selecione o tipo de estabelecimento." };
   }
+  const establishment_type = resolved.slug;
 
   const enabledModules = await loadWorkspaceEnabledModules(
     supabase,
     workspaceOwnerId,
   );
   if (
-    !isEstablishmentTypeAllowedForModules(establishment_type, enabledModules)
+    !isEstablishmentTypeAllowedForModules(
+      establishment_type,
+      enabledModules,
+      resolved.category,
+    )
   ) {
     return {
       ok: false,
-      error: establishmentTypeDisabledMessage(establishment_type),
+      error: establishmentTypeDisabledMessage(
+        establishment_type,
+        resolved.category,
+      ),
     };
   }
 

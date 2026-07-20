@@ -1,20 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import {
   type EstablishmentFormResult,
   createEstablishmentAction,
   updateEstablishmentAction,
 } from "@/lib/actions/establishments";
+import type { EstablishmentCustomType } from "@/lib/actions/establishment-custom-types";
 import { EstablishmentCategorySelect } from "@/components/clientes/establishment-category-select";
-import {
-  ESTABLISHMENT_TYPES_BY_CATEGORY,
-  categoryFromType,
-  establishmentTypeLabel,
-} from "@/lib/constants/establishment-types";
-import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
+import { EstablishmentTypeSelect } from "@/components/clientes/establishment-type-select";
+import { categoryFromType } from "@/lib/constants/establishment-types";
+import type { EstablishmentCategory } from "@/lib/types/establishments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,39 +29,40 @@ export function EstablishmentForm({
   clientId,
   establishmentId,
   defaults,
+  customTypes = [],
 }: {
   mode: "create" | "edit";
   clientId: string;
   establishmentId?: string;
   defaults: {
     name: string;
-    establishment_type: EstablishmentType;
+    establishment_type: string;
     address_line1: string;
     address_line2: string;
     city: string;
     state: string;
     postal_code: string;
   };
+  customTypes?: EstablishmentCustomType[];
 }) {
   const action =
     mode === "create" ? createEstablishmentAction : updateEstablishmentAction;
   const [state, formAction] = useActionState(action, initial);
 
   const initialCategory: EstablishmentCategory | "" =
-    mode === "edit" ? categoryFromType(defaults.establishment_type) : "";
-  const initialType: EstablishmentType | "" =
+    mode === "edit"
+      ? (categoryFromType(defaults.establishment_type, customTypes) ?? "")
+      : "";
+  const initialType: string =
     mode === "edit" ? defaults.establishment_type : "";
 
   const [category, setCategory] = useState<EstablishmentCategory | "">(initialCategory);
-  const [selectedType, setSelectedType] = useState<EstablishmentType | "">(initialType);
+  const [selectedType, setSelectedType] = useState<string>(initialType);
 
   function handleCategoryChange(value: EstablishmentCategory | "") {
     setCategory(value);
     setSelectedType("");
   }
-
-  const typesForCategory =
-    category !== "" ? ESTABLISHMENT_TYPES_BY_CATEGORY[category] : [];
 
   return (
     <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
@@ -73,7 +71,6 @@ export function EstablishmentForm({
         <input type="hidden" name="id" value={establishmentId} />
       ) : null}
 
-      {/* ── Grupo 1: Identificação ──────────────────────────── */}
       <fieldset className="space-y-4">
         <legend className={legendClass}>Identificação</legend>
 
@@ -92,7 +89,6 @@ export function EstablishmentForm({
           />
         </div>
 
-        {/* Categoria — filtra os tipos disponíveis */}
         <div className="space-y-2">
           <Label htmlFor="est-category">Categoria</Label>
           <EstablishmentCategorySelect
@@ -107,36 +103,30 @@ export function EstablishmentForm({
           </p>
         </div>
 
-        {/* Tipo — só aparece após categoria ser escolhida */}
         {category !== "" ? (
           <div className="space-y-2">
             <Label htmlFor="est-type">Tipo de estabelecimento</Label>
-            <select
-              id="est-type"
+            <input
+              type="hidden"
               name="establishment_type"
-              required
               value={selectedType}
-              onChange={(e) =>
-                setSelectedType(e.target.value as EstablishmentType)
-              }
+              required
+            />
+            <EstablishmentTypeSelect
+              id="est-type"
+              category={category}
+              value={selectedType}
+              customTypes={customTypes}
+              onChange={setSelectedType}
+              placeholder="Selecione o tipo…"
               className={selectClass}
-            >
-              <option value="" disabled>
-                Selecione o tipo…
-              </option>
-              {typesForCategory.map((t) => (
-                <option key={t} value={t}>
-                  {establishmentTypeLabel[t]}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         ) : null}
       </fieldset>
 
       <div className="border-t border-border" />
 
-      {/* ── Grupo 2: Morada ─────────────────────────────────── */}
       <fieldset className="space-y-4">
         <legend className={legendClass}>Morada</legend>
 
@@ -195,7 +185,6 @@ export function EstablishmentForm({
         </div>
       </fieldset>
 
-      {/* ── Feedback ─────────────────────────────────────────── */}
       {state?.ok === false ? (
         <p
           id="establishment-form-err"

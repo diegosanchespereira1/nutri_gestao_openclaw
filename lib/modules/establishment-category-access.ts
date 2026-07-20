@@ -2,8 +2,9 @@ import {
   categoryFromType,
   establishmentCategoryLabel,
   ESTABLISHMENT_CATEGORIES,
+  isBuiltinEstablishmentType,
 } from "@/lib/constants/establishment-types";
-import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
+import type { EstablishmentCategory } from "@/lib/types/establishments";
 import type { EnabledModules } from "@/lib/types/modules";
 
 export function isEstablishmentCategoryEnabled(
@@ -23,10 +24,15 @@ export function establishmentCategorySelectLabel(
 }
 
 export function isEstablishmentTypeAllowedForModules(
-  type: EstablishmentType,
+  type: string,
   modules: EnabledModules,
+  customCategory?: EstablishmentCategory | null,
 ): boolean {
-  return isEstablishmentCategoryEnabled(categoryFromType(type), modules);
+  const category =
+    customCategory ??
+    (isBuiltinEstablishmentType(type) ? categoryFromType(type) : null);
+  if (!category) return false;
+  return isEstablishmentCategoryEnabled(category, modules);
 }
 
 export function firstEnabledEstablishmentCategory(
@@ -45,7 +51,14 @@ export function establishmentCategoryDisabledMessage(
 }
 
 export function establishmentTypeDisabledMessage(
-  type: EstablishmentType,
+  type: string,
+  customCategory?: EstablishmentCategory | null,
 ): string {
-  return establishmentCategoryDisabledMessage(categoryFromType(type));
+  const category =
+    customCategory ??
+    (isBuiltinEstablishmentType(type) ? categoryFromType(type) : null);
+  if (!category) {
+    return "Tipo de estabelecimento inválido ou não habilitado na sua conta.";
+  }
+  return establishmentCategoryDisabledMessage(category);
 }

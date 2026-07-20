@@ -20,6 +20,7 @@ import {
   loadComplianceDeadlinesForEstablishment,
 } from "@/lib/actions/compliance-deadlines";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
+import { loadEstablishmentCustomTypesAction } from "@/lib/actions/establishment-custom-types";
 import {
   buildCurrentUrl,
   getReturnToParam,
@@ -69,9 +70,10 @@ export default async function EditarEstabelecimentoPage({
 
   const row = est as EstablishmentRow;
 
-  const [deadlines, { templates }] = await Promise.all([
+  const [deadlines, { templates }, customTypes] = await Promise.all([
     loadComplianceDeadlinesForEstablishment(row.id),
     loadChecklistCatalog(),
+    loadEstablishmentCustomTypesAction(),
   ]);
   const templateOptions = templates.map((t) => ({
     id: t.id,
@@ -114,6 +116,7 @@ export default async function EditarEstabelecimentoPage({
             mode="edit"
             clientId={clientId}
             establishmentId={row.id}
+            customTypes={customTypes}
             defaults={{
               name: row.name,
               establishment_type: row.establishment_type,

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { isBrazilUf } from "@/lib/constants/brazil-states";
-import { parseEstablishmentType } from "@/lib/constants/establishment-types";
+import { resolveWorkspaceEstablishmentType } from "@/lib/actions/establishment-custom-types";
 import { refreshProfileContextAfterOnboarding } from "@/lib/auth/refresh-profile-context-after-onboarding";
 import {
   establishmentTypeDisabledMessage,
@@ -159,19 +159,28 @@ export async function completeOnboardingAction(
   );
 
   if (needsEstablishment) {
-    const establishment_type = parseEstablishmentType(
+    const resolved = await resolveWorkspaceEstablishmentType(
       formData.get("establishment_type"),
+      workspaceOwnerId,
     );
-    if (!establishment_type) {
+    if (!resolved) {
       return { ok: false, error: "Selecione o tipo de estabelecimento." };
     }
+    const establishment_type = resolved.slug;
 
     if (
-      !isEstablishmentTypeAllowedForModules(establishment_type, enabledModules)
+      !isEstablishmentTypeAllowedForModules(
+        establishment_type,
+        enabledModules,
+        resolved.category,
+      )
     ) {
       return {
         ok: false,
-        error: establishmentTypeDisabledMessage(establishment_type),
+        error: establishmentTypeDisabledMessage(
+          establishment_type,
+          resolved.category,
+        ),
       };
     }
 

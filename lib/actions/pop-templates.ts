@@ -36,7 +36,7 @@ export async function loadPopTemplatesAction(): Promise<{
 }
 
 export async function loadPopTemplatesForEstablishmentTypeAction(
-  establishmentType: EstablishmentType,
+  establishmentType: string,
 ): Promise<{ rows: PopTemplateRow[] }> {
   const supabase = await createClient();
   const {

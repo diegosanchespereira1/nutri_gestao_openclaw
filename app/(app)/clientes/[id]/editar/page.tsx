@@ -29,6 +29,7 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
+import { loadEstablishmentCustomTypesAction } from "@/lib/actions/establishment-custom-types";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
 import { loadGradesForClient } from "@/lib/actions/school-grades";
@@ -220,7 +221,7 @@ async function ClientEditLoadedPanels({
   const shell = shellFromClientRow(row);
   const needEstablishment = row.kind === "pj";
 
-  const [estRes, customSegments, teamMembersForSelect, tz, chargesResult, contractsResult] =
+  const [estRes, customSegments, customEstTypes, teamMembersForSelect, tz, chargesResult, contractsResult] =
     await Promise.all([
       needEstablishment
         ? supabase
@@ -230,6 +231,7 @@ async function ClientEditLoadedPanels({
             .maybeSingle()
         : Promise.resolve({ data: null }),
       loadCustomSegmentsAction(),
+      loadEstablishmentCustomTypesAction(),
       loadTeamMembersForSelect(),
       fetchProfileTimeZone(supabase, user?.id ?? ""),
       loadFinancialChargesForClient(row.id),
@@ -300,6 +302,7 @@ async function ClientEditLoadedPanels({
         defaultTechnicalRepPhone={row.technical_rep_phone ?? ""}
         defaultBusinessSegment={row.business_segment ?? ""}
         defaultCustomSegments={customSegments}
+        defaultCustomEstTypes={customEstTypes}
         teamMembersForSelect={teamMembersForSelect}
         defaultResponsibleTeamMemberId={row.responsible_team_member_id ?? null}
         defaultEstName={estRow?.name ?? ""}

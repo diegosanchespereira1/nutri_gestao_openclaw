@@ -6,15 +6,19 @@ import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { getClientLogoSignedUrls } from "@/lib/clientes/logo-sync";
 import { buttonVariants } from "@/components/ui/button-variants";
 import {
-  establishmentTypeBadgeClass,
-  establishmentTypeLabel,
+  badgeClassForEstablishmentType,
+  labelForEstablishmentType,
 } from "@/lib/constants/establishment-types";
+import { loadEstablishmentCustomTypesAction } from "@/lib/actions/establishment-custom-types";
 import { createClient } from "@/lib/supabase/server";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { cn } from "@/lib/utils";
 
 export default async function PopsPage() {
-  const { rows: establishments } = await loadEstablishmentsForOwner();
+  const [{ rows: establishments }, customTypes] = await Promise.all([
+    loadEstablishmentsForOwner(),
+    loadEstablishmentCustomTypesAction(),
+  ]);
 
   const supabase = await createClient();
   const clientIds = [...new Set(establishments.map((e) => e.client_id))];
@@ -117,10 +121,13 @@ export default async function PopsPage() {
                         className={cn(
                           badgeBase(),
                           "px-1.5 py-0 text-[11px]",
-                          establishmentTypeBadgeClass[e.establishment_type],
+                          badgeClassForEstablishmentType(e.establishment_type),
                         )}
                       >
-                        {establishmentTypeLabel[e.establishment_type]}
+                        {labelForEstablishmentType(
+                          e.establishment_type,
+                          customTypes,
+                        )}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">

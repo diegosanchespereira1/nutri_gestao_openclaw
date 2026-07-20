@@ -14,7 +14,7 @@ import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templat
 import { lookupCepByViaCep } from "@/lib/cep/viacep";
 import {
   categoryFromType,
-  establishmentTypeLabel,
+  labelForEstablishmentType,
 } from "@/lib/constants/establishment-types";
 import { EstablishmentCategorySelect } from "@/components/clientes/establishment-category-select";
 import { EstablishmentTypeSelect } from "@/components/clientes/establishment-type-select";
@@ -24,7 +24,7 @@ import { formatEstablishmentAddressLines } from "@/lib/format/establishment-addr
 import { buildOnboardingSummaryItems } from "@/lib/onboarding/summary";
 import type { OnboardingInitialValues } from "@/lib/onboarding/initial-values";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
-import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
+import type { EstablishmentCategory } from "@/lib/types/establishments";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -226,7 +226,7 @@ function OnboardingHiddenFields({
   documentId: string;
   needsEstablishment: boolean;
   establishmentName: string;
-  establishmentType: EstablishmentType | "";
+  establishmentType: string;
   addressLine1: string;
   addressLine2: string;
   city: string;
@@ -273,9 +273,10 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
   const [documentId, setDocumentId] = useState("");
   const [establishmentName, setEstablishmentName] = useState("");
   const [establishmentCategory, setEstablishmentCategory] =
-    useState<EstablishmentCategory | "">(categoryFromType("escola"));
-  const [establishmentType, setEstablishmentType] =
-    useState<EstablishmentType | "">("");
+    useState<EstablishmentCategory | "">(
+      categoryFromType("escola") ?? "atendimento_nutricional",
+    );
+  const [establishmentType, setEstablishmentType] = useState<string>("");
   const [addressStreet, setAddressStreet] = useState("");
   const [addressNumber, setAddressNumber] = useState("");
   const [addressComplement, setAddressComplement] = useState("");
@@ -389,9 +390,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
       documentId,
       needsEstablishment,
       establishmentName,
-      establishmentType: (
-        needsEstablishment ? establishmentType : "restaurante"
-      ) as EstablishmentType,
+      establishmentType: needsEstablishment ? establishmentType : "restaurante",
       postalCode,
       addressStreet,
       addressNumber,
@@ -809,7 +808,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
               <p className="text-foreground text-sm font-medium">
                 Portarias sugeridas para {stateUf.toUpperCase()}
                 {establishmentType
-                  ? ` · ${establishmentTypeLabel[establishmentType]}`
+                  ? ` · ${labelForEstablishmentType(establishmentType)}`
                   : null}
               </p>
               {suggestedTemplates.length === 0 ? (

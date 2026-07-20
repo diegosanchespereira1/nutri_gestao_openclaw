@@ -17,6 +17,7 @@ import { isClientBusinessSegment } from "@/lib/constants/client-business-segment
 import type { ClientKind } from "@/lib/types/clients";
 import type { PatientSex } from "@/lib/types/patients";
 import type { EstablishmentType } from "@/lib/types/establishments";
+import { ALL_ESTABLISHMENT_TYPES } from "@/lib/constants/establishment-types";
 
 export const MAX_ROWS = 500;
 
@@ -129,13 +130,7 @@ export function applyMappings(
 // ── Validadores por entidade ────────────────────────────────────────────────
 
 const VALID_KINDS = new Set<ClientKind>(["pf", "pj"]);
-const VALID_EST_TYPES = new Set<EstablishmentType>([
-  "escola",
-  "hospital",
-  "clinica",
-  "lar_idosos",
-  "empresa",
-]);
+const VALID_EST_TYPES = new Set<string>([...ALL_ESTABLISHMENT_TYPES]);
 const VALID_SEX = new Set<PatientSex>(["female", "male", "other"]);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -235,7 +230,7 @@ export function validateEstablishmentRows(
     if (!VALID_EST_TYPES.has(type)) {
       errors.push({
         rowIndex: i,
-        message: `Tipo inválido: "${row.establishment_type}". Use: escola, hospital, clinica, lar_idosos, empresa.`,
+        message: `Tipo inválido: "${row.establishment_type}". Use um tipo do sistema (ex.: escola, hospital, clinica, restaurante, hotel, empresa) ou cadastre um tipo personalizado antes de importar.`,
       });
       return;
     }

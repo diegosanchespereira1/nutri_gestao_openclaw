@@ -92,21 +92,71 @@ export const establishmentTypeBadgeClass: Record<EstablishmentType, string> = {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-export function categoryFromType(
-  type: EstablishmentType,
-): EstablishmentCategory {
-  return (ATENDIMENTO_TYPES as readonly string[]).includes(type)
-    ? "atendimento_nutricional"
-    : "assessoria_alimentacao";
+export type EstablishmentCustomTypeRef = {
+  slug: string;
+  label: string;
+  category: EstablishmentCategory;
+};
+
+export const CUSTOM_ESTABLISHMENT_TYPE_BADGE_CLASS =
+  "border border-border bg-muted/50 text-foreground";
+
+export function isBuiltinEstablishmentType(
+  raw: string,
+): raw is EstablishmentType {
+  return (ALL_ESTABLISHMENT_TYPES as readonly string[]).includes(raw);
 }
 
+/** Categoria de um tipo built-in. Para custom, passe `customTypes`. */
+export function categoryFromType(
+  type: string,
+  customTypes?: ReadonlyArray<Pick<EstablishmentCustomTypeRef, "slug" | "category">>,
+): EstablishmentCategory | null {
+  if (isBuiltinEstablishmentType(type)) {
+    return (ATENDIMENTO_TYPES as readonly string[]).includes(type)
+      ? "atendimento_nutricional"
+      : "assessoria_alimentacao";
+  }
+  const found = customTypes?.find((t) => t.slug === type);
+  return found?.category ?? null;
+}
+
+export function labelForEstablishmentType(
+  type: string,
+  customTypes?: ReadonlyArray<Pick<EstablishmentCustomTypeRef, "slug" | "label">>,
+): string {
+  if (isBuiltinEstablishmentType(type)) {
+    return establishmentTypeLabel[type];
+  }
+  const found = customTypes?.find((t) => t.slug === type);
+  return found?.label ?? type;
+}
+
+export function badgeClassForEstablishmentType(type: string): string {
+  if (isBuiltinEstablishmentType(type)) {
+    return establishmentTypeBadgeClass[type];
+  }
+  return CUSTOM_ESTABLISHMENT_TYPE_BADGE_CLASS;
+}
+
+/** Aceita apenas slugs built-in. Use resolve no server para custom. */
 export function parseEstablishmentType(
   raw: unknown,
 ): EstablishmentType | null {
   if (typeof raw !== "string") return null;
-  return (ALL_ESTABLISHMENT_TYPES as readonly string[]).includes(raw)
-    ? (raw as EstablishmentType)
-    : null;
+  return isBuiltinEstablishmentType(raw) ? raw : null;
+}
+
+/** Gera slug estável a partir do label (prefixo custom_). */
+export function slugifyEstablishmentCustomTypeLabel(label: string): string {
+  const base = label
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return `custom_${base || "tipo"}`;
 }
 
 /** Deriva o tipo de estabelecimento a partir da categoria do negócio do cliente PJ. */

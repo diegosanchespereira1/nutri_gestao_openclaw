@@ -69,7 +69,8 @@ import {
 import { clientLifecycleLabel } from "@/lib/constants/client-lifecycle";
 import { MAX_CLIENT_LOGO_BYTES } from "@/lib/constants/client-logos-storage";
 import type { ClientKind, ClientLifecycleStatus } from "@/lib/types/clients";
-import type { EstablishmentCategory, EstablishmentType } from "@/lib/types/establishments";
+import type { EstablishmentCategory } from "@/lib/types/establishments";
+import type { EstablishmentCustomType } from "@/lib/actions/establishment-custom-types";
 import type { PatientSex } from "@/lib/types/patients";
 import { cn } from "@/lib/utils";
 
@@ -166,6 +167,7 @@ export function ClientForm({
   defaultEstCity = "",
   defaultEstState = "",
   defaultEstPostalCode = "",
+  defaultCustomEstTypes = [],
   /** Abre o separador interno «Estabelecimento» ao carregar (edição PJ). */
   initialFormTab,
   children,
@@ -226,12 +228,14 @@ export function ClientForm({
   defaultResponsibleTeamMemberId?: string | null;
   /** Campos do estabelecimento 1:1 (apenas PJ). */
   defaultEstName?: string;
-  defaultEstType?: EstablishmentType;
+  defaultEstType?: string;
   defaultEstAddressLine1?: string;
   defaultEstAddressLine2?: string;
   defaultEstCity?: string;
   defaultEstState?: string;
   defaultEstPostalCode?: string;
+  /** Tipos de estabelecimento personalizados do workspace. */
+  defaultCustomEstTypes?: EstablishmentCustomType[];
   initialFormTab?: "pj-estabelecimento";
   children?: ReactNode;
 }) {
@@ -257,10 +261,11 @@ export function ClientForm({
   });
 
   const initialEstCategory: EstablishmentCategory | "" = defaultEstType
-    ? categoryFromType(defaultEstType)
+    ? (categoryFromType(defaultEstType, defaultCustomEstTypes) ?? "")
     : "";
   const [estCategory, setEstCategory] = useState<EstablishmentCategory | "">(initialEstCategory);
-  const [estType, setEstType] = useState<EstablishmentType | "">(defaultEstType ?? "");
+  const [estType, setEstType] = useState<string>(defaultEstType ?? "");
+  const [customEstTypes] = useState<EstablishmentCustomType[]>(defaultCustomEstTypes);
   const [estValidationError, setEstValidationError] = useState(false);
   const [logoPrepareError, setLogoPrepareError] = useState<string | null>(null);
   const [examPrepareError, setExamPrepareError] = useState<string | null>(null);
@@ -391,7 +396,11 @@ export function ClientForm({
     setSegmentValue(defaultBusinessSegment);
     setResponsibleValue(defaultResponsibleTeamMemberId ?? "");
     setSexValue(defaultSex);
-    setEstCategory(defaultEstType ? categoryFromType(defaultEstType) : "");
+    setEstCategory(
+      defaultEstType
+        ? (categoryFromType(defaultEstType, customEstTypes) ?? "")
+        : "",
+    );
     setEstType(defaultEstType ?? "");
   }, [
     isEditing,
@@ -400,6 +409,7 @@ export function ClientForm({
     defaultResponsibleTeamMemberId,
     defaultSex,
     defaultEstType,
+    customEstTypes,
   ]);
 
   function handleCreateSegment() {
@@ -927,9 +937,12 @@ export function ClientForm({
                         setEstValidationError(false);
                       }}
                       placeholder="Selecione o tipo…"
-                      className="w-full"
                       disabled={fieldsLocked}
                     />
+                    <p className="text-muted-foreground text-xs">
+                      Use <strong>+</strong> para criar um novo tipo caso não
+                      esteja na lista.
+                    </p>
                   </div>
                 ) : null}
                 <div className="space-y-2">

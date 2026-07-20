@@ -16,11 +16,14 @@ export type EstablishmentCategory =
   | "atendimento_nutricional"
   | "assessoria_alimentacao";
 
+/** Valor persistido: slug built-in (`EstablishmentType`) ou slug custom do workspace. */
+export type EstablishmentTypeValue = EstablishmentType | string;
+
 export type EstablishmentRow = {
   id: string;
   client_id: string;
   name: string;
-  establishment_type: EstablishmentType;
+  establishment_type: EstablishmentTypeValue;
   address_line1: string;
   address_line2: string | null;
   city: string | null;
@@ -47,5 +50,5 @@ export type EstablishmentPickerOption = {
   id: string;
   label: string;
   state: string | null;
-  establishment_type: EstablishmentType;
+  establishment_type: EstablishmentTypeValue;
 };

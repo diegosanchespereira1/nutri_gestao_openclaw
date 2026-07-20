@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { loadEstablishmentsForClient } from "@/lib/actions/establishments";
-import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
+import { loadEstablishmentCustomTypesAction } from "@/lib/actions/establishment-custom-types";
+import { labelForEstablishmentType } from "@/lib/constants/establishment-types";
 import { withReturnTo } from "@/lib/navigation/return-to";
 import type { EstablishmentRow } from "@/lib/types/establishments";
 
@@ -15,10 +16,12 @@ export async function EstablishmentsSection({
   establishment?: EstablishmentRow | null;
   returnToOrigin: string;
 }) {
-  const establishment =
+  const [establishment, customTypes] = await Promise.all([
     preloadedEstablishment !== undefined
-      ? preloadedEstablishment
-      : (await loadEstablishmentsForClient(clientId)).rows[0] ?? null;
+      ? Promise.resolve(preloadedEstablishment)
+      : loadEstablishmentsForClient(clientId).then((r) => r.rows[0] ?? null),
+    loadEstablishmentCustomTypesAction(),
+  ]);
 
   return (
     <section
@@ -56,7 +59,10 @@ export async function EstablishmentsSection({
           >
             <span className="text-foreground font-medium">{establishment.name}</span>
             <span className="text-muted-foreground mt-1 block text-sm">
-              {establishmentTypeLabel[establishment.establishment_type]}
+              {labelForEstablishmentType(
+                establishment.establishment_type,
+                customTypes,
+              )}
               {establishment.address_line1 ? ` · ${establishment.address_line1}` : ""}
               {establishment.city ? ` · ${establishment.city}` : ""}
               {establishment.state ? ` (${establishment.state})` : ""}

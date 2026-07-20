@@ -1,6 +1,5 @@
 import type { OnboardingWorkContext } from "@/lib/actions/onboarding";
-import { establishmentTypeLabel } from "@/lib/constants/establishment-types";
-import type { EstablishmentType } from "@/lib/types/establishments";
+import { labelForEstablishmentType } from "@/lib/constants/establishment-types";
 
 export type OnboardingSummaryInput = {
   tenantCompanyName: string;
@@ -11,7 +10,7 @@ export type OnboardingSummaryInput = {
   documentId: string;
   needsEstablishment: boolean;
   establishmentName: string;
-  establishmentType: EstablishmentType;
+  establishmentType: string;
   postalCode: string;
   addressStreet: string;
   addressNumber: string;
@@ -57,7 +56,7 @@ export function buildOnboardingSummaryItems(
   });
   items.push({
     label: "Tipo",
-    value: establishmentTypeLabel[input.establishmentType],
+    value: labelForEstablishmentType(input.establishmentType),
   });
 
   if (input.postalCode.trim()) {

@@ -9,6 +9,7 @@ import {
   deleteLogoAtPathIfAny,
   resolveClientLogoPathFromForm,
 } from "@/lib/clientes/logo-sync";
+import { resolveWorkspaceEstablishmentType } from "@/lib/actions/establishment-custom-types";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -21,10 +22,7 @@ import type {
   ClientSocialLinks,
 } from "@/lib/types/clients";
 import type { PatientSex } from "@/lib/types/patients";
-import {
-  establishmentTypeFromSegment,
-  parseEstablishmentType,
-} from "@/lib/constants/establishment-types";
+import { establishmentTypeFromSegment } from "@/lib/constants/establishment-types";
 import {
   establishmentTypeDisabledMessage,
   isEstablishmentTypeAllowedForModules,
@@ -35,6 +33,7 @@ import {
   isValidCpf,
   onlyDigits,
 } from "@/lib/validators/br-document";
+import type { EstablishmentCategory } from "@/lib/types/establishments";
 
 type PfProfileFields = {
   attended_full_name: string | null;
@@ -289,18 +288,31 @@ function parsePjFields(formData: FormData):
 }
 
 /** Lê os campos `est_*` do FormData e retorna payload pronto para inserir/atualizar. */
-function parseEstablishmentInlineFields(
+async function parseEstablishmentInlineFields(
   formData: FormData,
   fallbackName: string,
-) {
+  workspaceOwnerId: string,
+): Promise<{
+  name: string;
+  establishment_type: string | null;
+  category: EstablishmentCategory | null;
+  address_line1: string;
+  address_line2: string | null;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+}> {
   const rawName = String(formData.get("est_name") ?? "").trim();
   const name = rawName.length > 0 ? rawName : fallbackName;
 
-  // Usa o tipo enviado explicitamente pelo formulário; cai no segmento como fallback.
   const estTypeRaw = String(formData.get("est_type") ?? "").trim();
   const segmentRaw = String(formData.get("business_segment") ?? "").trim();
-  const establishment_type =
-    parseEstablishmentType(estTypeRaw) ?? establishmentTypeFromSegment(segmentRaw);
+  const resolved =
+    (await resolveWorkspaceEstablishmentType(estTypeRaw, workspaceOwnerId)) ??
+    (await resolveWorkspaceEstablishmentType(
+      establishmentTypeFromSegment(segmentRaw),
+      workspaceOwnerId,
+    ));
 
   const address_line1 =
     String(formData.get("est_address_line1") ?? "").trim() || "";
@@ -321,7 +333,8 @@ function parseEstablishmentInlineFields(
 
   return {
     name,
-    establishment_type,
+    establishment_type: resolved?.slug ?? null,
+    category: resolved?.category ?? null,
     address_line1,
     address_line2,
     city,
@@ -465,7 +478,11 @@ export async function createClientAction(
     pjPayload = { ...pj.fields, logo_storage_path: null };
 
     // Valida estabelecimento antes de criar o cliente para não deixar registos órfãos
-    const estCheck = parseEstablishmentInlineFields(formData, legal_name);
+    const estCheck = await parseEstablishmentInlineFields(
+      formData,
+      legal_name,
+      workspaceOwnerId,
+    );
     if (!estCheck.establishment_type) {
       return {
         ok: false,
@@ -481,11 +498,15 @@ export async function createClientAction(
       !isEstablishmentTypeAllowedForModules(
         estCheck.establishment_type,
         enabledModules,
+        estCheck.category,
       )
     ) {
       return {
         ok: false,
-        error: establishmentTypeDisabledMessage(estCheck.establishment_type),
+        error: establishmentTypeDisabledMessage(
+          estCheck.establishment_type,
+          estCheck.category,
+        ),
       };
     }
   }
@@ -540,7 +561,12 @@ export async function createClientAction(
   }
 
   if (kind === "pj") {
-    const estPayload = parseEstablishmentInlineFields(formData, legal_name);
+    const estParsed = await parseEstablishmentInlineFields(
+      formData,
+      legal_name,
+      workspaceOwnerId,
+    );
+    const { category: _category, ...estPayload } = estParsed;
     const { error: estErr } = await supabase.from("establishments").insert({
       client_id: newId,
       ...estPayload,
@@ -721,8 +747,12 @@ export async function updateClientAction(
   }
 
   if (kind === "pj") {
-    const estPayload = parseEstablishmentInlineFields(formData, legal_name);
-    if (!estPayload.establishment_type) {
+    const estParsed = await parseEstablishmentInlineFields(
+      formData,
+      legal_name,
+      workspaceOwnerId,
+    );
+    if (!estParsed.establishment_type) {
       return {
         ok: false,
         error:
@@ -735,15 +765,21 @@ export async function updateClientAction(
     );
     if (
       !isEstablishmentTypeAllowedForModules(
-        estPayload.establishment_type,
+        estParsed.establishment_type,
         enabledModules,
+        estParsed.category,
       )
     ) {
       return {
         ok: false,
-        error: establishmentTypeDisabledMessage(estPayload.establishment_type),
+        error: establishmentTypeDisabledMessage(
+          estParsed.establishment_type,
+          estParsed.category,
+        ),
       };
     }
+
+    const { category: _category, ...estPayload } = estParsed;
 
     const { data: existingEst } = await supabase
       .from("establishments")

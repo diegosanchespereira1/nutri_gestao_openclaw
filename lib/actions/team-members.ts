@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 
 import { parseTeamJobRole } from "@/lib/constants/team-roles";
 import { canAccessAdminArea } from "@/lib/roles";
-import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import {
+  createServiceRoleClient,
+  isServiceRoleConfigured,
+} from "@/lib/supabase/service-role";
+import { sendPasswordRecoveryViaSupabase } from "@/lib/email/send-supabase-auth-email";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -656,4 +660,225 @@ export async function deleteTeamMemberAction(formData: FormData): Promise<void> 
   revalidatePath("/visitas");
   revalidatePath("/visitas/nova");
   redirect("/equipe");
+}
+
+export type ToggleTeamMemberActiveResult =
+  | { ok: true; activated: boolean }
+  | { ok: false; error: string };
+
+/**
+ * Ativa/desativa um membro da equipe a partir do próprio workspace.
+ * Permissão: titular, cargo Gestão ou admin/super_admin (canManageTeamMembers).
+ *
+ * Desativar: is_active=false + ban do usuário em auth.users (sessões novas
+ * bloqueadas; RLS também barra via workspace_member_user_ids, que filtra
+ * is_active). Reativar: unban + senha aleatória + email de redefinição —
+ * a senha antiga não volta a funcionar.
+ */
+export async function toggleTeamMemberActiveByTeamAction(
+  input: { memberId: string; activate: boolean },
+): Promise<ToggleTeamMemberActiveResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await canManageTeamMembers(supabase, user.id, workspaceOwnerId);
+  if (!allowed) {
+    return {
+      ok: false,
+      error: "Sem permissão. Apenas o titular ou cargo Gestão podem ativar/desativar membros.",
+    };
+  }
+
+  const memberId = input.memberId.trim();
+  if (!memberId) return { ok: false, error: "Membro inválido." };
+
+  if (!isServiceRoleConfigured()) {
+    return { ok: false, error: "Configuração do servidor incompleta. Contate o suporte." };
+  }
+  const service = createServiceRoleClient();
+
+  const { data: member, error: memberErr } = await service
+    .from("team_members")
+    .select("id, owner_user_id, member_user_id, email, is_active")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (memberErr || !member) return { ok: false, error: "Membro não encontrado." };
+  // Escopo do workspace: nunca mexer em membro de outro tenant.
+  if (member.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Membro não pertence a este workspace." };
+  }
+  // Ninguém se auto-desativa (evita perder o próprio acesso por engano).
+  if (!input.activate && member.member_user_id === user.id) {
+    return { ok: false, error: "Você não pode desativar o seu próprio acesso." };
+  }
+
+  const memberUserId = member.member_user_id as string | null;
+
+  if (input.activate) {
+    if (memberUserId) {
+      const randomPassword = crypto.randomUUID().replace(/-/g, "");
+      const { error: authErr } = await service.auth.admin.updateUserById(
+        memberUserId,
+        { ban_duration: "none", password: randomPassword },
+      );
+      if (authErr) {
+        console.error("[toggleTeamMemberActiveByTeamAction] unban falhou", {
+          memberId,
+          message: authErr.message,
+        });
+        return { ok: false, error: "Não foi possível reativar o acesso. Tente novamente." };
+      }
+      const email = member.email as string | null;
+      if (email) {
+        const sent = await sendPasswordRecoveryViaSupabase(service, email);
+        if (!sent.ok) {
+          console.error(
+            "[toggleTeamMemberActiveByTeamAction] email de redefinição falhou",
+            { memberId, error: sent.error },
+          );
+        }
+      }
+    }
+  } else if (memberUserId) {
+    const { error: authErr } = await service.auth.admin.updateUserById(
+      memberUserId,
+      { ban_duration: "876000h" },
+    );
+    if (authErr) {
+      console.error("[toggleTeamMemberActiveByTeamAction] ban falhou", {
+        memberId,
+        message: authErr.message,
+      });
+      return { ok: false, error: "Não foi possível desativar o acesso. Tente novamente." };
+    }
+  }
+
+  const { error } = await service
+    .from("team_members")
+    .update({ is_active: input.activate })
+    .eq("id", memberId)
+    .eq("owner_user_id", workspaceOwnerId);
+  if (error) {
+    console.error("[toggleTeamMemberActiveByTeamAction] update falhou", {
+      memberId,
+      message: error.message,
+    });
+    return { ok: false, error: "Não foi possível salvar a alteração." };
+  }
+
+  revalidatePath("/equipe");
+  revalidatePath("/visitas");
+  return { ok: true, activated: input.activate };
+}
+
+export type ResetTeamMemberPasswordResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Redefine a senha de um membro da equipe (Auth Admin API).
+ * Permissão: titular, cargo Gestão ou admin/super_admin (canManageTeamMembers).
+ */
+export async function resetTeamMemberPasswordByTeamAction(input: {
+  memberId: string;
+  password: string;
+  confirmPassword: string;
+}): Promise<ResetTeamMemberPasswordResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await canManageTeamMembers(supabase, user.id, workspaceOwnerId);
+  if (!allowed) {
+    return {
+      ok: false,
+      error:
+        "Sem permissão. Apenas o titular ou cargo Gestão podem redefinir senhas.",
+    };
+  }
+
+  const memberId = input.memberId.trim();
+  const password = input.password;
+  const confirmPassword = input.confirmPassword;
+
+  if (!memberId) return { ok: false, error: "Membro inválido." };
+  if (!password || !confirmPassword) {
+    return { ok: false, error: "Informe a nova senha e a confirmação." };
+  }
+  if (password !== confirmPassword) {
+    return { ok: false, error: "As senhas não coincidem." };
+  }
+  if (password.length < 6 || !hasSpecialCharacter(password)) {
+    return {
+      ok: false,
+      error:
+        "Senha fraca. Use no mínimo 6 caracteres e pelo menos 1 especial (ex.: @ # !).",
+    };
+  }
+
+  if (!isServiceRoleConfigured()) {
+    return {
+      ok: false,
+      error: "Configuração do servidor incompleta. Contate o suporte.",
+    };
+  }
+  const service = createServiceRoleClient();
+
+  const { data: member, error: memberErr } = await service
+    .from("team_members")
+    .select("id, owner_user_id, member_user_id, is_active")
+    .eq("id", memberId)
+    .maybeSingle();
+
+  if (memberErr || !member) return { ok: false, error: "Membro não encontrado." };
+  if (member.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Membro não pertence a este workspace." };
+  }
+
+  const memberUserId = member.member_user_id as string | null;
+  if (!memberUserId) {
+    return {
+      ok: false,
+      error: "Este membro ainda não tem conta de acesso para redefinir a senha.",
+    };
+  }
+  if (!member.is_active) {
+    return {
+      ok: false,
+      error: "Reative o membro antes de redefinir a senha.",
+    };
+  }
+
+  const { error: authErr } = await service.auth.admin.updateUserById(
+    memberUserId,
+    { password },
+  );
+  if (authErr) {
+    console.error("[resetTeamMemberPasswordByTeamAction] update falhou", {
+      memberId,
+      message: authErr.message,
+    });
+    const param = mapCreateAuthErrorToParam(authErr.message);
+    if (param === "password_policy") {
+      return {
+        ok: false,
+        error:
+          "Senha rejeitada pela política do sistema. Use no mínimo 6 caracteres e 1 especial.",
+      };
+    }
+    return {
+      ok: false,
+      error: "Não foi possível redefinir a senha. Tente novamente.",
+    };
+  }
+
+  return { ok: true };
 }

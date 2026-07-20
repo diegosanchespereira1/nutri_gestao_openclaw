@@ -395,19 +395,22 @@ export function TeamMemberForm({ mode, initial }: Props) {
               "border-destructive ring-destructive/20",
           )}
           required
-          defaultValue={initial?.job_role ?? "nutricionista"}
-          value={isCreate ? jobRoleValue : undefined}
-          onChange={
-            isCreate
-              ? (event) => {
+          // Controlado no create (value) e não-controlado no edit (defaultValue)
+          // — nunca os dois juntos (aviso do React).
+          {...(isCreate
+            ? {
+                value: jobRoleValue,
+                onChange: (
+                  event: React.ChangeEvent<HTMLSelectElement>,
+                ) => {
                   const value = event.target.value as TeamMemberRow["job_role"];
                   setJobRoleValue(value);
                   if (attemptedSubmit) {
                     runCreateValidation({ jobRole: value });
                   }
-                }
-              : undefined
-          }
+                },
+              }
+            : { defaultValue: initial?.job_role ?? "nutricionista" })}
           aria-invalid={
             isCreate
               ? shouldShowFieldError("job_role") && Boolean(fieldErrors.job_role)

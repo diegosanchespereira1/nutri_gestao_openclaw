@@ -2,7 +2,10 @@ import Link from "next/link";
 import { UserCog } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button-variants";
+import { Badge } from "@/components/ui/badge";
 import { ExternalPortalSection } from "@/components/equipe/external-portal-section";
+import { ResetMemberPasswordButton } from "@/components/team/reset-member-password-button";
+import { ToggleMemberActiveButton } from "@/components/team/toggle-member-active-button";
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -73,18 +76,44 @@ export default async function EquipePage({
           aria-label="Membros da equipe"
         >
           {rows.map((m) => (
-            <li key={m.id}>
+            <li
+              key={m.id}
+              className={cn(
+                "flex items-center gap-3 px-4 py-3",
+                !m.is_active && "bg-muted/30",
+              )}
+            >
               <Link
                 href={withReturnTo(`/equipe/${m.id}/editar`, returnToOrigin)}
-                className="hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-3 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="hover:bg-muted/50 focus-visible:ring-ring -mx-2 -my-1 flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-1 transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
                 {/* Avatar inicial */}
-                <div className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase">
+                <div
+                  className={cn(
+                    "flex size-9 shrink-0 items-center justify-center rounded-full text-sm font-semibold uppercase",
+                    m.is_active
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
                   {m.full_name.charAt(0)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <span className="text-foreground block font-medium leading-snug">
+                  <span
+                    className={cn(
+                      "block font-medium leading-snug",
+                      m.is_active ? "text-foreground" : "text-muted-foreground",
+                    )}
+                  >
                     {m.full_name}
+                    {!m.is_active ? (
+                      <Badge
+                        variant="destructive"
+                        className="ml-2 align-middle text-[10px] uppercase tracking-wide"
+                      >
+                        Desativado
+                      </Badge>
+                    ) : null}
                   </span>
                   <span className="text-muted-foreground block text-sm">
                     {teamJobRoleLabel[m.job_role as TeamJobRole] ?? m.job_role}
@@ -99,6 +128,21 @@ export default async function EquipePage({
                   ) : null}
                 </div>
               </Link>
+              {canManageTeam && m.member_user_id ? (
+                <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-start">
+                  {m.is_active ? (
+                    <ResetMemberPasswordButton
+                      memberId={m.id}
+                      memberName={m.full_name}
+                    />
+                  ) : null}
+                  <ToggleMemberActiveButton
+                    memberId={m.id}
+                    memberName={m.full_name}
+                    isActive={m.is_active}
+                  />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -14,6 +14,13 @@ import {
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { createVisitDialogAction } from "@/lib/actions/visits";
 import { VISIT_KINDS, visitKindLabel } from "@/lib/constants/visit-kinds";
@@ -25,12 +32,12 @@ import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
 import type { TeamMemberRow } from "@/lib/types/team-members";
 import type { ClientLifecycleStatus } from "@/lib/types/clients";
-import type { VisitTargetType } from "@/lib/types/visits";
+import type { VisitKind, VisitTargetType } from "@/lib/types/visits";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { cn } from "@/lib/utils";
 
-const selectClassName =
-  "border-input bg-background text-foreground box-border h-9 min-w-0 w-full max-w-full truncate rounded-lg border px-2.5 text-sm shadow-xs outline-none transition-[color,box-shadow] focus:border-ring focus:ring-2 focus:ring-inset focus:ring-ring/40";
+/** Valor sentinela: Base UI Select não aceita string vazia em SelectItem. */
+const SELF_ASSIGNEE_EMPTY = "__self__";
 
 const textareaClass =
   "border-input bg-background placeholder:text-muted-foreground box-border flex min-h-[72px] min-w-0 w-full max-w-full resize-y break-words rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus:border-ring focus:ring-2 focus:ring-inset focus:ring-ring/40";
@@ -74,6 +81,17 @@ export function VisitScheduleDialog({
   );
   const [state, formAction, isPending] = useActionState(createVisitDialogAction, null);
 
+  const selfAssigneeValue =
+    assigneeContext.currentTeamMemberId ?? SELF_ASSIGNEE_EMPTY;
+  const [assigneeId, setAssigneeId] = useState(
+    () => assigneeContext.defaultAssigneeId || SELF_ASSIGNEE_EMPTY,
+  );
+  const [visitKind, setVisitKind] = useState<VisitKind>(() =>
+    establishments.some((e) => e.clients.lifecycle_status === "ativo")
+      ? "technical_compliance"
+      : "patient_care",
+  );
+
   useEffect(() => {
     if (state?.ok) {
       router.refresh();
@@ -82,6 +100,23 @@ export function VisitScheduleDialog({
   }, [state, router, onClose]);
 
   const [formKey, setFormKey] = useState(0);
+
+  useEffect(() => {
+    if (!open) return;
+    setAssigneeId(assigneeContext.defaultAssigneeId || SELF_ASSIGNEE_EMPTY);
+    setVisitKind(
+      targetType === "patient" ? "patient_care" : "technical_compliance",
+    );
+    // Só ao abrir o diálogo — targetType intencional no momento da abertura.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, assigneeContext.defaultAssigneeId]);
+
+  function handleTargetTypeChange(next: VisitTargetType) {
+    setTargetType(next);
+    setVisitKind(
+      next === "patient" ? "patient_care" : "technical_compliance",
+    );
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     const form = e.currentTarget;
@@ -181,7 +216,7 @@ export function VisitScheduleDialog({
                       name="target_type"
                       value="establishment"
                       checked={targetType === "establishment"}
-                      onChange={() => setTargetType("establishment")}
+                      onChange={() => handleTargetTypeChange("establishment")}
                       required
                       className="h-4 w-4"
                     />
@@ -193,7 +228,7 @@ export function VisitScheduleDialog({
                       name="target_type"
                       value="patient"
                       checked={targetType === "patient"}
-                      onChange={() => setTargetType("patient")}
+                      onChange={() => handleTargetTypeChange("patient")}
                       required
                       className="h-4 w-4"
                     />
@@ -206,24 +241,26 @@ export function VisitScheduleDialog({
               {targetType === "establishment" ? (
                 <div className={fieldClassName}>
                   <Label htmlFor="dlg-establishment">Estabelecimento (cliente PJ)</Label>
-                  <select
-                    id="dlg-establishment"
-                    name="establishment_id"
-                    className={selectClassName}
-                    defaultValue=""
-                    required
-                  >
-                    <option value="">— Selecionar —</option>
-                    {establishments.map((est) => {
-                      const blocked = est.clients.lifecycle_status !== "ativo";
-                      return (
-                        <option key={est.id} value={est.id} disabled={blocked}>
-                          {est.name} — {establishmentClientLabel(est)}
-                          {schedulingBlockedSuffix(est.clients.lifecycle_status)}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <Select name="establishment_id" required modal={false}>
+                    <SelectTrigger id="dlg-establishment" className="w-full">
+                      <SelectValue placeholder="— Selecionar —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {establishments.map((est) => {
+                        const blocked = est.clients.lifecycle_status !== "ativo";
+                        return (
+                          <SelectItem
+                            key={est.id}
+                            value={est.id}
+                            disabled={blocked}
+                          >
+                            {est.name} — {establishmentClientLabel(est)}
+                            {schedulingBlockedSuffix(est.clients.lifecycle_status)}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
               ) : (
                 <input type="hidden" name="establishment_id" value="" />
@@ -232,26 +269,31 @@ export function VisitScheduleDialog({
               {targetType === "patient" ? (
                 <div className={fieldClassName}>
                   <Label htmlFor="dlg-patient">Paciente</Label>
-                  <select
-                    id="dlg-patient"
-                    name="patient_id"
-                    className={selectClassName}
-                    defaultValue=""
-                    required
-                  >
-                    <option value="">— Selecionar —</option>
-                    {patients.map((p) => {
-                      const life = (p.clients?.lifecycle_status ?? "ativo") as ClientLifecycleStatus;
-                      const blocked = life !== "ativo";
-                      return (
-                        <option key={p.id} value={p.id} disabled={blocked}>
-                          {p.full_name}
-                          {p.clients?.legal_name ? ` (${p.clients.legal_name})` : ""}
-                          {schedulingBlockedSuffix(life)}
-                        </option>
-                      );
-                    })}
-                  </select>
+                  <Select name="patient_id" required modal={false}>
+                    <SelectTrigger id="dlg-patient" className="w-full">
+                      <SelectValue placeholder="— Selecionar —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {patients.map((p) => {
+                        const life = (p.clients?.lifecycle_status ??
+                          "ativo") as ClientLifecycleStatus;
+                        const blocked = life !== "ativo";
+                        return (
+                          <SelectItem
+                            key={p.id}
+                            value={p.id}
+                            disabled={blocked}
+                          >
+                            {p.full_name}
+                            {p.clients?.legal_name
+                              ? ` (${p.clients.legal_name})`
+                              : ""}
+                            {schedulingBlockedSuffix(life)}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
               ) : (
                 <input type="hidden" name="patient_id" value="" />
@@ -260,44 +302,61 @@ export function VisitScheduleDialog({
               {/* Tipo de visita */}
               <div className={fieldClassName}>
                 <Label htmlFor="dlg-visit-kind">Tipo de visita</Label>
-                <select
-                  id="dlg-visit-kind"
-                  key={`kind-${targetType}`}
+                <Select
                   name="visit_kind"
-                  className={selectClassName}
                   required
-                  defaultValue={
-                    targetType === "patient" ? "patient_care" : "technical_compliance"
-                  }
+                  modal={false}
+                  value={visitKind}
+                  onValueChange={(next) => {
+                    if (next) setVisitKind(next as VisitKind);
+                  }}
                 >
-                  {VISIT_KINDS.map((k) => (
-                    <option key={k} value={k}>
-                      {visitKindLabel[k]}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="dlg-visit-kind" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VISIT_KINDS.map((k) => (
+                      <SelectItem key={k} value={k}>
+                        {visitKindLabel[k]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Profissional */}
               <div className={fieldClassName}>
                 <Label htmlFor="dlg-assignee">Profissional que atende</Label>
-                <select
-                  id="dlg-assignee"
+                <input
+                  type="hidden"
                   name="assigned_team_member_id"
-                  className={selectClassName}
-                  defaultValue={assigneeContext.defaultAssigneeId}
+                  value={
+                    assigneeId === SELF_ASSIGNEE_EMPTY ? "" : assigneeId
+                  }
+                />
+                <Select
+                  modal={false}
+                  value={assigneeId}
+                  onValueChange={(next) => {
+                    if (next) setAssigneeId(next);
+                  }}
                 >
-                  <option value={assigneeContext.currentTeamMemberId ?? ""}>
-                    {assigneeContext.selfAssigneeLabel}
-                  </option>
-                  {teamMembers
-                    .filter((m) => m.id !== assigneeContext.currentTeamMemberId)
-                    .map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.full_name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger id="dlg-assignee" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={selfAssigneeValue}>
+                      {assigneeContext.selfAssigneeLabel}
+                    </SelectItem>
+                    {teamMembers
+                      .filter((m) => m.id !== assigneeContext.currentTeamMemberId)
+                      .map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.full_name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Data e hora + Prioridade */}
@@ -319,18 +378,22 @@ export function VisitScheduleDialog({
 
                 <div className={fieldClassName}>
                   <Label htmlFor="dlg-priority">Prioridade</Label>
-                  <select
-                    id="dlg-priority"
+                  <Select
                     name="priority"
-                    className={selectClassName}
+                    modal={false}
                     defaultValue="normal"
                   >
-                    {VISIT_PRIORITIES.map((p) => (
-                      <option key={p} value={p}>
-                        {visitPriorityLabel[p]}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger id="dlg-priority" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VISIT_PRIORITIES.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {visitPriorityLabel[p]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

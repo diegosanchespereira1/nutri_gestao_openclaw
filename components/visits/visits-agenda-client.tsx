@@ -285,8 +285,8 @@ export function VisitsAgendaClient({
   );
 
   return (
-    <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:gap-8">
-      <div className="min-w-0 flex-1 space-y-5">
+    <div className="flex min-w-0 max-w-full flex-col gap-6 xl:flex-row xl:items-start xl:gap-8">
+      <div className="min-w-0 max-w-full flex-1 space-y-5">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-foreground font-heading text-2xl font-semibold tracking-tight">
@@ -345,7 +345,7 @@ export function VisitsAgendaClient({
         ) : null}
 
         <div
-          className="flex flex-wrap items-center gap-2"
+          className="flex w-full min-w-0 items-center justify-between gap-1"
           role="toolbar"
           aria-label="Filtro por prioridade"
         >
@@ -355,10 +355,10 @@ export function VisitsAgendaClient({
               type="button"
               onClick={() => setPriorityFilter(chip.value)}
               className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "min-w-0 flex-1 rounded-full border px-1.5 py-1.5 text-center text-[0.7rem] font-medium leading-tight whitespace-nowrap transition-colors sm:px-2.5 sm:text-xs",
                 chip.className,
                 priorityFilter === chip.value
-                  ? "ring-primary ring-2 ring-offset-2 ring-offset-background"
+                  ? "border-primary ring-primary ring-2 ring-inset"
                   : "opacity-80 hover:opacity-100",
               )}
             >
@@ -443,7 +443,7 @@ export function VisitsAgendaClient({
           </section>
         </div>
 
-        <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3 shadow-xs sm:p-4">
+        <div className="border-border bg-card flex max-w-full min-w-0 flex-col gap-3 overflow-x-hidden rounded-2xl border p-4 shadow-xs sm:p-5">
           <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1">
@@ -622,7 +622,7 @@ export function VisitsAgendaClient({
       </div>
 
       <aside
-        className="border-border xl:border-l xl:pl-8 space-y-5 xl:w-[min(100%,20rem)] xl:shrink-0"
+        className="border-border xl:border-l xl:pl-8 min-w-0 max-w-full space-y-5 xl:w-[min(100%,20rem)] xl:shrink-0"
         aria-label="Resumo e detalhe da visita"
       >
         <div className="hidden grid-cols-3 gap-2 xl:grid">

@@ -143,12 +143,12 @@ export function VisitWeekTimeGrid({
   const dragInfoRef = useRef<{ visitId: string; oldStart: string } | null>(null);
   const [dragOverDay, setDragOverDay] = useState<string | null>(null);
 
-  const gutterWidthClass = "w-12 sm:w-14";
+  const gutterWidthClass = "w-14 sm:w-16";
 
   return (
-    <div className="border-border overflow-hidden rounded-xl border">
-      <div className="max-h-[min(72vh,880px)] overflow-auto">
-        <div className="min-w-[44rem] sm:min-w-[52rem]">
+    <div className="border-border max-w-full rounded-xl border">
+      <div className="max-h-[min(72vh,880px)] max-w-full overflow-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
+        <div className="w-max min-w-[44rem] sm:min-w-[52rem]">
           {/* Cabeçalho: canto + dias */}
           <div className="bg-muted/30 border-border sticky top-0 z-40 flex border-b">
             <div
@@ -156,6 +156,7 @@ export function VisitWeekTimeGrid({
                 gutterWidthClass,
                 "border-border sticky left-0 z-50 shrink-0 border-r bg-card",
               )}
+              aria-hidden
             />
             {weekKeys.map((dayKey) => {
               const isToday = dayKey === todayKey;
@@ -166,7 +167,7 @@ export function VisitWeekTimeGrid({
                   type="button"
                   onClick={() => onSelectDay(dayKey)}
                   className={cn(
-                    "min-w-0 flex-1 border-l px-1 py-2.5 text-center transition-colors sm:px-2",
+                    "min-w-[4.75rem] flex-1 border-l px-1 py-2.5 text-center transition-colors sm:min-w-0 sm:px-2",
                     "hover:bg-muted/50 focus-visible:ring-ring focus-visible:z-10 focus-visible:ring-2 focus-visible:outline-none",
                     isSelected && "bg-primary/10",
                     isToday && "ring-primary/50 ring-1 ring-inset",
@@ -195,7 +196,7 @@ export function VisitWeekTimeGrid({
                 <div
                   key={h}
                   style={{ height: PX_PER_HOUR }}
-                  className="text-muted-foreground flex items-start justify-end pr-1 pt-1 text-[0.65rem] tabular-nums sm:pr-2 sm:text-xs"
+                  className="text-muted-foreground flex items-start justify-end px-1.5 pt-1 text-[0.65rem] tabular-nums sm:px-2 sm:text-xs"
                 >
                   {formatHourRowLabel(h)}
                 </div>
@@ -214,7 +215,7 @@ export function VisitWeekTimeGrid({
                     key={dayKey}
                     role="presentation"
                     className={cn(
-                      "relative min-w-0 flex-1 border-l",
+                      "relative min-w-[4.75rem] flex-1 border-l sm:min-w-0",
                       isSelected && "bg-primary/[0.03]",
                       dragOverDay === dayKey && "bg-primary/[0.07] ring-1 ring-inset ring-primary/30",
                     )}
@@ -297,7 +298,7 @@ export function VisitWeekTimeGrid({
                         aria-hidden
                       >
                         <div className="bg-primary relative h-0.5 shadow-sm">
-                          <span className="bg-primary text-primary-foreground absolute -top-1.5 -left-1 size-2.5 rounded-full shadow-xs" />
+                          <span className="bg-primary text-primary-foreground absolute -top-1.5 left-0 size-2.5 rounded-full shadow-xs" />
                         </div>
                       </div>
                     ) : null}

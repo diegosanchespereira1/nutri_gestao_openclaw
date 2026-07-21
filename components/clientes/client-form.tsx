@@ -245,10 +245,12 @@ export function ClientForm({
   const [state, formAction, isPending] = useActionState(action, initial);
   const [isEditing, setIsEditing] = useState(mode === "create");
   const [formEpoch, setFormEpoch] = useState(0);
+  const [saveTimedOut, setSaveTimedOut] = useState(false);
   const fieldsLocked = mode === "edit" && !isEditing;
-  // Fecha o overlay assim que a action devolve resultado. Evita popup preso
-  // quando isPending fica true após router.refresh() (deadlock Next.js).
-  const savingDialogOpen = isPending && state?.ok !== true;
+  // Fecha o overlay assim que a action devolve ok, ou se isPending ficar
+  // preso (deadlock Next.js com router.refresh) / timeout de segurança.
+  const savingDialogOpen =
+    isPending && state?.ok !== true && !saveTimedOut;
   const [kind, setKind] = useState<ClientKind>(defaultKind);
   const [tab, setTab] = useState<ClientFormTab>(() => {
     if (
@@ -320,14 +322,25 @@ export function ClientForm({
     // Sai do modo de edição após salvar com sucesso; adiado para fora do
     // corpo síncrono do efeito.
     queueMicrotask(() => setIsEditing(false));
-    // revalidatePath na action já invalida a página; o refresh no cliente
-    // só atualiza default*. Atrasar evita descartar a transition da action
-    // e deixar isPending=true para sempre (Unicorn/deadlock do App Router).
-    const refreshId = window.setTimeout(() => {
-      router.refresh();
-    }, 100);
-    return () => window.clearTimeout(refreshId);
-  }, [mode, state, router]);
+  }, [mode, state]);
+
+  // Só refresca DEPOIS de isPending=false. Chamar router.refresh() enquanto a
+  // transition da useActionState ainda corre deixa isPending=true para sempre
+  // (deadlock do App Router) e o popup "Salvando…" nunca fecha.
+  useEffect(() => {
+    if (mode !== "edit" || state?.ok !== true || isPending) return;
+    router.refresh();
+  }, [mode, state, isPending, router]);
+
+  // Watchdog: se a action/transition travar, não deixar o modal eterno.
+  useEffect(() => {
+    if (!isPending || state?.ok === true) {
+      setSaveTimedOut(false);
+      return;
+    }
+    const id = window.setTimeout(() => setSaveTimedOut(true), 25_000);
+    return () => window.clearTimeout(id);
+  }, [isPending, state]);
 
   const defaultsSignature = [
     defaultLegalName,
@@ -1530,6 +1543,11 @@ export function ClientForm({
               role="alert"
             >
               {state.error}
+            </p>
+          ) : saveTimedOut ? (
+            <p className="text-destructive text-sm" role="alert">
+              O salvamento demorou demais. Verifique a ligação e tente outra
+              vez — se o problema continuar, atualize a página.
             </p>
           ) : (
             <span className="text-muted-foreground hidden text-sm sm:block">

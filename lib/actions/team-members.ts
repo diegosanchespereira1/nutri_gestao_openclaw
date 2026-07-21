@@ -315,7 +315,7 @@ export async function createTeamMemberAction(
   if (!canManage) {
     return createTeamMemberError(
       "auth_create",
-      "Apenas o titular, usuários com cargo Gestão ou administradores podem adicionar membros da equipe.",
+      "Apenas o titular, Gestão, Administrativo ou administradores podem adicionar membros da equipe.",
     );
   }
 
@@ -801,7 +801,8 @@ export type ResetTeamMemberPasswordResult =
 
 /**
  * Redefine a senha de um membro da equipe (Auth Admin API).
- * Permissão: titular, cargo Gestão ou admin/super_admin (canManageTeamMembers).
+ * Permissão: titular, Gestão, Administrativo ou admin/super_admin
+ * (canManageTeamMembers).
  */
 export async function resetTeamMemberPasswordByTeamAction(input: {
   memberId: string;
@@ -820,7 +821,7 @@ export async function resetTeamMemberPasswordByTeamAction(input: {
     return {
       ok: false,
       error:
-        "Sem permissão. Apenas o titular ou cargo Gestão podem redefinir senhas.",
+        "Sem permissão. Apenas o titular, Gestão ou Administrativo podem redefinir senhas.",
     };
   }
 

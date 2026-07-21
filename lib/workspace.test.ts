@@ -37,7 +37,9 @@ function mockGestaoThenProfile(opts: {
           select: () => chain,
           eq: () => chain,
           maybeSingle: async () => ({
-            data: opts.gestaoRow,
+            data: opts.gestaoRow
+              ? { ...opts.gestaoRow, job_role: "gestao" }
+              : null,
           }),
         };
         return chain;
@@ -170,6 +172,24 @@ describe("canManageTeamMembers / canDeleteWorkspaceMasterData", () => {
     ).resolves.toBe(true);
   });
 
+  it("administrativo pode gerir equipe mas não apagar dados mestres", async () => {
+    const manageClient = mockTeamMemberThenProfile({
+      teamRow: { id: "tm-adm", job_role: "administrativo" },
+      profileRole: "user",
+    });
+    await expect(
+      canManageTeamMembers(manageClient, "adm-1", "owner-1"),
+    ).resolves.toBe(true);
+
+    const deleteClient = mockGestaoThenProfile({
+      gestaoRow: null,
+      profileRole: "user",
+    });
+    await expect(
+      canDeleteWorkspaceMasterData(deleteClient, "adm-1", "owner-1"),
+    ).resolves.toBe(false);
+  });
+
   it("admin de plataforma pode gerir e apagar", async () => {
     const supabase = mockGestaoThenProfile({
       gestaoRow: null,
@@ -218,13 +238,16 @@ describe("canToggleTeamMemberActive", () => {
     ).resolves.toBe(true);
   });
 
-  it("administrativo ativo pode ativar/desativar", async () => {
+  it("administrativo ativo pode ativar/desativar (mesmo que canManage)", async () => {
     const supabase = mockTeamMemberThenProfile({
       teamRow: { id: "tm-adm", job_role: "administrativo" },
       profileRole: "user",
     });
     await expect(
       canToggleTeamMemberActive(supabase, "adm-1", "owner-1"),
+    ).resolves.toBe(true);
+    await expect(
+      canManageTeamMembers(supabase, "adm-1", "owner-1"),
     ).resolves.toBe(true);
   });
 
@@ -245,16 +268,6 @@ describe("canToggleTeamMemberActive", () => {
     });
     await expect(
       canToggleTeamMemberActive(supabase, "nutri-1", "owner-1"),
-    ).resolves.toBe(false);
-  });
-
-  it("administrativo não ganha canManageTeamMembers", async () => {
-    const supabase = mockGestaoThenProfile({
-      gestaoRow: null,
-      profileRole: "user",
-    });
-    await expect(
-      canManageTeamMembers(supabase, "adm-1", "owner-1"),
     ).resolves.toBe(false);
   });
 });

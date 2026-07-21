@@ -38,8 +38,8 @@ export function isTeamMember(
   return authUserId !== workspaceOwnerId;
 }
 
-/** Cargos que podem ativar/desativar membros (além do titular e admin). */
-const TEAM_ROLES_CAN_TOGGLE_MEMBER_ACTIVE = ["gestao", "administrativo"] as const;
+/** Cargos que podem gerir a equipe (criar/editar/ativar/reset), além do titular e admin. */
+const TEAM_ROLES_CAN_MANAGE_TEAM = ["gestao", "administrativo"] as const;
 
 /** Membro da equipa com cargo Gestão no workspace atual. */
 export async function isWorkspaceGestaoMember(
@@ -63,9 +63,9 @@ export async function isWorkspaceGestaoMember(
 
 /**
  * Membro ativo com cargo Gestão ou Administrativo no workspace atual.
- * Usado para ativar/desativar colegas (não inclui criar/editar/apagar).
+ * Pode criar/editar/ativar membros e resetar senha (não apaga dados mestres).
  */
-export async function isWorkspaceTeamActiveToggleMember(
+export async function isWorkspaceTeamManagerMember(
   supabase: SupabaseClient,
   authUserId: string,
   workspaceOwnerId: string,
@@ -83,8 +83,17 @@ export async function isWorkspaceTeamActiveToggleMember(
   const role = data?.job_role;
   return (
     typeof role === "string" &&
-    (TEAM_ROLES_CAN_TOGGLE_MEMBER_ACTIVE as readonly string[]).includes(role)
+    (TEAM_ROLES_CAN_MANAGE_TEAM as readonly string[]).includes(role)
   );
+}
+
+/** @deprecated Use isWorkspaceTeamManagerMember — mantido para testes/compat. */
+export async function isWorkspaceTeamActiveToggleMember(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+): Promise<boolean> {
+  return isWorkspaceTeamManagerMember(supabase, authUserId, workspaceOwnerId);
 }
 
 async function isPlatformAdmin(
@@ -113,35 +122,34 @@ async function isOwnerGestaoOrPlatformAdmin(
   return isPlatformAdmin(supabase, authUserId);
 }
 
-/** Titular, cargo Gestão ou admin/super_admin da plataforma podem gerir a equipe. */
-export async function canManageTeamMembers(
-  supabase: SupabaseClient,
-  authUserId: string,
-  workspaceOwnerId: string,
-): Promise<boolean> {
-  return isOwnerGestaoOrPlatformAdmin(supabase, authUserId, workspaceOwnerId);
-}
-
 /**
- * Pode ativar/desativar membros do workspace.
- * Titular, Gestão, Administrativo ou admin/super_admin da plataforma.
+ * Titular, Gestão, Administrativo ou admin/super_admin.
+ * Cobre criar/editar membro, ativar/desativar e reset de senha.
  */
-export async function canToggleTeamMemberActive(
+export async function canManageTeamMembers(
   supabase: SupabaseClient,
   authUserId: string,
   workspaceOwnerId: string,
 ): Promise<boolean> {
   if (authUserId === workspaceOwnerId) return true;
   if (
-    await isWorkspaceTeamActiveToggleMember(
-      supabase,
-      authUserId,
-      workspaceOwnerId,
-    )
+    await isWorkspaceTeamManagerMember(supabase, authUserId, workspaceOwnerId)
   ) {
     return true;
   }
   return isPlatformAdmin(supabase, authUserId);
+}
+
+/**
+ * Pode ativar/desativar membros do workspace.
+ * Mesmo critério de canManageTeamMembers.
+ */
+export async function canToggleTeamMemberActive(
+  supabase: SupabaseClient,
+  authUserId: string,
+  workspaceOwnerId: string,
+): Promise<boolean> {
+  return canManageTeamMembers(supabase, authUserId, workspaceOwnerId);
 }
 
 /**

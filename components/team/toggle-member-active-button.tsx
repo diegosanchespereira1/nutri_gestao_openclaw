@@ -13,7 +13,7 @@ type Props = {
 };
 
 /**
- * Botão Ativar/Desativar membro da equipe (visível para titular e Gestão).
+ * Botão Ativar/Desativar membro da equipe (titular, Gestão ou Administrativo).
  * Desativar pede confirmação: bloqueia o login do membro e o exclui das
  * permissões do workspace até ser reativado.
  */

@@ -14,6 +14,7 @@ import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
 import {
   canManageTeamMembers,
+  canToggleTeamMemberActive,
   getWorkspaceAccountOwnerId,
 } from "@/lib/workspace";
 import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
@@ -267,6 +268,18 @@ export async function canCurrentUserManageTeamMembers(): Promise<boolean> {
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
   return canManageTeamMembers(supabase, user.id, workspaceOwnerId);
+}
+
+/** Titular, Gestão, Administrativo ou admin de plataforma. */
+export async function canCurrentUserToggleTeamMemberActive(): Promise<boolean> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  return canToggleTeamMemberActive(supabase, user.id, workspaceOwnerId);
 }
 
 export async function createTeamMemberAction(
@@ -668,7 +681,8 @@ export type ToggleTeamMemberActiveResult =
 
 /**
  * Ativa/desativa um membro da equipe a partir do próprio workspace.
- * Permissão: titular, cargo Gestão ou admin/super_admin (canManageTeamMembers).
+ * Permissão: titular, Gestão, Administrativo ou admin/super_admin
+ * (canToggleTeamMemberActive).
  *
  * Desativar: is_active=false + ban do usuário em auth.users (sessões novas
  * bloqueadas; RLS também barra via workspace_member_user_ids, que filtra
@@ -685,11 +699,16 @@ export async function toggleTeamMemberActiveByTeamAction(
   if (!user) return { ok: false, error: "Sessão expirada." };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
-  const allowed = await canManageTeamMembers(supabase, user.id, workspaceOwnerId);
+  const allowed = await canToggleTeamMemberActive(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+  );
   if (!allowed) {
     return {
       ok: false,
-      error: "Sem permissão. Apenas o titular ou cargo Gestão podem ativar/desativar membros.",
+      error:
+        "Sem permissão. Apenas o titular, Gestão ou Administrativo podem ativar/desativar membros.",
     };
   }
 

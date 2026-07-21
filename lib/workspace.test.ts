@@ -3,11 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   canDeleteWorkspaceMasterData,
   canManageTeamMembers,
+  canToggleTeamMemberActive,
   isTeamMember,
   isWorkspaceGestaoMember,
 } from "@/lib/workspace";
 
-type MaybeSingleResult = { data: { id?: string; role?: string } | null };
+type MaybeSingleResult = { data: { id?: string; role?: string; job_role?: string } | null };
 
 function mockTeamMemberLookup(result: MaybeSingleResult) {
   return {
@@ -38,6 +39,35 @@ function mockGestaoThenProfile(opts: {
           maybeSingle: async () => ({
             data: opts.gestaoRow,
           }),
+        };
+        return chain;
+      }
+      if (table === "profiles") {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          maybeSingle: async () => ({
+            data: opts.profileRole ? { role: opts.profileRole } : null,
+          }),
+        };
+        return chain;
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  } as never;
+}
+
+function mockTeamMemberThenProfile(opts: {
+  teamRow: { id: string; job_role: string } | null;
+  profileRole: string | null;
+}) {
+  return {
+    from: (table: string) => {
+      if (table === "team_members") {
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          maybeSingle: async () => ({ data: opts.teamRow }),
         };
         return chain;
       }
@@ -173,6 +203,58 @@ describe("canManageTeamMembers / canDeleteWorkspaceMasterData", () => {
     ).resolves.toBe(false);
     await expect(
       canDeleteWorkspaceMasterData(supabase, "nutri-1", "owner-1"),
+    ).resolves.toBe(false);
+  });
+});
+
+describe("canToggleTeamMemberActive", () => {
+  it("titular pode ativar/desativar", async () => {
+    const supabase = mockTeamMemberThenProfile({
+      teamRow: null,
+      profileRole: null,
+    });
+    await expect(
+      canToggleTeamMemberActive(supabase, "owner-1", "owner-1"),
+    ).resolves.toBe(true);
+  });
+
+  it("administrativo ativo pode ativar/desativar", async () => {
+    const supabase = mockTeamMemberThenProfile({
+      teamRow: { id: "tm-adm", job_role: "administrativo" },
+      profileRole: "user",
+    });
+    await expect(
+      canToggleTeamMemberActive(supabase, "adm-1", "owner-1"),
+    ).resolves.toBe(true);
+  });
+
+  it("gestao ativo pode ativar/desativar", async () => {
+    const supabase = mockTeamMemberThenProfile({
+      teamRow: { id: "tm-g", job_role: "gestao" },
+      profileRole: "user",
+    });
+    await expect(
+      canToggleTeamMemberActive(supabase, "gestao-1", "owner-1"),
+    ).resolves.toBe(true);
+  });
+
+  it("nutricionista não pode ativar/desativar", async () => {
+    const supabase = mockTeamMemberThenProfile({
+      teamRow: { id: "tm-n", job_role: "nutricionista" },
+      profileRole: "user",
+    });
+    await expect(
+      canToggleTeamMemberActive(supabase, "nutri-1", "owner-1"),
+    ).resolves.toBe(false);
+  });
+
+  it("administrativo não ganha canManageTeamMembers", async () => {
+    const supabase = mockGestaoThenProfile({
+      gestaoRow: null,
+      profileRole: "user",
+    });
+    await expect(
+      canManageTeamMembers(supabase, "adm-1", "owner-1"),
     ).resolves.toBe(false);
   });
 });

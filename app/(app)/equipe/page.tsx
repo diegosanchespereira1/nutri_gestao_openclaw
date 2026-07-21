@@ -12,6 +12,7 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { Separator } from "@/components/ui/separator";
 import {
   canCurrentUserManageTeamMembers,
+  canCurrentUserToggleTeamMemberActive,
   loadResponsiblePortfolioByMemberId,
   loadTeamMembersForOwner,
 } from "@/lib/actions/team-members";
@@ -35,12 +36,13 @@ export default async function EquipePage({
   const email_err = typeof sp.email_err === "string" ? sp.email_err : undefined;
   const returnToOrigin = buildCurrentUrl("/equipe", sp);
   const novaHref = withReturnTo("/equipe/nova", returnToOrigin);
-  const [{ rows }, { rows: portalUsers }, portfolioByMember, canManageTeam] =
+  const [{ rows }, { rows: portalUsers }, portfolioByMember, canManageTeam, canToggleActive] =
     await Promise.all([
       loadTeamMembersForOwner(),
       loadExternalPortalUsers(),
       loadResponsiblePortfolioByMemberId(),
       canCurrentUserManageTeamMembers(),
+      canCurrentUserToggleTeamMemberActive(),
     ]);
 
   return (
@@ -128,9 +130,9 @@ export default async function EquipePage({
                   ) : null}
                 </div>
               </Link>
-              {canManageTeam && m.member_user_id ? (
+              {canToggleActive && m.member_user_id ? (
                 <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-start">
-                  {m.is_active ? (
+                  {canManageTeam && m.is_active ? (
                     <ResetMemberPasswordButton
                       memberId={m.id}
                       memberName={m.full_name}

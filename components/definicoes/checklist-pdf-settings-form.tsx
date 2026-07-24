@@ -352,7 +352,8 @@ export function ChecklistPdfSettingsForm({
 
         {!canManage && (
           <p className="text-xs text-muted-foreground">
-            Apenas o titular da conta pode alterar estas configurações.
+            Apenas o titular da conta ou um membro com cargo Gestão podem alterar
+            estas configurações.
           </p>
         )}
 

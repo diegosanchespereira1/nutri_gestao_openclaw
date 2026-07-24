@@ -4,7 +4,10 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import {
+  canManageTenantFully,
+  getWorkspaceAccountOwnerId,
+} from "@/lib/workspace";
 import {
   DEFAULT_PDF_SETTINGS,
   type ChecklistPdfSettings,
@@ -222,15 +225,14 @@ export async function savePdfSettingsAction(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada." };
 
-  // Apenas o titular pode gravar (RLS garante, mas validamos aqui também)
-  const { data: member } = await supabase
-    .from("team_members")
-    .select("owner_user_id")
-    .eq("member_user_id", user.id)
-    .maybeSingle();
-
-  if (member?.owner_user_id) {
-    return { ok: false, error: "Apenas o titular da conta pode alterar as configurações do PDF." };
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const allowed = await canManageTenantFully(supabase, user.id, workspaceOwnerId);
+  if (!allowed) {
+    return {
+      ok: false,
+      error:
+        "Apenas o titular da conta ou um membro com cargo Gestão podem alterar as configurações do PDF.",
+    };
   }
 
   const headerBgColor   = sanitizeHex(formData.get("header_bg_color"),   DEFAULT_PDF_SETTINGS.headerBgColor);
@@ -239,7 +241,7 @@ export async function savePdfSettingsAction(
   const clientSignatureRequired = formData.get("client_signature_required") === "on";
 
   const colorPayload = {
-    workspace_owner_id: user.id,
+    workspace_owner_id: workspaceOwnerId,
     header_bg_color: headerBgColor,
     header_text_color: headerTextColor,
     accent_color: accentColor,
@@ -254,7 +256,7 @@ export async function savePdfSettingsAction(
 
   const sigResult = await persistClientSignatureRequired(
     supabase,
-    user.id,
+    workspaceOwnerId,
     clientSignatureRequired,
   );
   if (!sigResult.ok) return sigResult;

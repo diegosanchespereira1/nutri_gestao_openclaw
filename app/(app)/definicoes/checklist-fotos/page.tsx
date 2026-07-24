@@ -11,6 +11,7 @@ import {
   resolveBackNavigation,
 } from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { canManageTenantFully } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +21,14 @@ export default async function ChecklistFotosDefinicoesPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const { user, workspaceOwnerId } = await getServerContext();
-  if (!user) redirect("/login");
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) redirect("/login");
 
-  // Apenas titulares podem editar; membros de equipa só lêem
-  const canManage = user.id === workspaceOwnerId;
+  const canManage = await canManageTenantFully(
+    supabase,
+    user.id,
+    workspaceOwnerId,
+  );
 
   const pdfSettings = await getPdfSettingsAction();
 

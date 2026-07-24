@@ -12,6 +12,7 @@ import { parseProfileContextCookie } from "@/lib/auth/profile-context-cookie";
 import { canViewAllWorkspaceVisits } from "@/lib/visits/agenda-access";
 import { loadCurrentUserAssigneeContext } from "@/lib/visits/assignee-context";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
+import { isWorkspaceGestaoMember } from "@/lib/workspace";
 
 export async function VisitasAgendaSection() {
   const [cookieStore, { supabase, user, workspaceOwnerId }] = await Promise.all([
@@ -37,6 +38,7 @@ export async function VisitasAgendaSection() {
     { rows: visits },
     assigneeContext,
     { establishments, patients, teamMembers },
+    isGestaoMember,
   ] = await Promise.all([
     fetchAgendaSettings(supabase, user.id),
     loadScheduledVisitsForAgenda({
@@ -49,6 +51,7 @@ export async function VisitasAgendaSection() {
     }),
     loadCurrentUserAssigneeContext(supabase, user.id, workspaceOwnerId),
     loadVisitScheduleFormDataAction(),
+    isWorkspaceGestaoMember(supabase, user.id, workspaceOwnerId),
   ]);
 
   const todayKey = civilTodayKey(new Date(), tz);
@@ -56,6 +59,7 @@ export async function VisitasAgendaSection() {
     user.id,
     workspaceOwnerId,
     profileCtx?.role,
+    isGestaoMember,
   );
 
   return (

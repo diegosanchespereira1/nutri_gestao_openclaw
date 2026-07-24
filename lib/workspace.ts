@@ -109,8 +109,14 @@ async function isPlatformAdmin(
   return profile?.role === "admin" || profile?.role === "super_admin";
 }
 
-/** Titular, cargo Gestão ou admin/super_admin da plataforma. */
-async function isOwnerGestaoOrPlatformAdmin(
+/**
+ * Privilégios plenos do tenant (100%): titular, cargo Gestão, ou admin/super_admin
+ * da plataforma no contexto do workspace atual.
+ *
+ * Não inclui cargo Administrativo (esse gere equipe, mas não dados mestres /
+ * definições de tenant). Não altera permissões SaaS (criar/excluir tenants).
+ */
+export async function canManageTenantFully(
   supabase: SupabaseClient,
   authUserId: string,
   workspaceOwnerId: string,
@@ -161,5 +167,5 @@ export async function canDeleteWorkspaceMasterData(
   authUserId: string,
   workspaceOwnerId: string,
 ): Promise<boolean> {
-  return isOwnerGestaoOrPlatformAdmin(supabase, authUserId, workspaceOwnerId);
+  return canManageTenantFully(supabase, authUserId, workspaceOwnerId);
 }

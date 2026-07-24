@@ -20,6 +20,10 @@ describe("canViewAllWorkspaceVisits", () => {
   it("membro comum não vê tudo", () => {
     expect(canViewAllWorkspaceVisits("u2", "u1", "member")).toBe(false);
   });
+
+  it("gestao vê tudo", () => {
+    expect(canViewAllWorkspaceVisits("u2", "u1", "user", true)).toBe(true);
+  });
 });
 
 describe("canCancelScheduledVisit", () => {
@@ -32,6 +36,12 @@ describe("canCancelScheduledVisit", () => {
   it("titular pode cancelar", () => {
     expect(
       canCancelScheduledVisit("owner", "owner", "member", { user_id: "u2" }),
+    ).toBe(true);
+  });
+
+  it("gestao pode cancelar", () => {
+    expect(
+      canCancelScheduledVisit("g1", "owner", "user", { user_id: "u2" }, true),
     ).toBe(true);
   });
 });
@@ -82,6 +92,20 @@ describe("resolveAssignedTeamMemberIdOnCreate", () => {
 });
 
 describe("canManageScheduledVisit", () => {
+  function mockTeamMemberQueries(results: Array<{ id: string } | null>) {
+    let i = 0;
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      maybeSingle: async () => {
+        const data = results[i] ?? null;
+        i += 1;
+        return { data };
+      },
+    };
+    return { from: () => chain } as never;
+  }
+
   it("admin gere qualquer visita", async () => {
     const supabase = {} as never;
     await expect(
@@ -96,48 +120,41 @@ describe("canManageScheduledVisit", () => {
   });
 
   it("membro atribuído gere visita", async () => {
-    const supabase = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { id: "tm-1" } }),
-            }),
-          }),
-        }),
-      }),
-    } as never;
+    const supabase = mockTeamMemberQueries([null, { id: "tm-1" }]);
     await expect(
       canManageScheduledVisit({
         supabase,
         authUserId: "u2",
         workspaceOwnerId: "owner",
-        role: "member",
+        role: "user",
         visit: { user_id: "other", assigned_team_member_id: "tm-1" },
       }),
     ).resolves.toBe(true);
   });
 
   it("nega membro não atribuído", async () => {
-    const supabase = {
-      from: () => ({
-        select: () => ({
-          eq: () => ({
-            eq: () => ({
-              maybeSingle: async () => ({ data: { id: "tm-2" } }),
-            }),
-          }),
-        }),
-      }),
-    } as never;
+    const supabase = mockTeamMemberQueries([null, { id: "tm-2" }]);
     await expect(
       canManageScheduledVisit({
         supabase,
         authUserId: "u2",
         workspaceOwnerId: "owner",
-        role: "member",
+        role: "user",
         visit: { user_id: "other", assigned_team_member_id: "tm-1" },
       }),
     ).resolves.toBe(false);
+  });
+
+  it("gestao gere qualquer visita", async () => {
+    const supabase = mockTeamMemberQueries([{ id: "tm-g" }]);
+    await expect(
+      canManageScheduledVisit({
+        supabase,
+        authUserId: "gestao-1",
+        workspaceOwnerId: "owner",
+        role: "user",
+        visit: { user_id: "other", assigned_team_member_id: null },
+      }),
+    ).resolves.toBe(true);
   });
 });

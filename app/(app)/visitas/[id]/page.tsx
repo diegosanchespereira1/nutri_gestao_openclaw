@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { VisitDossierEmailPanel } from "@/components/visits/visit-dossier-email-panel";
 import type { DossierEmailSendStatus } from "@/lib/types/visits";
+import { isWorkspaceGestaoMember } from "@/lib/workspace";
 
 const avisoMessages: Record<string, string> = {
   visita_nao_agendada:
@@ -39,17 +40,25 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
   const { aviso } = await searchParams;
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user) redirect("/login");
-  const [{ row }, tz, role] = await Promise.all([
+  const [{ row }, tz, role, isGestaoMember] = await Promise.all([
     loadScheduledVisitById(id),
     fetchProfileTimeZone(supabase, user.id),
     fetchProfileRole(supabase, user.id),
+    workspaceOwnerId
+      ? isWorkspaceGestaoMember(supabase, user.id, workspaceOwnerId)
+      : Promise.resolve(false),
   ]);
   if (!row) notFound();
   const canCancel =
     visitIsCancellable(row.status) &&
-    canCancelScheduledVisit(user.id, workspaceOwnerId, role, {
-      user_id: row.user_id,
-    });
+    !!workspaceOwnerId &&
+    canCancelScheduledVisit(
+      user.id,
+      workspaceOwnerId,
+      role,
+      { user_id: row.user_id },
+      isGestaoMember,
+    );
 
   const title = visitDisplayTitle(row);
   const avisoMsg =

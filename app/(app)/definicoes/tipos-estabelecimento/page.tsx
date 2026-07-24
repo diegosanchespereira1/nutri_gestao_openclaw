@@ -8,8 +8,8 @@ import {
   getReturnToParam,
   resolveBackNavigation,
 } from "@/lib/navigation/return-to";
-import { canAccessAdminArea } from "@/lib/roles";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { canManageTenantFully } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +22,10 @@ export default async function DefinicoesTiposEstabelecimentoPage({
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user || !workspaceOwnerId) redirect("/login");
 
-  const [profileRow, customTypes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then((r) => r.data),
+  const [customTypes, canEdit] = await Promise.all([
     loadEstablishmentCustomTypesAction(),
+    canManageTenantFully(supabase, user.id, workspaceOwnerId),
   ]);
-
-  const canEdit =
-    user.id === workspaceOwnerId || canAccessAdminArea(profileRow?.role);
 
   const back = resolveBackNavigation({
     returnTo: getReturnToParam(sp),

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canDeleteWorkspaceMasterData,
   canManageTeamMembers,
+  canManageTenantFully,
   canToggleTeamMemberActive,
   isTeamMember,
   isWorkspaceGestaoMember,
@@ -142,6 +143,58 @@ describe("isWorkspaceGestaoMember", () => {
     ).resolves.toBe(true);
     expect(eqs).toContainEqual(["is_active", true]);
     expect(eqs).toContainEqual(["job_role", "gestao"]);
+  });
+});
+
+describe("canManageTenantFully", () => {
+  it("titular tem privilégios plenos do tenant", async () => {
+    const supabase = mockGestaoThenProfile({
+      gestaoRow: null,
+      profileRole: null,
+    });
+    await expect(
+      canManageTenantFully(supabase, "owner-1", "owner-1"),
+    ).resolves.toBe(true);
+  });
+
+  it("membro gestao tem privilégios plenos do tenant", async () => {
+    const supabase = mockGestaoThenProfile({
+      gestaoRow: { id: "tm-g" },
+      profileRole: "user",
+    });
+    await expect(
+      canManageTenantFully(supabase, "member-1", "owner-1"),
+    ).resolves.toBe(true);
+  });
+
+  it("administrativo NÃO tem privilégios plenos do tenant", async () => {
+    const supabase = mockGestaoThenProfile({
+      gestaoRow: null,
+      profileRole: "user",
+    });
+    await expect(
+      canManageTenantFully(supabase, "adm-1", "owner-1"),
+    ).resolves.toBe(false);
+  });
+
+  it("admin de plataforma tem privilégios plenos do tenant", async () => {
+    const supabase = mockGestaoThenProfile({
+      gestaoRow: null,
+      profileRole: "admin",
+    });
+    await expect(
+      canManageTenantFully(supabase, "admin-1", "owner-1"),
+    ).resolves.toBe(true);
+  });
+
+  it("nutricionista não tem privilégios plenos do tenant", async () => {
+    const supabase = mockGestaoThenProfile({
+      gestaoRow: null,
+      profileRole: "user",
+    });
+    await expect(
+      canManageTenantFully(supabase, "nutri-1", "owner-1"),
+    ).resolves.toBe(false);
   });
 });
 

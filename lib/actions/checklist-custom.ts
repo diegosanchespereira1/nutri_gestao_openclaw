@@ -7,9 +7,11 @@ import { loadChecklistTemplateBundleById } from "@/lib/actions/checklists";
 import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-items";
-import { canAccessAdminArea } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import {
+  canManageTenantFully,
+  getWorkspaceAccountOwnerId,
+} from "@/lib/workspace";
 import type {
   ChecklistTemplateSectionWithItems,
   ChecklistTemplateWithSections,
@@ -76,15 +78,7 @@ async function canDeleteCustomChecklistsForUser(args: {
   workspaceOwnerId: string;
 }): Promise<boolean> {
   const { supabase, authUserId, workspaceOwnerId } = args;
-  if (workspaceOwnerId === authUserId) return true;
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("user_id", authUserId)
-    .maybeSingle();
-
-  return canAccessAdminArea(profile?.role ?? null);
+  return canManageTenantFully(supabase, authUserId, workspaceOwnerId);
 }
 
 export async function canCurrentUserDeleteCustomChecklists(): Promise<boolean> {
@@ -817,7 +811,7 @@ export async function deleteCustomTemplateAction(
     return {
       ok: false,
       error:
-        "Apenas o titular da conta ou administradores podem remover modelos personalizados.",
+        "Apenas o titular da conta ou um membro com cargo Gestão podem remover modelos personalizados.",
     };
   }
 
@@ -879,7 +873,7 @@ export async function archiveCustomTemplateAction(
     return {
       ok: false,
       error:
-        "Apenas o titular da conta ou administradores podem arquivar modelos personalizados.",
+        "Apenas o titular da conta ou um membro com cargo Gestão podem arquivar modelos personalizados.",
     };
   }
 
@@ -939,7 +933,7 @@ export async function unarchiveCustomTemplateAction(
     return {
       ok: false,
       error:
-        "Apenas o titular da conta ou administradores podem reativar modelos personalizados.",
+        "Apenas o titular da conta ou um membro com cargo Gestão podem reativar modelos personalizados.",
     };
   }
 

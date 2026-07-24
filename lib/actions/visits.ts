@@ -11,7 +11,7 @@ import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-t
 import type { ProfileRole } from "@/lib/roles";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, isWorkspaceGestaoMember } from "@/lib/workspace";
 import type { VisitTargetType } from "@/lib/types/visits";
 import {
   canCancelScheduledVisit,
@@ -397,9 +397,13 @@ export async function cancelVisitAction(
   }
 
   if (
-    !canCancelScheduledVisit(user.id, workspaceOwnerId, role, {
-      user_id: visit.user_id as string,
-    })
+    !canCancelScheduledVisit(
+      user.id,
+      workspaceOwnerId,
+      role,
+      { user_id: visit.user_id as string },
+      await isWorkspaceGestaoMember(supabase, user.id, workspaceOwnerId),
+    )
   ) {
     return { ok: false, error: "Sem permissão para cancelar esta visita." };
   }

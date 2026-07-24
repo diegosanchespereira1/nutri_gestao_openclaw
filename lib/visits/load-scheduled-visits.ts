@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ProfileRole } from "@/lib/roles";
 import { createClient } from "@/lib/supabase/server";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, isWorkspaceGestaoMember } from "@/lib/workspace";
 
 import {
   canViewAllWorkspaceVisits,
@@ -93,6 +93,11 @@ export async function loadScheduledVisitsForAgenda(args: {
       args.authUserId,
       args.workspaceOwnerId,
       role,
+      await isWorkspaceGestaoMember(
+        args.supabase,
+        args.authUserId,
+        args.workspaceOwnerId,
+      ),
     )
   ) {
     const teamMemberId = await resolveTeamMemberIdForAuthUser(

@@ -21,7 +21,7 @@ import { persistWorkspaceTemplateStructure } from "@/lib/checklists/workspace-te
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import { getWorkspaceAccountOwnerId, canManageTenantFully } from "@/lib/workspace";
 import type { ChecklistFillSessionRow } from "@/lib/types/checklist-fill";
 import type {
   ChecklistTemplateSectionWithItems,
@@ -582,7 +582,14 @@ async function assertWorkspaceTemplateDraft(
     return { ok: false, error: "Este modelo já foi publicado." };
   }
   if (existing.created_by_user_id !== userId) {
-    return { ok: false, error: "Sem permissão para editar este rascunho." };
+    const canManage = await canManageTenantFully(
+      supabase,
+      userId,
+      workspaceOwnerId,
+    );
+    if (!canManage) {
+      return { ok: false, error: "Sem permissão para editar este rascunho." };
+    }
   }
   return { ok: true };
 }

@@ -11,8 +11,8 @@ import {
   getReturnToParam,
   resolveBackNavigation,
 } from "@/lib/navigation/return-to";
-import { canAccessAdminArea } from "@/lib/roles";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { canManageTenantFully } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -25,22 +25,14 @@ export default async function DefinicoesCategoriasPage({
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user || !workspaceOwnerId) redirect("/login");
 
-  const [profileRow, { data: allSegments }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("role")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then((r) => r.data),
+  const [{ data: allSegments }, canEdit] = await Promise.all([
     supabase
       .from("client_custom_segments")
       .select("id, label, built_in_key")
       .eq("owner_user_id", workspaceOwnerId)
       .order("label", { ascending: true }),
+    canManageTenantFully(supabase, user.id, workspaceOwnerId),
   ]);
-
-  const canEdit =
-    user.id === workspaceOwnerId || canAccessAdminArea(profileRow?.role);
 
   // Split into custom (no built_in_key) and built-in overrides
   const customSegments = (allSegments ?? [])

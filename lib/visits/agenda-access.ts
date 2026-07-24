@@ -1,15 +1,19 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { canAccessAdminArea, type ProfileRole } from "@/lib/roles";
+import { isWorkspaceGestaoMember } from "@/lib/workspace";
 
-/** Titular da conta ou perfil admin/super_admin — vê todas as visitas do workspace. */
+/** Titular, Gestão ou admin/super_admin — vê todas as visitas do workspace. */
 export function canViewAllWorkspaceVisits(
   authUserId: string,
   workspaceOwnerId: string,
   role: ProfileRole | null | undefined,
+  isGestaoMember = false,
 ): boolean {
   return (
-    authUserId === workspaceOwnerId || canAccessAdminArea(role ?? null)
+    authUserId === workspaceOwnerId ||
+    canAccessAdminArea(role ?? null) ||
+    isGestaoMember
   );
 }
 
@@ -60,8 +64,13 @@ export async function canManageScheduledVisit(args: {
 }): Promise<boolean> {
   const { supabase, authUserId, workspaceOwnerId, role, visit } = args;
 
+  // Titular / admin de plataforma: sem roundtrip em team_members.
+  if (canViewAllWorkspaceVisits(authUserId, workspaceOwnerId, role, false)) {
+    return true;
+  }
+
   if (
-    canViewAllWorkspaceVisits(authUserId, workspaceOwnerId, role)
+    await isWorkspaceGestaoMember(supabase, authUserId, workspaceOwnerId)
   ) {
     return true;
   }
@@ -83,15 +92,21 @@ export async function canManageScheduledVisit(args: {
   return false;
 }
 
-/** Criador da visita ou titular/admin do workspace. */
+/** Criador da visita ou titular/Gestão/admin do workspace. */
 export function canCancelScheduledVisit(
   authUserId: string,
   workspaceOwnerId: string,
   role: ProfileRole | null | undefined,
   visit: { user_id: string },
+  isGestaoMember = false,
 ): boolean {
   return (
     visit.user_id === authUserId ||
-    canViewAllWorkspaceVisits(authUserId, workspaceOwnerId, role)
+    canViewAllWorkspaceVisits(
+      authUserId,
+      workspaceOwnerId,
+      role,
+      isGestaoMember,
+    )
   );
 }

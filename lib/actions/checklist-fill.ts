@@ -500,23 +500,23 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
       ? "custom"
       : "global";
 
-  // Phase 2: todos os dados dependentes da sessão em paralelo.
-  // loadChecklistTemplateBundleByIdDirect usa o mesmo cliente — sem round-trip extra de auth.
-  // loadWorkspaceTemplateBundle / loadCustomTemplateUnified ainda criam o próprio cliente
-  // mas correm em paralelo com as outras queries, não adicionando ao caminho crítico.
-  // includeArchivedItems: itens removidos do modelo continuam visíveis no dossiê/histórico.
+  // Itens arquivados do modelo: só no dossiê já aprovado (histórico/PDF).
+  // Em preenchimento novo/em andamento, carregar apenas itens ativos — senão
+  // «Aplicar» mostra itens que a equipe removeu do checklist.
+  const includeArchivedItems = row.dossier_approved_at != null;
+
   const templatePromise: Promise<ChecklistTemplateWithSections | null> =
     row.workspace_template_id
       ? loadWorkspaceTemplateBundle(row.workspace_template_id, {
-          includeArchivedItems: true,
+          includeArchivedItems,
         })
       : row.custom_template_id
         ? loadCustomTemplateUnified(row.custom_template_id, {
-            includeArchivedItems: true,
+            includeArchivedItems,
           })
         : row.template_id
           ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
-              includeArchivedItems: true,
+              includeArchivedItems,
             })
           : Promise.resolve(null);
 
@@ -2073,18 +2073,20 @@ async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
     workspace_template_id?: string | null;
   };
 
+  const includeArchivedItems = row.dossier_approved_at != null;
+
   const templatePromise: Promise<ChecklistTemplateWithSections | null> =
     row.workspace_template_id
       ? loadWorkspaceTemplateBundle(row.workspace_template_id, {
-          includeArchivedItems: true,
+          includeArchivedItems,
         })
       : row.custom_template_id
         ? loadCustomTemplateUnified(row.custom_template_id, {
-            includeArchivedItems: true,
+            includeArchivedItems,
           })
         : row.template_id
           ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
-              includeArchivedItems: true,
+              includeArchivedItems,
             })
           : Promise.resolve(null);
 

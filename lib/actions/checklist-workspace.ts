@@ -496,6 +496,24 @@ export async function loadWorkspaceTemplateBundle(
     };
   });
 
+  // Em preenchimento novo, omitir seções cujos itens foram todos arquivados.
+  const visibleSections = includeArchivedItems
+    ? mappedSections
+    : mappedSections.filter((sec) => sec.items.length > 0);
+
+  // Recalcula contagens após filtrar seções vazias.
+  if (!includeArchivedItems) {
+    required_item_count = 0;
+    total_item_count = 0;
+    for (const sec of visibleSections) {
+      for (const it of sec.items) {
+        if (it.is_structure_only) continue;
+        total_item_count += 1;
+        if (it.is_required) required_item_count += 1;
+      }
+    }
+  }
+
   return {
     id: String(template.id),
     name: String(template.name),
@@ -507,7 +525,7 @@ export async function loadWorkspaceTemplateBundle(
     is_active: template.archived_at === null,
     created_at: String(template.created_at),
     updated_at: String(template.updated_at),
-    sections: mappedSections,
+    sections: visibleSections,
     required_item_count,
     total_item_count,
   };

@@ -48,8 +48,8 @@ export default async function NewWorkspaceChecklistPage({
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
             Modelo 100% customizável da equipe. O rascunho é salvo no servidor
-            ao adicionar seção ou item — textos em edição são gravados na
-            publicação.
+            ao adicionar ou remover seção/item — textos em edição são gravados
+            na publicação.
           </p>
         </div>
         <Link

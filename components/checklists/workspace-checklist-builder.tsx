@@ -139,31 +139,53 @@ export function WorkspaceChecklistBuilder({
   const [autosaveError, setAutosaveError] = useState<string | null>(null);
 
   const isSavingDraftRef = useRef(false);
+  /** Último snapshot pendente enquanto um save corre — evita perder exclusões. */
+  const pendingAutosaveRef = useRef<AutosaveSnapshot | null>(null);
 
   const autosaveEnabled = mode === "create" && isDraft && Boolean(templateId);
 
   const runAutosave = useCallback(
     async (snapshot: AutosaveSnapshot) => {
-      if (!autosaveEnabled || !templateId || isSavingDraftRef.current) return;
+      if (!autosaveEnabled || !templateId) return;
+
+      if (isSavingDraftRef.current) {
+        pendingAutosaveRef.current = snapshot;
+        return;
+      }
 
       isSavingDraftRef.current = true;
       setAutosaveState("saving");
       setAutosaveError(null);
 
-      const result = await saveWorkspaceTemplateDraftAction(
-        templateId,
-        buildPayload(snapshot.name, snapshot.sections),
-      );
+      let current: AutosaveSnapshot | null = snapshot;
 
-      isSavingDraftRef.current = false;
+      while (current) {
+        const result = await saveWorkspaceTemplateDraftAction(
+          templateId,
+          buildPayload(current.name, current.sections),
+        );
 
-      if (!result.ok) {
-        setAutosaveState("error");
-        setAutosaveError(result.error);
-        return;
+        if (!result.ok) {
+          isSavingDraftRef.current = false;
+          pendingAutosaveRef.current = null;
+          setAutosaveState("error");
+          setAutosaveError(result.error);
+          return;
+        }
+
+        const nextPending = pendingAutosaveRef.current;
+        pendingAutosaveRef.current = null;
+
+        // Se o utilizador alterou (ex.: removeu itens) durante o save, não
+        // funde IDs do snapshot antigo — o próximo ciclo grava o estado certo.
+        if (!nextPending) {
+          setSections((prev) => mergePersistedSectionIds(prev, result.sections));
+        }
+
+        current = nextPending;
       }
 
-      setSections((prev) => mergePersistedSectionIds(prev, result.sections));
+      isSavingDraftRef.current = false;
       setAutosaveState("saved");
     },
     [autosaveEnabled, templateId],
@@ -257,9 +279,12 @@ export function WorkspaceChecklistBuilder({
   }
 
   function removeSection(tempId: string) {
-    setSections((prev) =>
-      prev.length === 1 ? prev : prev.filter((sec) => sec.tempId !== tempId),
-    );
+    setSections((prev) => {
+      if (prev.length === 1) return prev;
+      const next = prev.filter((sec) => sec.tempId !== tempId);
+      triggerAutosave({ name, sections: next });
+      return next;
+    });
   }
 
   function moveSection(tempId: string, dir: -1 | 1) {
@@ -313,8 +338,8 @@ export function WorkspaceChecklistBuilder({
   }
 
   function removeItem(sectionTempId: string, itemTempId: string) {
-    setSections((prev) =>
-      prev.map((sec) =>
+    setSections((prev) => {
+      const next = prev.map((sec) =>
         sec.tempId === sectionTempId
           ? {
               ...sec,
@@ -324,8 +349,15 @@ export function WorkspaceChecklistBuilder({
                   : sec.items.filter((it) => it.tempId !== itemTempId),
             }
           : sec,
-      ),
-    );
+      );
+      const changed = next.some(
+        (sec, idx) => sec.items.length !== prev[idx]?.items.length,
+      );
+      if (changed) {
+        triggerAutosave({ name, sections: next });
+      }
+      return next;
+    });
   }
 
   function moveItem(sectionTempId: string, itemTempId: string, dir: -1 | 1) {
@@ -405,7 +437,7 @@ export function WorkspaceChecklistBuilder({
     if (autosaveState === "saving") return "Salvando rascunho…";
     if (autosaveState === "saved") return "Rascunho salvo no servidor";
     if (autosaveState === "error") return "Falha ao salvar rascunho";
-    return "Salvo ao adicionar seção ou item";
+    return "Salvo ao adicionar ou remover seção/item";
   })();
 
   return (

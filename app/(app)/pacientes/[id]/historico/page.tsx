@@ -50,7 +50,7 @@ export default async function HistoricoPacientePage({
   const back = resolveBackNavigation({
     returnTo: getReturnToParam(sp),
     fallbackHref: `/pacientes/${id}`,
-    fallbackLabel: "Prontuário",
+    fallbackLabel: "Indicadores",
     currentPath: `/pacientes/${id}/historico`,
   });
 

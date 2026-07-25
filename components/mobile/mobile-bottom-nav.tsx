@@ -16,7 +16,6 @@ import {
 import { useModuleGate } from "@/components/modules/module-gate-provider";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
-import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { Separator } from "@/components/ui/separator";
 import {
   buildVisibleNavGroups,
@@ -46,6 +45,8 @@ const navItemClassName = (active: boolean) =>
   cn(
     "relative z-10 flex h-10 min-w-0 items-center gap-1.5 rounded-full py-1.5 pl-2 pr-2.5",
     "max-[380px]:h-9 max-[380px]:gap-1 max-[380px]:py-1 max-[380px]:pl-1.5 max-[380px]:pr-2",
+    // Tablet: alvos maiores e mais folga visual
+    "md:h-14 md:gap-2 md:py-2 md:pl-3.5 md:pr-4",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
     active
       ? "text-primary-foreground"
@@ -70,19 +71,23 @@ const BottomNavItem = forwardRef<
 
   const content = (
     <>
-      <span className="flex size-8 shrink-0 items-center justify-center">
-        <Icon className="size-4 shrink-0 max-[380px]:size-3.5" aria-hidden />
+      <span className="flex size-8 shrink-0 items-center justify-center md:size-11">
+        <Icon
+          className="size-4 shrink-0 max-[380px]:size-3.5 md:size-6"
+          aria-hidden
+        />
       </span>
       <span
         className={cn(
           "grid overflow-hidden text-xs font-semibold whitespace-nowrap transition-[grid-template-columns,opacity] duration-300 motion-reduce:transition-none",
           "max-[380px]:text-[10px] max-[380px]:tracking-tight",
+          "md:text-sm",
           "ease-[cubic-bezier(0.34,1.56,0.64,1)]",
           active ? "grid-cols-[1fr] opacity-100" : "grid-cols-[0fr] opacity-0",
         )}
         aria-hidden={!active}
       >
-        <span className="max-w-[12ch] overflow-hidden text-ellipsis pr-0.5 max-[380px]:max-w-[10ch]">
+        <span className="max-w-[12ch] overflow-hidden text-ellipsis pr-0.5 max-[380px]:max-w-[10ch] md:max-w-[14ch] md:pr-1">
           {label}
         </span>
       </span>
@@ -222,10 +227,8 @@ function MoreSheetGroups({
 
 export function MobileBottomNav({
   showAdminNav = false,
-  userFirstName = null,
 }: {
   showAdminNav?: boolean;
-  userFirstName?: string | null;
 }) {
   const pathname = usePathname();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -401,11 +404,11 @@ export function MobileBottomNav({
       >
         <div
           ref={navShellRef}
-          className="pointer-events-auto flex justify-center px-3 pb-[max(0.75rem,var(--safe-area-bottom))]"
+          className="pointer-events-auto flex justify-center px-4 pb-[max(0.75rem,var(--safe-area-bottom))] md:px-8 md:pb-[max(1rem,var(--safe-area-bottom))]"
         >
           <div
             ref={containerRef}
-            className="relative flex w-full max-w-md items-center justify-between gap-0.5 rounded-full bg-white dark:bg-white px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60"
+            className="relative flex w-full max-w-md items-center justify-between gap-0.5 rounded-full bg-white dark:bg-white px-1.5 py-1.5 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.18)] ring-1 ring-border/60 md:max-w-3xl md:gap-1.5 md:px-3 md:py-2.5"
           >
             {indicator ? (
               <div
@@ -448,8 +451,11 @@ export function MobileBottomNav({
                     aria-disabled="true"
                     aria-label={item.label}
                   >
-                    <span className="flex size-8 shrink-0 items-center justify-center">
-                      <Icon className="size-4 shrink-0 opacity-60" aria-hidden />
+                    <span className="flex size-8 shrink-0 items-center justify-center md:size-11">
+                      <Icon
+                        className="size-4 shrink-0 opacity-60 md:size-6"
+                        aria-hidden
+                      />
                     </span>
                   </button>
                 );
@@ -492,7 +498,7 @@ export function MobileBottomNav({
             role="dialog"
             aria-modal="true"
             aria-labelledby="more-menu-title"
-            className="pointer-events-none fixed inset-x-0 z-[58] mx-auto max-w-lg px-4 lg:hidden"
+            className="pointer-events-none fixed inset-x-0 z-[58] mx-auto max-w-lg px-4 md:max-w-3xl md:px-8 lg:hidden"
             style={{ bottom: navShellHeight }}
           >
             <div
@@ -520,19 +526,17 @@ export function MobileBottomNav({
                   onNavigate={() => setMoreOpen(false)}
                 />
 
-                <Separator className="my-4" />
+                <Separator className="my-2 md:my-2.5" />
 
-                <AppShellUserGreeting firstName={userFirstName} />
-
-                <div className="mt-3 flex flex-col gap-1">
-                  <LogoutButton />
-                  <AppBuildLabel className="text-muted-foreground/60" />
+                <div className="flex flex-col gap-0">
+                  <LogoutButton className="h-8 min-h-8 px-3 text-xs md:h-9 md:min-h-9" />
+                  <AppBuildLabel className="text-muted-foreground/60 mt-0 leading-tight" />
                   <Link
                     href="/politica-de-privacidade"
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={() => setMoreOpen(false)}
-                    className="text-muted-foreground/60 hover:text-muted-foreground mt-1 px-3 text-[10px] transition-colors"
+                    className="text-muted-foreground/60 hover:text-muted-foreground mt-0 px-3 text-[10px] leading-tight transition-colors"
                   >
                     Política de Privacidade
                   </Link>

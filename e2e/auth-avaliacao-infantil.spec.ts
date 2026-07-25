@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { login, gotoNovaAvaliacao, discoverPatientIdInBeforeAll } from "./helpers/auth";
-import { abrirFormularioAvaliacao } from "./helpers/avaliacao";
+import {
+  abrirFormularioAvaliacao,
+  expectAvaliacaoSalva,
+  REGISTRAR_AVALIACAO_RE,
+} from "./helpers/avaliacao";
 import { shot, resetShotIndex } from "./helpers/screenshot";
 
 /**
@@ -40,12 +44,14 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
     test.skip(!patientId, "Nenhum paciente criança encontrado em /pacientes?categoria=crianca.");
   });
 
-  test("01 — navega até o formulário e a aba Infantil está visível", async ({ page }) => {
+  test("01 — navega até o formulário infantil (renderizado direto, sem abas)", async ({ page }) => {
     await login(page);
     await gotoNovaAvaliacao(page, patientId);
     await shot(page, SCREENSHOT_DIR, "pagina-carregada");
 
-    await expect(page.getByRole("tab", { name: /infantil/i })).toBeVisible();
+    // Paciente de categoria única: formulário direto, sem tablist.
+    await expect(page.locator("#ca-sex")).toBeVisible();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
     await expect(page).toHaveURL(/avaliacao\/nova/);
   });
 
@@ -79,8 +85,8 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
     await page.locator("#ca-height").fill("120");
     await shot(page, SCREENSHOT_DIR, "peso-altura-preenchidos");
 
-    // IMC = 22/(1,2²) ≈ 15,3
-    await expect(page.getByText(/15[,.]3/)).toBeVisible();
+    // IMC = 22/(1,2²) ≈ 15,3 — pode aparecer em mais de um card
+    await expect(page.getByText(/15[,.]3/).first()).toBeVisible();
   });
 
   test("04 — critério Z-score: opção presente (habilitada ou desabilitada)", async ({ page }) => {
@@ -150,17 +156,15 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
     await page.locator("#ca-height").fill("110");
     await shot(page, SCREENSHOT_DIR, "antes-submissao");
 
-    await page.getByRole("button", { name: /registar avaliação/i }).click();
-    await page.waitForURL(new RegExp(`/pacientes/${patientId}`), { timeout: 30_000 });
+    await page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE }).click();
+    await expectAvaliacaoSalva(page, patientId);
     await shot(page, SCREENSHOT_DIR, "apos-submissao");
-
-    await expect(page.getByRole("alert")).not.toBeVisible();
   });
 
   test("09 — botão desabilitado sem sexo selecionado", async ({ page }) => {
     await abrirFormularioAvaliacao(page, patientId, "infantil");
 
-    const btnSubmit = page.getByRole("button", { name: /registar avaliação/i });
+    const btnSubmit = page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE });
     await expect(btnSubmit).toBeDisabled();
   });
 
@@ -175,13 +179,17 @@ test.describe("Avaliação Infantil — preenchimento completo", () => {
     await page.locator("#ca-recorded").fill(new Date().toISOString().slice(0, 10));
     await page.locator("#ca-weight").fill("24");
     await page.locator("#ca-height").fill("122");
-    await page.getByRole("button", { name: /registar avaliação/i }).click();
-    await page.waitForURL(new RegExp(`/pacientes/${patientId}`), { timeout: 30_000 });
+    await page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE }).click();
+    await expectAvaliacaoSalva(page, patientId);
 
-    const historicoSection = page.locator("[data-testid='child-assessments-section']")
-      .or(page.getByRole("region", { name: /avaliações infantis/i }))
-      .or(page.locator("section").filter({ hasText: /avalia.*infantil/i }));
-    await expect(historicoSection.first()).toBeVisible({ timeout: 10_000 });
+    // Redirect abre o prontuário unificado; histórico fica na aba Avaliação.
+    await expect(
+      page.getByRole("tab", { name: /Indicadores/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/pacientes/${patientId}?tab=avaliacao`);
+    await expect(page.getByRole("heading", { name: /^Histórico$/i })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
 
@@ -218,7 +226,7 @@ test.describe("Avaliação Infantil — validações de borda", () => {
     await page.locator("#ca-height").fill("115");
 
     await expect(page.getByText(/imc calculado/i)).not.toBeVisible();
-    await expect(page.getByRole("button", { name: /registar avaliação/i })).toBeEnabled();
+    await expect(page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE })).toBeEnabled();
   });
 
   test("13 — data de nascimento futura → botão desabilitado", async ({ page }) => {
@@ -230,6 +238,6 @@ test.describe("Avaliação Infantil — validações de borda", () => {
     await page.locator("#ca-birth").fill(futuro.toISOString().slice(0, 10));
     await page.locator("#ca-recorded").fill(new Date().toISOString().slice(0, 10));
 
-    await expect(page.getByRole("button", { name: /registar avaliação/i })).toBeDisabled();
+    await expect(page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE })).toBeDisabled();
   });
 });

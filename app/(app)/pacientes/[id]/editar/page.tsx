@@ -118,7 +118,7 @@ export default async function EditarPacientePage({
   const back = resolveBackNavigation({
     returnTo: getReturnToParam(sp),
     fallbackHref: `/pacientes/${row.id}`,
-    fallbackLabel: "Prontuário",
+    fallbackLabel: "Indicadores",
     currentPath: pagePath,
   });
   const historicoHref = withReturnTo(

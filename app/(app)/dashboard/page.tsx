@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { LayoutDashboard } from "lucide-react";
 
+import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { DashboardClientReminder } from "@/components/dashboard/dashboard-client-reminder";
 import { DashboardClinicalPanel } from "@/components/dashboard/dashboard-clinical-panel";
 import { DashboardFinancialPanel } from "@/components/dashboard/dashboard-financial-panel";
@@ -24,10 +25,19 @@ export default async function DashboardPage({
   const onboardingMinimal = sp.onboarding === "minimal";
   const deferHeavyPanels = bemvindo || onboardingMinimal;
 
-  const { user } = await getServerContext();
+  const { user, supabase } = await getServerContext();
   if (!user) {
     redirect("/login");
   }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const fullName =
+    typeof profile?.full_name === "string" ? profile.full_name.trim() : "";
+  const userFirstName = fullName ? fullName.split(/\s+/)[0] ?? null : null;
 
   return (
     <PageLayout>
@@ -44,14 +54,17 @@ export default async function DashboardPage({
         />
       </Suspense>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="text-primary size-5" aria-hidden />
-          <h1 className="text-foreground text-2xl font-bold tracking-tight">
-            Dashboard
-          </h1>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <AppShellUserGreeting firstName={userFirstName} />
+          <DashboardQuickActions />
         </div>
-        <DashboardQuickActions />
+        <div className="flex items-center gap-2">
+          <LayoutDashboard className="text-primary size-4" aria-hidden />
+          <h2 className="text-foreground text-lg font-semibold tracking-tight">
+            Dashboard
+          </h2>
+        </div>
       </div>
 
       {deferHeavyPanels ? (

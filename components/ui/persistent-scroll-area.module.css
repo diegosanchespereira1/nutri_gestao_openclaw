@@ -14,6 +14,21 @@
   overflow: visible;
 }
 
+/* Menu lateral / overflow-only: só scroll vertical — nunca lateral. */
+.persistentViewportOverflowOnly {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+}
+
+.persistentViewportOverflowOnlyScrollable {
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: contain;
+}
+
 .persistentColumn {
   display: none;
   width: var(--scroll-column-width);

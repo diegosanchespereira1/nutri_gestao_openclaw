@@ -20,7 +20,6 @@ import { AppPageScroll } from "@/components/app-page-scroll";
 import { AppRoutePrefetcher } from "@/components/app-route-prefetcher";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
-import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { cn } from "@/lib/utils";
 
 function NavGroups({
@@ -65,9 +64,9 @@ function NavGroups({
                 isNavItemActive(pathname, item.href);
 
               const itemClassName = cn(
-                "flex min-h-9 min-w-0 w-full items-center gap-3 rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors duration-150",
+                "flex min-h-9 min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors duration-150",
                 "max-lg:min-h-10 max-lg:py-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:py-2",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-inset",
                 isLocked
                   ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/40 cursor-pointer"
                   : active
@@ -126,11 +125,9 @@ function NavGroups({
 export function AppShell({
   children,
   showAdminNav = false,
-  userFirstName = null,
 }: {
   children: React.ReactNode;
   showAdminNav?: boolean;
-  userFirstName?: string | null;
 }) {
   return (
     <div className="bg-background flex min-h-screen w-full max-w-full overflow-x-hidden">
@@ -144,44 +141,41 @@ export function AppShell({
 
       {/* Sidebar fixa — ≥ lg (1024px) */}
       <aside
-        className="bg-sidebar border-sidebar-border fixed inset-y-0 left-0 z-40 hidden w-60 max-w-60 flex-col overflow-x-hidden border-r shadow-lg lg:flex"
+        className="bg-sidebar border-sidebar-border fixed inset-y-0 left-0 z-40 hidden w-60 max-w-60 flex-col overflow-x-hidden overflow-y-hidden overscroll-x-none border-r shadow-lg lg:flex"
         aria-label="Barra lateral"
       >
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 px-4">
+        <div className="flex h-14 min-w-0 shrink-0 items-center gap-2 px-4">
           <Leaf className="text-sidebar-primary size-5 shrink-0" aria-hidden />
           <Link
             href={APP_DASHBOARD_PATH}
             prefetch
-            className="text-sidebar-foreground font-heading text-base font-semibold tracking-tight"
+            className="text-sidebar-foreground font-heading min-w-0 truncate text-base font-semibold tracking-tight"
           >
             NutriGestão
           </Link>
         </div>
 
-        <Separator className="bg-sidebar-border opacity-40" />
-
-        <AppShellUserGreeting firstName={userFirstName} />
-
-        <Separator className="bg-sidebar-border opacity-40" />
+        <Separator className="bg-sidebar-border shrink-0 opacity-40" />
 
         <PersistentScrollArea
           controls="overflow-only"
-          className="min-h-0 min-w-0 flex-1 overflow-x-hidden"
+          className="min-h-0 min-w-0 max-w-full flex-1 overflow-x-hidden"
         >
           <NavGroups showAdminNav={showAdminNav} />
         </PersistentScrollArea>
 
-        <Separator className="bg-sidebar-border opacity-40" />
+        <Separator className="bg-sidebar-border shrink-0 opacity-40" />
 
-        <div className="p-2">
-          <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring" />
-          <AppBuildLabel className="text-sidebar-foreground/45" />
+        {/* Rodapé compacto (tablet/desktop curto): evita scroll no menu por causa do min-h de toque. */}
+        <div className="min-w-0 shrink-0 overflow-x-hidden px-2 py-1 xl:py-1.5">
+          <LogoutButton className="text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground focus-visible:ring-sidebar-ring h-8 min-h-8 px-3 text-xs" />
+          <AppBuildLabel className="text-sidebar-foreground/45 mt-0 truncate leading-tight" />
           <Link
             href="/politica-de-privacidade"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sidebar-foreground/35 hover:text-sidebar-foreground/60 mt-1 block px-3 text-[10px] transition-colors"
+            className="text-sidebar-foreground/35 hover:text-sidebar-foreground/60 mt-0 block truncate px-3 text-[10px] leading-tight transition-colors"
           >
             Política de Privacidade
           </Link>
@@ -192,7 +186,7 @@ export function AppShell({
         <AndroidTopInset className="shrink-0 lg:hidden" />
         {/* Header mobile / tablet */}
         <header
-          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex min-h-14 shrink-0 items-center justify-center border-b px-4 backdrop-blur lg:hidden"
+          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex min-h-14 shrink-0 items-center justify-center border-b px-[max(1.25rem,var(--safe-area-left))] pr-[max(1.25rem,var(--safe-area-right))] backdrop-blur lg:hidden"
           role="banner"
         >
           <Link
@@ -207,7 +201,7 @@ export function AppShell({
 
         <main
           id="conteudo-principal"
-          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden p-4 pb-[calc(5.5rem+var(--safe-area-bottom))] md:min-h-0 md:overflow-hidden md:p-6 lg:pb-6"
+          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden px-[max(1.25rem,var(--safe-area-left))] pt-4 pb-[calc(5.5rem+var(--safe-area-bottom))] pr-[max(1.25rem,var(--safe-area-right))] md:min-h-0 md:overflow-hidden md:px-6 md:pt-6 md:pb-[calc(7rem+var(--safe-area-bottom))] lg:pb-6"
           tabIndex={-1}
         >
           <AppPageScroll>
@@ -215,10 +209,7 @@ export function AppShell({
           </AppPageScroll>
         </main>
 
-        <MobileBottomNav
-          showAdminNav={showAdminNav}
-          userFirstName={userFirstName}
-        />
+        <MobileBottomNav showAdminNav={showAdminNav} />
       </div>
     </div>
   );

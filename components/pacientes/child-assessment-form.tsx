@@ -17,6 +17,7 @@ import type {
 } from "@/lib/nutrition/child/types";
 import { ChildAssessmentResultCards } from "@/components/pacientes/child-assessment-result-cards";
 import { ChildGrowthCurve } from "@/components/pacientes/child-growth-curve";
+import { AssessmentFormSection } from "@/components/pacientes/assessment-form-section";
 import {
   MeasurementTips,
   HEIGHT_MEASUREMENT_TIPS,
@@ -31,8 +32,6 @@ const initial: ChildAssessmentFormResult | undefined = undefined;
 
 const selectClass =
   "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none text-foreground";
-const legendClass =
-  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 const textareaClass =
   "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
@@ -135,240 +134,234 @@ export function ChildAssessmentForm({
       <input type="hidden" name="subscapular_skinfold_mm" value={numSubscapularSkinfold != null ? String(numSubscapularSkinfold) : ""} />
       <input type="hidden" name="head_circumference_cm"   value={numHeadCircumference   != null ? String(numHeadCircumference)   : ""} />
 
-      {/* Perfil + datas */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Identificação</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {/* Perfil + datas */}
+        <AssessmentFormSection title="Identificação">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ca-sex">Sexo</Label>
+              <select
+                id="ca-sex"
+                className={cn(selectClass, sex === "" && "text-muted-foreground")}
+                value={sex}
+                onChange={(e) => setSex(e.target.value as ChildSex | "")}
+              >
+                <option value="">— selecione —</option>
+                <option value="female">Feminino</option>
+                <option value="male">Masculino</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ca-birth">Data de nascimento</Label>
+              <Input
+                id="ca-birth"
+                type="date"
+                value={birthDate}
+                onChange={(e) => setBirthDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ca-recorded">Data da avaliação</Label>
+              <Input
+                id="ca-recorded"
+                type="date"
+                value={recordedAt}
+                onChange={(e) => setRecordedAt(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Idade na avaliação</Label>
+              <p className="flex h-9 items-center font-mono text-sm tabular-nums text-foreground">
+                {ageLabel(ageMonths)}
+              </p>
+            </div>
+          </div>
+        </AssessmentFormSection>
+
+        {/* Medidas */}
+        <AssessmentFormSection title="Medidas">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="relative space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="ca-weight">Peso (kg)</Label>
+                <MeasurementTips title="Como medir o peso" tips={WEIGHT_MEASUREMENT_TIPS} />
+              </div>
+              <Input
+                id="ca-weight"
+                type="number"
+                step="0.01"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 22,0"
+                className="tabular-nums"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+              />
+            </div>
+            <div className="relative space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Label htmlFor="ca-height">
+                  {measuredLying ? "Comprimento (cm) — deitado" : "Estatura (cm) — em pé"}
+                </Label>
+                <MeasurementTips
+                  title="Como medir a estatura"
+                  tips={HEIGHT_MEASUREMENT_TIPS}
+                />
+              </div>
+              <Input
+                id="ca-height"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 120"
+                className="tabular-nums"
+                value={height}
+                onChange={(e) => setHeight(e.target.value)}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="ca-sex">Sexo</Label>
+            <Label htmlFor="ca-method">Critério de classificação</Label>
             <select
-              id="ca-sex"
-              className={cn(selectClass, sex === "" && "text-muted-foreground")}
-              value={sex}
-              onChange={(e) => setSex(e.target.value as ChildSex | "")}
+              id="ca-method"
+              className={selectClass}
+              value={method}
+              onChange={(e) => setMethod(e.target.value as ClassificationMethod)}
             >
-              <option value="">— selecione —</option>
-              <option value="female">Feminino</option>
-              <option value="male">Masculino</option>
+              <option value="percentile">{CHILD_METHOD_LABELS.percentile}</option>
+              <option value="zscore" disabled={!zAvailable}>
+                {CHILD_METHOD_LABELS.zscore}
+                {zAvailable ? "" : " — referência ainda não carregada"}
+              </option>
             </select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="ca-birth">Data de nascimento</Label>
-            <Input
-              id="ca-birth"
-              type="date"
-              value={birthDate}
-              onChange={(e) => setBirthDate(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="ca-recorded">Data da avaliação</Label>
-            <Input
-              id="ca-recorded"
-              type="date"
-              value={recordedAt}
-              onChange={(e) => setRecordedAt(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Idade na avaliação</Label>
-            <p className="flex h-9 items-center font-mono text-sm tabular-nums text-foreground">
-              {ageLabel(ageMonths)}
-            </p>
-          </div>
-        </div>
-      </fieldset>
 
-      <div className="border-t border-border" />
-
-      {/* Medidas */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Medidas</legend>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="relative space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="ca-weight">Peso (kg)</Label>
-              <MeasurementTips title="Como medir o peso" tips={WEIGHT_MEASUREMENT_TIPS} />
-            </div>
-            <Input
-              id="ca-weight"
-              type="number"
-              step="0.01"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 22,0"
-              className="tabular-nums"
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-            />
-          </div>
-          <div className="relative space-y-2">
-            <div className="flex items-center gap-1.5">
-              <Label htmlFor="ca-height">
-                {measuredLying ? "Comprimento (cm) — deitado" : "Estatura (cm) — em pé"}
-              </Label>
-              <MeasurementTips
-                title="Como medir a estatura"
-                tips={HEIGHT_MEASUREMENT_TIPS}
-              />
-            </div>
-            <Input
-              id="ca-height"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 120"
-              className="tabular-nums"
-              value={height}
-              onChange={(e) => setHeight(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="ca-method">Critério de classificação</Label>
-          <select
-            id="ca-method"
-            className={selectClass}
-            value={method}
-            onChange={(e) => setMethod(e.target.value as ClassificationMethod)}
-          >
-            <option value="percentile">{CHILD_METHOD_LABELS.percentile}</option>
-            <option value="zscore" disabled={!zAvailable}>
-              {CHILD_METHOD_LABELS.zscore}
-              {zAvailable ? "" : " — referência ainda não carregada"}
-            </option>
-          </select>
-        </div>
-
-        {/* Campos WHO 0–60 meses: Perímetro cefálico */}
-        {showHeadCirc && (
-          <div className="space-y-2">
-            <Label htmlFor="ca-head-circ">Perímetro cefálico (cm)</Label>
-            <Input
-              id="ca-head-circ"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 39,5"
-              className="tabular-nums"
-              value={headCircumference}
-              onChange={(e) => setHeadCircumference(e.target.value)}
-            />
-          </div>
-        )}
-
-        {/* Campos WHO 3–60 meses: CB, PCT, SE */}
-        {showSkinfoldAndCB && (
-          <div className="grid gap-4 sm:grid-cols-3">
+          {/* Campos WHO 0–60 meses: Perímetro cefálico */}
+          {showHeadCirc && (
             <div className="space-y-2">
-              <Label htmlFor="ca-arm-circ">Circunferência do braço (cm)</Label>
+              <Label htmlFor="ca-head-circ">Perímetro cefálico (cm)</Label>
               <Input
-                id="ca-arm-circ"
+                id="ca-head-circ"
                 type="number"
                 step="0.1"
                 min={0}
                 inputMode="decimal"
-                placeholder="Ex.: 14,5"
+                placeholder="Ex.: 39,5"
                 className="tabular-nums"
-                value={armCircumference}
-                onChange={(e) => setArmCircumference(e.target.value)}
+                value={headCircumference}
+                onChange={(e) => setHeadCircumference(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="ca-triceps">Prega tricipital (mm)</Label>
-              <Input
-                id="ca-triceps"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 8,5"
-                className="tabular-nums"
-                value={tricepsSkinfold}
-                onChange={(e) => setTricepsSkinfold(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ca-subscapular">Prega subescapular (mm)</Label>
-              <Input
-                id="ca-subscapular"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 6,1"
-                className="tabular-nums"
-                value={subscapularSkinfold}
-                onChange={(e) => setSubscapularSkinfold(e.target.value)}
-              />
-            </div>
-          </div>
-        )}
-      </fieldset>
-
-      {/* Resultado em tempo real */}
-      {assessment && (
-        <fieldset className="space-y-4">
-          <legend className={legendClass}>Resultado</legend>
-          {assessment.bmi != null && (
-            <p className="text-sm text-muted-foreground">
-              IMC calculado:{" "}
-              <span className="font-mono font-semibold text-foreground">
-                {assessment.bmi.toFixed(1).replace(".", ",")} kg/m²
-              </span>
-            </p>
           )}
-          <ChildAssessmentResultCards indicators={assessment.indicators} />
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            {numWeight != null && (
-              <ChildGrowthCurve
-                indicator="weight_for_age"
-                sex={sex as ChildSex}
-                ageMonths={ageMonths as number}
-                value={numWeight}
-                method={method}
-              />
-            )}
-            {numHeight != null && (
-              <ChildGrowthCurve
-                indicator="height_for_age"
-                sex={sex as ChildSex}
-                ageMonths={ageMonths as number}
-                value={numHeight}
-                method={method}
-              />
-            )}
+          {/* Campos WHO 3–60 meses: CB, PCT, SE */}
+          {showSkinfoldAndCB && (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="space-y-2">
+                <Label htmlFor="ca-arm-circ">Circunferência do braço (cm)</Label>
+                <Input
+                  id="ca-arm-circ"
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  inputMode="decimal"
+                  placeholder="Ex.: 14,5"
+                  className="tabular-nums"
+                  value={armCircumference}
+                  onChange={(e) => setArmCircumference(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ca-triceps">Prega tricipital (mm)</Label>
+                <Input
+                  id="ca-triceps"
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  inputMode="decimal"
+                  placeholder="Ex.: 8,5"
+                  className="tabular-nums"
+                  value={tricepsSkinfold}
+                  onChange={(e) => setTricepsSkinfold(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ca-subscapular">Prega subescapular (mm)</Label>
+                <Input
+                  id="ca-subscapular"
+                  type="number"
+                  step="0.1"
+                  min={0}
+                  inputMode="decimal"
+                  placeholder="Ex.: 6,1"
+                  className="tabular-nums"
+                  value={subscapularSkinfold}
+                  onChange={(e) => setSubscapularSkinfold(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+        </AssessmentFormSection>
+
+        {/* Resultado em tempo real */}
+        {assessment ? (
+          <AssessmentFormSection className="lg:col-span-2" title="Resultado">
             {assessment.bmi != null && (
-              <ChildGrowthCurve
-                indicator="bmi_for_age"
-                sex={sex as ChildSex}
-                ageMonths={ageMonths as number}
-                value={assessment.bmi}
-                method={method}
-              />
+              <p className="text-sm text-muted-foreground">
+                IMC calculado:{" "}
+                <span className="font-mono font-semibold text-foreground">
+                  {assessment.bmi.toFixed(1).replace(".", ",")} kg/m²
+                </span>
+              </p>
             )}
-          </div>
-        </fieldset>
-      )}
+            <ChildAssessmentResultCards indicators={assessment.indicators} />
 
-      <div className="border-t border-border" />
+            <div className="grid gap-4 lg:grid-cols-3">
+              {numWeight != null && (
+                <ChildGrowthCurve
+                  indicator="weight_for_age"
+                  sex={sex as ChildSex}
+                  ageMonths={ageMonths as number}
+                  value={numWeight}
+                  method={method}
+                />
+              )}
+              {numHeight != null && (
+                <ChildGrowthCurve
+                  indicator="height_for_age"
+                  sex={sex as ChildSex}
+                  ageMonths={ageMonths as number}
+                  value={numHeight}
+                  method={method}
+                />
+              )}
+              {assessment.bmi != null && (
+                <ChildGrowthCurve
+                  indicator="bmi_for_age"
+                  sex={sex as ChildSex}
+                  ageMonths={ageMonths as number}
+                  value={assessment.bmi}
+                  method={method}
+                />
+              )}
+            </div>
+          </AssessmentFormSection>
+        ) : null}
 
-      <fieldset className="space-y-2">
-        <legend className={legendClass}>Notas clínicas</legend>
-        <textarea
-          name="clinical_notes"
-          rows={3}
-          className={textareaClass}
-          style={{ minHeight: "72px" }}
-          placeholder="Observações, queixas, objetivos… (opcional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </fieldset>
+        <AssessmentFormSection className="lg:col-span-2" title="Notas clínicas">
+          <textarea
+            name="clinical_notes"
+            rows={3}
+            className={textareaClass}
+            style={{ minHeight: "72px" }}
+            placeholder="Observações, queixas, objetivos… (opcional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+          />
+        </AssessmentFormSection>
+      </div>
 
       {state?.ok === false ? (
         <p

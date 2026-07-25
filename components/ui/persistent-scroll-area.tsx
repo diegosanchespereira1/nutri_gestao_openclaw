@@ -133,7 +133,10 @@ export function PersistentScrollArea({
         id={id}
         className={cn(
           styles.persistentViewport,
-          !isScrollable && styles.persistentViewportNatural,
+          controls === "overflow-only" && styles.persistentViewportOverflowOnly,
+          !isScrollable &&
+            controls !== "overflow-only" &&
+            styles.persistentViewportNatural,
           isScrollable &&
             controls === "full" &&
             styles.persistentViewportScrollable,
@@ -141,7 +144,7 @@ export function PersistentScrollArea({
             controls === "overflow-only" &&
             cn(
               scrollStyles.scroll,
-              "md:overflow-y-auto md:overscroll-y-contain",
+              styles.persistentViewportOverflowOnlyScrollable,
             ),
         )}
         {...props}

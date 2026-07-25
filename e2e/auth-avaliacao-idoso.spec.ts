@@ -1,7 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 import { login, gotoNovaAvaliacao, discoverPatientIdInBeforeAll } from "./helpers/auth";
-import { abrirFormularioAvaliacao } from "./helpers/avaliacao";
+import {
+  abrirFormularioAvaliacao,
+  expectAvaliacaoSalva,
+  fillAndAssert,
+  getCalcBoxValue,
+  parseCalcBoxNumber,
+  REGISTRAR_AVALIACAO_RE,
+} from "./helpers/avaliacao";
 import { shot, resetShotIndex } from "./helpers/screenshot";
 
 /**
@@ -31,11 +38,6 @@ test.beforeAll(async ({ browser }) => {
   patientId = await discoverPatientIdInBeforeAll(browser, "idoso");
 });
 
-async function getCalcBoxValue(page: Parameters<typeof shot>[0], label: string): Promise<string> {
-  const box = page.locator(".rounded-lg").filter({ hasText: new RegExp(label, "i") }).first();
-  return (await box.locator("p.font-mono").textContent()) ?? "";
-}
-
 // ── Suite principal ───────────────────────────────────────────────────────────
 
 test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
@@ -45,15 +47,19 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
     test.skip(!patientId, "Nenhum paciente idoso encontrado em /pacientes?categoria=idoso.");
   });
 
-  test("01 — navega até o formulário e a aba Idoso está visível", async ({ page }) => {
+  test("01 — navega até o formulário de idoso (renderizado direto, sem abas)", async ({ page }) => {
     await login(page);
     await gotoNovaAvaliacao(page, patientId);
     await shot(page, SCREENSHOT_DIR, "pagina-carregada");
-    await expect(page.getByRole("tab", { name: /idoso/i })).toBeVisible();
+    // Paciente de categoria única: formulário direto, sem tablist.
+    await expect(page.locator("#ga-group")).toBeVisible();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
   });
 
   test("02 — altura geriátrica exige AJ + Idade (todos os grupos)", async ({ page }) => {
     await abrirFormularioAvaliacao(page, patientId, "idoso");
+    // Limpa a idade pré-preenchida a partir da data de nascimento do paciente.
+    await page.locator("#ga-age").fill("");
 
     let alt = await getCalcBoxValue(page, "Altura Estimada");
     expect(alt).toMatch(/^–/);
@@ -76,8 +82,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
     await page.locator("#ga-aj").fill("50");
     await page.locator("#ga-age").fill("75");
 
-    const pe = await getCalcBoxValue(page, "Peso Estimado");
-    const peNum = Number(pe.replace(",", ".").replace(/[^\d.]/g, ""));
+    const peNum = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
 
     expect(peNum).toBeCloseTo(55.99, 0);
     await shot(page, SCREENSHOT_DIR, "pe-geriatrico");
@@ -110,20 +115,25 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
     await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("homem_branco");
-    await page.locator("#ga-cb").fill("27");
-    await page.locator("#ga-aj").fill("50");
-    await page.locator("#ga-age").fill("72");
+    await expect(page.locator("#ga-group")).toHaveValue("homem_branco");
+    await fillAndAssert(page, "#ga-cb", "27");
+    await fillAndAssert(page, "#ga-aj", "50");
+    await fillAndAssert(page, "#ga-age", "72");
 
-    const peSem = await getCalcBoxValue(page, "Peso Estimado");
+    // Aguarda o PE base estar calculado antes de marcar amputação.
+    await expect
+      .poll(async () => parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado")), {
+        timeout: 15_000,
+      })
+      .not.toBeNaN();
+    const peSem = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
 
-    await page.locator("input[type='checkbox']").check();
+    await page.getByLabel(/membro amputado/i).check();
     await expect(page.locator("#ga-amp-pct")).toBeVisible();
     await shot(page, SCREENSHOT_DIR, "amputacao-marcada");
 
-    const peCom = await getCalcBoxValue(page, "Peso Estimado");
-    expect(Number(peCom.replace(",", "."))).toBeGreaterThan(
-      Number(peSem.replace(",", ".")),
-    );
+    const peCom = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
+    expect(peCom).toBeGreaterThan(peSem);
   });
 
   test("07 — Kcal/kg e g PTN/kg → NE e NP calculados", async ({ page }) => {
@@ -157,16 +167,14 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
     await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("mulher_branca");
-    await page.locator("#ga-cb").fill("24");
-    await page.locator("#ga-aj").fill("47");
-    await page.locator("#ga-age").fill("74");
+    await fillAndAssert(page, "#ga-cb", "24");
+    await fillAndAssert(page, "#ga-aj", "47");
+    await fillAndAssert(page, "#ga-age", "74");
     await shot(page, SCREENSHOT_DIR, "antes-submissao");
 
-    await page.getByRole("button", { name: /registar avaliação/i }).first().click();
-    await page.waitForURL(new RegExp(`/pacientes/${patientId}`), { timeout: 30_000 });
+    await page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE }).first().click();
+    await expectAvaliacaoSalva(page, patientId);
     await shot(page, SCREENSHOT_DIR, "apos-submissao");
-
-    await expect(page.getByRole("alert")).not.toBeVisible();
   });
 
   test("10 — avaliação geriátrica aparece no histórico do paciente", async ({ page }) => {
@@ -174,16 +182,20 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
     await abrirFormularioAvaliacao(page, patientId, "idoso");
 
     await page.locator("#ga-group").selectOption("homem_negro");
-    await page.locator("#ga-cb").fill("26");
-    await page.locator("#ga-aj").fill("51");
-    await page.locator("#ga-age").fill("80");
-    await page.getByRole("button", { name: /registar avaliação/i }).first().click();
-    await page.waitForURL(new RegExp(`/pacientes/${patientId}`), { timeout: 30_000 });
+    await fillAndAssert(page, "#ga-cb", "26");
+    await fillAndAssert(page, "#ga-aj", "51");
+    await fillAndAssert(page, "#ga-age", "80");
+    await page.getByRole("button", { name: REGISTRAR_AVALIACAO_RE }).first().click();
+    await expectAvaliacaoSalva(page, patientId);
 
-    const historicoSection = page.locator("[data-testid='geriatric-assessments-section']")
-      .or(page.getByRole("region", { name: /avaliações geriátricas/i }))
-      .or(page.locator("section").filter({ hasText: /geriátric/i }));
-    await expect(historicoSection.first()).toBeVisible({ timeout: 10_000 });
+    // Redirect abre o prontuário unificado; histórico fica na aba Avaliação.
+    await expect(
+      page.getByRole("tab", { name: /Indicadores/i }),
+    ).toBeVisible({ timeout: 10_000 });
+    await page.goto(`/pacientes/${patientId}?tab=avaliacao`);
+    await expect(page.getByRole("heading", { name: /^Histórico$/i })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 });
 
@@ -222,8 +234,7 @@ test.describe("Avaliação Idoso — diferenciação de fórmulas por grupo", ()
     await page.locator("#ga-age").fill("75");
     await shot(page, SCREENSHOT_DIR, "mulher-negra-pe");
 
-    const pe = await getCalcBoxValue(page, "Peso Estimado");
-    const peNum = Number(pe.replace(",", ".").replace(/[^\d.]/g, ""));
+    const peNum = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
     expect(peNum).toBeCloseTo(55.28, 0);
   });
 
@@ -237,8 +248,7 @@ test.describe("Avaliação Idoso — diferenciação de fórmulas por grupo", ()
     await page.locator("#ga-age").fill("75");
     await shot(page, SCREENSHOT_DIR, "homem-negro-pe");
 
-    const pe = await getCalcBoxValue(page, "Peso Estimado");
-    const peNum = Number(pe.replace(",", ".").replace(/[^\d.]/g, ""));
+    const peNum = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
     expect(peNum).toBeCloseTo(54.29, 0);
   });
 });

@@ -5,11 +5,17 @@ import { shot, resetShotIndex } from "./helpers/screenshot";
 import { waitForLocator } from "./helpers/retry";
 
 /**
- * Testes funcionais E2E — Visibilidade de abas de avaliação por categoria etária.
+ * Testes funcionais E2E — Formulário de avaliação por categoria etária.
  *
  * Pré-requisitos:
  *   E2E_EMAIL    — email da conta de teste (em .env.test)
  *   E2E_PASSWORD — senha da conta de teste (em .env.test)
+ *
+ * Layout atual:
+ *   - Paciente de categoria única (criança / adulto / idoso) → o formulário
+ *     correspondente é renderizado direto, sem tablist.
+ *   - Paciente sem data de nascimento → todas as categorias ficam visíveis
+ *     em abas (tablist com Infantil / Adultos / Idosos).
  *
  * Os pacientes são descobertos automaticamente pela lista filtrada por categoria.
  * Cada teste é ignorado individualmente se não houver paciente da categoria.
@@ -40,50 +46,47 @@ test.beforeAll(async ({ browser }) => {
 
 // ── Suite ─────────────────────────────────────────────────────────────────────
 
-test.describe("Visibilidade de abas de avaliação por categoria etária", () => {
+test.describe("Formulário de avaliação por categoria etária", () => {
   test.describe.configure({ timeout: 120_000 });
   test.beforeEach(resetShotIndex);
 
-  test("01 — paciente criança: só aba Infantil visível", async ({ page }) => {
+  test("01 — paciente criança: formulário infantil direto, sem abas", async ({ page }) => {
     test.skip(!ids.crianca, "Nenhum paciente criança encontrado.");
 
     await login(page);
     await gotoNovaAvaliacao(page, ids.crianca);
-    await shot(page, SCREENSHOT_DIR, "crianca-tabs");
+    await shot(page, SCREENSHOT_DIR, "crianca-form");
 
-    await waitForLocator(page.getByRole("tab", { name: /infantil/i }), {
-      label: "aba infantil",
-    });
-    await expect(page.getByRole("tab", { name: /adulto/i })).not.toBeVisible();
-    await expect(page.getByRole("tab", { name: /idoso/i })).not.toBeVisible();
+    await waitForLocator(page.locator("#ca-sex"), { label: "formulário infantil" });
+    await expect(page.locator("#adult-group")).toHaveCount(0);
+    await expect(page.locator("#ga-group")).toHaveCount(0);
+    await expect(page.getByRole("tablist")).toHaveCount(0);
   });
 
-  test("02 — paciente adulto: só aba Adulto visível", async ({ page }) => {
+  test("02 — paciente adulto: formulário adulto direto, sem abas", async ({ page }) => {
     test.skip(!ids.adulto, "Nenhum paciente adulto encontrado.");
 
     await login(page);
     await gotoNovaAvaliacao(page, ids.adulto);
-    await shot(page, SCREENSHOT_DIR, "adulto-tabs");
+    await shot(page, SCREENSHOT_DIR, "adulto-form");
 
-    await waitForLocator(page.getByRole("tab", { name: /adulto/i }), {
-      label: "aba adulto",
-    });
-    await expect(page.getByRole("tab", { name: /infantil/i })).not.toBeVisible();
-    await expect(page.getByRole("tab", { name: /idoso/i })).not.toBeVisible();
+    await waitForLocator(page.locator("#adult-group"), { label: "formulário adulto" });
+    await expect(page.locator("#ca-sex")).toHaveCount(0);
+    await expect(page.locator("#ga-group")).toHaveCount(0);
+    await expect(page.getByRole("tablist")).toHaveCount(0);
   });
 
-  test("03 — paciente idoso: só aba Idoso visível", async ({ page }) => {
+  test("03 — paciente idoso: formulário geriátrico direto, sem abas", async ({ page }) => {
     test.skip(!ids.idoso, "Nenhum paciente idoso encontrado.");
 
     await login(page);
     await gotoNovaAvaliacao(page, ids.idoso);
-    await shot(page, SCREENSHOT_DIR, "idoso-tabs");
+    await shot(page, SCREENSHOT_DIR, "idoso-form");
 
-    await waitForLocator(page.getByRole("tab", { name: /idoso/i }), {
-      label: "aba idoso",
-    });
-    await expect(page.getByRole("tab", { name: /infantil/i })).not.toBeVisible();
-    await expect(page.getByRole("tab", { name: /adulto/i })).not.toBeVisible();
+    await waitForLocator(page.locator("#ga-group"), { label: "formulário idoso" });
+    await expect(page.locator("#ca-sex")).toHaveCount(0);
+    await expect(page.locator("#adult-group")).toHaveCount(0);
+    await expect(page.getByRole("tablist")).toHaveCount(0);
   });
 
   test("04 — paciente sem data de nascimento: todas as abas visíveis", async ({ page }) => {

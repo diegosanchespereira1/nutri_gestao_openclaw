@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 import { login, gotoNovaAvaliacao, discoverPatientIdInBeforeAll } from "./helpers/auth";
-import { abrirFormularioAvaliacao } from "./helpers/avaliacao";
+import {
+  abrirFormularioAvaliacao,
+  expectAvaliacaoSalva,
+  getCalcBoxValue,
+  parseCalcBoxNumber,
+  REGISTRAR_AVALIACAO_ADULTOS_RE,
+} from "./helpers/avaliacao";
 import { shot, resetShotIndex } from "./helpers/screenshot";
 
 /**
@@ -31,11 +37,6 @@ test.beforeAll(async ({ browser }) => {
   patientId = await discoverPatientIdInBeforeAll(browser, "adulto");
 });
 
-async function getCalcBoxValue(page: Parameters<typeof shot>[0], label: string): Promise<string> {
-  const box = page.locator(".rounded-lg").filter({ hasText: new RegExp(label, "i") }).first();
-  return (await box.locator("p.font-mono").textContent()) ?? "";
-}
-
 // ── Suite principal ───────────────────────────────────────────────────────────
 
 test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", () => {
@@ -45,11 +46,13 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
     test.skip(!patientId, "Nenhum paciente adulto encontrado em /pacientes?categoria=adulto.");
   });
 
-  test("01 — navega até o formulário e a aba Adulto está visível", async ({ page }) => {
+  test("01 — navega até o formulário de adulto (renderizado direto, sem abas)", async ({ page }) => {
     await login(page);
     await gotoNovaAvaliacao(page, patientId);
     await shot(page, SCREENSHOT_DIR, "pagina-carregada");
-    await expect(page.getByRole("tab", { name: /adulto/i })).toBeVisible();
+    // Paciente de categoria única: formulário direto, sem tablist.
+    await expect(page.locator("#adult-group")).toBeVisible();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
   });
 
   test("02 — seleciona grupo e preenche idade", async ({ page }) => {
@@ -81,6 +84,8 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
   test("05 — mulher branca exige idade para Altura Estimada", async ({ page }) => {
     await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-group").selectOption("mulher_branca");
+    // Limpa a idade pré-preenchida a partir da data de nascimento do paciente.
+    await page.locator("#adult-age").fill("");
     await page.locator("#adult-aj").fill("48");
     const alt = await getCalcBoxValue(page, "Altura Estimada");
     expect(alt).toMatch(/^–/);
@@ -111,14 +116,15 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
     await abrirFormularioAvaliacao(page, patientId, "adulto");
     await page.locator("#adult-cb").fill("25");
     await page.locator("#adult-aj").fill("48");
-    const peSemAmp = await getCalcBoxValue(page, "Peso Estimado");
-    await page.locator("input[type='checkbox']").check();
+    await expect
+      .poll(async () => parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado")))
+      .not.toBeNaN();
+    const peSemAmp = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
+    await page.getByLabel(/membro amputado/i).check();
     await expect(page.locator("#adult-amp-pct")).toBeVisible();
     await shot(page, SCREENSHOT_DIR, "amputacao-marcada");
-    const peComAmp = await getCalcBoxValue(page, "Peso Estimado");
-    expect(Number(peComAmp.replace(",", "."))).toBeGreaterThan(
-      Number(peSemAmp.replace(",", ".")),
-    );
+    const peComAmp = parseCalcBoxNumber(await getCalcBoxValue(page, "Peso Estimado"));
+    expect(peComAmp).toBeGreaterThan(peSemAmp);
   });
 
   test("09 — Kcal/kg e g PTN/kg → NE e NP calculados", async ({ page }) => {
@@ -150,10 +156,9 @@ test.describe("Avaliação Adulto — preenchimento e cálculos em tempo real", 
     await page.locator("#adult-cb").fill("26");
     await page.locator("#adult-aj").fill("49");
     await shot(page, SCREENSHOT_DIR, "antes-submissao");
-    await page.getByRole("button", { name: /registar avaliação \(adultos\)/i }).click();
-    await page.waitForURL(new RegExp(`/pacientes/${patientId}`), { timeout: 30_000 });
+    await page.getByRole("button", { name: REGISTRAR_AVALIACAO_ADULTOS_RE }).click();
+    await expectAvaliacaoSalva(page, patientId);
     await shot(page, SCREENSHOT_DIR, "apos-submissao");
-    await expect(page.getByRole("alert")).not.toBeVisible();
   });
 });
 
@@ -181,8 +186,7 @@ test.describe("Avaliação Adulto — validações de borda", () => {
     await page.locator("#adult-aj").fill("46");
     await page.locator("#adult-cp").fill("28");
     await page.locator("#adult-notes").fill("Paciente em uso de diurético.");
-    await page.getByRole("button", { name: /registar avaliação \(adultos\)/i }).click();
-    await page.waitForURL(new RegExp(`/pacientes/${patientId}`), { timeout: 30_000 });
-    await expect(page.getByRole("alert")).not.toBeVisible();
+    await page.getByRole("button", { name: REGISTRAR_AVALIACAO_ADULTOS_RE }).click();
+    await expectAvaliacaoSalva(page, patientId);
   });
 });

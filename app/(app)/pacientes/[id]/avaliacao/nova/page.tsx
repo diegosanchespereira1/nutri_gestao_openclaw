@@ -4,12 +4,13 @@ import { AdultNutritionAssessmentForm } from "@/components/pacientes/adult-nutri
 import { ChildAssessmentForm } from "@/components/pacientes/child-assessment-form";
 import { GeriatricAssessmentForm } from "@/components/pacientes/geriatric-assessment-form";
 import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-assessments-tabs";
+import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
-import { Card, CardContent } from "@/components/ui/card";
 import { loadPatientById } from "@/lib/actions/patients";
 import type { ChildSex } from "@/lib/nutrition/child/types";
 import {
+  ageYearsFromBirth,
   assessmentVisibilityForCategory,
   patientAgeCategory,
 } from "@/lib/pacientes/age-category";
@@ -17,12 +18,19 @@ import {
   getReturnToParam,
   resolveBackNavigation,
 } from "@/lib/navigation/return-to";
+import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
+import { createClient } from "@/lib/supabase/server";
+const SEX_LABEL: Record<string, string> = {
+  female: "Feminino",
+  male: "Masculino",
+  other: "Outro",
+};
 
-function calcDefaultAge(isoDate: string): number {
-  return Math.floor(
-    (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24 * 365.25),
-  );
-}
+const CATEGORY_ASSESSMENT_LABEL: Record<string, string> = {
+  crianca: "Avaliação infantil",
+  adulto: "Avaliação adultos",
+  idoso: "Avaliação para idosos",
+};
 
 export default async function NovaAvaliacaoPage({
   params,
@@ -35,52 +43,81 @@ export default async function NovaAvaliacaoPage({
   const { row } = await loadPatientById(id);
   if (!row) notFound();
 
+  const supabase = await createClient();
+  const photoUrl = row.photo_storage_path
+    ? await getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
+    : null;
+
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
-  const defaultAge = birthSlice ? calcDefaultAge(birthSlice) : undefined;
-  const { showChild, showAdult, showGeriatric } = assessmentVisibilityForCategory(
-    patientAgeCategory(row.birth_date),
-  );
+  const ageYears = ageYearsFromBirth(row.birth_date);
+  const defaultAge = ageYears ?? undefined;
+  const category = patientAgeCategory(row.birth_date);
+  const { showChild, showAdult, showGeriatric } =
+    assessmentVisibilityForCategory(category);
   const childSex: ChildSex | null =
     row.sex === "female" || row.sex === "male" ? row.sex : null;
+
+  const subtitle = [
+    ageYears != null ? `${ageYears} anos` : null,
+    row.sex ? SEX_LABEL[row.sex] : null,
+    category ? CATEGORY_ASSESSMENT_LABEL[category] : "informações no prontuário",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const back = resolveBackNavigation({
     returnTo: getReturnToParam(sp),
     fallbackHref: `/pacientes/${id}`,
-    fallbackLabel: "Prontuário",
+    fallbackLabel: "Indicadores",
     currentPath: `/pacientes/${id}/avaliacao/nova`,
   });
 
   return (
-    <PageLayout variant="form">
+    <PageLayout variant="wide">
       <PageHeader
-        title="Realizar avaliação especializada"
-        description={`${row.full_name} — informações complementares no prontuário`}
+        title={row.full_name}
+        description={`Realizar avaliação especializada · ${subtitle}`}
+        leading={
+          <ClientAvatar
+            name={row.full_name}
+            imageUrl={photoUrl}
+            size="lg"
+            className="rounded-full ring-2 ring-teal-400/50 ring-offset-2 ring-offset-background"
+          />
+        }
         back={back}
       />
 
-      <Card>
-        <CardContent className="pt-6">
-          <NutritionAssessmentsTabs
-            showGeneral={false}
-            showChild={showChild}
-            showAdult={showAdult}
-            showGeriatric={showGeriatric}
-            childTab={
+      <div className="min-w-0 rounded-2xl border border-border/60 bg-card/80 p-2 shadow-sm sm:p-3 lg:p-4">
+        <NutritionAssessmentsTabs
+          showGeneral={false}
+          showChild={showChild}
+          showAdult={showAdult}
+          showGeriatric={showGeriatric}
+          childTab={
+            <div className="px-1 pt-3 sm:px-2">
               <ChildAssessmentForm
                 patientId={id}
                 defaultSex={childSex}
                 defaultBirthDate={birthSlice}
               />
-            }
-            adultTab={
-              <AdultNutritionAssessmentForm patientId={id} defaultAge={defaultAge} />
-            }
-            geriatricTab={
+            </div>
+          }
+          adultTab={
+            <div className="px-1 pt-3 sm:px-2">
+              <AdultNutritionAssessmentForm
+                patientId={id}
+                defaultAge={defaultAge}
+              />
+            </div>
+          }
+          geriatricTab={
+            <div className="px-1 pt-3 sm:px-2">
               <GeriatricAssessmentForm patientId={id} defaultAge={defaultAge} />
-            }
-          />
-        </CardContent>
-      </Card>
+            </div>
+          }
+        />
+      </div>
     </PageLayout>
   );
 }

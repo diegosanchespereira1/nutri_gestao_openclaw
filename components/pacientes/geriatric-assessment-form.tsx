@@ -2,6 +2,10 @@
 
 import { useActionState, useMemo, useState } from "react";
 
+import {
+  AssessmentCalcChip,
+  AssessmentFormSection,
+} from "@/components/pacientes/assessment-form-section";
 import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type GeriatricAssessmentFormResult,
@@ -33,9 +37,6 @@ function selectValueClass(value: string) {
   return cn(selectClass, value === "" && "text-muted-foreground");
 }
 
-const legendClass =
-  "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
-
 const textareaClass =
   "border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
@@ -51,34 +52,7 @@ function fmt(n: number | null, decimals = 2): string {
   return n.toFixed(decimals).replace(".", ",");
 }
 
-// ── Caixa de valor calculado ──────────────────────────────────────────────────
-function CalcBox({
-  label,
-  value,
-  unit,
-  formula,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  formula: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-muted/30 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-1 font-mono text-xl font-bold tabular-nums text-foreground">
-        {value}{" "}
-        <span className="text-sm font-normal text-muted-foreground">{unit}</span>
-      </p>
-      <p className="mt-1 text-[11px] italic text-muted-foreground">{formula}</p>
-    </div>
-  );
-}
-
-// ── Tipos auxiliares ──────────────────────────────────────────────────────────
-type NumericField = string; // valor string do input; converte para número só no cálculo
+type NumericField = string;
 
 export function GeriatricAssessmentForm({
   patientId,
@@ -190,315 +164,310 @@ export function GeriatricAssessmentForm({
       <input type="hidden" name="energy_needs_kcal"   value={ne               !== null ? String(ne)     : ""} />
       <input type="hidden" name="protein_needs_g"     value={np               !== null ? String(np)     : ""} />
 
-      {/* ── Grupo 1: Perfil ─────────────────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Perfil do paciente</legend>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="ga-group">Grupo (sexo / etnia)</Label>
-            <select
-              id="ga-group"
-              name="patient_group"
-              className={selectClass}
-              value={group}
-              onChange={(e) => setGroup(e.target.value as PatientGroup)}
-            >
-              {(Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]).map(
-                ([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ),
-              )}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Define a equação de Peso Estimado e Altura (Chumlea et al.)
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ga-age">Idade (anos)</Label>
-            <Input
-              id="ga-age"
-              name="age_years"
-              type="number"
-              min={0}
-              max={130}
-              step={1}
-              inputMode="numeric"
-              placeholder="Ex.: 80"
-              className="tabular-nums"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-input"
-              checked={hasAmputation}
-              onChange={(e) => setHasAmputation(e.target.checked)}
-            />
-            Membro amputado
-          </label>
-
-          {hasAmputation && (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="ga-amp-pct" className="whitespace-nowrap text-sm">
-                % segmento amputado
-              </Label>
-              <Input
-                id="ga-amp-pct"
-                name="amputation_segment_pct"
-                type="number"
-                min={0.1}
-                max={99.9}
-                step={0.1}
-                className="w-24 tabular-nums"
-                value={ampPct}
-                onChange={(e) => setAmpPct(e.target.value)}
-              />
-              <span className="text-xs text-muted-foreground">
-                coxa=10,0% · perna+pé=5,9% · pé=1,8%
-              </span>
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        {/* ── Grupo 1: Perfil ─────────────────────────────────────────────── */}
+        <AssessmentFormSection
+          title="Perfil do paciente"
+          description="Equações geriátricas (Chumlea)"
+        >
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ga-group">Grupo (sexo / etnia)</Label>
+              <select
+                id="ga-group"
+                name="patient_group"
+                className={selectClass}
+                value={group}
+                onChange={(e) => setGroup(e.target.value as PatientGroup)}
+              >
+                {(Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]).map(
+                  ([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ),
+                )}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Define a equação de Peso Estimado e Altura (Chumlea et al.)
+              </p>
             </div>
-          )}
-        </div>
-      </fieldset>
 
-      <div className="border-t border-border" />
-
-      {/* ── Grupo 2: Medidas antropométricas ────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Medidas antropométricas</legend>
-
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="space-y-2">
-            <Label htmlFor="ga-cb">CB — Circ. do Braço (cm)</Label>
-            <Input
-              id="ga-cb"
-              name="cb_cm"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 23"
-              className="tabular-nums"
-              value={cb}
-              onChange={(e) => setCb(e.target.value)}
-            />
+            <div className="space-y-2">
+              <Label htmlFor="ga-age">Idade (anos)</Label>
+              <Input
+                id="ga-age"
+                name="age_years"
+                type="number"
+                min={0}
+                max={130}
+                step={1}
+                inputMode="numeric"
+                placeholder="Ex.: 80"
+                className="tabular-nums"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="ga-dct">DCT — Dobra Cutânea Tricipital (mm)</Label>
-            <Input
-              id="ga-dct"
-              name="dct_mm"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 8"
-              className="tabular-nums"
-              value={dct}
-              onChange={(e) => setDct(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="ga-cp">CP — Circ. da Panturrilha (cm)</Label>
-            <Input
-              id="ga-cp"
-              name="cp_cm"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 27"
-              className="tabular-nums"
-              value={cp}
-              onChange={(e) => setCp(e.target.value)}
-            />
-          </div>
-        </div>
 
-        {/* CMB calculado em destaque */}
-        <CalcBox
-          label="CMB — Circunferência Muscular do Braço"
-          value={fmt(cmb)}
-          unit="cm"
-          formula="CMB = CB − (DCT × 0,314)   [Gurney & Jelliffe, 1973]"
-        />
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-input"
+                checked={hasAmputation}
+                onChange={(e) => setHasAmputation(e.target.checked)}
+              />
+              Membro amputado
+            </label>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="ga-aj">AJ — Altura do Joelho (cm)</Label>
-            <Input
-              id="ga-aj"
-              name="aj_cm"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 48,5"
-              className="tabular-nums"
-              value={aj}
-              onChange={(e) => setAj(e.target.value)}
-            />
+            {hasAmputation && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="ga-amp-pct" className="whitespace-nowrap text-sm">
+                  % segmento amputado
+                </Label>
+                <Input
+                  id="ga-amp-pct"
+                  name="amputation_segment_pct"
+                  type="number"
+                  min={0.1}
+                  max={99.9}
+                  step={0.1}
+                  className="w-24 tabular-nums"
+                  value={ampPct}
+                  onChange={(e) => setAmpPct(e.target.value)}
+                />
+                <span className="text-xs text-muted-foreground">
+                  coxa=10,0% · perna+pé=5,9% · pé=1,8%
+                </span>
+              </div>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="ga-weight">Peso Real (kg)</Label>
-            <Input
-              id="ga-weight"
-              name="weight_real_kg"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Opcional — deixe vazio se não mensurável"
-              className="tabular-nums"
-              value={weightReal}
-              onChange={(e) => setWeightReal(e.target.value)}
-            />
+        </AssessmentFormSection>
+
+        {/* ── Grupo 2: Medidas antropométricas ────────────────────────────── */}
+        <AssessmentFormSection title="Medidas antropométricas">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ga-cb">CB — Circ. do Braço (cm)</Label>
+              <Input
+                id="ga-cb"
+                name="cb_cm"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 23"
+                className="tabular-nums"
+                value={cb}
+                onChange={(e) => setCb(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ga-dct">DCT — Dobra Cutânea Tricipital (mm)</Label>
+              <Input
+                id="ga-dct"
+                name="dct_mm"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 8"
+                className="tabular-nums"
+                value={dct}
+                onChange={(e) => setDct(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ga-cp">CP — Circ. da Panturrilha (cm)</Label>
+              <Input
+                id="ga-cp"
+                name="cp_cm"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 27"
+                className="tabular-nums"
+                value={cp}
+                onChange={(e) => setCp(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ga-aj">AJ — Altura do Joelho (cm)</Label>
+              <Input
+                id="ga-aj"
+                name="aj_cm"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 48,5"
+                className="tabular-nums"
+                value={aj}
+                onChange={(e) => setAj(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ga-weight">Peso Real (kg)</Label>
+              <Input
+                id="ga-weight"
+                name="weight_real_kg"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Opcional — deixe vazio se não mensurável"
+                className="tabular-nums"
+                value={weightReal}
+                onChange={(e) => setWeightReal(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
-      </fieldset>
 
-      <div className="border-t border-border" />
-
-      {/* ── Grupo 3: Valores calculados ──────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Valores calculados automaticamente</legend>
-        <p className="text-xs text-muted-foreground">
-          Atualizados em tempo real conforme as medidas são preenchidas acima.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <CalcBox
-            label="Peso Estimado"
-            value={fmt(pe)}
-            unit="kg"
-            formula={peFormula}
+          <AssessmentCalcChip
+            code="CMB"
+            label="Circunferência muscular do braço"
+            value={fmt(cmb)}
+            unit="cm"
+            formula="CMB = CB − (DCT × 0,314)   [Gurney & Jelliffe, 1973]"
+            highlight
           />
-          <CalcBox
-            label="Altura Estimada"
-            value={fmt(altura, 3)}
-            unit="m"
-            formula={altFormula}
-          />
-          <CalcBox
-            label="IMC"
-            value={fmt(imc)}
-            unit="kg/m²"
-            formula={imcFormula}
-          />
-        </div>
-      </fieldset>
+        </AssessmentFormSection>
 
-      <div className="border-t border-border" />
-
-      {/* ── Grupo 4: Prescrição energético-proteica ───────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Prescrição energético-proteica</legend>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="ga-kcal">Kcal/kg · dia</Label>
-            <Input
-              id="ga-kcal"
-              name="kcal_per_kg"
-              type="number"
-              step="0.5"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 30"
-              className="tabular-nums"
-              value={kcal}
-              onChange={(e) => setKcal(e.target.value)}
+        {/* ── Grupo 3: Valores calculados ──────────────────────────────────── */}
+        <AssessmentFormSection
+          title="Valores calculados"
+          description="Atualizam automaticamente conforme as medidas são preenchidas acima."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <AssessmentCalcChip
+              code="PE"
+              label="Peso estimado"
+              value={fmt(pe)}
+              unit="kg"
+              formula={peFormula}
+              highlight
+            />
+            <AssessmentCalcChip
+              code="AE"
+              label="Altura estimada"
+              value={fmt(altura, 3)}
+              unit="m"
+              formula={altFormula}
+              highlight
+            />
+            <AssessmentCalcChip
+              code="IMC"
+              label="IMC"
+              value={fmt(imc)}
+              unit="kg/m²"
+              formula={imcFormula}
+              highlight
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="ga-ptn">g PTN/kg · dia</Label>
-            <Input
-              id="ga-ptn"
-              name="ptn_per_kg"
-              type="number"
-              step="0.1"
-              min={0}
-              inputMode="decimal"
-              placeholder="Ex.: 1,2"
-              className="tabular-nums"
-              value={ptn}
-              onChange={(e) => setPtn(e.target.value)}
+        </AssessmentFormSection>
+
+        {/* ── Grupo 4: Prescrição energético-proteica ───────────────────────── */}
+        <AssessmentFormSection title="Prescrição energético-proteica">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ga-kcal">Kcal/kg · dia</Label>
+              <Input
+                id="ga-kcal"
+                name="kcal_per_kg"
+                type="number"
+                step="0.5"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 30"
+                className="tabular-nums"
+                value={kcal}
+                onChange={(e) => setKcal(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ga-ptn">g PTN/kg · dia</Label>
+              <Input
+                id="ga-ptn"
+                name="ptn_per_kg"
+                type="number"
+                step="0.1"
+                min={0}
+                inputMode="decimal"
+                placeholder="Ex.: 1,2"
+                className="tabular-nums"
+                value={ptn}
+                onChange={(e) => setPtn(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <AssessmentCalcChip
+              code="NE"
+              label="Necessidade energética"
+              value={ne !== null ? Math.round(ne).toLocaleString("pt-BR") : "–"}
+              unit="kcal/dia"
+              formula="NE = Peso Estimado × Kcal/kg"
+              highlight
+            />
+            <AssessmentCalcChip
+              code="NP"
+              label="Necessidade proteica"
+              value={fmt(np, 1)}
+              unit="g/dia"
+              formula="NP = g PTN/kg × Peso Estimado"
+              highlight
             />
           </div>
-        </div>
+        </AssessmentFormSection>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <CalcBox
-            label="Necessidade Energética"
-            value={ne !== null ? Math.round(ne).toLocaleString("pt-BR") : "–"}
-            unit="kcal/dia"
-            formula="NE = Peso Estimado × Kcal/kg"
-          />
-          <CalcBox
-            label="Necessidade Proteica"
-            value={fmt(np, 1)}
-            unit="g/dia"
-            formula="NP = g PTN/kg × Peso Estimado"
-          />
-        </div>
-      </fieldset>
-
-      <div className="border-t border-border" />
-
-      {/* ── Grupo 5: Avaliação clínica ────────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className={legendClass}>Avaliação clínica</legend>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="ga-risk">Risco Nutricional</Label>
-            <select
-              id="ga-risk"
-              name="nutritional_risk"
-              className={selectValueClass(risk)}
-              value={risk}
-              onChange={(e) => setRisk(e.target.value)}
-            >
-              <option value="">— não avaliado —</option>
-              {(Object.entries(NUTRITIONAL_RISK_LABELS) as [NutritionalRisk, string][]).map(
-                ([val, label]) => (
-                  <option key={val} value={val}>{label}</option>
-                ),
-              )}
-            </select>
+        {/* ── Grupo 5: Avaliação clínica ────────────────────────────────────── */}
+        <AssessmentFormSection className="lg:col-span-2" title="Avaliação clínica">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-2">
+              <Label htmlFor="ga-risk">Risco Nutricional</Label>
+              <select
+                id="ga-risk"
+                name="nutritional_risk"
+                className={selectValueClass(risk)}
+                value={risk}
+                onChange={(e) => setRisk(e.target.value)}
+              >
+                <option value="">— não avaliado —</option>
+                {(Object.entries(NUTRITIONAL_RISK_LABELS) as [NutritionalRisk, string][]).map(
+                  ([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ),
+                )}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="ga-diagnosis">Diagnóstico nutricional</Label>
+              <Input
+                id="ga-diagnosis"
+                name="nutritional_diagnosis"
+                placeholder="Ex.: SRD-19, SRN-12, D-16 (opcional)"
+                value={diagnosis}
+                onChange={(e) => setDiagnosis(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2 lg:col-span-1">
+              <Label htmlFor="ga-notes">Notas clínicas</Label>
+              <textarea
+                id="ga-notes"
+                name="clinical_notes"
+                rows={3}
+                className={textareaClass}
+                style={{ minHeight: "72px" }}
+                placeholder="Condicionantes, medicação com impacto nutricional, objetivos… (opcional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="ga-diagnosis">Diagnóstico nutricional</Label>
-            <Input
-              id="ga-diagnosis"
-              name="nutritional_diagnosis"
-              placeholder="Ex.: SRD-19, SRN-12, D-16 (opcional)"
-              value={diagnosis}
-              onChange={(e) => setDiagnosis(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="ga-notes">Notas clínicas</Label>
-          <textarea
-            id="ga-notes"
-            name="clinical_notes"
-            rows={3}
-            className={textareaClass}
-            style={{ minHeight: "72px" }}
-            placeholder="Condicionantes, medicação com impacto nutricional, objetivos… (opcional)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-        </div>
-      </fieldset>
+        </AssessmentFormSection>
+      </div>
 
       {/* ── Feedback ──────────────────────────────────────────────────────── */}
       {state?.ok === false ? (

@@ -166,10 +166,11 @@ export async function createAdultNutritionAssessmentAction(
   }
 
   revalidatePath(`/pacientes/${patientId}`);
+  revalidatePath(`/pacientes/${patientId}/prontuario`);
   revalidatePath(`/pacientes/${patientId}/editar`);
   redirect(
     hrefWithOptionalReturnTo(
-      `/pacientes/${patientId}?tab=avaliacao&avaliacao=ok`,
+      `/pacientes/${patientId}?avaliacao=ok`,
       getReturnToFromFormData(formData),
     ),
   );

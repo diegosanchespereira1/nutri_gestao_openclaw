@@ -33,8 +33,6 @@ export default async function AppAreaLayout({
 
   const role = profileCtx.role;
   const timeZone = profileCtx.timeZone || DEFAULT_PROFILE_TIME_ZONE;
-  const fullName = profileCtx.fullName;
-  const userFirstName = fullName ? fullName.split(" ")[0] ?? null : null;
   const showAdminNav = canAccessAdminArea(role);
   const enabledModules = profileCtx.enabledModules ?? DEFAULT_ENABLED_MODULES;
   const onboardingOnly =
@@ -54,12 +52,7 @@ export default async function AppAreaLayout({
               <AppPageScroll className="p-4 md:p-6">{children}</AppPageScroll>
             </div>
           ) : (
-            <AppShell
-              showAdminNav={showAdminNav}
-              userFirstName={userFirstName}
-            >
-              {children}
-            </AppShell>
+            <AppShell showAdminNav={showAdminNav}>{children}</AppShell>
           )}
         </ModuleGateProvider>
       </EnabledModulesProvider>

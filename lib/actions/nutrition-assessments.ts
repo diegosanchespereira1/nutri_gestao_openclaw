@@ -121,7 +121,7 @@ export async function createNutritionAssessmentAction(
   revalidatePath(`/pacientes/${patientId}/editar`);
   redirect(
     hrefWithOptionalReturnTo(
-      `/pacientes/${patientId}?avaliacao=ok`,
+      `/pacientes/${patientId}?tab=dados&avaliacao=ok`,
       getReturnToFromFormData(formData),
     ),
   );

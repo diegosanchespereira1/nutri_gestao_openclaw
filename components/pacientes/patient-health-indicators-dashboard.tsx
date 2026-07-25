@@ -310,14 +310,14 @@ export function PatientHealthIndicatorsDashboard({
               <ClientAvatar
                 name={patientName}
                 imageUrl={photoUrl}
-                size="lg"
+                size="xl"
                 className="rounded-full"
               />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Indicadores de saúde
                 </p>
-                <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
                   {patientName}
                 </h1>
                 <p className="mt-0.5 truncate text-sm text-muted-foreground">

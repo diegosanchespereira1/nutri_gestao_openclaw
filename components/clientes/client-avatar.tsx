@@ -8,7 +8,7 @@ function initialsFromName(name: string): string {
 type Props = {
   name: string;
   imageUrl: string | null;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 };
 
@@ -16,6 +16,7 @@ const sizeClass: Record<NonNullable<Props["size"]>, string> = {
   sm: "size-9 text-xs",
   md: "size-11 text-sm",
   lg: "size-14 text-base",
+  xl: "size-[4.5rem] text-lg sm:size-[5.25rem] sm:text-xl",
 };
 
 // Tamanho em px para width/height no <img> — evita CLS enquanto a imagem carrega.
@@ -23,6 +24,7 @@ const sizePx: Record<NonNullable<Props["size"]>, number> = {
   sm: 36,  // size-9  = 2.25rem = 36px
   md: 44,  // size-11 = 2.75rem = 44px
   lg: 56,  // size-14 = 3.5rem  = 56px
+  xl: 84,  // ~5.25rem no desktop (modelo dashboard paciente)
 };
 
 export function ClientAvatar({

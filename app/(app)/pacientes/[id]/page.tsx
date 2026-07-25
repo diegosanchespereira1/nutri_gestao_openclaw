@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { ClipboardList, Pencil } from "lucide-react";
+import { ArrowLeft, ClipboardList, Pencil } from "lucide-react";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
-import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
 import { PatientAssessmentsBlock } from "@/components/pacientes/patient-assessments-block";
 import { PatientHealthIndicatorsDashboard } from "@/components/pacientes/patient-health-indicators-dashboard";
@@ -179,34 +178,52 @@ export default async function PacientePage({
 
   return (
     <PageLayout variant="wide">
-      <PageHeader
-        leading={
-          <ClientAvatar
-            name={row.full_name}
-            imageUrl={photoUrl}
-            size="lg"
-            className="rounded-full"
-          />
-        }
-        title={row.full_name}
-        description={descriptionParts.join(" · ")}
-        back={back}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href={editarHref}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              <Pencil className="mr-1.5 size-3.5" aria-hidden />
-              Editar dados
-            </Link>
-            <Link href={novaAvaliacaoHref} className={cn(buttonVariants({ size: "sm" }))}>
-              <ClipboardList className="mr-1.5 size-3.5" aria-hidden />
-              Nova avaliação
-            </Link>
+      {/* Topo no estilo do dashboard de indicadores (modelo novo): nome em destaque */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-3">
+          <Link
+            href={back.href}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+          >
+            <ArrowLeft className="size-3.5" aria-hidden />
+            {back.label}
+          </Link>
+
+          <div className="flex min-w-0 items-center gap-4">
+            <ClientAvatar
+              name={row.full_name}
+              imageUrl={photoUrl}
+              size="xl"
+              className="rounded-full"
+            />
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Paciente
+              </p>
+              <h1 className="truncate text-2xl font-bold tracking-tight text-foreground sm:text-3xl md:text-4xl">
+                {row.full_name}
+              </h1>
+              <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                {descriptionParts.join(" · ") || "Sem informações"}
+              </p>
+            </div>
           </div>
-        }
-      />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={editarHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            <Pencil className="mr-1.5 size-3.5" aria-hidden />
+            Editar dados
+          </Link>
+          <Link href={novaAvaliacaoHref} className={cn(buttonVariants({ size: "sm" }))}>
+            <ClipboardList className="mr-1.5 size-3.5" aria-hidden />
+            Nova avaliação
+          </Link>
+        </div>
+      </div>
 
       {avaliacaoOk ? (
         <div

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   addCalendarDays,
+  addCalendarMonths,
   calendarDaysUntilDueDate,
   diffCalendarDayKeys,
   formatDayColumnHeader,
@@ -41,6 +42,16 @@ describe("addCalendarDays e diffCalendarDayKeys", () => {
   it("soma dias no calendário", () => {
     const next = addCalendarDays("2026-06-20", 1, TZ);
     expect(diffCalendarDayKeys("2026-06-20", next)).toBe(1);
+  });
+});
+
+describe("addCalendarMonths", () => {
+  it("avança um mês mantendo o dia", () => {
+    expect(addCalendarMonths("2026-06-15", 1, TZ)).toBe("2026-07-15");
+  });
+
+  it("ajusta dia 31 ao último dia do mês alvo", () => {
+    expect(addCalendarMonths("2026-01-31", 1, TZ)).toBe("2026-02-28");
   });
 });
 

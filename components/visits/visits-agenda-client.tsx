@@ -18,7 +18,9 @@ import { visitPriorityAgendaSurface, visitPriorityLabel } from "@/lib/constants/
 import { visitIsCancellable, visitStatusLabel } from "@/lib/constants/visit-status";
 import {
   addCalendarDays,
+  addCalendarMonths,
   formatDateTimeShort,
+  formatDayKeyLong,
   formatMonthYearTitle,
   formatTimeShort,
   formatWeekRangeLabel,
@@ -30,6 +32,7 @@ import {
   weekDayKeysFromMonday,
 } from "@/lib/datetime/calendar-tz";
 import { VisitCancelButton } from "@/components/visits/visit-cancel-button";
+import { VisitMonthGrid } from "@/components/visits/visit-month-grid";
 import { VisitQuickDetailDialog } from "@/components/visits/visit-quick-detail-dialog";
 import { VisitRescheduleConfirmDialog } from "@/components/visits/visit-reschedule-confirm-dialog";
 import { VisitScheduleDialog } from "@/components/visits/visit-schedule-dialog";
@@ -91,7 +94,7 @@ function visitMatchesFilter(v: ScheduledVisitWithTargets, f: PriorityFilter): bo
   return v.priority === f;
 }
 
-type ScheduleView = "week" | "list";
+type ScheduleView = "week" | "month" | "day" | "list";
 
 export function VisitsAgendaClient({
   visits: visitsProp,
@@ -163,20 +166,47 @@ export function VisitsAgendaClient({
     [byDay, priorityFilter],
   );
 
-  /** Dia em foco na UI: mantém-se coerente ao mudar de semana sem efeitos. */
+  /** Dia em foco na UI: na semana/lista mantém-se dentro da semana visível. */
   const effectiveDayKey = useMemo(() => {
-    if (weekKeys.includes(selectedDayKey)) return selectedDayKey;
-    return weekMonday;
-  }, [weekKeys, selectedDayKey, weekMonday]);
+    if (scheduleView === "week" || scheduleView === "list") {
+      if (weekKeys.includes(selectedDayKey)) return selectedDayKey;
+      return weekMonday;
+    }
+    return selectedDayKey;
+  }, [scheduleView, weekKeys, selectedDayKey, weekMonday]);
+
+  const monthViewCells = useMemo(
+    () => monthCalendarCells(miniMonthAnchor, tz),
+    [miniMonthAnchor, tz],
+  );
+
+  const monthViewKeys = useMemo(
+    () => new Set(monthViewCells.filter((c) => c.inMonth).map((c) => c.key)),
+    [monthViewCells],
+  );
 
   const effectiveSelectedVisitId = useMemo(() => {
     if (!selectedVisitId) return null;
     const v = visits.find((x) => x.id === selectedVisitId);
     if (!v) return null;
     const dk = visitDayKey(v.scheduled_start, tz);
-    if (!weekKeys.includes(dk)) return null;
+    if (scheduleView === "week" || scheduleView === "list") {
+      if (!weekKeys.includes(dk)) return null;
+    } else if (scheduleView === "day") {
+      if (dk !== effectiveDayKey) return null;
+    } else if (scheduleView === "month") {
+      if (!monthViewKeys.has(dk)) return null;
+    }
     return selectedVisitId;
-  }, [weekKeys, selectedVisitId, visits, tz]);
+  }, [
+    weekKeys,
+    selectedVisitId,
+    visits,
+    tz,
+    scheduleView,
+    effectiveDayKey,
+    monthViewKeys,
+  ]);
 
   const weekVisits = useMemo(() => {
     const set = new Set(weekKeys);
@@ -217,9 +247,67 @@ export function VisitsAgendaClient({
   }, [byDay, effectiveDayKey, priorityFilter]);
 
   const goWeek = useCallback((delta: number) => {
-    setWeekMonday((m) => addCalendarDays(m, delta * 7, tz));
+    setWeekMonday((m) => {
+      const next = addCalendarDays(m, delta * 7, tz);
+      setSelectedDayKey((prev) => {
+        const keys = weekDayKeysFromMonday(next, tz);
+        return keys.includes(prev) ? prev : next;
+      });
+      return next;
+    });
     setSelectedVisitId(null);
   }, [tz]);
+
+  const goDay = useCallback((delta: number) => {
+    setSelectedDayKey((prev) => {
+      const next = addCalendarDays(prev, delta, tz);
+      setWeekMonday(startOfIsoWeekMonday(next, tz));
+      setMiniMonthAnchor(next);
+      return next;
+    });
+    setSelectedVisitId(null);
+  }, [tz]);
+
+  const goMonth = useCallback((delta: number) => {
+    setMiniMonthAnchor((prev) => {
+      const next = addCalendarMonths(prev, delta, tz);
+      setSelectedDayKey(next);
+      setWeekMonday(startOfIsoWeekMonday(next, tz));
+      return next;
+    });
+    setSelectedVisitId(null);
+  }, [tz]);
+
+  const goPeriod = useCallback(
+    (delta: number) => {
+      if (scheduleView === "month") {
+        goMonth(delta);
+        return;
+      }
+      if (scheduleView === "day") {
+        goDay(delta);
+        return;
+      }
+      goWeek(delta);
+    },
+    [scheduleView, goMonth, goDay, goWeek],
+  );
+
+  const periodLabel = useMemo(() => {
+    if (scheduleView === "month") {
+      return formatMonthYearTitle(miniMonthAnchor, tz);
+    }
+    if (scheduleView === "day") {
+      return formatDayKeyLong(effectiveDayKey, tz);
+    }
+    return formatWeekRangeLabel(weekMonday, tz);
+  }, [scheduleView, miniMonthAnchor, tz, effectiveDayKey, weekMonday]);
+
+  const periodNavLabel = useMemo(() => {
+    if (scheduleView === "month") return { prev: "Mês anterior", next: "Mês seguinte" };
+    if (scheduleView === "day") return { prev: "Dia anterior", next: "Dia seguinte" };
+    return { prev: "Semana anterior", next: "Semana seguinte" };
+  }, [scheduleView]);
 
   const goToday = useCallback(() => {
     const mon = startOfIsoWeekMonday(todayKey, tz);
@@ -232,7 +320,23 @@ export function VisitsAgendaClient({
   const selectDay = useCallback((dayKey: string) => {
     setSelectedDayKey(dayKey);
     setMiniMonthAnchor(dayKey);
+    setWeekMonday(startOfIsoWeekMonday(dayKey, tz));
     setSelectedVisitId(null);
+  }, [tz]);
+
+  const focusVisit = useCallback(
+    (dayKey: string, visitId: string, openDetail = false) => {
+      setSelectedDayKey(dayKey);
+      setMiniMonthAnchor(dayKey);
+      setWeekMonday(startOfIsoWeekMonday(dayKey, tz));
+      setSelectedVisitId(visitId);
+      if (openDetail) setDetailDialogOpen(true);
+    },
+    [tz],
+  );
+
+  const setView = useCallback((view: ScheduleView) => {
+    setScheduleView(view);
   }, []);
 
   const handleVisitDrop = useCallback((visitId: string, newStartIso: string, oldStartIso: string) => {
@@ -272,11 +376,6 @@ export function VisitsAgendaClient({
     setScheduleDialogOpen(true);
   }, []);
 
-  const monthCells = useMemo(
-    () => monthCalendarCells(miniMonthAnchor, tz),
-    [miniMonthAnchor, tz],
-  );
-
   const canStartVisit = useCallback(
     (v: ScheduledVisitWithTargets) =>
       (v.status === "scheduled" || v.status === "in_progress") &&
@@ -293,8 +392,9 @@ export function VisitsAgendaClient({
               Agenda de visitas
             </h1>
             <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-              Grelha semanal hora a hora no seu fuso horário (Definições → Região).
-              Selecione um bloco para ver o detalhe à direita.
+              Agenda no seu fuso horário (Definições → Região). Vistas semana,
+              mês, dia e lista — selecione um compromisso para ver o detalhe à
+              direita.
             </p>
           </div>
           <button
@@ -449,29 +549,29 @@ export function VisitsAgendaClient({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => goWeek(-1)}
+                  onClick={() => goPeriod(-1)}
                   className={cn(
                     buttonVariants({ variant: "ghost", size: "icon-sm" }),
                     "min-h-11 min-w-11",
                   )}
-                  aria-label="Semana anterior"
+                  aria-label={periodNavLabel.prev}
                 >
                   <ChevronLeft className="size-4" />
                 </button>
                 <button
                   type="button"
-                  onClick={() => goWeek(1)}
+                  onClick={() => goPeriod(1)}
                   className={cn(
                     buttonVariants({ variant: "ghost", size: "icon-sm" }),
                     "min-h-11 min-w-11",
                   )}
-                  aria-label="Semana seguinte"
+                  aria-label={periodNavLabel.next}
                 >
                   <ChevronRight className="size-4" />
                 </button>
               </div>
-              <p className="text-foreground text-sm font-semibold sm:min-w-[12rem] sm:text-center">
-                {formatWeekRangeLabel(weekMonday, tz)}
+              <p className="text-foreground text-sm font-semibold capitalize sm:min-w-[12rem] sm:text-center">
+                {periodLabel}
               </p>
               <button
                 type="button"
@@ -490,53 +590,35 @@ export function VisitsAgendaClient({
               role="group"
               aria-label="Tipo de vista"
             >
-              <button
-                type="button"
-                onClick={() => setScheduleView("week")}
-                className={cn(
-                  "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  scheduleView === "week"
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                Semana
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Brevemente"
-                className="text-muted-foreground cursor-not-allowed rounded-md px-2.5 py-1.5 text-xs font-medium opacity-50"
-              >
-                Mês
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Brevemente"
-                className="text-muted-foreground cursor-not-allowed rounded-md px-2.5 py-1.5 text-xs font-medium opacity-50"
-              >
-                Dia
-              </button>
-              <button
-                type="button"
-                onClick={() => setScheduleView("list")}
-                className={cn(
-                  "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  scheduleView === "list"
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                Lista
-              </button>
+              {(
+                [
+                  { value: "week", label: "Semana" },
+                  { value: "month", label: "Mês" },
+                  { value: "day", label: "Dia" },
+                  { value: "list", label: "Lista" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setView(opt.value)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    scheduleView === opt.value
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {scheduleView === "week" ? (
+          {scheduleView === "week" || scheduleView === "day" ? (
             <VisitWeekTimeGrid
               timeZone={tz}
-              weekKeys={weekKeys}
+              weekKeys={scheduleView === "day" ? [effectiveDayKey] : weekKeys}
               todayKey={todayKey}
               effectiveDayKey={effectiveDayKey}
               effectiveSelectedVisitId={effectiveSelectedVisitId}
@@ -545,16 +627,33 @@ export function VisitsAgendaClient({
               agendaEndHour={agendaEndHour}
               onSelectDay={selectDay}
               onSelectVisit={(dayKey, visitId) => {
-                setSelectedDayKey(dayKey);
-                setSelectedVisitId(visitId);
+                focusVisit(dayKey, visitId);
               }}
               onVisitDoubleClick={(dayKey, visitId) => {
-                setSelectedDayKey(dayKey);
-                setSelectedVisitId(visitId);
-                setDetailDialogOpen(true);
+                focusVisit(dayKey, visitId, true);
               }}
               onVisitDrop={handleVisitDrop}
               onSlotClick={handleSlotClick}
+            />
+          ) : scheduleView === "month" ? (
+            <VisitMonthGrid
+              timeZone={tz}
+              cells={monthViewCells}
+              todayKey={todayKey}
+              effectiveDayKey={effectiveDayKey}
+              effectiveSelectedVisitId={effectiveSelectedVisitId}
+              getVisitsForDay={getVisitsForDay}
+              onSelectDay={selectDay}
+              onSelectVisit={(dayKey, visitId) => {
+                focusVisit(dayKey, visitId);
+              }}
+              onVisitDoubleClick={(dayKey, visitId) => {
+                focusVisit(dayKey, visitId, true);
+              }}
+              onDayDoubleClick={(dayKey) => {
+                selectDay(dayKey);
+                setView("day");
+              }}
             />
           ) : (
             <div className="border-border rounded-xl border">
@@ -695,7 +794,7 @@ export function VisitsAgendaClient({
             ))}
           </div>
           <div className="grid grid-cols-7 gap-1">
-            {monthCells.map(({ key, inMonth }) => {
+            {monthViewCells.map(({ key, inMonth }) => {
               const count = (byDay.get(key) ?? []).length;
               const isSel = key === effectiveDayKey;
               const isTodayM = key === todayKey;
@@ -705,7 +804,6 @@ export function VisitsAgendaClient({
                   type="button"
                   onClick={() => {
                     selectDay(key);
-                    setWeekMonday(startOfIsoWeekMonday(key, tz));
                   }}
                   className={cn(
                     "relative flex aspect-square max-h-9 flex-col items-center justify-center rounded-lg text-xs font-medium transition-colors",

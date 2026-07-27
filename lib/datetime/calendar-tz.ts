@@ -55,6 +55,21 @@ export function addCalendarDays(
   return visitDayKey(base.toISOString(), timeZone);
 }
 
+/** Avança/recua meses civis; mantém o dia quando possível (ex.: 31 → último do mês). */
+export function addCalendarMonths(
+  dayKey: string,
+  deltaMonths: number,
+  timeZone: string,
+): string {
+  const [y, m, d] = dayKey.split("-").map(Number);
+  const target = new Date(Date.UTC(y, m - 1 + deltaMonths, 1, 12, 0, 0));
+  const lastDay = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0, 12, 0, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return visitDayKey(target.toISOString(), timeZone);
+}
+
 const WEEKDAY_MON0: Record<string, number> = {
   Mon: 0,
   Tue: 1,

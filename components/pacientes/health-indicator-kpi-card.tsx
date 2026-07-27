@@ -266,6 +266,8 @@ function ChartScrollArea({
     return <ChartStage>{children(false, "100%")}</ChartStage>;
   }
 
+  const scrollPlotWidth = pointCount * PX_PER_POINT;
+
   return (
     <ChartStage scrollable>
       <div
@@ -276,9 +278,13 @@ function ChartScrollArea({
         {/* Padding horizontal evita corte das datas nas extremidades ao rolar. */}
         <div
           className="px-3"
-          style={{ width: plotWidth + 24, minWidth: plotWidth + 24, height: SPARKLINE_HEIGHT }}
+          style={{
+            width: scrollPlotWidth + 24,
+            minWidth: scrollPlotWidth + 24,
+            height: SPARKLINE_HEIGHT,
+          }}
         >
-          {children(true, plotWidth)}
+          {children(true, scrollPlotWidth)}
         </div>
       </div>
       <p className="px-2 pb-1 text-[10px] text-muted-foreground/80">

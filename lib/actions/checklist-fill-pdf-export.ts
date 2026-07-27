@@ -49,6 +49,33 @@ export async function generateDossierPdfAction(
     };
   }
 
+  // Se já existe PDF vigente gravado, devolve-o — não cria nova versão.
+  const { data: existingReady } = await supabase
+    .from("checklist_fill_pdf_exports")
+    .select(
+      "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
+    )
+    .eq("session_id", sessionId)
+    .eq("status", "ready")
+    .is("superseded_at", null)
+    .not("storage_path", "is", null)
+    .order("version_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingReady?.id && existingReady.storage_path) {
+    const downloadUrl = `/api/checklists/dossier-pdf/${existingReady.id}`;
+    const suggestedFilename =
+      (await resolveChecklistDossierPdfFilename(supabase, existingReady.id as string)) ??
+      `dossie-checklist-${sessionId.slice(0, 8)}.pdf`;
+    return {
+      ok: true,
+      job: existingReady as ChecklistFillPdfExportRow,
+      downloadUrl,
+      suggestedFilename,
+    };
+  }
+
   const { data: maxVerRow } = await supabase
     .from("checklist_fill_pdf_exports")
     .select("version_number")
@@ -199,7 +226,7 @@ export async function downloadDossierPdfAction(
     .maybeSingle();
 
   if (!row || row.status !== "ready" || !row.storage_path) {
-    return { ok: false, error: "PDF não disponível. Gere novamente." };
+    return { ok: false, error: "PDF não disponível. Gere o PDF primeiro." };
   }
 
   if (row.superseded_at) {

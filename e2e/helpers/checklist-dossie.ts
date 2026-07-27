@@ -196,9 +196,14 @@ export async function runChecklistDossieFlow(
   const downloadPromise = page.waitForEvent("download", {
     timeout: 180_000,
   });
-  await page
-    .getByRole("button", { name: /Gerar PDF|Gerar novamente/ })
-    .click();
+  const generateBtn = page.getByRole("button", { name: "Gerar PDF" });
+  const downloadBtn = page.getByRole("button", { name: "Baixar PDF" });
+  if (await generateBtn.isVisible().catch(() => false)) {
+    await generateBtn.click();
+  } else {
+    await expect(downloadBtn).toBeVisible({ timeout: 30_000 });
+    await downloadBtn.click();
+  }
   const download = await downloadPromise;
 
   expect(download.suggestedFilename()).toMatch(/\.pdf$/i);

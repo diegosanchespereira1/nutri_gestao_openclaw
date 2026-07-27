@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Eye, FileDown, Loader2, Mail, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, FileDown, Loader2, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -24,10 +24,11 @@ type Props = {
 
 function formatJobTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString("pt-BR", {
+    return new Intl.DateTimeFormat("pt-BR", {
       dateStyle: "short",
       timeStyle: "short",
-    });
+      timeZone: "America/Sao_Paulo",
+    }).format(new Date(iso));
   } catch {
     return iso;
   }
@@ -135,12 +136,13 @@ export function ChecklistFillDossierPdfCard({
 
   const showProcessing =
     job?.status === "processing" || job?.status === "pending";
+  const hasReadyPdf = job?.status === "ready" && Boolean(job.storage_path);
 
   return (
     <div className="border-border rounded-lg border bg-background p-4 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <p className="text-foreground font-medium">PDF do relatório</p>
-        {job?.status === "ready" && job.version_number ? (
+        {hasReadyPdf && job?.version_number ? (
           <span className="bg-muted text-foreground/90 rounded-md px-2 py-0.5 text-xs font-semibold tabular-nums">
             PDF v{job.version_number}
           </span>
@@ -148,18 +150,21 @@ export function ChecklistFillDossierPdfCard({
       </div>
       <p className="text-foreground/85 mt-1 text-xs">
         Relatório com texto do dossiê, identificação do profissional (CRN) e fotos de evidência embutidas no PDF.
+        {hasReadyPdf
+          ? " O ficheiro gravado inclui o hash, a data e o IP do dispositivo da aprovação."
+          : ""}
       </p>
 
       {showProcessing ? (
         <p className="text-muted-foreground mt-2 flex items-center gap-2 text-xs">
           <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden />
-          Gerando PDF… Se ficar preso, recarregue a página ou tente gerar de novo.
+          Gerando PDF… Se ficar preso, recarregue a página.
         </p>
       ) : null}
 
-      {job?.status === "ready" ? (
-        <p className="text-foreground/85 mt-2 text-xs">
-          Último PDF: {formatJobTime(job.updated_at ?? job.created_at)}
+      {hasReadyPdf && job ? (
+        <p className="text-foreground/85 mt-2 text-xs" suppressHydrationWarning>
+          PDF gravado em {formatJobTime(job.updated_at ?? job.created_at)}
         </p>
       ) : null}
 
@@ -176,22 +181,7 @@ export function ChecklistFillDossierPdfCard({
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending}
-          onClick={() => void handleGenerate()}
-          className="gap-1.5"
-        >
-          {pending ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          ) : job?.status === "ready" ? (
-            <RefreshCw className="size-4" aria-hidden />
-          ) : null}
-          {job?.status === "ready" ? "Gerar novamente" : "Gerar PDF"}
-        </Button>
-
-        {job?.status === "ready" ? (
+        {hasReadyPdf ? (
           <>
             <Button
               type="button"
@@ -211,7 +201,6 @@ export function ChecklistFillDossierPdfCard({
 
             <Button
               type="button"
-              variant="outline"
               size="sm"
               disabled={downloadPending}
               onClick={() => void handleDownload()}
@@ -225,6 +214,19 @@ export function ChecklistFillDossierPdfCard({
               Baixar PDF
             </Button>
           </>
+        ) : !showProcessing ? (
+          <Button
+            type="button"
+            size="sm"
+            disabled={pending}
+            onClick={() => void handleGenerate()}
+            className="gap-1.5"
+          >
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+            ) : null}
+            Gerar PDF
+          </Button>
         ) : null}
       </div>
 

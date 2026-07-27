@@ -1459,29 +1459,30 @@ export function ChecklistFillWizard({
             ) : null}
             <p className="text-muted-foreground mt-1 text-sm">
               {dossierApprovedAt
-                ? "Dossiê aprovado. Você pode editar as respostas a qualquer momento."
+                ? "Dossiê aprovado em modo leitura. Para alterar respostas, use Reabrir dossiê (com justificativa)."
                 : "Visualização do dossiê desta sessão."}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={
-                backHref && backHref !== "/checklists"
-                  ? `/checklists/preencher/${sessionId}?returnTo=${encodeURIComponent(backHref)}`
-                  : `/checklists/preencher/${sessionId}`
-              }
-              className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}
-            >
-              <Pencil className="size-4 shrink-0" aria-hidden />
-              Editar respostas
-            </Link>
-            {dossierApprovedAt ? (
+            {!dossierApprovedAt ? (
+              <Link
+                href={
+                  backHref && backHref !== "/checklists"
+                    ? `/checklists/preencher/${sessionId}?returnTo=${encodeURIComponent(backHref)}`
+                    : `/checklists/preencher/${sessionId}`
+                }
+                className={cn(buttonVariants({ variant: "default", size: "sm" }), "gap-1.5")}
+              >
+                <Pencil className="size-4 shrink-0" aria-hidden />
+                Editar respostas
+              </Link>
+            ) : (
               <ChecklistReopenDialog
                 sessionId={sessionId}
                 canReopen={canReopenDossier}
                 onReopened={handleDossierReopened}
               />
-            ) : null}
+            )}
             <Link
               href={backHref}
               className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
@@ -1523,7 +1524,7 @@ export function ChecklistFillWizard({
           heading={dossierApprovedAt ? "Dossiê aprovado" : "Dossiê em andamento"}
           intro={
             dossierApprovedAt
-              ? "Dossiê aprovado. Use \"Editar respostas\" para alterar itens a qualquer momento."
+              ? "Dossiê aprovado — conteúdo em modo leitura. Para alterar itens, use Reabrir dossiê."
               : "Modo de visualização. Use \"Editar respostas\" para continuar o preenchimento."
           }
           professionalSignatureDataUrl={savedProfessionalSig}
@@ -1576,9 +1577,9 @@ export function ChecklistFillWizard({
             <>
               {dossierApprovedAt ? (
                 <p className="text-muted-foreground mt-2 text-sm">
-                  Dossiê aprovado em {formatDossierApprovedLabel(dossierApprovedAt)}. Você
-                  pode alterar respostas normalmente; o PDF vigente será atualizado na
-                  próxima geração.
+                  Dossiê aprovado em {formatDossierApprovedLabel(dossierApprovedAt)}. As
+                  respostas estão bloqueadas para preservar rastreabilidade (hash, data e
+                  IP). Para alterar, use Reabrir dossiê.
                 </p>
               ) : null}
               <div className="mt-2 border-l-2 border-primary pl-3">

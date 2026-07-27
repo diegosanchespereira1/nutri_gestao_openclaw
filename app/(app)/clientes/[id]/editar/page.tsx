@@ -352,6 +352,19 @@ async function ClientEditLoadedPanels({
         </>
       ) : null}
 
+      {row.kind === "pj" && estRow?.id ? (
+        <>
+          <Separator className="my-8" />
+          <PatientsSection
+            variant="establishment"
+            clientId={row.id}
+            establishmentId={estRow.id}
+            establishmentName={estRow.name}
+            returnToOrigin={returnToOrigin}
+          />
+        </>
+      ) : null}
+
       {!canDelete ? null : (
         <>
           <Separator className="my-8" />

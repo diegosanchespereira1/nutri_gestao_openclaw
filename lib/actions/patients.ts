@@ -14,6 +14,7 @@ import {
 import { emitPatientResponsibleActivityLog } from "@/lib/patients/responsible-audit";
 import type { ClientKind } from "@/lib/types/clients";
 import type {
+  PatientInScope,
   PatientRow,
   PatientSex,
   PatientWithContext,
@@ -120,6 +121,44 @@ function parsePatientDocument(raw: string):
 // Queries
 // ─────────────────────────────────────────────────────────────────────────────
 
+type PatientScopeDbRow = PatientRow & {
+  client_school_grades:
+    | { name: string; position: number }
+    | { name: string; position: number }[]
+    | null;
+};
+
+function mapPatientInScope(row: PatientScopeDbRow): PatientInScope {
+  const grade = Array.isArray(row.client_school_grades)
+    ? (row.client_school_grades[0] ?? null)
+    : row.client_school_grades;
+  const { client_school_grades: _gradeJoin, ...patient } = row;
+  return {
+    ...(patient as PatientRow),
+    school_grade_name: grade?.name ?? null,
+    school_grade_position: grade?.position ?? null,
+  };
+}
+
+function comparePatientsInScope(a: PatientInScope, b: PatientInScope): number {
+  const aHasGrade = a.school_grade_name != null;
+  const bHasGrade = b.school_grade_name != null;
+  if (aHasGrade !== bHasGrade) return aHasGrade ? -1 : 1;
+
+  const posA = a.school_grade_position ?? 0;
+  const posB = b.school_grade_position ?? 0;
+  if (posA !== posB) return posA - posB;
+
+  const gradeCmp = (a.school_grade_name ?? "").localeCompare(
+    b.school_grade_name ?? "",
+    "pt",
+    { sensitivity: "base" },
+  );
+  if (gradeCmp !== 0) return gradeCmp;
+
+  return a.full_name.localeCompare(b.full_name, "pt", { sensitivity: "base" });
+}
+
 export async function loadPatientsForScope(
   scope:
     | { variant: "client_pf"; clientId: string }
@@ -128,7 +167,7 @@ export async function loadPatientsForScope(
         clientId: string;
         establishmentId: string;
       },
-): Promise<{ rows: PatientRow[] }> {
+): Promise<{ rows: PatientInScope[] }> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -137,8 +176,7 @@ export async function loadPatientsForScope(
 
   let q = supabase
     .from("patients")
-    .select("*")
-    .order("created_at", { ascending: false });
+    .select("*, client_school_grades ( name, position )");
 
   if (scope.variant === "client_pf") {
     q = q.eq("client_id", scope.clientId).is("establishment_id", null);
@@ -148,7 +186,12 @@ export async function loadPatientsForScope(
 
   const { data, error } = await q;
   if (error || !data) return { rows: [] };
-  return { rows: data as PatientRow[] };
+
+  return {
+    rows: (data as PatientScopeDbRow[])
+      .map(mapPatientInScope)
+      .sort(comparePatientsInScope),
+  };
 }
 
 /** Pacientes do cliente que ainda não têm estabelecimento — candidatos para associação. */

@@ -35,3 +35,9 @@ export type PatientWithContext = PatientRow & {
   } | null;
   establishments: { name: string } | null;
 };
+
+/** Paciente no âmbito de um cliente/estabelecimento, com nome da série/turma. */
+export type PatientInScope = PatientRow & {
+  school_grade_name: string | null;
+  school_grade_position: number | null;
+};

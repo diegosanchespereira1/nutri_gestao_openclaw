@@ -8,7 +8,14 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { formatCpfDisplay } from "@/lib/format/br-document";
 import { withReturnTo } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
-import type { PatientRow } from "@/lib/types/patients";
+import type { PatientInScope } from "@/lib/types/patients";
+
+function formatBirthDate(iso: string | null): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
 
 function calcAge(birthDate: string): string {
   const today = new Date();
@@ -27,7 +34,7 @@ export function EstablishmentPatientsList({
   returnToOrigin,
   associateSlot,
 }: {
-  patients: PatientRow[];
+  patients: PatientInScope[];
   novoHref: string;
   /** URL actual da página (path+query) para o botão voltar. */
   returnToOrigin: string;
@@ -37,9 +44,13 @@ export function EstablishmentPatientsList({
   const novoHrefWithReturn = withReturnTo(novoHref, returnToOrigin);
 
   const filtered = query.trim()
-    ? patients.filter((p) =>
-        p.full_name.toLowerCase().includes(query.trim().toLowerCase()),
-      )
+    ? patients.filter((p) => {
+        const q = query.trim().toLowerCase();
+        return (
+          p.full_name.toLowerCase().includes(q) ||
+          (p.school_grade_name?.toLowerCase().includes(q) ?? false)
+        );
+      })
     : patients;
 
   return (
@@ -47,7 +58,7 @@ export function EstablishmentPatientsList({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Input
           type="search"
-          placeholder="Buscar paciente por nome…"
+          placeholder="Buscar por nome ou série/turma…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="max-w-sm"
@@ -83,32 +94,62 @@ export function EstablishmentPatientsList({
           </p>
         </div>
       ) : (
-        <ul
-          className="divide-y divide-border overflow-hidden rounded-lg border border-border"
-          aria-label="Lista de pacientes"
-        >
-          {filtered.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={withReturnTo(`/pacientes/${p.id}`, returnToOrigin)}
-                className="flex items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <div>
-                  <span className="font-medium text-foreground">{p.full_name}</span>
-                  <span className="mt-0.5 block text-sm text-muted-foreground">
-                    {p.birth_date ? calcAge(p.birth_date) : "Idade não informada"}
-                    {p.document_id
-                      ? ` · CPF: ${formatCpfDisplay(p.document_id)}`
-                      : ""}
-                  </span>
-                </div>
-                <span className="ml-4 shrink-0 text-sm font-medium text-primary">
-                  Ver prontuário →
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto rounded-lg border border-border bg-white">
+          <table className="w-full min-w-[560px] text-left text-sm" aria-label="Lista de pacientes">
+            <thead className="border-b border-border bg-primary/10 dark:bg-primary/15">
+              <tr>
+                <th className="px-4 py-3 font-bold text-foreground">Nome</th>
+                <th className="px-4 py-3 font-bold text-foreground">Série / turma</th>
+                <th className="px-4 py-3 font-bold text-foreground">Idade</th>
+                <th className="px-4 py-3 font-bold text-foreground">CPF</th>
+                <th className="w-36 px-4 py-3 font-bold text-foreground">
+                  <span className="sr-only">Ações</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((p) => (
+                <tr
+                  key={p.id}
+                  className="border-b border-border last:border-0 hover:bg-muted/50"
+                >
+                  <td className="px-4 py-3">
+                    <Link
+                      href={withReturnTo(`/pacientes/${p.id}`, returnToOrigin)}
+                      className="rounded-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      {p.full_name}
+                    </Link>
+                    {p.birth_date ? (
+                      <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">
+                        Nasc.: {formatBirthDate(p.birth_date)}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {p.school_grade_name ?? (
+                      <span className="italic text-muted-foreground/70">Sem série</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                    {p.birth_date ? calcAge(p.birth_date) : "—"}
+                  </td>
+                  <td className="px-4 py-3 tabular-nums text-muted-foreground">
+                    {p.document_id ? formatCpfDisplay(p.document_id) : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={withReturnTo(`/pacientes/${p.id}`, returnToOrigin)}
+                      className="rounded-sm text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      Ver prontuário →
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {filtered.length > 0 && (

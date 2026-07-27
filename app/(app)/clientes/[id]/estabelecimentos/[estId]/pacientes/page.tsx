@@ -14,7 +14,6 @@ import {
   withReturnTo,
 } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
-import type { PatientRow } from "@/lib/types/patients";
 
 export default async function EstabelecimentoPacientesPage({
   params,
@@ -72,7 +71,7 @@ export default async function EstabelecimentoPacientesPage({
       />
 
       <EstablishmentPatientsList
-        patients={rows as PatientRow[]}
+        patients={rows}
         novoHref={novoHref}
         returnToOrigin={returnToOrigin}
         associateSlot={

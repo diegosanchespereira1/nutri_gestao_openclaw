@@ -148,7 +148,7 @@ export function VisitWeekTimeGrid({
   return (
     <div className="border-border max-w-full rounded-xl border">
       <div className="max-h-[min(72vh,880px)] max-w-full overflow-auto overscroll-x-contain [-webkit-overflow-scrolling:touch]">
-        <div className="w-max min-w-[44rem] sm:min-w-[52rem]">
+        <div className="w-full min-w-[44rem] sm:min-w-[52rem]">
           {/* Cabeçalho: canto + dias */}
           <div className="bg-muted/30 border-border sticky top-0 z-40 flex border-b">
             <div

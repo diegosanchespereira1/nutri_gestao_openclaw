@@ -32,7 +32,7 @@ import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
 import type { TeamMemberRow } from "@/lib/types/team-members";
 import type { ClientLifecycleStatus } from "@/lib/types/clients";
-import type { VisitKind, VisitTargetType } from "@/lib/types/visits";
+import type { VisitKind, VisitPriority, VisitTargetType } from "@/lib/types/visits";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,8 @@ const textareaClass =
   "border-input bg-background placeholder:text-muted-foreground box-border flex min-h-[72px] min-w-0 w-full max-w-full resize-y break-words rounded-md border px-3 py-2 text-sm outline-none transition-[color,box-shadow] focus:border-ring focus:ring-2 focus:ring-inset focus:ring-ring/40";
 
 const fieldClassName = "flex min-w-0 flex-col gap-2";
+
+const selectTriggerClassName = "w-full";
 
 function schedulingBlockedSuffix(status: ClientLifecycleStatus): string {
   if (status === "ativo") return "";
@@ -242,8 +244,15 @@ export function VisitScheduleDialog({
                 <div className={fieldClassName}>
                   <Label htmlFor="dlg-establishment">Estabelecimento (cliente PJ)</Label>
                   <Select name="establishment_id" required modal={false}>
-                    <SelectTrigger id="dlg-establishment" className="w-full">
-                      <SelectValue placeholder="— Selecionar —" />
+                    <SelectTrigger id="dlg-establishment" className={selectTriggerClassName}>
+                      <SelectValue placeholder="— Selecionar —">
+                        {(selected) => {
+                          if (!selected) return null;
+                          const est = establishments.find((e) => e.id === selected);
+                          if (!est) return selected;
+                          return `${est.name} — ${establishmentClientLabel(est)}${schedulingBlockedSuffix(est.clients.lifecycle_status)}`;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {establishments.map((est) => {
@@ -270,8 +279,21 @@ export function VisitScheduleDialog({
                 <div className={fieldClassName}>
                   <Label htmlFor="dlg-patient">Paciente</Label>
                   <Select name="patient_id" required modal={false}>
-                    <SelectTrigger id="dlg-patient" className="w-full">
-                      <SelectValue placeholder="— Selecionar —" />
+                    <SelectTrigger id="dlg-patient" className={selectTriggerClassName}>
+                      <SelectValue placeholder="— Selecionar —">
+                        {(selected) => {
+                          if (!selected) return null;
+                          const p = patients.find((x) => x.id === selected);
+                          if (!p) return selected;
+                          const life = (p.clients?.lifecycle_status ??
+                            "ativo") as ClientLifecycleStatus;
+                          return `${p.full_name}${
+                            p.clients?.legal_name
+                              ? ` (${p.clients.legal_name})`
+                              : ""
+                          }${schedulingBlockedSuffix(life)}`;
+                        }}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {patients.map((p) => {
@@ -311,8 +333,14 @@ export function VisitScheduleDialog({
                     if (next) setVisitKind(next as VisitKind);
                   }}
                 >
-                  <SelectTrigger id="dlg-visit-kind" className="w-full">
-                    <SelectValue />
+                  <SelectTrigger id="dlg-visit-kind" className={selectTriggerClassName}>
+                    <SelectValue>
+                      {(selected) =>
+                        selected
+                          ? visitKindLabel[selected as VisitKind] ?? selected
+                          : null
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {VISIT_KINDS.map((k) => (
@@ -341,8 +369,22 @@ export function VisitScheduleDialog({
                     if (next) setAssigneeId(next);
                   }}
                 >
-                  <SelectTrigger id="dlg-assignee" className="w-full">
-                    <SelectValue />
+                  <SelectTrigger id="dlg-assignee" className={selectTriggerClassName}>
+                    <SelectValue>
+                      {(selected) => {
+                        if (!selected) return null;
+                        if (
+                          selected === selfAssigneeValue ||
+                          selected === SELF_ASSIGNEE_EMPTY
+                        ) {
+                          return assigneeContext.selfAssigneeLabel;
+                        }
+                        return (
+                          teamMembers.find((m) => m.id === selected)?.full_name ??
+                          selected
+                        );
+                      }}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={selfAssigneeValue}>
@@ -383,8 +425,15 @@ export function VisitScheduleDialog({
                     modal={false}
                     defaultValue="normal"
                   >
-                    <SelectTrigger id="dlg-priority" className="w-full">
-                      <SelectValue />
+                    <SelectTrigger id="dlg-priority" className={selectTriggerClassName}>
+                      <SelectValue>
+                        {(selected) =>
+                          selected
+                            ? visitPriorityLabel[selected as VisitPriority] ??
+                              selected
+                            : null
+                        }
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {VISIT_PRIORITIES.map((p) => (

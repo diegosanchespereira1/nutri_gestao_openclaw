@@ -73,17 +73,19 @@ export function NutritionAssessmentsTabs({
   if (tabs.length === 1) return <>{tabs[0].content}</>;
 
   return (
-    <Tabs defaultValue={tabs[0].value}>
-      <TabsList className="flex h-auto min-h-10 w-full flex-wrap gap-1">
-        {tabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value}>
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+    <Tabs defaultValue={tabs[0].value} className="space-y-5">
+      <div className="rounded-2xl border border-border/60 bg-card/90 p-1.5 shadow-sm sm:p-2">
+        <TabsList className="flex h-auto min-h-10 w-full flex-wrap gap-1 bg-transparent p-0">
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
 
       {tabs.map((tab) => (
-        <TabsContent key={tab.value} value={tab.value}>
+        <TabsContent key={tab.value} value={tab.value} className="mt-0">
           {tab.content}
         </TabsContent>
       ))}

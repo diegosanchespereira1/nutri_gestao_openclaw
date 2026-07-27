@@ -20,16 +20,18 @@ export function AssessmentFormSection({
   return (
     <section
       className={cn(
-        "space-y-4 rounded-2xl border border-border/60 bg-card/90 p-5 shadow-sm sm:p-6",
+        "space-y-4 rounded-2xl border border-border/60 bg-card/90 p-4 shadow-sm sm:p-5",
         className,
       )}
     >
-      <div>
-        <h2 className="text-lg font-bold tracking-tight text-foreground">{title}</h2>
+      <header className="space-y-0.5">
+        <h2 className="text-base font-bold tracking-tight text-foreground sm:text-lg">
+          {title}
+        </h2>
         {description ? (
-          <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
         ) : null}
-      </div>
+      </header>
       {children}
     </section>
   );
@@ -54,28 +56,30 @@ export function AssessmentCalcChip({
   return (
     <div
       className={cn(
-        "rounded-2xl border px-4 py-3",
+        "rounded-xl border px-3 py-2.5 sm:px-4 sm:py-3",
         highlight
           ? "border-primary/25 bg-primary/5"
           : "border-border/60 bg-background/80",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground/80">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground/80">
           {label}
         </p>
         {code ? (
-          <span className="rounded-full border border-teal-500/20 bg-teal-500/10 px-2 py-0.5 text-[10px] font-bold tracking-wider text-teal-800 dark:text-teal-200">
+          <span className="shrink-0 rounded-md border border-teal-500/20 bg-teal-500/10 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-teal-800 dark:text-teal-200">
             {code}
           </span>
         ) : null}
       </div>
-      <p className="mt-1 font-mono text-xl font-bold tabular-nums tracking-tight text-foreground">
+      <p className="mt-1 font-mono text-lg font-bold tabular-nums tracking-tight text-foreground sm:text-xl">
         {value}{" "}
         <span className="text-sm font-normal text-muted-foreground">{unit}</span>
       </p>
       {formula ? (
-        <p className="mt-1 text-[11px] text-muted-foreground">{formula}</p>
+        <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
+          {formula}
+        </p>
       ) : null}
     </div>
   );

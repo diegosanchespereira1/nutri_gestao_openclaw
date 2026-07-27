@@ -183,277 +183,287 @@ export function AdultNutritionAssessmentForm({
         value={np !== null ? String(np) : ""}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <AssessmentFormSection
-          title="Perfil do paciente"
-          description="Dados usados nas equações de estimativa"
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-group">Grupo (sexo / etnia)</Label>
-              <select
-                id="adult-group"
-                name="patient_group"
-                className={nativeSelectClass}
-                value={group}
-                onChange={(e) => setGroup(e.target.value as PatientGroup)}
-              >
-                {(
-                  Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]
-                ).map(([val, label]) => (
-                  <option key={val} value={val}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">
-                <strong>Peso estimado:</strong> mesma equação para todos (
-                {ADULT_ESTIMATED_WEIGHT_FORMULA_DESC}).{" "}
-                <strong>Altura estimada:</strong> Chumlea et al. (1985), faixa adulta
-                18–60 anos; mulheres precisam de idade no cálculo. A CB não entra no
-                cálculo da altura.
-              </p>
-            </div>
+      <div className="space-y-4 sm:space-y-5">
+        {/* Coleta (esq.) · Resultados (dir.) — pilhas independentes, sem buracos */}
+        <div className="grid gap-4 sm:gap-5 lg:grid-cols-2 lg:items-start">
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+            <AssessmentFormSection
+              title="Perfil do paciente"
+              description="Dados usados nas equações de estimativa"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-group">Grupo (sexo / etnia)</Label>
+                  <select
+                    id="adult-group"
+                    name="patient_group"
+                    className={nativeSelectClass}
+                    value={group}
+                    onChange={(e) => setGroup(e.target.value as PatientGroup)}
+                  >
+                    {(
+                      Object.entries(PATIENT_GROUP_LABELS) as [
+                        PatientGroup,
+                        string,
+                      ][]
+                    ).map(([val, label]) => (
+                      <option key={val} value={val}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-age">Idade (anos)</Label>
-              <Input
-                id="adult-age"
-                name="age_years"
-                type="number"
-                min={0}
-                max={130}
-                step={1}
-                inputMode="numeric"
-                placeholder="Ex.: 42 — obrigatória para altura (mulheres)"
-                className="tabular-nums"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
-              <input
-                type="checkbox"
-                className="h-4 w-4 rounded border-input"
-                checked={hasAmputation}
-                onChange={(e) => setHasAmputation(e.target.checked)}
-              />
-              Membro amputado
-            </label>
-
-            {hasAmputation ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Label htmlFor="adult-amp-pct" className="whitespace-nowrap text-sm">
-                  % do segmento amputado
-                </Label>
-                <Input
-                  id="adult-amp-pct"
-                  name="amputation_segment_pct"
-                  type="number"
-                  min={0.1}
-                  max={99.9}
-                  step={0.1}
-                  className="w-24 tabular-nums"
-                  value={ampPct}
-                  onChange={(e) => setAmpPct(e.target.value)}
-                />
-                <span className="text-xs text-muted-foreground">
-                  coxa = 10,0% · perna + pé = 5,9% · pé = 1,8%
-                </span>
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-age">Idade (anos)</Label>
+                  <Input
+                    id="adult-age"
+                    name="age_years"
+                    type="number"
+                    min={0}
+                    max={130}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder="Ex.: 42"
+                    className="tabular-nums"
+                    value={age}
+                    onChange={(e) => setAge(e.target.value)}
+                  />
+                </div>
               </div>
-            ) : null}
-          </div>
-        </AssessmentFormSection>
-
-        <AssessmentFormSection
-          title="Medidas antropométricas"
-          description="Preencha as medidas coletadas nesta avaliação"
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-cb">CB — circunferência do braço (cm)</Label>
-              <Input
-                id="adult-cb"
-                name="cb_cm"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 23"
-                className="tabular-nums"
-                value={cb}
-                onChange={(e) => setCb(e.target.value)}
-              />
-            </div>
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-dct">DCT — dobra cutânea tricipital (mm)</Label>
-              <Input
-                id="adult-dct"
-                name="dct_mm"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 8"
-                className="tabular-nums"
-                value={dct}
-                onChange={(e) => setDct(e.target.value)}
-              />
-            </div>
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-cp">CP — circunferência da panturrilha (cm)</Label>
-              <Input
-                id="adult-cp"
-                name="cp_cm"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 27"
-                className="tabular-nums"
-                value={cp}
-                onChange={(e) => setCp(e.target.value)}
-              />
-            </div>
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-aj">AJ — altura do joelho (cm)</Label>
-              <Input
-                id="adult-aj"
-                name="aj_cm"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 48,5"
-                className="tabular-nums"
-                value={aj}
-                onChange={(e) => setAj(e.target.value)}
-              />
-            </div>
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-weight">Peso real (kg)</Label>
-              <Input
-                id="adult-weight"
-                name="weight_real_kg"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Opcional"
-                className="tabular-nums"
-                value={weightReal}
-                onChange={(e) => setWeightReal(e.target.value)}
-              />
               <p className="text-xs text-muted-foreground">
-                Deixe vazio se o peso não for mensurável.
+                Altura estimada: Chumlea (idade obrigatória para mulheres). Peso
+                estimado: AJ + CB.
               </p>
-            </div>
+
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-input"
+                    checked={hasAmputation}
+                    onChange={(e) => setHasAmputation(e.target.checked)}
+                  />
+                  Membro amputado
+                </label>
+
+                {hasAmputation ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Label
+                      htmlFor="adult-amp-pct"
+                      className="whitespace-nowrap text-sm"
+                    >
+                      % do segmento amputado
+                    </Label>
+                    <Input
+                      id="adult-amp-pct"
+                      name="amputation_segment_pct"
+                      type="number"
+                      min={0.1}
+                      max={99.9}
+                      step={0.1}
+                      className="w-24 tabular-nums"
+                      value={ampPct}
+                      onChange={(e) => setAmpPct(e.target.value)}
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      coxa = 10,0% · perna + pé = 5,9% · pé = 1,8%
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+            </AssessmentFormSection>
+
+            <AssessmentFormSection
+              title="Medidas antropométricas"
+              description="Preencha as medidas coletadas nesta avaliação"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-cb">CB — circ. do braço (cm)</Label>
+                  <Input
+                    id="adult-cb"
+                    name="cb_cm"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Ex.: 23"
+                    className="tabular-nums"
+                    value={cb}
+                    onChange={(e) => setCb(e.target.value)}
+                  />
+                </div>
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-dct">DCT — dobra tricipital (mm)</Label>
+                  <Input
+                    id="adult-dct"
+                    name="dct_mm"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Ex.: 8"
+                    className="tabular-nums"
+                    value={dct}
+                    onChange={(e) => setDct(e.target.value)}
+                  />
+                </div>
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-cp">CP — circ. panturrilha (cm)</Label>
+                  <Input
+                    id="adult-cp"
+                    name="cp_cm"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Ex.: 27"
+                    className="tabular-nums"
+                    value={cp}
+                    onChange={(e) => setCp(e.target.value)}
+                  />
+                </div>
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-aj">AJ — altura do joelho (cm)</Label>
+                  <Input
+                    id="adult-aj"
+                    name="aj_cm"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Ex.: 48,5"
+                    className="tabular-nums"
+                    value={aj}
+                    onChange={(e) => setAj(e.target.value)}
+                  />
+                </div>
+                <div className={cn(formFieldClass, "sm:col-span-2")}>
+                  <Label htmlFor="adult-weight">Peso real (kg)</Label>
+                  <Input
+                    id="adult-weight"
+                    name="weight_real_kg"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Opcional"
+                    className="max-w-xs tabular-nums"
+                    value={weightReal}
+                    onChange={(e) => setWeightReal(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Deixe vazio se o peso não for mensurável.
+                  </p>
+                </div>
+              </div>
+            </AssessmentFormSection>
           </div>
 
-          <AssessmentCalcChip
-            code="CMB"
-            label="Circunferência muscular do braço"
-            value={fmt(cmb)}
-            unit="cm"
-            formula="CMB = CB − (DCT × 0,314)   [Gurney & Jelliffe, 1973]"
-            highlight
-          />
-        </AssessmentFormSection>
+          <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
+            <AssessmentFormSection
+              title="Valores calculados"
+              description="Atualizam automaticamente — não precisam ser preenchidos"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AssessmentCalcChip
+                  code="CMB"
+                  label="Circ. muscular do braço"
+                  value={fmt(cmb)}
+                  unit="cm"
+                  formula="CB − (DCT × 0,314)"
+                  highlight
+                />
+                <AssessmentCalcChip
+                  code="PE"
+                  label="Peso estimado"
+                  value={fmt(pe)}
+                  unit="kg"
+                  formula={peFormula}
+                  highlight
+                />
+                <AssessmentCalcChip
+                  code="AE"
+                  label="Altura estimada"
+                  value={fmt(altura, 3)}
+                  unit="m"
+                  formula={altFormula}
+                  highlight
+                />
+                <AssessmentCalcChip
+                  code="IMC"
+                  label="IMC"
+                  value={fmt(imc)}
+                  unit="kg/m²"
+                  formula={imcFormula}
+                  highlight
+                />
+              </div>
+            </AssessmentFormSection>
+
+            <AssessmentFormSection
+              title="Prescrição energético-proteica"
+              description="Metas por kg · necessidades calculadas abaixo"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-kcal">Kcal/kg · dia</Label>
+                  <Input
+                    id="adult-kcal"
+                    name="kcal_per_kg"
+                    type="number"
+                    step="0.5"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Ex.: 30"
+                    className="tabular-nums"
+                    value={kcal}
+                    onChange={(e) => setKcal(e.target.value)}
+                  />
+                </div>
+                <div className={formFieldClass}>
+                  <Label htmlFor="adult-ptn">g PTN/kg · dia</Label>
+                  <Input
+                    id="adult-ptn"
+                    name="ptn_per_kg"
+                    type="number"
+                    step="0.1"
+                    min={0}
+                    inputMode="decimal"
+                    placeholder="Ex.: 1,2"
+                    className="tabular-nums"
+                    value={ptn}
+                    onChange={(e) => setPtn(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AssessmentCalcChip
+                  code="NE"
+                  label="Necessidade energética"
+                  value={
+                    ne !== null ? Math.round(ne).toLocaleString("pt-BR") : "–"
+                  }
+                  unit="kcal/dia"
+                  formula="NE = Peso Estimado × Kcal/kg"
+                  highlight
+                />
+                <AssessmentCalcChip
+                  code="NP"
+                  label="Necessidade proteica"
+                  value={fmt(np, 1)}
+                  unit="g/dia"
+                  formula="NP = g PTN/kg × Peso Estimado"
+                  highlight
+                />
+              </div>
+            </AssessmentFormSection>
+          </div>
+        </div>
 
         <AssessmentFormSection
-          title="Valores calculados"
-          description="Atualizam automaticamente — não precisam ser preenchidos"
-        >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <AssessmentCalcChip
-              code="PE"
-              label="Peso estimado"
-              value={fmt(pe)}
-              unit="kg"
-              formula={peFormula}
-              highlight
-            />
-            <AssessmentCalcChip
-              code="AE"
-              label="Altura estimada"
-              value={fmt(altura, 3)}
-              unit="m"
-              formula={altFormula}
-              highlight
-            />
-            <AssessmentCalcChip
-              code="IMC"
-              label="IMC"
-              value={fmt(imc)}
-              unit="kg/m²"
-              formula={imcFormula}
-              highlight
-            />
-          </div>
-        </AssessmentFormSection>
-
-        <AssessmentFormSection
-          title="Prescrição energético-proteica"
-          description="Metas por kg · necessidades calculadas abaixo"
-        >
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-kcal">Kcal/kg · dia</Label>
-              <Input
-                id="adult-kcal"
-                name="kcal_per_kg"
-                type="number"
-                step="0.5"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 30"
-                className="tabular-nums"
-                value={kcal}
-                onChange={(e) => setKcal(e.target.value)}
-              />
-            </div>
-            <div className={formFieldClass}>
-              <Label htmlFor="adult-ptn">g PTN/kg · dia</Label>
-              <Input
-                id="adult-ptn"
-                name="ptn_per_kg"
-                type="number"
-                step="0.1"
-                min={0}
-                inputMode="decimal"
-                placeholder="Ex.: 1,2"
-                className="tabular-nums"
-                value={ptn}
-                onChange={(e) => setPtn(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <AssessmentCalcChip
-              code="NE"
-              label="Necessidade energética"
-              value={ne !== null ? Math.round(ne).toLocaleString("pt-BR") : "–"}
-              unit="kcal/dia"
-              formula="NE = Peso Estimado × Kcal/kg"
-              highlight
-            />
-            <AssessmentCalcChip
-              code="NP"
-              label="Necessidade proteica"
-              value={fmt(np, 1)}
-              unit="g/dia"
-              formula="NP = g PTN/kg × Peso Estimado"
-              highlight
-            />
-          </div>
-        </AssessmentFormSection>
-
-        <AssessmentFormSection
-          className="lg:col-span-2"
           title="Avaliação clínica"
           description="Classificação e observações desta consulta"
         >

@@ -88,36 +88,28 @@ export default async function NovaAvaliacaoPage({
         back={back}
       />
 
-      <div className="min-w-0 rounded-2xl border border-border/60 bg-card/80 p-2 shadow-sm sm:p-3 lg:p-4">
-        <NutritionAssessmentsTabs
-          showGeneral={false}
-          showChild={showChild}
-          showAdult={showAdult}
-          showGeriatric={showGeriatric}
-          childTab={
-            <div className="px-1 pt-3 sm:px-2">
-              <ChildAssessmentForm
-                patientId={id}
-                defaultSex={childSex}
-                defaultBirthDate={birthSlice}
-              />
-            </div>
-          }
-          adultTab={
-            <div className="px-1 pt-3 sm:px-2">
-              <AdultNutritionAssessmentForm
-                patientId={id}
-                defaultAge={defaultAge}
-              />
-            </div>
-          }
-          geriatricTab={
-            <div className="px-1 pt-3 sm:px-2">
-              <GeriatricAssessmentForm patientId={id} defaultAge={defaultAge} />
-            </div>
-          }
-        />
-      </div>
+      <NutritionAssessmentsTabs
+        showGeneral={false}
+        showChild={showChild}
+        showAdult={showAdult}
+        showGeriatric={showGeriatric}
+        childTab={
+          <ChildAssessmentForm
+            patientId={id}
+            defaultSex={childSex}
+            defaultBirthDate={birthSlice}
+          />
+        }
+        adultTab={
+          <AdultNutritionAssessmentForm
+            patientId={id}
+            defaultAge={defaultAge}
+          />
+        }
+        geriatricTab={
+          <GeriatricAssessmentForm patientId={id} defaultAge={defaultAge} />
+        }
+      />
     </PageLayout>
   );
 }

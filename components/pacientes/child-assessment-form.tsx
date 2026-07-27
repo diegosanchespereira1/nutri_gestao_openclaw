@@ -134,52 +134,56 @@ export function ChildAssessmentForm({
       <input type="hidden" name="subscapular_skinfold_mm" value={numSubscapularSkinfold != null ? String(numSubscapularSkinfold) : ""} />
       <input type="hidden" name="head_circumference_cm"   value={numHeadCircumference   != null ? String(numHeadCircumference)   : ""} />
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        {/* Perfil + datas */}
-        <AssessmentFormSection title="Identificação">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="ca-sex">Sexo</Label>
-              <select
-                id="ca-sex"
-                className={cn(selectClass, sex === "" && "text-muted-foreground")}
-                value={sex}
-                onChange={(e) => setSex(e.target.value as ChildSex | "")}
-              >
-                <option value="">— selecione —</option>
-                <option value="female">Feminino</option>
-                <option value="male">Masculino</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ca-birth">Data de nascimento</Label>
-              <Input
-                id="ca-birth"
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ca-recorded">Data da avaliação</Label>
-              <Input
-                id="ca-recorded"
-                type="date"
-                value={recordedAt}
-                onChange={(e) => setRecordedAt(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Idade na avaliação</Label>
-              <p className="flex h-9 items-center font-mono text-sm tabular-nums text-foreground">
-                {ageLabel(ageMonths)}
-              </p>
-            </div>
+      <div className="space-y-4 sm:space-y-5">
+        <div className="grid gap-4 sm:gap-5 lg:grid-cols-2 lg:items-start">
+          <div className="min-w-0">
+            {/* Perfil + datas */}
+            <AssessmentFormSection title="Identificação">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="ca-sex">Sexo</Label>
+                  <select
+                    id="ca-sex"
+                    className={cn(selectClass, sex === "" && "text-muted-foreground")}
+                    value={sex}
+                    onChange={(e) => setSex(e.target.value as ChildSex | "")}
+                  >
+                    <option value="">— selecione —</option>
+                    <option value="female">Feminino</option>
+                    <option value="male">Masculino</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ca-birth">Data de nascimento</Label>
+                  <Input
+                    id="ca-birth"
+                    type="date"
+                    value={birthDate}
+                    onChange={(e) => setBirthDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ca-recorded">Data da avaliação</Label>
+                  <Input
+                    id="ca-recorded"
+                    type="date"
+                    value={recordedAt}
+                    onChange={(e) => setRecordedAt(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Idade na avaliação</Label>
+                  <p className="flex h-9 items-center font-mono text-sm tabular-nums text-foreground">
+                    {ageLabel(ageMonths)}
+                  </p>
+                </div>
+              </div>
+            </AssessmentFormSection>
           </div>
-        </AssessmentFormSection>
 
-        {/* Medidas */}
-        <AssessmentFormSection title="Medidas">
+          <div className="min-w-0">
+            {/* Medidas */}
+            <AssessmentFormSection title="Medidas">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="relative space-y-2">
               <div className="flex items-center gap-1.5">
@@ -304,10 +308,12 @@ export function ChildAssessmentForm({
             </div>
           )}
         </AssessmentFormSection>
+          </div>
+        </div>
 
         {/* Resultado em tempo real */}
         {assessment ? (
-          <AssessmentFormSection className="lg:col-span-2" title="Resultado">
+          <AssessmentFormSection title="Resultado">
             {assessment.bmi != null && (
               <p className="text-sm text-muted-foreground">
                 IMC calculado:{" "}
@@ -318,7 +324,7 @@ export function ChildAssessmentForm({
             )}
             <ChildAssessmentResultCards indicators={assessment.indicators} />
 
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {numWeight != null && (
                 <ChildGrowthCurve
                   indicator="weight_for_age"
@@ -350,7 +356,7 @@ export function ChildAssessmentForm({
           </AssessmentFormSection>
         ) : null}
 
-        <AssessmentFormSection className="lg:col-span-2" title="Notas clínicas">
+        <AssessmentFormSection title="Notas clínicas">
           <textarea
             name="clinical_notes"
             rows={3}

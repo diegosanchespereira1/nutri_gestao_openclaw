@@ -39,13 +39,58 @@ import {
 } from "@/lib/pacientes/health-indicator-series";
 import { cn } from "@/lib/utils";
 
-/** Quantos pontos cabem no card sem rolagem. */
-const MAX_VISIBLE_POINTS = 5;
-/** Largura mínima por avaliação no modo com scroll. */
-const PX_PER_POINT = 44;
-const SPARKLINE_HEIGHT = 96;
-const CHART_MARGIN = { top: 8, right: 10, bottom: 22, left: 4 } as const;
+/** Quantos pontos cabem no card sem rolagem (alinhado ao período “Últimas 6”). */
+const MAX_VISIBLE_POINTS = 6;
+/** Largura mínima por avaliação no modo com scroll (datas dd/mm/aa). */
+const PX_PER_POINT = 58;
+const SPARKLINE_HEIGHT = 108;
+/** Margens laterais para os ticks de data não serem cortados pelo SVG. */
+const CHART_MARGIN = { top: 10, right: 12, bottom: 28, left: 12 } as const;
 const AXIS_TICK = { fontSize: 9, fill: "hsl(215 16% 57%)" };
+const AXIS_PADDING = { left: 20, right: 20 } as const;
+
+/** Data curta no eixo (dd/mm) — o tooltip mantém a data completa da série. */
+function formatAxisDate(fullDate: string): string {
+  const parts = fullDate.split("/");
+  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  return fullDate;
+}
+
+type DateTickProps = {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+  index?: number;
+  visibleTicksCount?: number;
+};
+
+/** Evita corte das datas nas extremidades do gráfico. */
+function DateAxisTick({
+  x = 0,
+  y = 0,
+  payload,
+  index = 0,
+  visibleTicksCount = 1,
+}: DateTickProps) {
+  const raw = payload?.value ?? "";
+  const label = formatAxisDate(raw);
+  if (!label) return null;
+  const isFirst = index === 0;
+  const isLast = index === visibleTicksCount - 1;
+  const textAnchor = isFirst ? "start" : isLast ? "end" : "middle";
+  return (
+    <text
+      x={x}
+      y={y + 10}
+      textAnchor={textAnchor}
+      fill={AXIS_TICK.fill}
+      fontSize={AXIS_TICK.fontSize}
+      className="tabular-nums"
+    >
+      {label}
+    </text>
+  );
+}
 
 const DELTA_ICON: Record<DeltaKind, ComponentType<SVGProps<SVGSVGElement>>> = {
   up: TrendingUp,
@@ -147,41 +192,41 @@ function ChartStage({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl border border-teal-500/15",
+        "relative rounded-xl border border-teal-500/15",
         "bg-[linear-gradient(180deg,rgba(45,212,191,0.08)_0%,rgba(255,255,255,0.55)_42%,rgba(248,250,252,0.95)_100%)]",
         "dark:bg-[linear-gradient(180deg,rgba(45,212,191,0.12)_0%,rgba(15,23,42,0.35)_55%,rgba(15,23,42,0.55)_100%)]",
         "shadow-[inset_0_1px_0_rgba(255,255,255,0.65)]",
       )}
     >
-      {/* Grade decorativa */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-[0.45]"
-        style={{
-          backgroundImage:
-            "linear-gradient(to right, hsl(173 40% 80% / 0.35) 1px, transparent 1px), linear-gradient(to bottom, hsl(173 40% 80% / 0.28) 1px, transparent 1px)",
-          backgroundSize: "18px 16px",
-          maskImage:
-            "linear-gradient(180deg, transparent 0%, black 18%, black 78%, transparent 100%)",
-        }}
-      />
-      {/* Glow superior */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-6 left-1/2 h-16 w-2/3 -translate-x-1/2 rounded-full bg-teal-400/20 blur-2xl"
-      />
-      {/* Base sutil */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-slate-200/30 to-transparent dark:from-slate-900/40"
-      />
-      {scrollable ? (
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-[1] w-8 bg-gradient-to-l from-white/80 to-transparent dark:from-slate-950/50" />
-      ) : null}
-      {scrollable ? (
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-[1] w-6 bg-gradient-to-r from-white/70 to-transparent dark:from-slate-950/40" />
-      ) : null}
-      <div className="relative z-[1]">{children}</div>
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+        {/* Grade decorativa */}
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.45]"
+          style={{
+            backgroundImage:
+              "linear-gradient(to right, hsl(173 40% 80% / 0.35) 1px, transparent 1px), linear-gradient(to bottom, hsl(173 40% 80% / 0.28) 1px, transparent 1px)",
+            backgroundSize: "18px 16px",
+            maskImage:
+              "linear-gradient(180deg, transparent 0%, black 18%, black 78%, transparent 100%)",
+          }}
+        />
+        {/* Glow superior */}
+        <div
+          aria-hidden
+          className="absolute -top-6 left-1/2 h-16 w-2/3 -translate-x-1/2 rounded-full bg-teal-400/20 blur-2xl"
+        />
+        {/* Base sutil */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-slate-200/30 to-transparent dark:from-slate-900/40"
+        />
+        {/* Fade só à direita — o da esquerda cortava as datas do eixo. */}
+        {scrollable ? (
+          <div className="absolute inset-y-0 right-0 z-[1] w-6 bg-gradient-to-l from-white/70 to-transparent dark:from-slate-950/45" />
+        ) : null}
+      </div>
+      <div className="relative z-[1] px-2.5 pt-1">{children}</div>
     </div>
   );
 }
@@ -228,7 +273,11 @@ function ChartScrollArea({
         className="overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-teal-400/40"
         aria-label="Histórico do indicador com rolagem horizontal — avaliação mais recente à direita"
       >
-        <div style={{ width: plotWidth, minWidth: plotWidth, height: SPARKLINE_HEIGHT }}>
+        {/* Padding horizontal evita corte das datas nas extremidades ao rolar. */}
+        <div
+          className="px-3"
+          style={{ width: plotWidth + 24, minWidth: plotWidth + 24, height: SPARKLINE_HEIGHT }}
+        >
           {children(true, plotWidth)}
         </div>
       </div>
@@ -267,12 +316,13 @@ function NumericSparkline({
             />
             <XAxis
               dataKey="date"
-              tick={AXIS_TICK}
+              tick={<DateAxisTick />}
               axisLine={false}
               tickLine={false}
-              interval={needsScroll ? 0 : "preserveStartEnd"}
-              minTickGap={needsScroll ? 8 : 16}
-              height={18}
+              interval={0}
+              minTickGap={needsScroll ? 8 : 12}
+              height={22}
+              padding={AXIS_PADDING}
             />
             <YAxis hide domain={["auto", "auto"]} />
             <RechartsTooltip
@@ -353,12 +403,13 @@ function CategoricalHistory({
             />
             <XAxis
               dataKey="date"
-              tick={AXIS_TICK}
+              tick={<DateAxisTick />}
               axisLine={false}
               tickLine={false}
-              interval={needsScroll ? 0 : "preserveStartEnd"}
-              minTickGap={needsScroll ? 8 : 16}
-              height={18}
+              interval={0}
+              minTickGap={needsScroll ? 8 : 12}
+              height={22}
+              padding={AXIS_PADDING}
             />
             <YAxis hide domain={[0, 1.4]} />
             <RechartsTooltip

@@ -185,7 +185,7 @@ function EmptyIndicatorsState({ novaAvaliacaoHref }: { novaAvaliacaoHref: string
         className={cn(buttonVariants({ size: "sm" }), "mt-4")}
       >
         <Plus className="mr-1.5 size-3.5" aria-hidden />
-        Realizar avaliação
+        Realizar avaliação especializada
       </Link>
     </div>
   );

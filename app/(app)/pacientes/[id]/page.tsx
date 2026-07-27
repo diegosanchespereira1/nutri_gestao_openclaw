@@ -220,7 +220,7 @@ export default async function PacientePage({
           </Link>
           <Link href={novaAvaliacaoHref} className={cn(buttonVariants({ size: "sm" }))}>
             <ClipboardList className="mr-1.5 size-3.5" aria-hidden />
-            Nova avaliação
+            Nova avaliação especializada
           </Link>
         </div>
       </div>

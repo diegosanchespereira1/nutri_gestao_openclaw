@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, TrendingUp, ChevronDown, FileDown, LineChart } from "lucide-react";
+import { ClipboardList, TrendingUp, ChevronDown, FileDown } from "lucide-react";
 
 import { formSectionLegendClass } from "@/components/forms/form-section";
 import {
@@ -613,13 +613,6 @@ export async function PatientAssessmentsBlock({
         >
           <ClipboardList className="mr-1.5 size-3.5" aria-hidden />
           Realizar avaliação especializada
-        </Link>
-        <Link
-          href={withReturnTo(`/pacientes/${patientId}?tab=indicadores`, returnToOrigin)}
-          className={cn(buttonVariants({ size: "sm", variant: "outline" }))}
-        >
-          <LineChart className="mr-1.5 size-3.5" aria-hidden />
-          Indicadores de saúde
         </Link>
       </div>
 

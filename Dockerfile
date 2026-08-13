@@ -2,11 +2,28 @@
 
 FROM node:22-alpine AS base
 WORKDIR /app
-RUN corepack disable || true
+# libc6-compat: necessário para vários binários nativos (ex.: sharp) no Alpine.
+RUN apk add --no-cache libc6-compat \
+  && (corepack disable || true)
 
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Cache npm + retries: o install do sharp baixa libvips no GitHub e falha
+# intermitente com ECONNRESET derruba o CI sem isso.
+RUN --mount=type=cache,target=/root/.npm \
+  npm config set fetch-retries 5 \
+  && npm config set fetch-retry-mintimeout 20000 \
+  && npm config set fetch-retry-maxtimeout 120000 \
+  && for attempt in 1 2 3 4 5; do \
+       echo "npm ci (tentativa ${attempt}/5)..." \
+       && npm ci \
+       && break \
+       || { \
+            echo "npm ci falhou na tentativa ${attempt}" \
+            && if [ "${attempt}" -eq 5 ]; then exit 1; fi \
+            && sleep $((attempt * 8)); \
+          }; \
+     done
 
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules

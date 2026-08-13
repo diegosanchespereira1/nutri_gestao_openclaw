@@ -638,17 +638,25 @@ export async function deleteCustomItemAction(
   }
 
   // Soft-delete: arquiva o item para preservar histórico de preenchimentos.
-  const { error } = await supabase
+  const { data: archivedRows, error } = await supabase
     .from("checklist_custom_items")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", customItemId)
-    .is("archived_at", null);
+    .is("archived_at", null)
+    .select("id");
 
   if (error) {
     return {
       ok: false,
       error:
-        "Este item já foi usado em checklists aplicados e foi arquivado quando possível (não removido do histórico).",
+        "Não foi possível remover o item. Tente novamente.",
+    };
+  }
+  if (!archivedRows || archivedRows.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Sem permissão para remover este item, ou ele já tinha sido removido. A exclusão NÃO foi confirmada.",
     };
   }
 
@@ -696,16 +704,24 @@ export async function deleteCustomSectionAction(
 
   const activeItemIds = (sectionItems ?? []).map((row) => String(row.id));
   if (activeItemIds.length > 0) {
-    const { error: archiveErr } = await supabase
+    const { data: archivedRows, error: archiveErr } = await supabase
       .from("checklist_custom_items")
       .update({ archived_at: new Date().toISOString() })
       .in("id", activeItemIds)
-      .is("archived_at", null);
+      .is("archived_at", null)
+      .select("id");
     if (archiveErr) {
       return {
         ok: false,
         error:
-          "Não foi possível arquivar os itens da seção. O histórico de checklists aplicados continua preservado.",
+          "Não foi possível arquivar os itens da seção. Nenhuma remoção foi confirmada.",
+      };
+    }
+    if (!archivedRows || archivedRows.length !== activeItemIds.length) {
+      return {
+        ok: false,
+        error:
+          "Alguns itens da seção não puderam ser arquivados (sem permissão ou falha no servidor). A exclusão NÃO foi confirmada.",
       };
     }
   }

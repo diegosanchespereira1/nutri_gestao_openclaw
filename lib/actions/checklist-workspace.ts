@@ -951,21 +951,43 @@ export async function updateWorkspaceTemplateAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { ok: false, error: "Sessão expirada." };
+  if (!user) {
+    return {
+      ok: false,
+      error: "Sessão expirada. Faça login novamente para salvar as alterações.",
+    };
+  }
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingErr } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, owner_user_id, archived_at")
+    .select("id, owner_user_id, archived_at, published_at")
     .eq("id", templateId)
     .maybeSingle();
 
+  if (existingErr) {
+    return {
+      ok: false,
+      error: "Não foi possível carregar o modelo para edição. Tente novamente.",
+    };
+  }
   if (!existing || existing.owner_user_id !== workspaceOwnerId) {
-    return { ok: false, error: "Modelo não encontrado." };
+    return {
+      ok: false,
+      error:
+        "Sem permissão para editar este modelo, ou ele não pertence à sua equipe.",
+    };
   }
   if (existing.archived_at) {
     return { ok: false, error: "Modelo arquivado não pode ser editado." };
+  }
+  if (existing.published_at === null) {
+    return {
+      ok: false,
+      error:
+        "Este modelo ainda é um rascunho. Continue a edição em Criar checklist.",
+    };
   }
 
   const persisted = await persistWorkspaceTemplateStructure(
@@ -1006,13 +1028,21 @@ export async function archiveWorkspaceTemplateAction(
     return { ok: false, error: "Modelo não encontrado." };
   }
 
-  const { error } = await supabase
+  const { data: archivedRows, error } = await supabase
     .from("checklist_workspace_templates")
     .update({ archived_at: new Date().toISOString() })
     .eq("id", templateId)
-    .eq("owner_user_id", workspaceOwnerId);
+    .eq("owner_user_id", workspaceOwnerId)
+    .select("id");
 
   if (error) return { ok: false, error: "Não foi possível arquivar o modelo." };
+  if (!archivedRows || archivedRows.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Sem permissão para arquivar este modelo, ou ele não foi encontrado.",
+    };
+  }
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");

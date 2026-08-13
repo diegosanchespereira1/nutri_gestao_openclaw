@@ -761,9 +761,15 @@ export function WorkspaceChecklistBuilder({
       </div>
 
       {error ? (
-        <p className="text-destructive text-sm" role="alert">
-          {error}
-        </p>
+        <div
+          className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3"
+          role="alert"
+        >
+          <p className="text-destructive text-sm font-medium">
+            As alterações não foram salvas
+          </p>
+          <p className="text-destructive/90 mt-1 text-sm">{error}</p>
+        </div>
       ) : null}
 
       <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">

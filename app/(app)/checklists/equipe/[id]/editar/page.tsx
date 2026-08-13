@@ -44,8 +44,10 @@ export default async function EditWorkspaceChecklistPage({
             Editar checklist da equipe
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Adicione ou remova itens. Itens já usados em sessões antigas são
-            preservados automaticamente.
+            Personalize à vontade: adicione, edite, reordene ou remova seções e
+            itens. Só mostramos sucesso depois de confirmar que tudo foi gravado
+            no servidor. Itens já usados em sessões antigas são arquivados (não
+            apagados do histórico).
           </p>
         </div>
         <Link

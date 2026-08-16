@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countVisibleTemplateItemsForSession,
   filterTemplateForSession,
   isItemVisibleForSession,
 } from "@/lib/checklists/filter-session-template-items";
@@ -335,5 +336,35 @@ describe("filterTemplateForSession", () => {
     expect(earned).toBe(4);
     expect(total).toBe(22);
     expect(Math.round((earned / total) * 100)).toBe(18);
+  });
+});
+
+describe("countVisibleTemplateItemsForSession", () => {
+  it("CINPAL: 74 itens / 51 arquivados antes → total 23 e pending 0", () => {
+    const items = [
+      ...Array.from({ length: 51 }, (_, i) => ({
+        archived_at: BEFORE,
+        is_structure_only: false,
+      })),
+      ...Array.from({ length: 23 }, () => ({
+        archived_at: null as string | null,
+        is_structure_only: false,
+      })),
+    ];
+    const totalItems = countVisibleTemplateItemsForSession(items, SESSION_AT);
+    expect(totalItems).toBe(23);
+    const answeredCount = 23; // 4 conforme + 18 NC + 1 NA
+    const pendingCount = Math.max(0, totalItems - answeredCount);
+    expect(pendingCount).toBe(0);
+  });
+
+  it("itens arquivados depois da sessão ainda contam (histórico)", () => {
+    const items = [
+      { archived_at: null as string | null, is_structure_only: false },
+      { archived_at: AFTER, is_structure_only: false },
+      { archived_at: BEFORE, is_structure_only: false },
+      { archived_at: null, is_structure_only: true },
+    ];
+    expect(countVisibleTemplateItemsForSession(items, SESSION_AT)).toBe(2);
   });
 });

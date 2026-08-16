@@ -30,6 +30,30 @@ export function isItemVisibleForSession(
   return hasResponse;
 }
 
+export type SessionVisibilityItem = {
+  archived_at?: string | null;
+  is_structure_only?: boolean;
+};
+
+/**
+ * Conta itens avaliáveis visíveis para uma sessão (histórico / pending_count).
+ * Exclui `is_structure_only` e itens arquivados antes de `sessionCreatedAt`.
+ */
+export function countVisibleTemplateItemsForSession(
+  items: readonly SessionVisibilityItem[],
+  sessionCreatedAt: string,
+): number {
+  let total = 0;
+  for (const it of items) {
+    if (Boolean(it.is_structure_only)) continue;
+    if (!isItemVisibleForSession(it.archived_at, sessionCreatedAt, false)) {
+      continue;
+    }
+    total += 1;
+  }
+  return total;
+}
+
 /**
  * Filtra o template para dossiê/PDF/score visual de uma sessão:
  * remove itens excluídos antes do preenchimento e seções que ficarem vazias.

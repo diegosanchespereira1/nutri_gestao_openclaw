@@ -1,5 +1,9 @@
 "use server";
 
+import {
+  countVisibleTemplateItemsForSession,
+  type SessionVisibilityItem,
+} from "@/lib/checklists/filter-session-template-items";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
@@ -466,56 +470,99 @@ export async function loadChecklistSessionsForClient(input: {
   }
 
   // ── Round 6: itens de todos os tipos de template em paralelo ─────────────
+  // Inclui archived_at / is_structure_only para contar por sessão (itens
+  // excluídos antes do fill não entram em total_items / pending_count).
+  type ItemRow = SessionVisibilityItem & {
+    id: string;
+    section_key: string;
+  };
+
   const [itemsResult, customItemsResult, workspaceItemsResult] =
     await Promise.all([
       sectionToTemplate.size > 0
         ? supabase
             .from("checklist_template_items")
-            .select("id, section_id")
+            .select("id, section_id, archived_at, is_structure_only")
             .in("section_id", [...sectionToTemplate.keys()])
-        : Promise.resolve({ data: [] as { id: string; section_id: string }[] }),
+        : Promise.resolve({
+            data: [] as {
+              id: string;
+              section_id: string;
+              archived_at: string | null;
+              is_structure_only: boolean | null;
+            }[],
+          }),
 
       cSectionToTemplate.size > 0
         ? supabase
             .from("checklist_custom_items")
-            .select("id, custom_section_id")
+            .select("id, custom_section_id, archived_at, is_structure_only")
             .in("custom_section_id", [...cSectionToTemplate.keys()])
-        : Promise.resolve({ data: [] as { id: string; custom_section_id: unknown }[] }),
+        : Promise.resolve({
+            data: [] as {
+              id: string;
+              custom_section_id: unknown;
+              archived_at: string | null;
+              is_structure_only: boolean | null;
+            }[],
+          }),
 
       wSectionToTemplate.size > 0
         ? supabase
             .from("checklist_workspace_items")
-            .select("id, workspace_section_id")
+            .select("id, workspace_section_id, archived_at, is_structure_only")
             .in("workspace_section_id", [...wSectionToTemplate.keys()])
-        : Promise.resolve({ data: [] as { id: string; workspace_section_id: unknown }[] }),
+        : Promise.resolve({
+            data: [] as {
+              id: string;
+              workspace_section_id: unknown;
+              archived_at: string | null;
+              is_structure_only: boolean | null;
+            }[],
+          }),
     ]);
 
-  // Conta itens por template
-  const templateTotalItemsMap = new Map<string, number>();
+  // Itens por template (lista, não contagem — o total depende de session.created_at)
+  const templateItemsById = new Map<string, ItemRow[]>();
   for (const item of itemsResult.data ?? []) {
     const tid = sectionToTemplate.get(item.section_id);
-    if (tid) {
-      templateTotalItemsMap.set(tid, (templateTotalItemsMap.get(tid) ?? 0) + 1);
-    }
+    if (!tid) continue;
+    const list = templateItemsById.get(tid) ?? [];
+    list.push({
+      id: item.id,
+      section_key: item.section_id,
+      archived_at: item.archived_at,
+      is_structure_only: Boolean(item.is_structure_only),
+    });
+    templateItemsById.set(tid, list);
   }
 
-  const customTemplateTotalItemsMap = new Map<string, number>();
+  const customTemplateItemsById = new Map<string, ItemRow[]>();
   for (const item of customItemsResult.data ?? []) {
     const ctid = cSectionToTemplate.get(item.custom_section_id as string);
-    if (ctid) {
-      customTemplateTotalItemsMap.set(ctid, (customTemplateTotalItemsMap.get(ctid) ?? 0) + 1);
-    }
+    if (!ctid) continue;
+    const list = customTemplateItemsById.get(ctid) ?? [];
+    list.push({
+      id: item.id,
+      section_key: String(item.custom_section_id),
+      archived_at: item.archived_at,
+      is_structure_only: Boolean(item.is_structure_only),
+    });
+    customTemplateItemsById.set(ctid, list);
   }
 
-  const workspaceTemplateTotalItemsMap = new Map<string, number>();
+  const workspaceTemplateItemsById = new Map<string, ItemRow[]>();
   for (const item of workspaceItemsResult.data ?? []) {
     const wtid = wSectionToTemplate.get(item.workspace_section_id as string);
-    if (wtid) {
-      workspaceTemplateTotalItemsMap.set(
-        wtid,
-        (workspaceTemplateTotalItemsMap.get(wtid) ?? 0) + 1,
-      );
-    }
+    if (!wtid) continue;
+    const list = workspaceTemplateItemsById.get(wtid) ?? [];
+    list.push({
+      id: item.id,
+      section_key: String(item.workspace_section_id),
+      archived_at: item.archived_at,
+      is_structure_only: Boolean(item.is_structure_only),
+    });
+    workspaceTemplateItemsById.set(wtid, list);
   }
 
   // Processa PDFs por sessão
@@ -586,21 +633,28 @@ export async function loadChecklistSessionsForClient(input: {
       templateOrigin = "workspace";
       templateName =
         workspaceTemplateNameMap.get(sessWorkspaceTemplateId) ?? "Modelo da equipe";
-      totalItems =
-        workspaceTemplateTotalItemsMap.get(sessWorkspaceTemplateId) ?? 0;
+      totalItems = countVisibleTemplateItemsForSession(
+        workspaceTemplateItemsById.get(sessWorkspaceTemplateId) ?? [],
+        sess.created_at,
+      );
     } else if (sess.template_id) {
       templateOrigin = "system";
       const tInfo = templateNameMap.get(sess.template_id);
       templateName = tInfo?.name ?? "Template";
       portariaRef = tInfo?.portaria_ref ?? null;
-      totalItems = templateTotalItemsMap.get(sess.template_id) ?? 0;
+      totalItems = countVisibleTemplateItemsForSession(
+        templateItemsById.get(sess.template_id) ?? [],
+        sess.created_at,
+      );
     } else if (sess.custom_template_id) {
       templateOrigin = "custom";
       templateName =
         customTemplateNameMap.get(sess.custom_template_id) ??
         "Template personalizado";
-      totalItems =
-        customTemplateTotalItemsMap.get(sess.custom_template_id) ?? 0;
+      totalItems = countVisibleTemplateItemsForSession(
+        customTemplateItemsById.get(sess.custom_template_id) ?? [],
+        sess.created_at,
+      );
     }
 
     const answeredCount = counts.conforme + counts.nc + counts.na;

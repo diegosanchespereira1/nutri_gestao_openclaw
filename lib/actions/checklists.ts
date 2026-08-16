@@ -70,6 +70,7 @@ function assembleTemplates(
       continue;
     }
     const sectionId = String(it.section_id);
+    const archivedRaw = it.archived_at;
     const item: ChecklistTemplateItemRow = {
       id: String(it.id),
       section_id: sectionId,
@@ -78,6 +79,10 @@ function assembleTemplates(
       position: Number(it.position),
       peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
       is_structure_only: Boolean(it.is_structure_only),
+      archived_at:
+        archivedRaw == null || String(archivedRaw).trim() === ""
+          ? null
+          : String(archivedRaw),
       created_at: String(it.created_at),
     };
     const list = itemsBySection.get(sectionId) ?? [];
@@ -90,10 +95,15 @@ function assembleTemplates(
 
   return templatesRaw.map((raw) => {
     const base = mapTemplateRow(raw);
-    const sections = (sectionsByTemplate.get(base.id) ?? []).map((sec) => {
-      const items = itemsBySection.get(sec.id) ?? [];
-      return { ...sec, items };
-    });
+    const sectionsRawMapped = (sectionsByTemplate.get(base.id) ?? []).map(
+      (sec) => {
+        const items = itemsBySection.get(sec.id) ?? [];
+        return { ...sec, items };
+      },
+    );
+    const sections = includeArchivedItems
+      ? sectionsRawMapped
+      : sectionsRawMapped.filter((sec) => sec.items.length > 0);
     let required_item_count = 0;
     let total_item_count = 0;
     for (const sec of sections) {

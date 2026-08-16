@@ -30,6 +30,7 @@ export type DownloadDossierPdfResult =
 
 export async function generateDossierPdfAction(
   sessionId: string,
+  options?: { force?: boolean },
 ): Promise<GenerateDossierPdfResult> {
   const supabase = await createClient();
   const {
@@ -38,6 +39,7 @@ export async function generateDossierPdfAction(
   if (!user) return { ok: false, error: "Sessão expirada." };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const force = options?.force === true;
 
   const bundle = await loadFillSessionPageData(sessionId);
   if (!bundle) return { ok: false, error: "Sessão não encontrada." };
@@ -50,6 +52,7 @@ export async function generateDossierPdfAction(
   }
 
   // Se já existe PDF vigente gravado, devolve-o — não cria nova versão.
+  // Com force=true (Regenerar), marca o vigente como obsoleto e reconstrói.
   const { data: existingReady } = await supabase
     .from("checklist_fill_pdf_exports")
     .select(
@@ -63,7 +66,7 @@ export async function generateDossierPdfAction(
     .limit(1)
     .maybeSingle();
 
-  if (existingReady?.id && existingReady.storage_path) {
+  if (existingReady?.id && existingReady.storage_path && !force) {
     const downloadUrl = `/api/checklists/dossier-pdf/${existingReady.id}`;
     const suggestedFilename =
       (await resolveChecklistDossierPdfFilename(supabase, existingReady.id as string)) ??
@@ -74,6 +77,15 @@ export async function generateDossierPdfAction(
       downloadUrl,
       suggestedFilename,
     };
+  }
+
+  if (force && existingReady?.id) {
+    const nowIso = new Date().toISOString();
+    await supabase
+      .from("checklist_fill_pdf_exports")
+      .update({ superseded_at: nowIso })
+      .eq("id", existingReady.id)
+      .is("superseded_at", null);
   }
 
   const { data: maxVerRow } = await supabase

@@ -34,6 +34,11 @@ export type ChecklistTemplateItemRow = {
    * `isStructureOnlyItem` e skill `nutrigestao-dev` → «Checklists — Subseções só indicador».
    */
   is_structure_only?: boolean;
+  /**
+   * Soft-delete do item no modelo. Null = ativo.
+   * Usado para filtrar dossiê/PDF: itens arquivados antes da sessão não entram.
+   */
+  archived_at?: string | null;
   created_at: string;
 };
 

@@ -475,6 +475,7 @@ export async function loadWorkspaceTemplateBundle(
         total_item_count += 1;
         if (Boolean(it.is_required)) required_item_count += 1;
       }
+      const archivedRaw = it.archived_at;
       return {
         id: String(it.id),
         section_id: String(sec.id),
@@ -483,6 +484,10 @@ export async function loadWorkspaceTemplateBundle(
         position: Number(it.position),
         peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
         is_structure_only: structureOnly,
+        archived_at:
+          archivedRaw == null || String(archivedRaw).trim() === ""
+            ? null
+            : String(archivedRaw),
         created_at: String(it.created_at),
       };
     });

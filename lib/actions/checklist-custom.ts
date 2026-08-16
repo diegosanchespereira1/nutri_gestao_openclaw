@@ -344,6 +344,7 @@ export async function loadCustomTemplateUnified(
         total_item_count += 1;
         if (Boolean(it.is_required)) required_item_count += 1;
       }
+      const archivedRaw = it.archived_at;
       return {
         id: String(it.id),
         section_id: String(sec.id),
@@ -352,6 +353,10 @@ export async function loadCustomTemplateUnified(
         position: Number(it.position),
         peso: it.peso !== null && it.peso !== undefined ? Number(it.peso) : 1,
         is_structure_only: structureOnly,
+        archived_at:
+          archivedRaw == null || String(archivedRaw).trim() === ""
+            ? null
+            : String(archivedRaw),
         created_at: String(it.created_at),
       };
     });
@@ -365,6 +370,23 @@ export async function loadCustomTemplateUnified(
     };
   });
 
+  // Em preenchimento novo, omitir seções cujos itens foram todos arquivados.
+  const visibleSections = includeArchivedItems
+    ? mappedSections
+    : mappedSections.filter((sec) => sec.items.length > 0);
+
+  if (!includeArchivedItems) {
+    required_item_count = 0;
+    total_item_count = 0;
+    for (const sec of visibleSections) {
+      for (const it of sec.items) {
+        if (it.is_structure_only) continue;
+        total_item_count += 1;
+        if (it.is_required) required_item_count += 1;
+      }
+    }
+  }
+
   return {
     id: String(ct.id),
     name: String(ct.name),
@@ -376,7 +398,7 @@ export async function loadCustomTemplateUnified(
     is_active: ct.archived_at === null,
     created_at: String(ct.created_at),
     updated_at: String(ct.updated_at),
-    sections: mappedSections,
+    sections: visibleSections,
     required_item_count,
     total_item_count,
   };

@@ -271,7 +271,9 @@ export async function buildApprovedDossierPdfBytes(
     headerTextColor: pdfSettings.headerTextColor,
     accentColor:     pdfSettings.accentColor,
     sections: await Promise.all(
-      input.template.sections.map(async (sec) => ({
+      input.template.sections
+        .filter((sec) => sec.items.length > 0)
+        .map(async (sec) => ({
         title: sec.title,
         items: await Promise.all(
           sec.items.map(async (it) => {

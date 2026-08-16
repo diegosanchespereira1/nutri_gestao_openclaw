@@ -100,4 +100,51 @@ describe("buildDossierPdfBytes", () => {
     });
     expect(bytes.length).toBeGreaterThan(1500);
   });
+
+  it("omite seções vazias e gera PDF válido com score reduzido", async () => {
+    const bytes = await buildDossierPdfBytes({
+      templateName: "CINPAL produção",
+      establishmentLabel: "CINPAL CIA — Cinpal - Planta 1",
+      clientLabel: "Cinpal - Planta 1",
+      approvedAtLabel: "16 de agosto de 2026, 18:26",
+      professionalName: "Nutricionista",
+      crn: "12345",
+      score: { percentage: 18, pointsEarned: 4, pointsTotal: 22 },
+      sections: [
+        { title: "Documentação", items: [] },
+        {
+          title: "Manipulação e Boas Práticas",
+          items: [
+            {
+              description: "Item 1",
+              outcome: "conforme",
+              note: null,
+              annotation: null,
+            },
+            {
+              description: "Item 2",
+              outcome: "nc",
+              note: null,
+              annotation: null,
+            },
+          ],
+        },
+        {
+          title: "Asseio pessoal",
+          items: [
+            {
+              description: "Item 3",
+              outcome: "na",
+              note: null,
+              annotation: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.length).toBeGreaterThan(2000);
+    expect(Buffer.from(bytes.slice(0, 5)).toString("utf8")).toBe("%PDF-");
+  });
 });

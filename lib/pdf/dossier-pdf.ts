@@ -473,7 +473,11 @@ function drawMetaCard(ctx: Ctx, input: DossierPdfBuildInput): void {
 /* ── Tabela de resumo por seção (resultado por categoria) ──────────────── */
 
 function drawSectionSummaryTable(ctx: Ctx, input: DossierPdfBuildInput): void {
-  const sections = input.sections;
+  // Seções sem itens avaliáveis (ex.: só estrutura, ou esvaziadas após exclusão
+  // no modelo) não entram na tabela de resultado.
+  const sections = input.sections.filter((sec) =>
+    sec.items.some((it) => !it.isStructureOnly),
+  );
   if (sections.length === 0) return;
 
   const COL_TITLE_W  = CONTENT_W * 0.42;
@@ -1313,6 +1317,7 @@ export async function buildDossierPdfBytes(
 
   for (let i = 0; i < input.sections.length; i++) {
     const section = input.sections[i];
+    if (section.items.length === 0) continue;
     ctx.y -= 4;
     drawSectionHeader(ctx, section, i);
     for (let j = 0; j < section.items.length; j++) {

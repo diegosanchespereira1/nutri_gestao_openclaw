@@ -49,6 +49,7 @@ import {
   resolveSessionTemplateColumn,
   sessionAreaMatchesForInheritance,
 } from "@/lib/checklists/inherit-valid-responses";
+import { filterTemplateForSession } from "@/lib/checklists/filter-session-template-items";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 
 export type FillActionResult =
@@ -572,8 +573,20 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   let { data: respRows } = respRowsResult;
 
+  // Filtra antes da herança: itens excluídos antes desta sessão não devem
+  // receber respostas herdadas nem aparecer no dossiê/PDF.
+  let typedRespRows = (respRows ?? []) as Array<
+    ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+  >;
+  let respondedItemIds = collectExistingResponseItemIds(typedRespRows);
+  let sessionTemplate = filterTemplateForSession(
+    template,
+    String(row.created_at),
+    respondedItemIds,
+  );
+
   // Herança idempotente: preenche itens ainda sem resposta com validade vigente do histórico.
-  const responseCountBefore = (respRows ?? []).length;
+  const responseCountBefore = typedRespRows.length;
   console.log(
     "[inherit] sessão:",
     row.id,
@@ -583,7 +596,7 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
   const insertedCount = await inheritValidResponsesIfFreshSession(
     supabase,
     row,
-    template,
+    sessionTemplate,
     timeZone,
   );
   if (insertedCount > 0) {
@@ -593,15 +606,19 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
       .eq("session_id", sessionId);
     if (refreshed) {
       respRows = refreshed;
+      typedRespRows = refreshed as Array<
+        ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+      >;
+      respondedItemIds = collectExistingResponseItemIds(typedRespRows);
+      sessionTemplate = filterTemplateForSession(
+        template,
+        String(row.created_at),
+        respondedItemIds,
+      );
     }
   }
 
-  const responses = mapFillResponseRowsToMap(
-    (respRows ?? []) as Array<
-      ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
-    >,
-    template,
-  );
+  const responses = mapFillResponseRowsToMap(typedRespRows, sessionTemplate);
 
   const vigenteInheritedItems = Object.values(responses).filter(
     (r) => r.outcome !== null && (r.validUntil ?? "").trim().length > 0,
@@ -665,7 +682,7 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
 
   return {
     session: { ...row, area_name: areaName },
-    template,
+    template: sessionTemplate,
     responses,
     inheritedCount,
     establishmentLabel,
@@ -2102,14 +2119,19 @@ async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
 
   if (!template) return null;
 
-  const responses = mapFillResponseRowsToMap(
-    (respResult.data ?? []) as Array<
-      ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
-    >,
+  const typedRespRows = (respResult.data ?? []) as Array<
+    ChecklistFillItemResponseRow & { workspace_item_id?: string | null }
+  >;
+  const respondedItemIds = collectExistingResponseItemIds(typedRespRows);
+  const sessionTemplate = filterTemplateForSession(
     template,
+    String(row.created_at),
+    respondedItemIds,
   );
 
-  return { session: row, template, responses };
+  const responses = mapFillResponseRowsToMap(typedRespRows, sessionTemplate);
+
+  return { session: row, template: sessionTemplate, responses };
 }
 
 /** Aprova o dossiê: valida todo o modelo, regista data e bloqueia edições (FR23); visita ligada → concluída. */

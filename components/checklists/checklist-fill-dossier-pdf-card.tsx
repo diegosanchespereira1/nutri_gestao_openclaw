@@ -60,10 +60,10 @@ export function ChecklistFillDossierPdfCard({
 
   if (!dossierApprovedAt) return null;
 
-  async function handleGenerate() {
+  async function handleGenerate(force = false) {
     setLocalErr(null);
     startTransition(async () => {
-      const r = await generateDossierPdfAction(sessionId);
+      const r = await generateDossierPdfAction(sessionId, { force });
       if (!r.ok) {
         setLocalErr(r.error);
         router.refresh();
@@ -213,13 +213,27 @@ export function ChecklistFillDossierPdfCard({
               )}
               Baixar PDF
             </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => void handleGenerate(true)}
+              className="gap-1.5"
+            >
+              {pending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : null}
+              Regenerar PDF
+            </Button>
           </>
         ) : !showProcessing ? (
           <Button
             type="button"
             size="sm"
             disabled={pending}
-            onClick={() => void handleGenerate()}
+            onClick={() => void handleGenerate(false)}
             className="gap-1.5"
           >
             {pending ? (

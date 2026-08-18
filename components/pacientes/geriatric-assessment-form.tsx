@@ -4,20 +4,25 @@ import { useActionState, useMemo, useState } from "react";
 
 import {
   AnthroPercentileHint,
+  AnthropometricReferenceSelect,
   AssessmentCalcChip,
   AssessmentFormSection,
+  PatientGroupSelect,
 } from "@/components/pacientes/assessment-form-section";
-import { adultAnthroNoteForGroup } from "@/lib/nutrition/adult/anthropometric-percentiles";
+import {
+  adultAnthroNoteForGroup,
+  tableModeFromReference,
+} from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type GeriatricAssessmentFormResult,
   createGeriatricAssessmentAction,
 } from "@/lib/actions/geriatric-assessments";
 import {
-  PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
   type PatientGroup,
   type NutritionalRisk,
+  type AnthropometricReference,
 } from "@/lib/types/geriatric-assessments";
 import {
   calcGeriatricEstimatedWeightKg,
@@ -59,18 +64,23 @@ type NumericField = string;
 export function GeriatricAssessmentForm({
   patientId,
   defaultAge,
+  defaultAnthropometricReference = "",
 }: {
   patientId: string;
   defaultAge?: number;
+  defaultAnthropometricReference?: AnthropometricReference | "";
 }) {
   const [state, formAction] = useActionState(createGeriatricAssessmentAction, initial);
 
   // ── Estado dos inputs (todos controlados para preservar valores em re-render) ─
-  const [group, setGroup]               = useState<PatientGroup>("mulher_branca");
+  const [group, setGroup]               = useState<PatientGroup | "">("");
   const [hasAmputation, setHasAmputation] = useState(false);
   const [ampPct, setAmpPct]             = useState<NumericField>("5.9");
 
   const [age, setAge]               = useState<NumericField>(defaultAge != null ? String(defaultAge) : "");
+  const [anthroRef, setAnthroRef]   = useState<AnthropometricReference | "">(
+    defaultAnthropometricReference,
+  );
   const [cb, setCb]                 = useState<NumericField>("");
   const [dct, setDct]               = useState<NumericField>("");
   const [cp, setCp]                 = useState<NumericField>("");
@@ -98,21 +108,32 @@ export function GeriatricAssessmentForm({
     return numCb - numDct * 0.314;
   }, [numCb, numDct]);
 
+  const tableMode = anthroRef ? tableModeFromReference(anthroRef) : null;
+
   const cbNote = useMemo(
-    () => adultAnthroNoteForGroup("cb", "geriatric", group, numAge, numCb, "compact"),
-    [group, numAge, numCb],
+    () =>
+      tableMode && group
+        ? adultAnthroNoteForGroup("cb", tableMode, group, numAge, numCb, "compact")
+        : null,
+    [tableMode, group, numAge, numCb],
   );
   const dctNote = useMemo(
-    () => adultAnthroNoteForGroup("dct", "geriatric", group, numAge, numDct, "compact"),
-    [group, numAge, numDct],
+    () =>
+      tableMode && group
+        ? adultAnthroNoteForGroup("dct", tableMode, group, numAge, numDct, "compact")
+        : null,
+    [tableMode, group, numAge, numDct],
   );
   const cmbNote = useMemo(
-    () => adultAnthroNoteForGroup("cmb", "geriatric", group, numAge, cmb, "compact"),
-    [group, numAge, cmb],
+    () =>
+      tableMode && group
+        ? adultAnthroNoteForGroup("cmb", tableMode, group, numAge, cmb, "compact")
+        : null,
+    [tableMode, group, numAge, cmb],
   );
 
   const peBase = useMemo<number | null>(() => {
-    if (numAj === null || numCb === null) return null;
+    if (!group || numAj === null || numCb === null) return null;
     const v = calcGeriatricEstimatedWeightKg(group, numAj, numCb);
     return Number.isFinite(v) ? v : null;
   }, [group, numAj, numCb]);
@@ -126,7 +147,7 @@ export function GeriatricAssessmentForm({
   }, [peBase, hasAmputation, ampPctNum]);
 
   const altura = useMemo<number | null>(() => {
-    if (numAj === null || numAge === null) return null;
+    if (!group || numAj === null || numAge === null) return null;
     const v = calcGeriatricEstimatedHeightM(group, numAj, numAge);
     return Number.isFinite(v) ? v : null;
   }, [group, numAj, numAge]);
@@ -150,6 +171,7 @@ export function GeriatricAssessmentForm({
 
   // ── Fórmulas exibidas ────────────────────────────────────────────────────
   const peFormula = (() => {
+    if (!group) return "Selecione o grupo (sexo / etnia)";
     const base = GERIATRIC_PE_FORMULAS[group];
     return hasAmputation && ampPctNum > 0
       ? `(${base}) × 100 ÷ (100 − ${ampPctNum}%)`
@@ -157,9 +179,11 @@ export function GeriatricAssessmentForm({
   })();
 
   const isMale = group === "homem_branco" || group === "homem_negro";
-  const altFormula = isMale
-    ? "(64,19 + 2,04×AJ − 0,04×Idade) ÷ 100"
-    : "(84,88 + 1,83×AJ − 0,24×Idade) ÷ 100";
+  const altFormula = !group
+    ? "Selecione o grupo (sexo / etnia)"
+    : isMale
+      ? "(64,19 + 2,04×AJ − 0,04×Idade) ÷ 100"
+      : "(84,88 + 1,83×AJ − 0,24×Idade) ÷ 100";
 
   const imcFormula =
     hasAmputation && ampPctNum > 0
@@ -188,25 +212,13 @@ export function GeriatricAssessmentForm({
               description="Equações geriátricas (Chumlea)"
             >
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="ga-group">Grupo (sexo / etnia)</Label>
-                  <select
-                    id="ga-group"
-                    name="patient_group"
-                    className={selectClass}
-                    value={group}
-                    onChange={(e) => setGroup(e.target.value as PatientGroup)}
-                  >
-                    {(Object.entries(PATIENT_GROUP_LABELS) as [PatientGroup, string][]).map(
-                      ([val, label]) => (
-                        <option key={val} value={val}>{label}</option>
-                      ),
-                    )}
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    Define a equação de Peso Estimado e Altura (Chumlea et al.)
-                  </p>
-                </div>
+                <PatientGroupSelect
+                  id="ga-group"
+                  value={group}
+                  onChange={setGroup}
+                  className={selectValueClass(group)}
+                  hint="Obrigatório nesta avaliação. Define a equação de peso e altura (Chumlea). Não é copiado do cadastro nem da consulta anterior."
+                />
 
                 <div className="space-y-2">
                   <Label htmlFor="ga-age">Idade (anos)</Label>
@@ -225,6 +237,14 @@ export function GeriatricAssessmentForm({
                   />
                 </div>
               </div>
+
+              <AnthropometricReferenceSelect
+                id="ga-anthro-ref"
+                value={anthroRef}
+                onChange={setAnthroRef}
+                className={selectValueClass(anthroRef)}
+                required={numCb != null || numDct != null}
+              />
 
               <div className="flex flex-wrap items-center gap-4">
                 <label className="flex cursor-pointer items-center gap-2 text-sm">

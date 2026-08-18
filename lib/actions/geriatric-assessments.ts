@@ -10,8 +10,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type {
   GeriatricAssessmentRow,
-  PatientGroup,
   NutritionalRisk,
+} from "@/lib/types/geriatric-assessments";
+import {
+  parseAnthropometricReference,
+  parsePatientGroup,
 } from "@/lib/types/geriatric-assessments";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
@@ -24,12 +27,6 @@ function parseDec(raw: FormDataEntryValue | null): number | null {
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
-}
-
-function parsePatientGroup(raw: FormDataEntryValue | null): PatientGroup | null {
-  const s = String(raw ?? "").trim();
-  const valid: PatientGroup[] = ["mulher_branca", "mulher_negra", "homem_branco", "homem_negro"];
-  return valid.includes(s as PatientGroup) ? (s as PatientGroup) : null;
 }
 
 function parseRisk(raw: FormDataEntryValue | null): NutritionalRisk | null {
@@ -106,6 +103,17 @@ export async function createGeriatricAssessmentAction(
   const nutritional_risk    = parseRisk(formData.get("nutritional_risk"));
   const nutritional_diagnosis = String(formData.get("nutritional_diagnosis") ?? "").trim() || null;
   const clinical_notes      = String(formData.get("clinical_notes") ?? "").trim() || null;
+  const anthropometric_reference = parseAnthropometricReference(
+    formData.get("anthropometric_reference"),
+  );
+
+  const hasAnthroMeasure = cb_cm != null || dct_mm != null;
+  if (hasAnthroMeasure && !anthropometric_reference) {
+    return {
+      ok: false,
+      error: "Selecione a referência antropométrica (Frisancho ou NHANES III).",
+    };
+  }
 
   const hasAny =
     cb_cm != null || dct_mm != null || cp_cm != null || aj_cm != null ||
@@ -140,6 +148,7 @@ export async function createGeriatricAssessmentAction(
       nutritional_risk,
       nutritional_diagnosis,
       clinical_notes,
+      anthropometric_reference,
     });
 
   if (error) {
@@ -232,6 +241,17 @@ export async function updateGeriatricAssessmentAction(
 
   const has_amputation = formData.get("has_amputation") === "true";
   const amputation_segment_pct = has_amputation ? parseDec(formData.get("amputation_segment_pct")) : null;
+  const cb_cm = parseDec(formData.get("cb_cm"));
+  const dct_mm = parseDec(formData.get("dct_mm"));
+  const anthropometric_reference = parseAnthropometricReference(
+    formData.get("anthropometric_reference"),
+  );
+  if ((cb_cm != null || dct_mm != null) && !anthropometric_reference) {
+    return {
+      ok: false,
+      error: "Selecione a referência antropométrica (Frisancho ou NHANES III).",
+    };
+  }
 
   const { error } = await supabase
     .from("patient_geriatric_assessments")
@@ -240,8 +260,8 @@ export async function updateGeriatricAssessmentAction(
       has_amputation,
       amputation_segment_pct,
       age_years:              Math.round(parseDec(formData.get("age_years")) ?? 0) || null,
-      cb_cm:                  parseDec(formData.get("cb_cm")),
-      dct_mm:                 parseDec(formData.get("dct_mm")),
+      cb_cm,
+      dct_mm,
       cp_cm:                  parseDec(formData.get("cp_cm")),
       aj_cm:                  parseDec(formData.get("aj_cm")),
       weight_real_kg:         parseDec(formData.get("weight_real_kg")),
@@ -256,6 +276,7 @@ export async function updateGeriatricAssessmentAction(
       nutritional_risk:       parseRisk(formData.get("nutritional_risk")),
       nutritional_diagnosis:  String(formData.get("nutritional_diagnosis") ?? "").trim() || null,
       clinical_notes:         String(formData.get("clinical_notes") ?? "").trim() || null,
+      anthropometric_reference,
     })
     .eq("id", assessmentId);
 

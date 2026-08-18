@@ -5,7 +5,9 @@ import {
 import type { ActivityLevel } from "@/lib/constants/activity-levels";
 import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
 import {
+  ANTHROPOMETRIC_REFERENCE_LABELS,
   NUTRITIONAL_RISK_LABELS,
+  type AnthropometricReference,
   type NutritionalRisk,
 } from "@/lib/types/geriatric-assessments";
 import type { NutritionAssessmentRow } from "@/lib/types/nutrition-assessments";
@@ -62,11 +64,15 @@ export function buildAnthroAssessmentSummaryLine(row: {
   estimated_weight_kg: number | null;
   bmi: number | null;
   nutritional_risk: NutritionalRisk | null;
+  anthropometric_reference?: AnthropometricReference | null;
 }): string {
   const pe = toAssessmentNum(row.estimated_weight_kg);
   const bmi = toAssessmentNum(row.bmi);
   const parts: string[] = [];
 
+  if (row.anthropometric_reference) {
+    parts.push(ANTHROPOMETRIC_REFERENCE_LABELS[row.anthropometric_reference]);
+  }
   if (pe != null) parts.push(`PE ${pe} kg`);
   if (bmi != null) parts.push(`IMC ${bmi}`);
   if (row.nutritional_risk) {

@@ -58,6 +58,7 @@ test.describe("Avaliação Idoso — preenchimento e cálculos", () => {
 
   test("02 — altura geriátrica exige AJ + Idade (todos os grupos)", async ({ page }) => {
     await abrirFormularioAvaliacao(page, patientId, "idoso");
+    await page.locator("#ga-group").selectOption("mulher_branca");
     // Limpa a idade pré-preenchida a partir da data de nascimento do paciente.
     await page.locator("#ga-age").fill("");
 

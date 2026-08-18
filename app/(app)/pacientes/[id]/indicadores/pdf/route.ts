@@ -5,7 +5,7 @@ import { loadChildAssessmentsForPatient } from "@/lib/actions/child-assessments"
 import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
 import { loadPatientById } from "@/lib/actions/patients";
 import { ageYearsFromBirth, patientAgeCategory } from "@/lib/pacientes/age-category";
-import { formatAdultAnthroMeasure } from "@/lib/nutrition/adult/anthropometric-percentiles";
+import { formatAdultAnthroMeasure, resolveTableMode } from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { foldTextForPdf } from "@/lib/pdf/dossier-pdf";
 import {
   buildAdultNutritionAssessmentReportPdfBytes,
@@ -66,7 +66,7 @@ function latestKpis(
   ): string =>
     formatAdultAnthroMeasure(
       indicator,
-      mode,
+      resolveTableMode(row.anthropometric_reference, mode),
       row.patient_group,
       row.age_years,
       value,

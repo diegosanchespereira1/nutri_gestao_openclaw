@@ -27,6 +27,7 @@ import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
 import {
   PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
+  ANTHROPOMETRIC_REFERENCE_LABELS,
 } from "@/lib/types/geriatric-assessments";
 import type { AdultNutritionAssessmentRow } from "@/lib/types/adult-nutrition-assessments";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -98,6 +99,9 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
     ? NUTRITIONAL_RISK_LABELS[row.nutritional_risk]
     : null;
   const summary = [
+    row.anthropometric_reference
+      ? ANTHROPOMETRIC_REFERENCE_LABELS[row.anthropometric_reference]
+      : null,
     row.estimated_weight_kg ? `PE ${fmt(row.estimated_weight_kg)} kg` : null,
     row.bmi ? `IMC ${fmt(row.bmi)}` : null,
     riskLabel ? riskLabel.split("—")[0].trim() : null,

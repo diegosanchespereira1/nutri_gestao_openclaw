@@ -9,6 +9,7 @@
 import {
   adultAnthroNoteForGroup,
   formatAdultAnthroMeasure,
+  resolveTableMode,
   type AdultAnthroIndicator,
   type AdultTableMode,
 } from "@/lib/nutrition/adult/anthropometric-percentiles";
@@ -681,7 +682,7 @@ export function adultKpiReferenceNote(
 
   return adultAnthroNoteForGroup(
     indicator,
-    mode,
+    resolveTableMode(latest.anthropometric_reference, mode),
     latest.patient_group,
     latest.age_years,
     value,
@@ -701,7 +702,7 @@ export function adultHistoryAnthroLabel(
   return (
     formatAdultAnthroMeasure(
       indicator,
-      mode,
+      resolveTableMode(row.anthropometric_reference, mode),
       row.patient_group,
       row.age_years,
       value,

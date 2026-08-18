@@ -10,7 +10,10 @@
  * Seguimos **exatamente** os números impressos no documento (mesma política do
  * módulo infantil). Anomalias do documento estão marcadas com comentários.
  */
-import type { PatientGroup } from "@/lib/types/geriatric-assessments";
+import type {
+  AnthropometricReference,
+  PatientGroup,
+} from "@/lib/types/geriatric-assessments";
 
 /** Indicadores antropométricos com tabela de percentis para adulto/idoso. */
 export type AdultAnthroIndicator = "cb" | "dct" | "cmb";
@@ -196,6 +199,25 @@ const TABLES: Record<
 /** Sexo biológico a partir do grupo (sexo/etnia) usado nas avaliações. */
 export function sexFromPatientGroup(group: PatientGroup): AdultSex {
   return group === "homem_branco" || group === "homem_negro" ? "male" : "female";
+}
+
+/** Frisancho → tabelas adultas; NHANES III → tabelas de idosos. */
+export function tableModeFromReference(ref: AnthropometricReference): AdultTableMode {
+  return ref === "nhanes" ? "geriatric" : "adult";
+}
+
+/**
+ * Método gravado na avaliação, ou fallback do tipo de formulário
+ * (adulto → Frisancho, idoso → NHANES) para linhas anteriores à coluna.
+ */
+export function resolveTableMode(
+  stored: AnthropometricReference | null | undefined,
+  fallback: AdultTableMode,
+): AdultTableMode {
+  if (stored === "frisancho" || stored === "nhanes") {
+    return tableModeFromReference(stored);
+  }
+  return fallback;
 }
 
 export type AdultAnthroReference = {

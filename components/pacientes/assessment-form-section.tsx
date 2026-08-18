@@ -1,5 +1,14 @@
 import type { ReactNode } from "react";
 
+import { Label } from "@/components/ui/label";
+import {
+  ANTHROPOMETRIC_REFERENCE_LABELS,
+  PATIENT_GROUP_LABELS,
+  parseAnthropometricReference,
+  parsePatientGroup,
+  type AnthropometricReference,
+  type PatientGroup,
+} from "@/lib/types/geriatric-assessments";
 import { cn } from "@/lib/utils";
 
 /**
@@ -95,5 +104,95 @@ export function AnthroPercentileHint({ text }: { text: string | null }) {
   if (!text) return null;
   return (
     <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{text}</p>
+  );
+}
+
+/** Seletor Frisancho / NHANES III — gravado por avaliação. */
+export function AnthropometricReferenceSelect({
+  id,
+  value,
+  onChange,
+  className,
+  required = false,
+}: {
+  id: string;
+  value: AnthropometricReference | "";
+  onChange: (value: AnthropometricReference | "") => void;
+  className: string;
+  required?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Referência antropométrica</Label>
+      <select
+        id={id}
+        name="anthropometric_reference"
+        className={className}
+        value={value}
+        required={required}
+        onChange={(e) => {
+          onChange(parseAnthropometricReference(e.target.value) ?? "");
+        }}
+      >
+        <option value="">Selecione Frisancho ou NHANES III</option>
+        {(
+          Object.entries(ANTHROPOMETRIC_REFERENCE_LABELS) as Array<
+            [AnthropometricReference, string]
+          >
+        ).map(([val, label]) => (
+          <option key={val} value={val}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-muted-foreground">
+        Tabelas de percentil de CB, DCT e CMB nesta avaliação. Não altera
+        consultas anteriores.
+      </p>
+    </div>
+  );
+}
+
+/** Seletor de sexo/etnia — obrigatório e sem valor pré-preenchido na nova avaliação. */
+export function PatientGroupSelect({
+  id,
+  value,
+  onChange,
+  className,
+  hint,
+}: {
+  id: string;
+  value: PatientGroup | "";
+  onChange: (value: PatientGroup | "") => void;
+  className: string;
+  hint?: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Grupo (sexo / etnia)</Label>
+      <select
+        id={id}
+        name="patient_group"
+        className={className}
+        value={value}
+        required
+        onChange={(e) => {
+          onChange(parsePatientGroup(e.target.value) ?? "");
+        }}
+      >
+        <option value="">Selecione o grupo</option>
+        {(
+          Object.entries(PATIENT_GROUP_LABELS) as Array<[PatientGroup, string]>
+        ).map(([val, label]) => (
+          <option key={val} value={val}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <p className="text-xs text-muted-foreground">
+        {hint ??
+          "Obrigatório nesta avaliação. Não é copiado do cadastro nem da consulta anterior."}
+      </p>
+    </div>
   );
 }

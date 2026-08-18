@@ -153,6 +153,7 @@ describe("adultKpiReferenceNote", () => {
       nutritional_risk: null,
       nutritional_diagnosis: null,
       clinical_notes: null,
+      anthropometric_reference: null,
       ...overrides,
     };
   }
@@ -228,5 +229,33 @@ describe("adultKpiReferenceNote", () => {
     expect(
       adultHistoryAnthroLabel("cb", "adult", adultRow({ cb_cm: 32.5 })),
     ).toBe("32,50 cm · ≈ P50");
+  });
+
+  it("método gravado NHANES em adulto ignora o fallback Frisancho", () => {
+    const note = adultKpiReferenceNote(
+      [adultRow({ cb_cm: 32.5, anthropometric_reference: "nhanes" })],
+      "cb",
+      "adult",
+    );
+    expect(note).toContain("Fora da faixa de referência");
+    expect(note).toContain("NHANES III");
+  });
+
+  it("método gravado Frisancho em idoso usa Frisancho, não NHANES", () => {
+    // Homem 62 anos, CB 32,0 = P50 Frisancho (60–64). NHANES P50 nesta idade é 32,7.
+    const note = adultKpiReferenceNote(
+      [
+        adultRow({
+          age_years: 62,
+          cb_cm: 32.0,
+          anthropometric_reference: "frisancho",
+        }),
+      ],
+      "cb",
+      "geriatric",
+    );
+    expect(note).toBe(
+      "≈ P50 · Eutrofia\nRef. P50: 32,0 cm · Frisancho, 1999",
+    );
   });
 });

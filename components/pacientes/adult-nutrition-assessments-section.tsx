@@ -5,6 +5,8 @@ import { adultHistoryAnthroLabel } from "@/lib/pacientes/health-indicator-series
 import {
   PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
+  ANTHROPOMETRIC_REFERENCE_LABELS,
+  defaultAnthropometricReference,
   type AdultNutritionAssessmentRow,
 } from "@/lib/types/adult-nutrition-assessments";
 
@@ -37,6 +39,9 @@ function AdultNutritionAssessmentHistoryCard({
     row.nutritional_risk ? NUTRITIONAL_RISK_LABELS[row.nutritional_risk] : null;
 
   const summary = [
+    row.anthropometric_reference
+      ? ANTHROPOMETRIC_REFERENCE_LABELS[row.anthropometric_reference]
+      : null,
     row.estimated_weight_kg ? `PE ${fmt(row.estimated_weight_kg)} kg` : null,
     row.bmi ? `IMC ${fmt(row.bmi)}` : null,
     riskLabel ? riskLabel.split("—")[0].trim() : null,
@@ -183,7 +188,15 @@ export async function AdultNutritionAssessmentsSection({
 
   return (
     <div className="space-y-6" aria-label="Avaliações nutricionais adultos">
-      <AdultNutritionAssessmentForm patientId={patientId} defaultAge={defaultAge} />
+      <AdultNutritionAssessmentForm
+        patientId={patientId}
+        defaultAge={defaultAge}
+        defaultAnthropometricReference={defaultAnthropometricReference(
+          rows[0]?.anthropometric_reference,
+          rows.length > 0,
+          "frisancho",
+        )}
+      />
 
       <div className="border-t border-border pt-6">
         <h3 className={formSectionLegendClass}>

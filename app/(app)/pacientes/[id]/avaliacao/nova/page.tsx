@@ -7,6 +7,8 @@ import { NutritionAssessmentsTabs } from "@/components/pacientes/nutrition-asses
 import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { loadAdultNutritionAssessmentsForPatient } from "@/lib/actions/adult-nutrition-assessments";
+import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
 import { loadPatientById } from "@/lib/actions/patients";
 import type { ChildSex } from "@/lib/nutrition/child/types";
 import {
@@ -20,6 +22,8 @@ import {
 } from "@/lib/navigation/return-to";
 import { getPatientPhotoSignedUrl } from "@/lib/patients/patient-photo-urls";
 import { createClient } from "@/lib/supabase/server";
+import { defaultAnthropometricReference } from "@/lib/types/geriatric-assessments";
+
 const SEX_LABEL: Record<string, string> = {
   female: "Feminino",
   male: "Masculino",
@@ -44,9 +48,13 @@ export default async function NovaAvaliacaoPage({
   if (!row) notFound();
 
   const supabase = await createClient();
-  const photoUrl = row.photo_storage_path
-    ? await getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
-    : null;
+  const [photoUrl, { rows: adultRows }, { rows: geriatricRows }] = await Promise.all([
+    row.photo_storage_path
+      ? getPatientPhotoSignedUrl(supabase, row.photo_storage_path)
+      : Promise.resolve(null),
+    loadAdultNutritionAssessmentsForPatient(id),
+    loadGeriatricAssessmentsForPatient(id),
+  ]);
 
   const birthSlice = row.birth_date ? String(row.birth_date).slice(0, 10) : null;
   const ageYears = ageYearsFromBirth(row.birth_date);
@@ -104,10 +112,23 @@ export default async function NovaAvaliacaoPage({
           <AdultNutritionAssessmentForm
             patientId={id}
             defaultAge={defaultAge}
+            defaultAnthropometricReference={defaultAnthropometricReference(
+              adultRows[0]?.anthropometric_reference,
+              adultRows.length > 0,
+              "frisancho",
+            )}
           />
         }
         geriatricTab={
-          <GeriatricAssessmentForm patientId={id} defaultAge={defaultAge} />
+          <GeriatricAssessmentForm
+            patientId={id}
+            defaultAge={defaultAge}
+            defaultAnthropometricReference={defaultAnthropometricReference(
+              geriatricRows[0]?.anthropometric_reference,
+              geriatricRows.length > 0,
+              "nhanes",
+            )}
+          />
         }
       />
     </PageLayout>

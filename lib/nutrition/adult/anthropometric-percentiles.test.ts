@@ -4,7 +4,9 @@ import {
   adultAnthroNote,
   adultAnthroReference,
   formatAdultAnthroMeasure,
+  resolveTableMode,
   sexFromPatientGroup,
+  tableModeFromReference,
 } from "./anthropometric-percentiles";
 
 describe("sexFromPatientGroup", () => {
@@ -179,5 +181,19 @@ describe("adultAnthroNote — textos de UI", () => {
     expect(
       formatAdultAnthroMeasure("cb", "adult", "homem_branco", 30, 32.5, 1),
     ).toBe("32,5 cm · ≈ P50");
+  });
+});
+
+describe("tableModeFromReference / resolveTableMode", () => {
+  it("mapeia o método escolhido para a tabela", () => {
+    expect(tableModeFromReference("frisancho")).toBe("adult");
+    expect(tableModeFromReference("nhanes")).toBe("geriatric");
+  });
+
+  it("usa o método gravado e o fallback só no legado", () => {
+    expect(resolveTableMode("nhanes", "adult")).toBe("geriatric");
+    expect(resolveTableMode("frisancho", "geriatric")).toBe("adult");
+    expect(resolveTableMode(null, "adult")).toBe("adult");
+    expect(resolveTableMode(undefined, "geriatric")).toBe("geriatric");
   });
 });

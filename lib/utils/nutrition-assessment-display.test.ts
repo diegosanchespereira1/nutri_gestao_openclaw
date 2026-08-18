@@ -77,6 +77,16 @@ describe("buildAnthroAssessmentSummaryLine", () => {
     expect(line).toContain("PE 60 kg");
     expect(line).toContain("S/RN");
   });
+
+  it("inclui o método antropométrico quando gravado", () => {
+    const line = buildAnthroAssessmentSummaryLine({
+      estimated_weight_kg: 60,
+      bmi: 22,
+      nutritional_risk: "s_rn",
+      anthropometric_reference: "frisancho",
+    });
+    expect(line).toContain("Frisancho, 1999");
+  });
 });
 
 describe("buildChildAssessmentSummaryLine", () => {

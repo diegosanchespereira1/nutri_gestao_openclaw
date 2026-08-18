@@ -10,8 +10,11 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdultNutritionAssessmentRow,
-  PatientGroup,
   NutritionalRisk,
+} from "@/lib/types/adult-nutrition-assessments";
+import {
+  parseAnthropometricReference,
+  parsePatientGroup,
 } from "@/lib/types/adult-nutrition-assessments";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
@@ -24,17 +27,6 @@ function parseDec(raw: FormDataEntryValue | null): number | null {
   if (!s) return null;
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
-}
-
-function parsePatientGroup(raw: FormDataEntryValue | null): PatientGroup | null {
-  const s = String(raw ?? "").trim();
-  const valid: PatientGroup[] = [
-    "mulher_branca",
-    "mulher_negra",
-    "homem_branco",
-    "homem_negro",
-  ];
-  return valid.includes(s as PatientGroup) ? (s as PatientGroup) : null;
 }
 
 function parseRisk(raw: FormDataEntryValue | null): NutritionalRisk | null {
@@ -116,6 +108,17 @@ export async function createAdultNutritionAssessmentAction(
     String(formData.get("nutritional_diagnosis") ?? "").trim() || null;
   const clinical_notes =
     String(formData.get("clinical_notes") ?? "").trim() || null;
+  const anthropometric_reference = parseAnthropometricReference(
+    formData.get("anthropometric_reference"),
+  );
+
+  const hasAnthroMeasure = cb_cm != null || dct_mm != null;
+  if (hasAnthroMeasure && !anthropometric_reference) {
+    return {
+      ok: false,
+      error: "Selecione a referência antropométrica (Frisancho ou NHANES III).",
+    };
+  }
 
   const hasAny =
     cb_cm != null ||
@@ -154,6 +157,7 @@ export async function createAdultNutritionAssessmentAction(
     nutritional_risk,
     nutritional_diagnosis,
     clinical_notes,
+    anthropometric_reference,
   });
 
   if (error) {

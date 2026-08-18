@@ -4,25 +4,29 @@ import { useActionState, useMemo, useState } from "react";
 
 import {
   formFieldClass,
-  nativeSelectClass,
   nativeSelectValueClass,
 } from "@/components/forms/form-section";
 import {
   AnthroPercentileHint,
+  AnthropometricReferenceSelect,
   AssessmentCalcChip,
   AssessmentFormSection,
+  PatientGroupSelect,
 } from "@/components/pacientes/assessment-form-section";
-import { adultAnthroNoteForGroup } from "@/lib/nutrition/adult/anthropometric-percentiles";
+import {
+  adultAnthroNoteForGroup,
+  tableModeFromReference,
+} from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type AdultNutritionAssessmentFormResult,
   createAdultNutritionAssessmentAction,
 } from "@/lib/actions/adult-nutrition-assessments";
 import {
-  PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
   type PatientGroup,
   type NutritionalRisk,
+  type AnthropometricReference,
 } from "@/lib/types/adult-nutrition-assessments";
 import {
   ADULT_ESTIMATED_WEIGHT_FORMULA_DESC,
@@ -53,21 +57,26 @@ type NumericField = string;
 export function AdultNutritionAssessmentForm({
   patientId,
   defaultAge,
+  defaultAnthropometricReference = "",
 }: {
   patientId: string;
   defaultAge?: number;
+  defaultAnthropometricReference?: AnthropometricReference | "";
 }) {
   const [state, formAction, pending] = useActionState(
     createAdultNutritionAssessmentAction,
     initial,
   );
 
-  const [group, setGroup] = useState<PatientGroup>("mulher_branca");
+  const [group, setGroup] = useState<PatientGroup | "">("");
   const [hasAmputation, setHasAmputation] = useState(false);
   const [ampPct, setAmpPct] = useState<NumericField>("5.9");
 
   const [age, setAge] = useState<NumericField>(
     defaultAge != null ? String(defaultAge) : "",
+  );
+  const [anthroRef, setAnthroRef] = useState<AnthropometricReference | "">(
+    defaultAnthropometricReference,
   );
   const [cb, setCb] = useState<NumericField>("");
   const [dct, setDct] = useState<NumericField>("");
@@ -109,23 +118,34 @@ export function AdultNutritionAssessmentForm({
   }, [peBase, hasAmputation, ampPctNum]);
 
   const altura = useMemo<number | null>(() => {
-    if (numAj === null) return null;
+    if (!group || numAj === null) return null;
     const needsAge = group === "mulher_branca" || group === "mulher_negra";
     if (needsAge && numAge === null) return null;
     return calcAdultEstimatedHeightM(group, numAj, needsAge ? numAge : null);
   }, [group, numAj, numAge]);
 
+  const tableMode = anthroRef ? tableModeFromReference(anthroRef) : null;
+
   const cbNote = useMemo(
-    () => adultAnthroNoteForGroup("cb", "adult", group, numAge, numCb, "compact"),
-    [group, numAge, numCb],
+    () =>
+      tableMode && group
+        ? adultAnthroNoteForGroup("cb", tableMode, group, numAge, numCb, "compact")
+        : null,
+    [tableMode, group, numAge, numCb],
   );
   const dctNote = useMemo(
-    () => adultAnthroNoteForGroup("dct", "adult", group, numAge, numDct, "compact"),
-    [group, numAge, numDct],
+    () =>
+      tableMode && group
+        ? adultAnthroNoteForGroup("dct", tableMode, group, numAge, numDct, "compact")
+        : null,
+    [tableMode, group, numAge, numDct],
   );
   const cmbNote = useMemo(
-    () => adultAnthroNoteForGroup("cmb", "adult", group, numAge, cmb, "compact"),
-    [group, numAge, cmb],
+    () =>
+      tableMode && group
+        ? adultAnthroNoteForGroup("cmb", tableMode, group, numAge, cmb, "compact")
+        : null,
+    [tableMode, group, numAge, cmb],
   );
 
   const imc = useMemo<number | null>(() => {
@@ -151,7 +171,9 @@ export function AdultNutritionAssessmentForm({
       ? `(${peBaseStr}) × 100 ÷ (100 − ${ampPctNum}%)`
       : peBaseStr;
 
-  const altFormula = adultEstimatedHeightFormulaLabel(group);
+  const altFormula = group
+    ? adultEstimatedHeightFormulaLabel(group)
+    : "Selecione o grupo (sexo / etnia)";
 
   const imcFormula =
     hasAmputation && ampPctNum > 0
@@ -207,27 +229,12 @@ export function AdultNutritionAssessmentForm({
               description="Dados usados nas equações de estimativa"
             >
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className={formFieldClass}>
-                  <Label htmlFor="adult-group">Grupo (sexo / etnia)</Label>
-                  <select
-                    id="adult-group"
-                    name="patient_group"
-                    className={nativeSelectClass}
-                    value={group}
-                    onChange={(e) => setGroup(e.target.value as PatientGroup)}
-                  >
-                    {(
-                      Object.entries(PATIENT_GROUP_LABELS) as [
-                        PatientGroup,
-                        string,
-                      ][]
-                    ).map(([val, label]) => (
-                      <option key={val} value={val}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <PatientGroupSelect
+                  id="adult-group"
+                  value={group}
+                  onChange={setGroup}
+                  className={nativeSelectValueClass(group)}
+                />
 
                 <div className={formFieldClass}>
                   <Label htmlFor="adult-age">Idade (anos)</Label>
@@ -246,6 +253,13 @@ export function AdultNutritionAssessmentForm({
                   />
                 </div>
               </div>
+              <AnthropometricReferenceSelect
+                id="adult-anthro-ref"
+                value={anthroRef}
+                onChange={setAnthroRef}
+                className={nativeSelectValueClass(anthroRef)}
+                required={numCb != null || numDct != null}
+              />
               <p className="text-xs text-muted-foreground">
                 Altura estimada: Chumlea (idade obrigatória para mulheres). Peso
                 estimado: AJ + CB.

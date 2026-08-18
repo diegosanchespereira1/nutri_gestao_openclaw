@@ -1,6 +1,7 @@
 import { GeriatricAssessmentForm } from "@/components/pacientes/geriatric-assessment-form";
 import { GeriatricAssessmentHistoryItem } from "@/components/pacientes/geriatric-assessment-history-item";
 import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
+import { defaultAnthropometricReference } from "@/lib/types/geriatric-assessments";
 
 export async function GeriatricAssessmentsSection({
   patientId,
@@ -13,7 +14,15 @@ export async function GeriatricAssessmentsSection({
 
   return (
     <div className="space-y-6" aria-label="Avaliações geriátricas">
-      <GeriatricAssessmentForm patientId={patientId} defaultAge={defaultAge} />
+      <GeriatricAssessmentForm
+        patientId={patientId}
+        defaultAge={defaultAge}
+        defaultAnthropometricReference={defaultAnthropometricReference(
+          rows[0]?.anthropometric_reference,
+          rows.length > 0,
+          "nhanes",
+        )}
+      />
 
       <div className="border-t border-border pt-6">
         <h3 className="mb-3 text-sm font-semibold text-foreground">

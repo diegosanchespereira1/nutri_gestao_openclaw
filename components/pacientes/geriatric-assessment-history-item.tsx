@@ -10,15 +10,21 @@ import {
 import {
   PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
+  ANTHROPOMETRIC_REFERENCE_LABELS,
   type GeriatricAssessmentRow,
   type PatientGroup,
   type NutritionalRisk,
+  type AnthropometricReference,
 } from "@/lib/types/geriatric-assessments";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { adultAnthroNoteForGroup } from "@/lib/nutrition/adult/anthropometric-percentiles";
+import { AnthropometricReferenceSelect } from "@/components/pacientes/assessment-form-section";
+import {
+  adultAnthroNoteForGroup,
+  tableModeFromReference,
+} from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { adultHistoryAnthroLabel } from "@/lib/pacientes/health-indicator-series";
 
 // ── Estilos partilhados ───────────────────────────────────────────────────────
@@ -140,6 +146,9 @@ function EditForm({
   const [hasAmputation, setHasAmputation] = useState(row.has_amputation ?? false);
   const [ampPct, setAmpPct] = useState(String(row.amputation_segment_pct ?? "5.9"));
   const [age, setAge] = useState(String(row.age_years ?? ""));
+  const [anthroRef, setAnthroRef] = useState<AnthropometricReference | "">(
+    row.anthropometric_reference ?? "nhanes",
+  );
   const [cb, setCb] = useState(String(row.cb_cm ?? ""));
   const [dct, setDct] = useState(String(row.dct_mm ?? ""));
   const [cp, setCp] = useState(String(row.cp_cm ?? ""));
@@ -165,9 +174,14 @@ function EditForm({
     return numCb - numDct * 0.314;
   }, [numCb, numDct]);
 
+  const tableMode = anthroRef ? tableModeFromReference(anthroRef) : null;
+
   const cmbNote = useMemo(
-    () => adultAnthroNoteForGroup("cmb", "geriatric", group, numAge, cmb, "compact"),
-    [group, numAge, cmb],
+    () =>
+      tableMode
+        ? adultAnthroNoteForGroup("cmb", tableMode, group, numAge, cmb, "compact")
+        : null,
+    [tableMode, group, numAge, cmb],
   );
 
   const peBase = useMemo<number | null>(() => {
@@ -251,6 +265,13 @@ function EditForm({
             />
           </div>
         </div>
+        <AnthropometricReferenceSelect
+          id={`eg-anthro-ref-${row.id}`}
+          value={anthroRef}
+          onChange={setAnthroRef}
+          className={selectValueClass(anthroRef)}
+          required={numCb != null || numDct != null}
+        />
 
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex cursor-pointer items-center gap-2 text-sm">
@@ -453,6 +474,9 @@ export function GeriatricAssessmentHistoryItem({
 
   const riskLabel = row.nutritional_risk ? NUTRITIONAL_RISK_LABELS[row.nutritional_risk] : null;
   const summary = [
+    row.anthropometric_reference
+      ? ANTHROPOMETRIC_REFERENCE_LABELS[row.anthropometric_reference]
+      : null,
     row.estimated_weight_kg ? `PE ${fmt(row.estimated_weight_kg)} kg` : null,
     row.bmi ? `IMC ${fmt(row.bmi)}` : null,
     riskLabel ? riskLabel.split("—")[0].trim() : null,

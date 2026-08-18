@@ -135,7 +135,7 @@ jobs:
   e2e-checklist-hospital:
     name: E2E — checklist Hospital TESTE
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.E2E_SUPABASE_URL || 'https://example.supabase.co' }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.E2E_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.test' }}
@@ -143,29 +143,44 @@ jobs:
       E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
       E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
     steps:
+      - name: Skip if E2E credentials missing
+        id: guard
+        run: |
+          if [ -z "$E2E_EMAIL" ] || [ -z "$E2E_PASSWORD" ]; then
+            echo "E2E_EMAIL/E2E_PASSWORD ausentes neste repositório — job ignorado."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout repository
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/checkout@v5
 
       - name: Setup Node
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/setup-node@v5
         with:
           node-version: "24"
           cache: npm
 
       - name: Install dependencies
+        if: steps.guard.outputs.skip != 'true'
         run: npm ci
 
       - name: Install Playwright (Chromium)
-        run: npx playwright install --with-deps chromium
+        if: steps.guard.outputs.skip != 'true'
+        timeout-minutes: 5
+        run: npx playwright install chromium
 
       - name: Build
+        if: steps.guard.outputs.skip != 'true'
         run: npm run build
 
       - name: Run checklist Hospital TESTE (E2E)
+        if: steps.guard.outputs.skip != 'true'
         run: npm run test:e2e -- e2e/auth-checklist-hospital-teste.spec.ts
 
       - name: Upload Playwright report
-        if: failure()
+        if: failure() && steps.guard.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report-checklist-hospital

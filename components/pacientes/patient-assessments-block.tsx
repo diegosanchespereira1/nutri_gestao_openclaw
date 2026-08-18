@@ -31,6 +31,7 @@ import {
 import type { AdultNutritionAssessmentRow } from "@/lib/types/adult-nutrition-assessments";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { withReturnTo } from "@/lib/navigation/return-to";
+import { adultHistoryAnthroLabel } from "@/lib/pacientes/health-indicator-series";
 import { cn } from "@/lib/utils";
 
 function fmtDate(iso: string): string {
@@ -125,9 +126,9 @@ function AdultHistoryItem({ row }: { row: AdultNutritionAssessmentRow }) {
           <div>
             <p className={formSectionLegendClass}>Medidas antropométricas</p>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-              <DataItem label="CB" value={row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–"} />
-              <DataItem label="DCT" value={row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–"} />
-              <DataItem label="CMB" value={row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–"} />
+              <DataItem label="CB" value={adultHistoryAnthroLabel("cb", "adult", row)} />
+              <DataItem label="DCT" value={adultHistoryAnthroLabel("dct", "adult", row)} />
+              <DataItem label="CMB" value={adultHistoryAnthroLabel("cmb", "adult", row)} />
               <DataItem label="CP" value={row.cp_cm != null ? `${fmt(row.cp_cm)} cm` : "–"} />
               <DataItem label="AJ" value={row.aj_cm != null ? `${fmt(row.aj_cm)} cm` : "–"} />
               <DataItem label="Peso Real" value={row.weight_real_kg != null ? `${fmt(row.weight_real_kg)} kg` : "–"} />

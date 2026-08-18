@@ -6,6 +6,14 @@
  * (mesma estrutura) e, opcionalmente, de `ChildAssessmentRow`.
  */
 
+import {
+  adultAnthroNoteForGroup,
+  formatAdultAnthroMeasure,
+  type AdultAnthroIndicator,
+  type AdultTableMode,
+} from "@/lib/nutrition/adult/anthropometric-percentiles";
+import { assessChild } from "@/lib/nutrition/child/assess";
+import type { ChildIndicator, ChildIndicatorResult } from "@/lib/nutrition/child/types";
 import type { AdultNutritionAssessmentRow } from "@/lib/types/adult-nutrition-assessments";
 import type { ChildAssessmentRow } from "@/lib/types/child-assessments";
 import {
@@ -569,6 +577,138 @@ export const CHILD_HEALTH_INDICATOR_SECTIONS: Array<HealthIndicatorSection<Child
     ],
   },
 ];
+
+// ── Referência (percentil / faixa) para os cards do dashboard ────────────────
+
+/** Indicador infantil (curvas OMS) correspondente a cada card do dashboard. */
+const CHILD_KPI_INDICATOR: Record<string, ChildIndicator> = {
+  peso: "weight_for_age",
+  estatura: "height_for_age",
+  "imc-infantil": "bmi_for_age",
+  "cb-infantil": "arm_circumference_for_age",
+  "dct-infantil": "triceps_skinfold_for_age",
+  "cc-infantil": "head_circumference_for_age",
+};
+
+/** "≈ P48 · Ref. P50: 15,2 kg" — percentil da última avaliação + valor tabelado. */
+function formatChildReference(r: ChildIndicatorResult, unit: string): string | null {
+  const pct =
+    r.boundary === "below_p1"
+      ? "< P1"
+      : r.boundary === "above_p99"
+        ? "> P99"
+        : r.percentile != null
+          ? `≈ P${Math.round(r.percentile)}`
+          : null;
+  if (pct == null) return null;
+
+  if (r.referencePercentileKey == null || r.referencePercentileValue == null) {
+    return pct;
+  }
+  const refNum = r.referencePercentileKey.slice(1);
+  const refVal = formatIndicatorValue(r.referencePercentileValue, 1);
+  return `${pct} · Ref. P${refNum}: ${refVal} ${unit}`;
+}
+
+/**
+ * Nota de referência (percentil OMS) para um card infantil do dashboard,
+ * calculada a partir da avaliação mais recente do período visível.
+ */
+export function childKpiReferenceNote(
+  rowsAsc: ChildAssessmentRow[],
+  defId: string,
+  unit: string,
+): string | null {
+  const indicator = CHILD_KPI_INDICATOR[defId];
+  if (!indicator) return null;
+
+  const latest = rowsAsc[rowsAsc.length - 1];
+  if (!latest) return null;
+
+  const assessment = assessChild({
+    sex: latest.sex,
+    ageMonths: latest.age_months,
+    weightKg: childNum(latest.weight_kg),
+    heightCm: childNum(latest.height_cm),
+    method: latest.classification_method,
+    armCircumferenceCm: childNum(latest.arm_circumference_cm),
+    tricepsSkinfoldMm: childNum(latest.triceps_skinfold_mm),
+    subscapularSkinfoldMm: childNum(latest.subscapular_skinfold_mm),
+    headCircumferenceCm: childNum(latest.head_circumference_cm),
+  });
+
+  const result = assessment.indicators.find((i) => i.indicator === indicator);
+  if (!result || result.outOfRange || result.value == null) return null;
+  return formatChildReference(result, unit);
+}
+
+/** Card do dashboard adulto → indicador com tabela de percentis. */
+const ADULT_KPI_INDICATOR: Record<string, AdultAnthroIndicator> = {
+  cb: "cb",
+  dct: "dct",
+  cmb: "cmb",
+};
+
+/**
+ * Nota de referência para cards de adulto/idoso.
+ * - CB/DCT/CMB: percentis Frisancho 1999 (adultos) / NHANES III (idosos) +
+ *   classificação Vitolo 2015, a partir da avaliação mais recente.
+ * - IMC: faixa de eutrofia OMS (adultos) / Lipschitz (idosos).
+ */
+export function adultKpiReferenceNote(
+  rowsAsc: AdultNutritionAssessmentRow[],
+  defId: string,
+  mode: AdultTableMode,
+): string | null {
+  if (defId === "imc") {
+    return mode === "geriatric"
+      ? "Ref. eutrofia Lipschitz: 22,0–27,0 kg/m²"
+      : "Ref. eutrofia OMS: 18,5–24,9 kg/m²";
+  }
+
+  const indicator = ADULT_KPI_INDICATOR[defId];
+  if (!indicator) return null;
+
+  const latest = rowsAsc[rowsAsc.length - 1];
+  if (!latest) return null;
+
+  const value =
+    indicator === "cb"
+      ? latest.cb_cm
+      : indicator === "dct"
+        ? latest.dct_mm
+        : latest.cmb_cm;
+
+  return adultAnthroNoteForGroup(
+    indicator,
+    mode,
+    latest.patient_group,
+    latest.age_years,
+    value,
+    "card",
+  );
+}
+
+/** "29,20 cm · ≈ P12" para histórico de avaliação. Sem medida → "–". */
+export function adultHistoryAnthroLabel(
+  indicator: AdultAnthroIndicator,
+  mode: AdultTableMode,
+  row: AdultNutritionAssessmentRow,
+  decimals = 2,
+): string {
+  const value =
+    indicator === "cb" ? row.cb_cm : indicator === "dct" ? row.dct_mm : row.cmb_cm;
+  return (
+    formatAdultAnthroMeasure(
+      indicator,
+      mode,
+      row.patient_group,
+      row.age_years,
+      value,
+      decimals,
+    ) ?? "–"
+  );
+}
 
 /** Converte campos numéricos (que podem vir como string) para número puro antes de usar como série. */
 export function childRowsWithNumericFields(rows: ChildAssessmentRow[]): ChildAssessmentRow[] {

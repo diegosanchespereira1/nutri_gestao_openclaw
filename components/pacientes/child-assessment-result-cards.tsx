@@ -18,6 +18,16 @@ function fmtPercentile(r: ChildIndicatorResult): string {
   return `≈ P${Math.round(r.percentile)}`;
 }
 
+/** "Ref. P50: 15,2 kg" — valor tabelado do percentil mais próximo. */
+function referenceLine(r: ChildIndicatorResult): string | null {
+  if (r.referencePercentileKey == null || r.referencePercentileValue == null) {
+    return null;
+  }
+  const unit = CHILD_INDICATOR_UNIT[r.indicator];
+  const num = r.referencePercentileKey.slice(1); // "p50" → "50"
+  return `Ref. P${num}: ${fmt(r.referencePercentileValue)} ${unit}`;
+}
+
 /** Faixa adequada em números, ex.: "Adequado: 14,2–24,3 kg" ou "≥ 100,6 cm". */
 function adequateRange(r: ChildIndicatorResult): string | null {
   const unit = CHILD_INDICATOR_UNIT[r.indicator];
@@ -59,6 +69,7 @@ function Card({ result }: { result: ChildIndicatorResult }) {
   }
 
   const range = adequateRange(result);
+  const reference = referenceLine(result);
 
   return (
     <div className={cn("rounded-lg border px-3 py-2.5", CHILD_COLOR_CLASSES[result.color])}>
@@ -72,6 +83,11 @@ function Card({ result }: { result: ChildIndicatorResult }) {
         {result.value != null ? `${fmt(result.value)} ${unit} · ` : ""}
         {fmtPercentile(result)}
       </p>
+      {reference && (
+        <p className="mt-0.5 font-mono text-[11px] tabular-nums leading-snug opacity-80">
+          {reference}
+        </p>
+      )}
       {range && (
         <p className="mt-1 text-[11px] leading-snug opacity-70">{range}</p>
       )}

@@ -8,9 +8,11 @@ import {
   nativeSelectValueClass,
 } from "@/components/forms/form-section";
 import {
+  AnthroPercentileHint,
   AssessmentCalcChip,
   AssessmentFormSection,
 } from "@/components/pacientes/assessment-form-section";
+import { adultAnthroNoteForGroup } from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type AdultNutritionAssessmentFormResult,
@@ -112,6 +114,19 @@ export function AdultNutritionAssessmentForm({
     if (needsAge && numAge === null) return null;
     return calcAdultEstimatedHeightM(group, numAj, needsAge ? numAge : null);
   }, [group, numAj, numAge]);
+
+  const cbNote = useMemo(
+    () => adultAnthroNoteForGroup("cb", "adult", group, numAge, numCb, "compact"),
+    [group, numAge, numCb],
+  );
+  const dctNote = useMemo(
+    () => adultAnthroNoteForGroup("dct", "adult", group, numAge, numDct, "compact"),
+    [group, numAge, numDct],
+  );
+  const cmbNote = useMemo(
+    () => adultAnthroNoteForGroup("cmb", "adult", group, numAge, cmb, "compact"),
+    [group, numAge, cmb],
+  );
 
   const imc = useMemo<number | null>(() => {
     if (pe === null || altura === null || altura <= 0) return null;
@@ -293,6 +308,7 @@ export function AdultNutritionAssessmentForm({
                     value={cb}
                     onChange={(e) => setCb(e.target.value)}
                   />
+                  <AnthroPercentileHint text={cbNote} />
                 </div>
                 <div className={formFieldClass}>
                   <Label htmlFor="adult-dct">DCT — dobra tricipital (mm)</Label>
@@ -308,6 +324,7 @@ export function AdultNutritionAssessmentForm({
                     value={dct}
                     onChange={(e) => setDct(e.target.value)}
                   />
+                  <AnthroPercentileHint text={dctNote} />
                 </div>
                 <div className={formFieldClass}>
                   <Label htmlFor="adult-cp">CP — circ. panturrilha (cm)</Label>
@@ -373,6 +390,7 @@ export function AdultNutritionAssessmentForm({
                   value={fmt(cmb)}
                   unit="cm"
                   formula="CB − (DCT × 0,314)"
+                  hint={cmbNote}
                   highlight
                 />
                 <AssessmentCalcChip

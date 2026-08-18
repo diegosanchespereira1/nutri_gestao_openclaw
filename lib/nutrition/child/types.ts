@@ -74,6 +74,14 @@ export type ChildIndicatorResult = {
   adequateHigh: number | null;
   /** True quando a idade não tem cobertura na tabela do indicador. */
   outOfRange: boolean;
+  /**
+   * Percentil tabelado (P1, P3, ..., P99) mais próximo do percentil calculado.
+   * Nos extremos: "p1" quando boundary=below_p1, "p99" quando boundary=above_p99.
+   * Opcional para retrocompatibilidade com resultados congelados em jsonb.
+   */
+  referencePercentileKey?: PercentileKey | null;
+  /** Valor tabelado (da tabela de referência) do percentil acima. */
+  referencePercentileValue?: number | null;
 };
 
 /** Entrada do orquestrador de avaliação. */

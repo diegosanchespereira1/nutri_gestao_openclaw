@@ -1,6 +1,7 @@
 import { formSectionLegendClass } from "@/components/forms/form-section";
 import { AdultNutritionAssessmentForm } from "@/components/pacientes/adult-nutrition-assessment-form";
 import { loadAdultNutritionAssessmentsForPatient } from "@/lib/actions/adult-nutrition-assessments";
+import { adultHistoryAnthroLabel } from "@/lib/pacientes/health-indicator-series";
 import {
   PATIENT_GROUP_LABELS,
   NUTRITIONAL_RISK_LABELS,
@@ -65,9 +66,9 @@ function AdultNutritionAssessmentHistoryCard({
           <div>
             <p className={formSectionLegendClass}>Medidas antropométricas</p>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
-              <DataItem label="CB" value={row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–"} />
-              <DataItem label="DCT" value={row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–"} />
-              <DataItem label="CMB" value={row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–"} />
+              <DataItem label="CB" value={adultHistoryAnthroLabel("cb", "adult", row)} />
+              <DataItem label="DCT" value={adultHistoryAnthroLabel("dct", "adult", row)} />
+              <DataItem label="CMB" value={adultHistoryAnthroLabel("cmb", "adult", row)} />
               <DataItem label="CP" value={row.cp_cm != null ? `${fmt(row.cp_cm)} cm` : "–"} />
               <DataItem label="AJ" value={row.aj_cm != null ? `${fmt(row.aj_cm)} cm` : "–"} />
               <DataItem

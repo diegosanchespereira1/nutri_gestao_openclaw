@@ -261,7 +261,8 @@ export async function buildAdultNutritionAssessmentReportPdfBytes(
         borderWidth: 0.6,
       });
       drawText(page, `${kpi.code} · ${kpi.label}`, x + 8, y - 4, font, 7, COL.muted);
-      drawText(page, kpi.value, x + 8, y - 18, fontBold, 11, COL.ink);
+      const valueSize = kpi.value.length > 18 ? 8 : 11;
+      drawText(page, kpi.value, x + 8, y - 18, fontBold, valueSize, COL.ink);
     }
     y -= rowH + 10;
   }

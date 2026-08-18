@@ -3,9 +3,11 @@
 import { useActionState, useMemo, useState } from "react";
 
 import {
+  AnthroPercentileHint,
   AssessmentCalcChip,
   AssessmentFormSection,
 } from "@/components/pacientes/assessment-form-section";
+import { adultAnthroNoteForGroup } from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
   type GeriatricAssessmentFormResult,
@@ -95,6 +97,19 @@ export function GeriatricAssessmentForm({
     if (numCb === null || numDct === null) return null;
     return numCb - numDct * 0.314;
   }, [numCb, numDct]);
+
+  const cbNote = useMemo(
+    () => adultAnthroNoteForGroup("cb", "geriatric", group, numAge, numCb, "compact"),
+    [group, numAge, numCb],
+  );
+  const dctNote = useMemo(
+    () => adultAnthroNoteForGroup("dct", "geriatric", group, numAge, numDct, "compact"),
+    [group, numAge, numDct],
+  );
+  const cmbNote = useMemo(
+    () => adultAnthroNoteForGroup("cmb", "geriatric", group, numAge, cmb, "compact"),
+    [group, numAge, cmb],
+  );
 
   const peBase = useMemo<number | null>(() => {
     if (numAj === null || numCb === null) return null;
@@ -263,6 +278,7 @@ export function GeriatricAssessmentForm({
                     value={cb}
                     onChange={(e) => setCb(e.target.value)}
                   />
+                  <AnthroPercentileHint text={cbNote} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ga-dct">DCT — dobra tricipital (mm)</Label>
@@ -278,6 +294,7 @@ export function GeriatricAssessmentForm({
                     value={dct}
                     onChange={(e) => setDct(e.target.value)}
                   />
+                  <AnthroPercentileHint text={dctNote} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ga-cp">CP — circ. panturrilha (cm)</Label>
@@ -341,6 +358,7 @@ export function GeriatricAssessmentForm({
                   value={fmt(cmb)}
                   unit="cm"
                   formula="CB − (DCT × 0,314)"
+                  hint={cmbNote}
                   highlight
                 />
                 <AssessmentCalcChip

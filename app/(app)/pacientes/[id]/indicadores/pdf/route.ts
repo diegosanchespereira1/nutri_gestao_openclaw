@@ -5,6 +5,7 @@ import { loadChildAssessmentsForPatient } from "@/lib/actions/child-assessments"
 import { loadGeriatricAssessmentsForPatient } from "@/lib/actions/geriatric-assessments";
 import { loadPatientById } from "@/lib/actions/patients";
 import { ageYearsFromBirth, patientAgeCategory } from "@/lib/pacientes/age-category";
+import { formatAdultAnthroMeasure } from "@/lib/nutrition/adult/anthropometric-percentiles";
 import { foldTextForPdf } from "@/lib/pdf/dossier-pdf";
 import {
   buildAdultNutritionAssessmentReportPdfBytes,
@@ -54,13 +55,30 @@ function initials(name: string): string {
   return (a + b).toUpperCase() || "NG";
 }
 
-function latestKpis(row: AdultNutritionAssessmentRow): AdultReportKpi[] {
+function latestKpis(
+  row: AdultNutritionAssessmentRow,
+  mode: "adult" | "geriatric",
+): AdultReportKpi[] {
+  const anthro = (
+    indicator: "cb" | "dct" | "cmb",
+    value: number | null,
+    decimals: number,
+  ): string =>
+    formatAdultAnthroMeasure(
+      indicator,
+      mode,
+      row.patient_group,
+      row.age_years,
+      value,
+      decimals,
+    ) ?? "–";
+
   return [
-    { code: "CB", label: "Circ. braço", value: row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–" },
-    { code: "DCT", label: "Dobra tricipital", value: row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–" },
+    { code: "CB", label: "Circ. braço", value: anthro("cb", row.cb_cm, 1) },
+    { code: "DCT", label: "Dobra tricipital", value: anthro("dct", row.dct_mm, 1) },
     { code: "CP", label: "Circ. panturrilha", value: row.cp_cm != null ? `${fmt(row.cp_cm)} cm` : "–" },
     { code: "AJ", label: "Altura joelho", value: row.aj_cm != null ? `${fmt(row.aj_cm)} cm` : "–" },
-    { code: "CMB", label: "Circ. muscular", value: row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–" },
+    { code: "CMB", label: "Circ. muscular", value: anthro("cmb", row.cmb_cm, 1) },
     {
       code: "PR",
       label: "Peso real",
@@ -231,7 +249,7 @@ export async function GET(
       ageLabel: ageYears != null ? `${ageYears} anos` : "Idade não informada",
       sexLabel: patient.sex ? SEX_LABEL[patient.sex] ?? "—" : "—",
     },
-    latestKpis: latestKpis(latest),
+    latestKpis: latestKpis(latest, isGeriatric ? "geriatric" : "adult"),
     history: historyRows(rows),
     professionalName: String(profile?.full_name ?? "—"),
     crn: String(profile?.crn ?? ""),

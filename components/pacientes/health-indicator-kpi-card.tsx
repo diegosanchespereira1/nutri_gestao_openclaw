@@ -116,6 +116,8 @@ type NumericKpiProps = {
   unit: string;
   decimals: number;
   asInt?: boolean;
+  /** Referência do indicador (ex.: "≈ P48 · Ref. P50: 15,2 kg"). */
+  reference?: string | null;
 };
 
 type CategoricalKpiProps = {
@@ -491,6 +493,12 @@ export function HealthIndicatorKpiCard(props: HealthIndicatorKpiCardProps) {
         <DeltaIcon className="size-3.5" aria-hidden />
         {delta.text}
       </p>
+
+      {props.kind === "numeric" && props.reference ? (
+        <p className="mt-0.5 whitespace-pre-line text-[11px] leading-snug tabular-nums text-muted-foreground">
+          {props.reference}
+        </p>
+      ) : null}
 
       <div className="mt-2.5 flex-1">
         {props.kind === "numeric" ? (

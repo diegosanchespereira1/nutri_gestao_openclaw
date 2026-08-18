@@ -4,7 +4,11 @@
  */
 import { computeBmi } from "@/lib/utils/bmi";
 import { classifyByPercentile } from "./classify";
-import { percentileForValue } from "./percentile";
+import {
+  findNearestTabulatedPercentile,
+  percentileForValue,
+  valueForPercentile,
+} from "./percentile";
 import {
   getReference,
   getReferenceByHeight,
@@ -15,6 +19,7 @@ import type {
   ChildAssessmentResult,
   ChildIndicator,
   ChildIndicatorResult,
+  PercentileKey,
   PercentileRow,
 } from "./types";
 
@@ -45,7 +50,29 @@ function emptyResult(
     adequateLow: null,
     adequateHigh: null,
     outOfRange,
+    referencePercentileKey: null,
+    referencePercentileValue: null,
   };
+}
+
+/**
+ * Percentil de referência (coluna tabelada mais próxima) e seu valor.
+ * Nos extremos usa P1 (below_p1) ou P99 (above_p99) como referência.
+ */
+function referenceForPercentile(
+  percentile: number | null,
+  boundary: "below_p1" | "above_p99" | null,
+  row: PercentileRow,
+): { key: PercentileKey | null; value: number | null } {
+  if (boundary === "below_p1") {
+    return { key: "p1", value: valueForPercentile("p1", row) };
+  }
+  if (boundary === "above_p99") {
+    return { key: "p99", value: valueForPercentile("p99", row) };
+  }
+  const nearest = findNearestTabulatedPercentile(percentile);
+  if (!nearest) return { key: null, value: null };
+  return { key: nearest.key, value: valueForPercentile(nearest.key, row) };
 }
 
 /** Faixa adequada/eutrófica (referência) para o indicador, a partir da linha. */
@@ -104,6 +131,7 @@ function buildResult(
   const { percentile, boundary } = percentileForValue(value, row);
   const { classification, color } = classifyByPercentile(indicator, ageMonths, value, row);
   const { low, high } = adequateBand(indicator, row);
+  const reference = referenceForPercentile(percentile, boundary, row);
   return {
     indicator,
     value,
@@ -115,6 +143,8 @@ function buildResult(
     adequateLow: low,
     adequateHigh: high,
     outOfRange: false,
+    referencePercentileKey: reference.key,
+    referencePercentileValue: reference.value,
   };
 }
 

@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { adultAnthroNoteForGroup } from "@/lib/nutrition/adult/anthropometric-percentiles";
+import { adultHistoryAnthroLabel } from "@/lib/pacientes/health-indicator-series";
 
 // ── Estilos partilhados ───────────────────────────────────────────────────────
 const selectClass =
@@ -61,13 +63,26 @@ function fmt(n: number | null | undefined, decimals = 2): string {
 }
 
 // ── Caixa de valor calculado (leve, inline) ───────────────────────────────────
-function CalcBox({ label, value, unit }: { label: string; value: string; unit: string }) {
+function CalcBox({
+  label,
+  value,
+  unit,
+  hint,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  hint?: string | null;
+}) {
   return (
     <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">{label}</p>
       <p className="font-mono text-base font-bold tabular-nums text-foreground">
         {value} <span className="text-xs font-normal text-muted-foreground">{unit}</span>
       </p>
+      {hint ? (
+        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }
@@ -149,6 +164,11 @@ function EditForm({
     if (numCb === null || numDct === null) return null;
     return numCb - numDct * 0.314;
   }, [numCb, numDct]);
+
+  const cmbNote = useMemo(
+    () => adultAnthroNoteForGroup("cmb", "geriatric", group, numAge, cmb, "compact"),
+    [group, numAge, cmb],
+  );
 
   const peBase = useMemo<number | null>(() => {
     if (numAj === null || numCb === null) return null;
@@ -291,7 +311,7 @@ function EditForm({
 
         {/* CMB calculado */}
         <div className="grid gap-2 sm:grid-cols-3">
-          <CalcBox label="CMB" value={fmt(cmb)} unit="cm" />
+          <CalcBox label="CMB" value={fmt(cmb)} unit="cm" hint={cmbNote} />
           <CalcBox label="Peso Estimado" value={fmt(pe)} unit="kg" />
           <CalcBox label="Altura Estimada" value={fmt(altura, 3)} unit="m" />
         </div>
@@ -507,9 +527,9 @@ export function GeriatricAssessmentHistoryItem({
           <div>
             <p className={legendClass}>Medidas antropométricas</p>
             <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-              <DataItem label="CB" value={row.cb_cm != null ? `${fmt(row.cb_cm)} cm` : "–"} />
-              <DataItem label="DCT" value={row.dct_mm != null ? `${fmt(row.dct_mm)} mm` : "–"} />
-              <DataItem label="CMB" value={row.cmb_cm != null ? `${fmt(row.cmb_cm)} cm` : "–"} />
+              <DataItem label="CB" value={adultHistoryAnthroLabel("cb", "geriatric", row)} />
+              <DataItem label="DCT" value={adultHistoryAnthroLabel("dct", "geriatric", row)} />
+              <DataItem label="CMB" value={adultHistoryAnthroLabel("cmb", "geriatric", row)} />
               <DataItem label="CP" value={row.cp_cm != null ? `${fmt(row.cp_cm)} cm` : "–"} />
               <DataItem label="AJ" value={row.aj_cm != null ? `${fmt(row.aj_cm)} cm` : "–"} />
               <DataItem label="Peso Real" value={row.weight_real_kg != null ? `${fmt(row.weight_real_kg)} kg` : "–"} />

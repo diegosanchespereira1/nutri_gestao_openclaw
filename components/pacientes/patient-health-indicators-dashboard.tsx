@@ -25,7 +25,9 @@ import {
 import {
   CHILD_HEALTH_INDICATOR_SECTIONS,
   HEALTH_INDICATOR_SECTIONS,
+  adultKpiReferenceNote,
   categorySeriesFromRows,
+  childKpiReferenceNote,
   childRowsWithNumericFields,
   deltaFromCategories,
   deltaFromSeries,
@@ -108,9 +110,12 @@ function BadgePill({
 function IndicatorSectionCard<TRow extends { recorded_at: string }>({
   section,
   rowsVisible,
+  referenceForDef,
 }: {
   section: HealthIndicatorSection<TRow>;
   rowsVisible: TRow[];
+  /** Nota de referência (percentil OMS / faixa de eutrofia) por indicador. */
+  referenceForDef?: (defId: string, unit: string) => string | null;
 }) {
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6">
@@ -162,6 +167,7 @@ function IndicatorSectionCard<TRow extends { recorded_at: string }>({
               decimals={def.decimals}
               asInt={def.asInt}
               delta={deltaFromSeries(series.map((point) => point.value))}
+              reference={referenceForDef?.(def.id, def.unit) ?? null}
             />
           );
         })}
@@ -383,6 +389,9 @@ export function PatientHealthIndicatorsDashboard({
               key={section.id}
               section={section}
               rowsVisible={visibleChildRows}
+              referenceForDef={(defId, unit) =>
+                childKpiReferenceNote(visibleChildRows, defId, unit)
+              }
             />
           ))}
         </div>
@@ -393,6 +402,9 @@ export function PatientHealthIndicatorsDashboard({
               key={section.id}
               section={section}
               rowsVisible={visibleAnthroRows}
+              referenceForDef={(defId) =>
+                adultKpiReferenceNote(visibleAnthroRows, defId, mode)
+              }
             />
           ))}
         </div>

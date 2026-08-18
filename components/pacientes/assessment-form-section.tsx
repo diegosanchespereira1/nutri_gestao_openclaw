@@ -44,6 +44,7 @@ export function AssessmentCalcChip({
   value,
   unit,
   formula,
+  hint,
   highlight = false,
 }: {
   code?: string;
@@ -51,6 +52,7 @@ export function AssessmentCalcChip({
   value: string;
   unit: string;
   formula?: string;
+  hint?: string | null;
   highlight?: boolean;
 }) {
   return (
@@ -81,6 +83,17 @@ export function AssessmentCalcChip({
           {formula}
         </p>
       ) : null}
+      {hint ? (
+        <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
+  );
+}
+
+/** Percentil ao vivo abaixo de um campo antropométrico. */
+export function AnthroPercentileHint({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{text}</p>
   );
 }

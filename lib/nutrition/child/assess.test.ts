@@ -88,6 +88,82 @@ describe("assessChild (percentil)", () => {
   });
 });
 
+describe("assessChild — referência de percentil", () => {
+  // Menina, 61 meses, IMC 15.3 → entre P50 (15.2) e P75 (16.3), mais perto de P50.
+  const base = {
+    sex: "female" as const,
+    ageMonths: 61,
+    weightKg: 22,
+    heightCm: 120,
+    method: "percentile" as const,
+    armCircumferenceCm: null,
+    tricepsSkinfoldMm: null,
+    subscapularSkinfoldMm: null,
+    headCircumferenceCm: null,
+  };
+
+  it("expõe percentil tabelado mais próximo e seu valor de referência", () => {
+    const bmi = pick(assessChild(base), "bmi_for_age");
+    expect(bmi.percentile).not.toBeNull();
+    expect(bmi.referencePercentileKey).toBe("p50");
+    expect(bmi.referencePercentileValue).toBe(15.2); // coluna P50 da tabela
+  });
+
+  it("todos os indicadores com percentil têm referência preenchida", () => {
+    const r = assessChild(base);
+    for (const ind of r.indicators) {
+      if (ind.percentile != null) {
+        expect(ind.referencePercentileKey).not.toBeNull();
+        expect(ind.referencePercentileValue).not.toBeNull();
+        expect(ind.referencePercentileValue).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("abaixo de P1 → referência é P1 com valor tabelado", () => {
+    const r = assessChild({ ...base, weightKg: 8 }); // muito abaixo de P1
+    const weight = pick(r, "weight_for_age");
+    expect(weight.boundary).toBe("below_p1");
+    expect(weight.referencePercentileKey).toBe("p1");
+    expect(weight.referencePercentileValue).not.toBeNull();
+  });
+
+  it("acima de P99 → referência é P99 com valor tabelado", () => {
+    const r = assessChild({ ...base, weightKg: 60 }); // muito acima de P99
+    const weight = pick(r, "weight_for_age");
+    expect(weight.boundary).toBe("above_p99");
+    expect(weight.referencePercentileKey).toBe("p99");
+    expect(weight.referencePercentileValue).not.toBeNull();
+  });
+
+  it("sem medida → referência null (não quebra)", () => {
+    const r = assessChild({ ...base, weightKg: null, heightCm: null });
+    const weight = pick(r, "weight_for_age");
+    expect(weight.referencePercentileKey).toBeNull();
+    expect(weight.referencePercentileValue).toBeNull();
+  });
+
+  it("idade fora da tabela → referência null (não quebra)", () => {
+    const r = assessChild({ ...base, ageMonths: 130 });
+    const weight = pick(r, "weight_for_age");
+    expect(weight.outOfRange).toBe(true);
+    expect(weight.referencePercentileKey).toBeNull();
+    expect(weight.referencePercentileValue).toBeNull();
+  });
+
+  it("não altera nenhum campo pré-existente do resultado", () => {
+    const bmi = pick(assessChild(base), "bmi_for_age");
+    // Mesmos valores validados nos testes originais — garantia de regressão.
+    expect(bmi.value).toBe(15.3);
+    expect(bmi.classification).toBe("IMC adequado ou eutrófico");
+    expect(bmi.color).toBe("green");
+    expect(bmi.adequateLow).toBe(12.9);
+    expect(bmi.adequateHigh).toBe(16.9);
+    expect(bmi.outOfRange).toBe(false);
+    expect(bmi.z).toBeNull();
+  });
+});
+
 describe("assessChild — casos de borda", () => {
   it("escore-Z fora da faixa dos novos indicadores (idade > 60m) → CB/PCT/SE/PC fora de faixa", () => {
     const r = assessChild({

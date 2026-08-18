@@ -64,3 +64,42 @@ export function valueForPercentile(
   if (idx < 0 || idx >= row.length) return null;
   return row[idx];
 }
+
+/** Percentil tabelado mais próximo do percentil calculado. */
+export type NearestPercentileReference = {
+  /** Chave da coluna tabelada, ex.: "p50". */
+  key: (typeof PERCENTILE_KEYS)[number];
+  /** Valor numérico do percentil, ex.: 50. */
+  percentileNumber: number;
+};
+
+/**
+ * Encontra a coluna de percentil tabelada (P1, P3, ..., P99) mais próxima do
+ * percentil calculado (interpolado) da criança.
+ *
+ * Ex.: 48.5 → P50; 2.0 → P1 ou P3 (empate resolve para a coluna menor);
+ * null/NaN → null.
+ */
+export function findNearestTabulatedPercentile(
+  calculatedPercentile: number | null,
+): NearestPercentileReference | null {
+  if (calculatedPercentile == null || !Number.isFinite(calculatedPercentile)) {
+    return null;
+  }
+
+  let closest = 0;
+  let minDistance = Infinity;
+
+  for (let i = 0; i < PERCENTILE_VALUES.length; i++) {
+    const distance = Math.abs(PERCENTILE_VALUES[i] - calculatedPercentile);
+    if (distance < minDistance) {
+      minDistance = distance;
+      closest = i;
+    }
+  }
+
+  return {
+    key: PERCENTILE_KEYS[closest],
+    percentileNumber: PERCENTILE_VALUES[closest],
+  };
+}

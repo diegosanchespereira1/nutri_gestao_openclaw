@@ -1,16 +1,24 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { revalidatePath, updateTag } from "next/cache";
-
-function revalidateGlobalChecklistCatalog() {
-  updateTag("checklist-catalog");
-}
+import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
-import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
+import type {
+  ChecklistTemplateItemView,
+  ChecklistTemplateSectionWithItems,
+  ChecklistTemplateWithSections,
+} from "@/lib/types/checklists";
 import type { EstablishmentType } from "@/lib/types/establishments";
+
+function revalidateGlobalChecklistCatalog() {
+  try {
+    revalidateTag("checklist-catalog", "max");
+  } catch {
+    // Cache tag inválida não pode abortar a mutação já persistida.
+  }
+}
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -432,11 +440,17 @@ export async function deleteChecklistItemAction(
 export async function addSectionQuickAction(payload: {
   templateId: string;
   title: string;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  section?: ChecklistTemplateSectionWithItems;
+}> {
   const { supabase } = await requireAdmin();
   const { templateId, title: rawTitle } = payload;
   const title = normalizeChecklistText(rawTitle);
-  if (!templateId || !title) return { ok: false, error: "invalid" };
+  if (!templateId || !title) {
+    return { ok: false, error: "Informe o título da seção." };
+  }
 
   const { data: existing } = await supabase
     .from("checklist_template_sections")
@@ -448,16 +462,33 @@ export async function addSectionQuickAction(payload: {
   const nextPosition =
     existing?.[0]?.position != null ? existing[0].position + 1 : 1;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("checklist_template_sections")
-    .insert({ template_id: templateId, title, position: nextPosition });
+    .insert({ template_id: templateId, title, position: nextPosition })
+    .select("id, template_id, title, position, created_at")
+    .single();
 
-  if (error) return { ok: false, error: error.message };
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error?.message ?? "Não foi possível adicionar a seção.",
+    };
+  }
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
   revalidateGlobalChecklistCatalog();
-  return { ok: true };
+  return {
+    ok: true,
+    section: {
+      id: String(data.id),
+      template_id: String(data.template_id),
+      title: String(data.title),
+      position: Number(data.position),
+      created_at: String(data.created_at),
+      items: [],
+    },
+  };
 }
 
 export async function deleteSectionQuickAction(payload: {
@@ -512,7 +543,11 @@ export async function addItemQuickAction(payload: {
   is_required: boolean;
   peso: number;
   is_structure_only: boolean;
-}): Promise<{ ok: boolean; error?: string }> {
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  item?: ChecklistTemplateItemView;
+}> {
   const { supabase } = await requireAdmin();
   const {
     templateId,
@@ -523,8 +558,9 @@ export async function addItemQuickAction(payload: {
     is_structure_only,
   } = payload;
   const description = normalizeChecklistText(rawDescription);
-  if (!templateId || !sectionId || !description)
-    return { ok: false, error: "invalid" };
+  if (!templateId || !sectionId || !description) {
+    return { ok: false, error: "Informe a descrição do item." };
+  }
 
   const { data: existing } = await supabase
     .from("checklist_template_items")
@@ -537,21 +573,45 @@ export async function addItemQuickAction(payload: {
   const nextPosition =
     existing?.[0]?.position != null ? existing[0].position + 1 : 1;
 
-  const { error } = await supabase.from("checklist_template_items").insert({
-    section_id: sectionId,
-    description,
-    is_required,
-    peso,
-    is_structure_only,
-    position: nextPosition,
-  });
+  const { data, error } = await supabase
+    .from("checklist_template_items")
+    .insert({
+      section_id: sectionId,
+      description,
+      is_required,
+      peso,
+      is_structure_only,
+      position: nextPosition,
+    })
+    .select(
+      "id, section_id, description, is_required, position, peso, is_structure_only, archived_at, created_at",
+    )
+    .single();
 
-  if (error) return { ok: false, error: error.message };
+  if (error || !data) {
+    return {
+      ok: false,
+      error: error?.message ?? "Não foi possível adicionar o item.",
+    };
+  }
 
   revalidatePath(`/admin/checklists/${templateId}/editar`);
   revalidatePath("/admin/checklists");
   revalidateGlobalChecklistCatalog();
-  return { ok: true };
+  return {
+    ok: true,
+    item: {
+      id: String(data.id),
+      section_id: String(data.section_id),
+      description: String(data.description),
+      is_required: Boolean(data.is_required),
+      position: Number(data.position),
+      peso: data.peso != null ? Number(data.peso) : 1,
+      is_structure_only: Boolean(data.is_structure_only),
+      archived_at: data.archived_at ? String(data.archived_at) : null,
+      created_at: String(data.created_at),
+    },
+  };
 }
 
 export async function deleteItemQuickAction(payload: {

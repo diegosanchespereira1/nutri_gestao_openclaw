@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, GripVertical, Undo2 } from "lucide-react";
 
@@ -32,7 +32,17 @@ import {
   addItemQuickAction,
   deleteItemQuickAction,
 } from "@/lib/actions/admin-checklists";
-import type { ChecklistTemplateSectionWithItems } from "@/lib/types/checklists";
+import type {
+  ChecklistTemplateItemView,
+  ChecklistTemplateSectionWithItems,
+} from "@/lib/types/checklists";
+
+type StructuralResult = {
+  ok: boolean;
+  error?: string;
+  section?: ChecklistTemplateSectionWithItems;
+  item?: ChecklistTemplateItemView;
+};
 
 type ItemDraft = {
   description: string;
@@ -63,6 +73,19 @@ export function ChecklistEditor({ sections, templateId }: Props) {
   const [structuralPending, setStructuralPending] = useState(false);
   const [structuralError, setStructuralError] = useState<string | null>(null);
   const [structuralSuccess, setStructuralSuccess] = useState<string | null>(null);
+  const [extraSections, setExtraSections] = useState<
+    ChecklistTemplateSectionWithItems[]
+  >([]);
+  const [hiddenSectionIds, setHiddenSectionIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [extraItemsBySection, setExtraItemsBySection] = useState<
+    Record<string, ChecklistTemplateItemView[]>
+  >({});
+  const [hiddenItemIds, setHiddenItemIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const newSectionRef = useRef<HTMLDivElement | null>(null);
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -85,6 +108,41 @@ export function ChecklistEditor({ sections, templateId }: Props) {
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+
+  const displayedSections = useMemo(() => {
+    const serverIds = new Set(sections.map((sec) => sec.id));
+    const fromServer = sections.filter((sec) => !hiddenSectionIds.has(sec.id));
+    const extras = extraSections.filter(
+      (sec) => !serverIds.has(sec.id) && !hiddenSectionIds.has(sec.id),
+    );
+    return [...fromServer, ...extras].map((sec) => {
+      const extrasForSec = extraItemsBySection[sec.id] ?? [];
+      const itemIds = new Set(sec.items.map((it) => it.id));
+      return {
+        ...sec,
+        items: [
+          ...sec.items.filter((it) => !hiddenItemIds.has(it.id)),
+          ...extrasForSec.filter(
+            (it) => !itemIds.has(it.id) && !hiddenItemIds.has(it.id),
+          ),
+        ],
+      };
+    });
+  }, [
+    sections,
+    extraSections,
+    extraItemsBySection,
+    hiddenSectionIds,
+    hiddenItemIds,
+  ]);
+
+  useEffect(() => {
+    if (extraSections.length === 0) return;
+    newSectionRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [extraSections]);
 
   const isDirty =
     Object.keys(itemDrafts).length > 0 || Object.keys(sectionDrafts).length > 0;
@@ -131,25 +189,35 @@ export function ChecklistEditor({ sections, templateId }: Props) {
 
   const runStructural = useCallback(
     async (
-      op: () => Promise<{ ok: boolean; error?: string }>,
+      op: () => Promise<StructuralResult>,
       successMessage?: string,
-    ) => {
+    ): Promise<StructuralResult> => {
       setStructuralPending(true);
       setStructuralError(null);
       setStructuralSuccess(null);
-      const result = await op();
-      setStructuralPending(false);
-      if (result.ok) {
-        if (successMessage) {
-          setStructuralSuccess(successMessage);
-          setTimeout(() => setStructuralSuccess(null), 4000);
+      try {
+        const result = await op();
+        if (result.ok) {
+          if (successMessage) {
+            setStructuralSuccess(successMessage);
+            setTimeout(() => setStructuralSuccess(null), 4000);
+          }
+          router.refresh();
+          setAddFormsKey((k) => k + 1);
+        } else {
+          setStructuralError(result.error ?? "Erro ao executar operação.");
         }
-        router.refresh();
-        setAddFormsKey((k) => k + 1);
-      } else {
-        setStructuralError(result.error ?? "Erro ao executar operação.");
+        return result;
+      } catch {
+        const failed: StructuralResult = {
+          ok: false,
+          error: "Não foi possível concluir a operação. Tente novamente.",
+        };
+        setStructuralError(failed.error ?? null);
+        return failed;
+      } finally {
+        setStructuralPending(false);
       }
-      return result.ok;
     },
     [router],
   );
@@ -255,15 +323,15 @@ export function ChecklistEditor({ sections, templateId }: Props) {
 
       <div className="space-y-4">
         <h2 className="text-sm font-semibold text-foreground">
-          Seções ({sections.length})
+          Seções ({displayedSections.length})
         </h2>
 
-        {sections.length === 0 ? (
+        {displayedSections.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             Nenhuma seção criada. Adicione a primeira seção abaixo.
           </p>
         ) : (
-          sections.map((section) => {
+          displayedSections.map((section) => {
             const secDraft = sectionDrafts[section.id];
             const secVal = {
               title: secDraft?.title ?? section.title,
@@ -271,7 +339,15 @@ export function ChecklistEditor({ sections, templateId }: Props) {
             };
 
             return (
-              <Card key={section.id}>
+              <div
+                key={section.id}
+                ref={
+                  extraSections.some((sec) => sec.id === section.id)
+                    ? newSectionRef
+                    : undefined
+                }
+              >
+              <Card>
                 <CardHeader className="pb-3 border-b border-border">
                   <div className="flex flex-wrap items-end gap-2">
                     <div className="flex-1 min-w-40 space-y-1">
@@ -327,8 +403,16 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                             sectionId: section.id,
                           }),
                         "Seção removida do modelo ativo. Histórico de checklists aplicados preservado.",
-                      ).then((ok) => {
-                        if (ok) {
+                      ).then((result) => {
+                        if (result.ok) {
+                          setHiddenSectionIds((prev) => {
+                            const next = new Set(prev);
+                            next.add(section.id);
+                            return next;
+                          });
+                          setExtraSections((prev) =>
+                            prev.filter((sec) => sec.id !== section.id),
+                          );
                           setSectionDrafts((prev) => {
                             const n = { ...prev };
                             delete n[section.id];
@@ -566,8 +650,19 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                                             itemId: item.id,
                                           }),
                                         "Item removido do modelo ativo. Histórico de checklists aplicados preservado.",
-                                      ).then((ok) => {
-                                        if (ok) {
+                                      ).then((result) => {
+                                        if (result.ok) {
+                                          setHiddenItemIds((prev) => {
+                                            const next = new Set(prev);
+                                            next.add(item.id);
+                                            return next;
+                                          });
+                                          setExtraItemsBySection((prev) => ({
+                                            ...prev,
+                                            [section.id]: (
+                                              prev[section.id] ?? []
+                                            ).filter((it) => it.id !== item.id),
+                                          }));
                                           setItemDrafts((prev) => {
                                             const n = { ...prev };
                                             delete n[item.id];
@@ -610,20 +705,34 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                         onSubmit={async (e) => {
                           e.preventDefault();
                           const fd = new FormData(e.currentTarget);
-                          await runStructural(() =>
-                            addItemQuickAction({
-                              templateId,
-                              sectionId: section.id,
-                              description: String(
-                                fd.get("description") ?? "",
-                              ).trim(),
-                              is_required: fd.get("is_required") === "true",
-                              peso:
-                                parseFloat(String(fd.get("peso") ?? "1")) || 1,
-                              is_structure_only:
-                                fd.get("is_structure_only") === "true",
-                            }),
-                          );
+                          await runStructural(
+                            () =>
+                              addItemQuickAction({
+                                templateId,
+                                sectionId: section.id,
+                                description: String(
+                                  fd.get("description") ?? "",
+                                ).trim(),
+                                is_required: fd.get("is_required") === "true",
+                                peso:
+                                  parseFloat(String(fd.get("peso") ?? "1")) ||
+                                  1,
+                                is_structure_only:
+                                  fd.get("is_structure_only") === "true",
+                              }),
+                            "Item adicionado.",
+                          ).then((result) => {
+                            if (result.ok && result.item) {
+                              const created = result.item;
+                              setExtraItemsBySection((prev) => ({
+                                ...prev,
+                                [section.id]: [
+                                  ...(prev[section.id] ?? []),
+                                  created,
+                                ],
+                              }));
+                            }
+                          });
                         }}
                       >
                         <div className="space-y-1">
@@ -694,6 +803,7 @@ export function ChecklistEditor({ sections, templateId }: Props) {
                   </details>
                 </CardContent>
               </Card>
+              </div>
             );
           })
         )}
@@ -714,12 +824,18 @@ export function ChecklistEditor({ sections, templateId }: Props) {
             onSubmit={async (e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
-              await runStructural(() =>
-                addSectionQuickAction({
-                  templateId,
-                  title: String(fd.get("title") ?? "").trim(),
-                }),
+              const result = await runStructural(
+                () =>
+                  addSectionQuickAction({
+                    templateId,
+                    title: String(fd.get("title") ?? "").trim(),
+                  }),
+                "Seção adicionada.",
               );
+              if (result.ok && result.section) {
+                const created = result.section;
+                setExtraSections((prev) => [...prev, created]);
+              }
             }}
           >
             <div className="flex-1 min-w-48 space-y-1">
@@ -746,6 +862,14 @@ export function ChecklistEditor({ sections, templateId }: Props) {
               {structuralPending ? "Adicionando…" : "Adicionar seção"}
             </Button>
           </form>
+          {(structuralError || structuralSuccess) && (
+            <p
+              role="status"
+              className={`text-sm ${structuralError ? "text-destructive" : "text-muted-foreground"}`}
+            >
+              {structuralError ?? structuralSuccess}
+            </p>
+          )}
         </CardContent>
       </Card>
 

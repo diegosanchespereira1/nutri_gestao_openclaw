@@ -621,6 +621,7 @@ export function WorkspaceChecklistBuilder({
             value={clientId}
             onChange={(e) => {
               const next = e.target.value;
+              clientIdRef.current = next;
               setClientId(next);
               triggerAutosave({ name, sections });
             }}
@@ -637,8 +638,8 @@ export function WorkspaceChecklistBuilder({
           </select>
           <p className="text-muted-foreground text-xs">
             {clientId
-              ? "Este checklist só aparece ao preencher estabelecimentos deste cliente."
-              : "Sem vínculo: o modelo aparece para qualquer cliente do workspace."}
+              ? "Só aparece para novos preenchimentos deste cliente. Histórico e rascunhos já iniciados continuam visíveis."
+              : "Sem vínculo: o modelo aparece para qualquer cliente do workspace. Histórico já existente continua visível."}
           </p>
         </div>
       </div>

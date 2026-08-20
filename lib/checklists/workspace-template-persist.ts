@@ -13,14 +13,65 @@ export type PersistWorkspaceTemplateResult =
   | { ok: true; sections: WorkspaceEditSection[] }
   | { ok: false; error: string };
 
+export const WORKSPACE_TEMPLATE_OPEN_DRAFTS_ERROR =
+  "Existem rascunhos em aberto usando este modelo. Aprove-os ou exclua-os antes de editar.";
+
+export type PersistWorkspaceTemplateMetadataResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
 function asIdList(rows: Array<{ id: string }> | null | undefined): string[] {
   return (rows ?? []).map((row) => String(row.id));
 }
 
 /**
+ * Grava nome e/ou vínculo com cliente sem reescrever seções/itens.
+ *
+ * Não consulta preenchimentos em aberto: alterar a visibilidade do modelo
+ * no catálogo não invalida sessões já iniciadas nem o histórico.
+ */
+export async function persistWorkspaceTemplateMetadata(
+  supabase: SupabaseClient,
+  templateId: string,
+  workspaceOwnerId: string,
+  input: {
+    name?: string;
+    clientId: string | null;
+  },
+): Promise<PersistWorkspaceTemplateMetadataResult> {
+  const patch: { name?: string; client_id: string | null } = {
+    client_id: input.clientId,
+  };
+  if (input.name !== undefined) {
+    patch.name = input.name;
+  }
+
+  const { data: rows, error } = await supabase
+    .from("checklist_workspace_templates")
+    .update(patch)
+    .eq("id", templateId)
+    .eq("owner_user_id", workspaceOwnerId)
+    .select("id");
+
+  if (error) {
+    return { ok: false, error: "Não foi possível salvar o modelo." };
+  }
+  if (!rows || rows.length === 0) {
+    return {
+      ok: false,
+      error:
+        "Sem permissão para alterar este modelo, ou ele não foi encontrado.",
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Persiste nome + seções + itens de um modelo da equipe.
- * `clientId` opcional: quando informado, grava o vínculo com o cliente PJ
- * (`null` = todos os clientes).
+ *
+ * Vínculo com cliente (`clientId`) deve ir em
+ * {@link persistWorkspaceTemplateMetadata}: não reescreve itens e não é
+ * bloqueado por rascunhos em aberto, para preservar o histórico.
  *
  * Regra crítica: nunca devolve `ok: true` se remoções/atualizações não
  * afetaram as linhas esperadas (PostgREST/RLS costumam retornar sucesso com 0 rows).
@@ -32,7 +83,6 @@ export async function persistWorkspaceTemplateStructure(
   input: {
     name: string;
     sections: WorkspaceEditSection[];
-    clientId?: string | null;
   },
   options: PersistWorkspaceTemplateOptions,
 ): Promise<PersistWorkspaceTemplateResult> {
@@ -55,22 +105,14 @@ export async function persistWorkspaceTemplateStructure(
     if ((openSessionsCount ?? 0) > 0) {
       return {
         ok: false,
-        error:
-          "Existem rascunhos em aberto usando este modelo. Aprove-os ou exclua-os antes de editar.",
+        error: WORKSPACE_TEMPLATE_OPEN_DRAFTS_ERROR,
       };
     }
   }
 
-  const templatePatch: { name: string; client_id?: string | null } = {
-    name: input.name,
-  };
-  if (input.clientId !== undefined) {
-    templatePatch.client_id = input.clientId;
-  }
-
   const { data: nameRows, error: nameErr } = await supabase
     .from("checklist_workspace_templates")
-    .update(templatePatch)
+    .update({ name: input.name })
     .eq("id", templateId)
     .eq("owner_user_id", workspaceOwnerId)
     .select("id");

@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { persistWorkspaceTemplateStructure } from "@/lib/checklists/workspace-template-persist";
+import {
+  persistWorkspaceTemplateMetadata,
+  persistWorkspaceTemplateStructure,
+} from "@/lib/checklists/workspace-template-persist";
 
 type Row = Record<string, unknown>;
 
@@ -255,5 +258,46 @@ describe("persistWorkspaceTemplateStructure", () => {
         },
       ],
     });
+  });
+});
+
+describe("persistWorkspaceTemplateMetadata", () => {
+  it("grava o vínculo com o cliente sem consultar preenchimentos em aberto", async () => {
+    const supabase = createQueuedSupabase({
+      checklist_workspace_templates: [
+        { data: [{ id: "tpl-1" }], error: null },
+      ],
+    });
+    const fromSpy = vi.spyOn(supabase, "from");
+
+    const result = await persistWorkspaceTemplateMetadata(
+      supabase,
+      "tpl-1",
+      "owner-1",
+      { name: "Checklist de teste", clientId: "client-pj-1" },
+    );
+
+    expect(result).toEqual({ ok: true });
+    expect(fromSpy.mock.calls.map((c) => c[0])).toEqual([
+      "checklist_workspace_templates",
+    ]);
+  });
+
+  it("falha se o update não afetar nenhuma linha", async () => {
+    const supabase = createQueuedSupabase({
+      checklist_workspace_templates: [{ data: [], error: null }],
+    });
+
+    const result = await persistWorkspaceTemplateMetadata(
+      supabase,
+      "tpl-1",
+      "owner-1",
+      { clientId: null },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/permissão|não foi encontrado/i);
+    }
   });
 });

@@ -17,7 +17,11 @@ import {
 } from "@/lib/checklists/workspace-template-draft";
 import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-items";
-import { persistWorkspaceTemplateStructure } from "@/lib/checklists/workspace-template-persist";
+import {
+  persistWorkspaceTemplateMetadata,
+  persistWorkspaceTemplateStructure,
+  WORKSPACE_TEMPLATE_OPEN_DRAFTS_ERROR,
+} from "@/lib/checklists/workspace-template-persist";
 import {
   normalizeWorkspaceTemplateClientId,
   workspaceTemplateAllowedForFill,
@@ -837,11 +841,19 @@ export async function saveWorkspaceTemplateDraftAction(
   );
   if (!client.ok) return client;
 
+  const metadata = await persistWorkspaceTemplateMetadata(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    { name: normalized.name, clientId: client.clientId },
+  );
+  if (!metadata.ok) return metadata;
+
   const persisted = await persistWorkspaceTemplateStructure(
     supabase,
     templateId,
     workspaceOwnerId,
-    { ...normalized, clientId: client.clientId },
+    normalized,
     { isDraft: true, bumpVersionIfUsed: false },
   );
   if (!persisted.ok) return persisted;
@@ -893,11 +905,19 @@ export async function publishWorkspaceTemplateAction(
   );
   if (!client.ok) return client;
 
+  const metadata = await persistWorkspaceTemplateMetadata(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    { name: sanitized.name, clientId: client.clientId },
+  );
+  if (!metadata.ok) return metadata;
+
   const persisted = await persistWorkspaceTemplateStructure(
     supabase,
     templateId,
     workspaceOwnerId,
-    { ...sanitized, clientId: client.clientId },
+    sanitized,
     { isDraft: true, bumpVersionIfUsed: false },
   );
   if (!persisted.ok) return persisted;
@@ -1110,14 +1130,33 @@ export async function updateWorkspaceTemplateAction(
   );
   if (!client.ok) return client;
 
+  const metadata = await persistWorkspaceTemplateMetadata(
+    supabase,
+    templateId,
+    workspaceOwnerId,
+    { name: sanitized.name, clientId: client.clientId },
+  );
+  if (!metadata.ok) return metadata;
+
   const persisted = await persistWorkspaceTemplateStructure(
     supabase,
     templateId,
     workspaceOwnerId,
-    { ...sanitized, clientId: client.clientId },
+    sanitized,
     { isDraft: false, bumpVersionIfUsed: true },
   );
-  if (!persisted.ok) return persisted;
+  if (!persisted.ok) {
+    // Nome e vínculo com cliente já foram gravados. Rascunhos/histórico
+    // continuam nas sessões existentes; só a estrutura (itens) fica bloqueada.
+    if (persisted.error === WORKSPACE_TEMPLATE_OPEN_DRAFTS_ERROR) {
+      revalidatePath("/checklists");
+      revalidatePath("/checklists/equipe");
+      revalidatePath(`/checklists/equipe/${templateId}/editar`);
+      invalidateWorkspaceCatalogCache(workspaceOwnerId);
+      return { ok: true, id: templateId };
+    }
+    return persisted;
+  }
 
   revalidatePath("/checklists");
   revalidatePath("/checklists/equipe");

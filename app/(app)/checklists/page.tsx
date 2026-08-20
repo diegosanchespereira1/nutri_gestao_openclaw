@@ -71,6 +71,12 @@ export default async function ChecklistsPage({
           modelo e tente novamente.
         </p>
       ) : null}
+      {err === "client" ? (
+        <p className="text-destructive text-sm" role="alert">
+          Este checklist é exclusivo de outro cliente. Selecione um
+          estabelecimento desse cliente para preenchê-lo.
+        </p>
+      ) : null}
       {err === "duplicate" ? (
         <p className="text-destructive text-sm" role="alert">
           Não foi possível criar o modelo personalizado. Tente novamente.

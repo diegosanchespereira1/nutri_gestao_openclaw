@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { WorkspaceChecklistBuilder } from "@/components/checklists/workspace-checklist-builder";
 import { loadWorkspaceTemplateForEdit } from "@/lib/actions/checklist-workspace";
 import type { WorkspaceEditSection } from "@/lib/actions/checklist-workspace";
+import { loadPjClientsForOwnerPicker } from "@/lib/actions/clients";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
@@ -14,7 +15,10 @@ export default async function EditWorkspaceChecklistPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const template = await loadWorkspaceTemplateForEdit(id);
+  const [template, pjClients] = await Promise.all([
+    loadWorkspaceTemplateForEdit(id),
+    loadPjClientsForOwnerPicker(),
+  ]);
 
   if (!template) {
     notFound();
@@ -45,9 +49,10 @@ export default async function EditWorkspaceChecklistPage({
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
             Personalize à vontade: adicione, edite, reordene ou remova seções e
-            itens. Só mostramos sucesso depois de confirmar que tudo foi gravado
-            no servidor. Itens já usados em sessões antigas são arquivados (não
-            apagados do histórico).
+            itens. Vincule a um cliente se este modelo não deve aparecer para
+            os demais. Só mostramos sucesso depois de confirmar que tudo foi
+            gravado no servidor. Itens já usados em sessões antigas são
+            arquivados (não apagados do histórico).
           </p>
         </div>
         <Link
@@ -83,6 +88,8 @@ export default async function EditWorkspaceChecklistPage({
         templateId={template.id}
         initialName={template.name}
         initialSections={initialSections}
+        initialClientId={template.client_id}
+        pjClients={pjClients}
       />
     </div>
   );

@@ -23,9 +23,8 @@ export default async function ChecklistsEquipePage({
             Modelos da equipe
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Checklists 100% customizáveis criados pela equipe. Reutilize em
-            qualquer estabelecimento, edite a qualquer momento e arquive sem
-            perder o histórico.
+            Checklists 100% customizáveis criados pela equipe. Podem valer para
+            todos os clientes ou ficar vinculados a um cliente específico.
           </p>
         </div>
         <div className="flex flex-col items-stretch gap-2 sm:items-end">

@@ -44,5 +44,21 @@ describe("normalizeDraftTemplateInput", () => {
     expect(result.name).toBe("La Vieiras Hipica");
     expect(result.sections[0]?.items[0]?.description).toBe("");
     expect(result.sections[0]?.items[0]?.is_required).toBe(true);
+    expect(result.clientId).toBeNull();
+  });
+
+  it("preserva o cliente vinculado no rascunho", () => {
+    const clientId = "550e8400-e29b-41d4-a716-446655440000";
+    const result = normalizeDraftTemplateInput({
+      name: "Checklist do hotel",
+      clientId,
+      sections: [
+        {
+          title: "Cozinha",
+          items: [{ description: "Pia limpa", is_required: true }],
+        },
+      ],
+    });
+    expect(result.clientId).toBe(clientId);
   });
 });

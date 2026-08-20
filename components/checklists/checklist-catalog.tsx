@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
+import { filterWorkspaceTemplatesForEstablishmentClient } from "@/lib/checklists/workspace-template-client-scope";
 import {
   ESTABLISHMENT_TYPES,
   establishmentTypeLabel,
@@ -388,17 +389,29 @@ export function ChecklistCatalog({
     "";
 
   const filteredWorkspaceTemplates = useMemo(() => {
-    let result = workspaceTemplates;
+    const establishmentClientId = filterEstablishmentId
+      ? (selectedEstablishment?.client_id ?? null)
+      : null;
+    let result = filterWorkspaceTemplatesForEstablishmentClient(
+      workspaceTemplates,
+      establishmentClientId,
+    );
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(
         (wt) =>
           wt.name.toLowerCase().includes(q) ||
-          (wt.created_by_name?.toLowerCase().includes(q) ?? false),
+          (wt.created_by_name?.toLowerCase().includes(q) ?? false) ||
+          (wt.client_label?.toLowerCase().includes(q) ?? false),
       );
     }
     return result;
-  }, [workspaceTemplates, search]);
+  }, [
+    workspaceTemplates,
+    search,
+    filterEstablishmentId,
+    selectedEstablishment?.client_id,
+  ]);
 
   const filteredCustomTemplates = useMemo(() => {
     let result = customTemplates;
@@ -541,6 +554,14 @@ export function ChecklistCatalog({
     );
     if (!stillVisible) setSelectedCustomTemplateId(null);
   }, [filteredCustomTemplates, selectedCustomTemplateId]);
+
+  useEffect(() => {
+    if (!selectedWorkspaceTemplateId) return;
+    const stillVisible = filteredWorkspaceTemplates.some(
+      (wt) => wt.id === selectedWorkspaceTemplateId,
+    );
+    if (!stillVisible) setSelectedWorkspaceTemplateId(null);
+  }, [filteredWorkspaceTemplates, selectedWorkspaceTemplateId]);
 
   useEffect(() => {
     if (!selectedWorkspaceTemplateId) return;
@@ -909,7 +930,11 @@ export function ChecklistCatalog({
     if (result.ok) {
       await finalizeAfterStart(result, templateId, source);
     } else {
-      setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
+      setBatchError(
+        result.error === "client_mismatch"
+          ? "Este checklist é exclusivo de outro cliente. Selecione um estabelecimento desse cliente."
+          : "Não foi possível iniciar o preenchimento. Tente novamente.",
+      );
     }
   }
 
@@ -928,7 +953,11 @@ export function ChecklistCatalog({
           areaIds: selectedAreaIds,
         });
         if (!prep.ok) {
-          setBatchError("Não foi possível iniciar o preenchimento. Tente novamente.");
+          setBatchError(
+            prep.error === "client_mismatch"
+              ? "Este checklist é exclusivo de outro cliente. Selecione um estabelecimento desse cliente."
+              : "Não foi possível iniciar o preenchimento. Tente novamente.",
+          );
           return;
         }
         if (prep.kind === "conflict") {
@@ -1625,9 +1654,11 @@ export function ChecklistCatalog({
             {filteredWorkspaceTemplates.length === 0 ? (
               <div className="rounded-xl border border-dashed p-6 text-center">
                 <p className="text-sm text-muted-foreground">
-                  {hasActiveFilters
-                    ? "Nenhum modelo da equipe com esses filtros."
-                    : "Ainda não há modelos da equipe publicados."}
+                  {establishmentId && !hasActiveFilters
+                    ? "Nenhum modelo da equipe para este cliente."
+                    : hasActiveFilters
+                      ? "Nenhum modelo da equipe com esses filtros."
+                      : "Ainda não há modelos da equipe publicados."}
                 </p>
               </div>
             ) : (
@@ -1676,6 +1707,11 @@ export function ChecklistCatalog({
                               <span className="inline-flex shrink-0 items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
                                 Equipe
                               </span>
+                              {wt.client_label ? (
+                                <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
+                                  Somente {wt.client_label}
+                                </span>
+                              ) : null}
                             </div>
                           </div>
                           <p className="mt-1 text-xs text-foreground/85">

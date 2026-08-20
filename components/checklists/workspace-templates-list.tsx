@@ -106,8 +106,8 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
           Nenhum modelo de equipe ainda.
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Crie um checklist 100% customizável para reutilizar em qualquer
-          estabelecimento.
+          Crie um checklist 100% customizável. Pode valer para todos os clientes
+          ou ficar vinculado a um cliente específico.
         </p>
         <Link
           href="/checklists/novo?novo=1"
@@ -140,6 +140,15 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                   <span className="inline-flex items-center rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-semibold text-primary">
                     Equipe
                   </span>
+                  {tpl.client_label ? (
+                    <span className="inline-flex max-w-[12rem] items-center truncate rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
+                      Somente {tpl.client_label}
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      Todos os clientes
+                    </span>
+                  )}
                   {tpl.is_draft ? (
                     <Badge variant="secondary" className="text-[10px]">
                       Rascunho

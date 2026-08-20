@@ -29,6 +29,7 @@ type EstablishmentClientJoin = EstablishmentWithClientNames["clients"];
 
 type EstablishmentPickerDbRow = {
   id: string;
+  client_id: string;
   name: string;
   state: string | null;
   establishment_type: EstablishmentRow["establishment_type"];
@@ -49,6 +50,7 @@ function mapRowToPickerOption(
 ): EstablishmentPickerOption | null {
   const client = pickClientJoin(row.clients);
   if (!client) return null;
+  if (!row.client_id) return null;
 
   const uf = row.state?.toUpperCase() ?? "UF não definida";
   const clientLabel = client.trade_name?.trim() || client.legal_name;
@@ -58,6 +60,7 @@ function mapRowToPickerOption(
   );
   return {
     id: row.id,
+    client_id: row.client_id,
     label: `${row.name} — ${clientLabel} (${uf} · ${typeLabel})`,
     state: row.state,
     establishment_type: row.establishment_type,
@@ -121,7 +124,7 @@ export async function searchOwnerEstablishmentsAction(params: {
   const q = `%${query}%`;
 
   const selectClause =
-    "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)";
+    "id, client_id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)";
 
   const { data: byEstablishmentName, error: byEstErr } = await supabase
     .from("establishments")
@@ -189,7 +192,7 @@ export async function loadOwnerChecklistEstablishmentsDropdownAction(params?: {
   const offset = Math.max(0, params?.offset ?? 0);
 
   const selectClause =
-    "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)";
+    "id, client_id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)";
 
   const { data, error, count } = await supabase
     .from("establishments")
@@ -240,7 +243,7 @@ export async function loadRecentChecklistEstablishmentsAction(
   const { data: establishments, error: estErr } = await supabase
     .from("establishments")
     .select(
-      "id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)",
+      "id, client_id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)",
     )
     .in("id", establishmentIds)
     .eq("clients.owner_user_id", workspaceOwnerId)
@@ -271,7 +274,7 @@ export async function loadEstablishmentPickerOptionById(
 
   const { data: row, error } = await supabase
     .from("establishments")
-    .select("id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)")
+    .select("id, client_id, name, state, establishment_type, clients!inner(legal_name, trade_name, lifecycle_status, owner_user_id, kind)")
     .eq("id", establishmentId)
     .eq("clients.owner_user_id", workspaceOwnerId)
     .eq("clients.kind", "pj")

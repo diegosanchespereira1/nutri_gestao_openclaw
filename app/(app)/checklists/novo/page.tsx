@@ -7,6 +7,7 @@ import {
   loadBaseTemplateCandidates,
   type WorkspaceEditSection,
 } from "@/lib/actions/checklist-workspace";
+import { loadPjClientsForOwnerPicker } from "@/lib/actions/clients";
 import { WORKSPACE_TEMPLATE_DRAFT_DEFAULT_NAME } from "@/lib/checklists/workspace-template-draft";
 
 export default async function NewWorkspaceChecklistPage({
@@ -17,10 +18,13 @@ export default async function NewWorkspaceChecklistPage({
   const sp = await searchParams;
   const draftParam = typeof sp.draft === "string" ? sp.draft : undefined;
   const forceNew = sp.novo === "1";
-  const baseTemplates = await loadBaseTemplateCandidates();
-  const draft = await ensureWorkspaceTemplateDraftForPage(draftParam, {
-    forceNew,
-  });
+  const [baseTemplates, draft, pjClients] = await Promise.all([
+    loadBaseTemplateCandidates(),
+    ensureWorkspaceTemplateDraftForPage(draftParam, {
+      forceNew,
+    }),
+    loadPjClientsForOwnerPicker(),
+  ]);
 
   if (!draft) {
     redirect("/checklists?err=draft");
@@ -47,9 +51,10 @@ export default async function NewWorkspaceChecklistPage({
             Criar checklist personalizado
           </h1>
           <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Modelo 100% customizável da equipe. O rascunho é salvo no servidor
-            ao adicionar ou remover seção/item — textos em edição são gravados
-            na publicação.
+            Modelo 100% customizável da equipe. Opcionalmente vincule a um
+            cliente: aí ele só aparece nos estabelecimentos desse cliente. O
+            rascunho é salvo no servidor ao adicionar ou remover seção/item —
+            textos em edição são gravados na publicação.
           </p>
         </div>
         <Link
@@ -65,6 +70,8 @@ export default async function NewWorkspaceChecklistPage({
         templateId={draft.id}
         initialName={initialName}
         initialSections={initialSections}
+        initialClientId={draft.client_id}
+        pjClients={pjClients}
         baseTemplates={baseTemplates}
         isDraft
       />

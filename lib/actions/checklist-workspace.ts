@@ -18,6 +18,11 @@ import {
 import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { sortChecklistItemsByPosition } from "@/lib/checklists/sort-checklist-items";
 import { persistWorkspaceTemplateStructure } from "@/lib/checklists/workspace-template-persist";
+import {
+  normalizeWorkspaceTemplateClientId,
+  workspaceTemplateAllowedForFill,
+  workspaceTemplateClientLabel,
+} from "@/lib/checklists/workspace-template-client-scope";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -51,6 +56,10 @@ export type WorkspaceTemplateListRow = {
   is_draft: boolean;
   /** Modelo arquivado (soft-delete) — visível para reativação. */
   is_archived: boolean;
+  /** Cliente PJ vinculado; null = todos os clientes. */
+  client_id: string | null;
+  /** Nome de exibição do cliente vinculado, se houver. */
+  client_label: string | null;
 };
 
 export type WorkspaceEditItem = {
@@ -68,6 +77,8 @@ export type WorkspaceEditSection = {
 export type WorkspaceTemplateInput = {
   name: string;
   sections: WorkspaceEditSection[];
+  /** Cliente PJ opcional; omitido/null = todos os clientes. */
+  clientId?: string | null;
 };
 
 export type WorkspaceTemplateLoadResult = {
@@ -78,6 +89,7 @@ export type WorkspaceTemplateLoadResult = {
   archived_at: string | null;
   published_at: string | null;
   is_draft: boolean;
+  client_id: string | null;
   sections: Array<{
     id: string;
     title: string;
@@ -101,13 +113,63 @@ export type WorkspaceDraftSaveResult =
 
 /* ─── Carregamento ─────────────────────────────────────────────────────── */
 
+async function loadClientLabelsById(
+  supabase: SupabaseClient,
+  clientIds: Array<string | null | undefined>,
+): Promise<Map<string, string>> {
+  const unique = [
+    ...new Set(
+      clientIds.filter((id): id is string => typeof id === "string" && id.length > 0),
+    ),
+  ];
+  const labels = new Map<string, string>();
+  if (unique.length === 0) return labels;
+
+  const { data } = await supabase
+    .from("clients")
+    .select("id, legal_name, trade_name")
+    .in("id", unique);
+
+  for (const row of data ?? []) {
+    labels.set(
+      String(row.id),
+      workspaceTemplateClientLabel({
+        legal_name: String(row.legal_name ?? ""),
+        trade_name: row.trade_name != null ? String(row.trade_name) : null,
+      }),
+    );
+  }
+  return labels;
+}
+
+async function resolveOwnedPjClientId(
+  supabase: SupabaseClient,
+  workspaceOwnerId: string,
+  raw: string | null | undefined,
+): Promise<{ ok: true; clientId: string | null } | { ok: false; error: string }> {
+  const normalized = normalizeWorkspaceTemplateClientId(raw);
+  if (!normalized.ok) return normalized;
+  if (normalized.clientId == null) return { ok: true, clientId: null };
+
+  const { data } = await supabase
+    .from("clients")
+    .select("id, kind, owner_user_id")
+    .eq("id", normalized.clientId)
+    .maybeSingle();
+
+  if (!data || data.kind !== "pj" || data.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Cliente não encontrado ou sem permissão." };
+  }
+  return { ok: true, clientId: normalized.clientId };
+}
+
 async function fetchWorkspaceTemplatesForCatalogRows(
   supabase: SupabaseClient,
   workspaceOwnerId: string,
 ): Promise<WorkspaceTemplateListRow[]> {
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, name, created_by_user_id, version, updated_at, published_at, archived_at")
+    .select("id, name, created_by_user_id, version, updated_at, published_at, archived_at, client_id")
     .eq("owner_user_id", workspaceOwnerId)
     .order("archived_at", { ascending: true, nullsFirst: true })
     .order("updated_at", { ascending: false });
@@ -157,6 +219,11 @@ async function fetchWorkspaceTemplatesForCatalogRows(
     if (tid) usedTemplateIds.add(tid);
   }
 
+  const clientLabels = await loadClientLabelsById(
+    supabase,
+    templates.map((t) => (t.client_id != null ? String(t.client_id) : null)),
+  );
+
   // Fase 2: items dependem dos sectionIds da fase anterior
   const counts = new Map<string, { total: number; required: number }>();
   for (const id of templateIds) counts.set(id, { total: 0, required: 0 });
@@ -178,19 +245,24 @@ async function fetchWorkspaceTemplatesForCatalogRows(
     }
   }
 
-  return templates.map((t) => ({
-    id: String(t.id),
-    name: String(t.name),
-    created_by_user_id: String(t.created_by_user_id),
-    created_by_name: profileNames.get(String(t.created_by_user_id)) ?? null,
-    total_item_count: counts.get(String(t.id))?.total ?? 0,
-    required_item_count: counts.get(String(t.id))?.required ?? 0,
-    version: Number(t.version ?? 1),
-    updated_at: String(t.updated_at),
-    has_been_used: usedTemplateIds.has(String(t.id)),
-    is_draft: t.published_at === null,
-    is_archived: t.archived_at !== null,
-  }));
+  return templates.map((t) => {
+    const clientId = t.client_id != null ? String(t.client_id) : null;
+    return {
+      id: String(t.id),
+      name: String(t.name),
+      created_by_user_id: String(t.created_by_user_id),
+      created_by_name: profileNames.get(String(t.created_by_user_id)) ?? null,
+      total_item_count: counts.get(String(t.id))?.total ?? 0,
+      required_item_count: counts.get(String(t.id))?.required ?? 0,
+      version: Number(t.version ?? 1),
+      updated_at: String(t.updated_at),
+      has_been_used: usedTemplateIds.has(String(t.id)),
+      is_draft: t.published_at === null,
+      is_archived: t.archived_at !== null,
+      client_id: clientId,
+      client_label: clientId ? (clientLabels.get(clientId) ?? null) : null,
+    };
+  });
 }
 
 /** Variante leve para a página /checklists — sem perfis nem verificação de sessões. */
@@ -200,7 +272,7 @@ async function fetchWorkspaceTemplatesForCatalogLightRows(
 ): Promise<WorkspaceTemplateListRow[]> {
   const { data: templates, error } = await supabase
     .from("checklist_workspace_templates")
-    .select("id, name, created_by_user_id, version, updated_at, published_at, archived_at")
+    .select("id, name, created_by_user_id, version, updated_at, published_at, archived_at, client_id")
     .eq("owner_user_id", workspaceOwnerId)
     .order("archived_at", { ascending: true, nullsFirst: true })
     .order("updated_at", { ascending: false });
@@ -240,19 +312,29 @@ async function fetchWorkspaceTemplatesForCatalogLightRows(
     }
   }
 
-  return templates.map((t) => ({
-    id: String(t.id),
-    name: String(t.name),
-    created_by_user_id: String(t.created_by_user_id),
-    created_by_name: null,
-    total_item_count: counts.get(String(t.id))?.total ?? 0,
-    required_item_count: counts.get(String(t.id))?.required ?? 0,
-    version: Number(t.version ?? 1),
-    updated_at: String(t.updated_at),
-    has_been_used: false,
-    is_draft: t.published_at === null,
-    is_archived: t.archived_at !== null,
-  }));
+  const clientLabels = await loadClientLabelsById(
+    supabase,
+    templates.map((t) => (t.client_id != null ? String(t.client_id) : null)),
+  );
+
+  return templates.map((t) => {
+    const clientId = t.client_id != null ? String(t.client_id) : null;
+    return {
+      id: String(t.id),
+      name: String(t.name),
+      created_by_user_id: String(t.created_by_user_id),
+      created_by_name: null,
+      total_item_count: counts.get(String(t.id))?.total ?? 0,
+      required_item_count: counts.get(String(t.id))?.required ?? 0,
+      version: Number(t.version ?? 1),
+      updated_at: String(t.updated_at),
+      has_been_used: false,
+      is_draft: t.published_at === null,
+      is_archived: t.archived_at !== null,
+      client_id: clientId,
+      client_label: clientId ? (clientLabels.get(clientId) ?? null) : null,
+    };
+  });
 }
 
 function getCachedWorkspaceCatalogRows(workspaceOwnerId: string) {
@@ -262,7 +344,7 @@ function getCachedWorkspaceCatalogRows(workspaceOwnerId: string) {
         createServiceRoleClient(),
         workspaceOwnerId,
       ),
-    ["workspace-catalog-v2", workspaceOwnerId],
+    ["workspace-catalog-v3", workspaceOwnerId],
     {
       revalidate: 120,
       tags: [`workspace-catalog-${workspaceOwnerId}`],
@@ -313,7 +395,7 @@ async function loadWorkspaceTemplateForEditWithClient(
   const [{ data: template }, { count: fillSessionCount }] = await Promise.all([
     supabase
       .from("checklist_workspace_templates")
-      .select("id, name, version, archived_at, published_at, owner_user_id")
+      .select("id, name, version, archived_at, published_at, owner_user_id, client_id")
       .eq("id", id)
       .maybeSingle(),
     supabase
@@ -365,6 +447,7 @@ async function loadWorkspaceTemplateForEditWithClient(
     archived_at: template.archived_at as string | null,
     published_at: (template.published_at as string | null) ?? null,
     is_draft: template.published_at === null,
+    client_id: template.client_id != null ? String(template.client_id) : null,
     sections: (sections ?? [])
       .map((sec) => ({
         id: String(sec.id),
@@ -542,6 +625,7 @@ function sanitizeInput(input: WorkspaceTemplateInput): {
   ok: true;
   name: string;
   sections: WorkspaceEditSection[];
+  clientId: string | null;
 } | { ok: false; error: string } {
   const name = (input.name ?? "").trim();
   if (name.length === 0) {
@@ -550,6 +634,9 @@ function sanitizeInput(input: WorkspaceTemplateInput): {
   if (name.length > 200) {
     return { ok: false, error: "O nome deve ter no máximo 200 caracteres." };
   }
+
+  const clientNormalized = normalizeWorkspaceTemplateClientId(input.clientId);
+  if (!clientNormalized.ok) return clientNormalized;
 
   const sections: WorkspaceEditSection[] = [];
   for (const sec of input.sections ?? []) {
@@ -580,7 +667,7 @@ function sanitizeInput(input: WorkspaceTemplateInput): {
     return { ok: false, error: "Adicione pelo menos uma seção com itens." };
   }
 
-  return { ok: true, name, sections };
+  return { ok: true, name, sections, clientId: clientNormalized.clientId };
 }
 
 async function assertWorkspaceTemplateDraft(
@@ -743,11 +830,18 @@ export async function saveWorkspaceTemplateDraftAction(
   if (!allowed.ok) return allowed;
 
   const normalized = normalizeDraftTemplateInput(input);
+  const client = await resolveOwnedPjClientId(
+    supabase,
+    workspaceOwnerId,
+    normalized.clientId,
+  );
+  if (!client.ok) return client;
+
   const persisted = await persistWorkspaceTemplateStructure(
     supabase,
     templateId,
     workspaceOwnerId,
-    normalized,
+    { ...normalized, clientId: client.clientId },
     { isDraft: true, bumpVersionIfUsed: false },
   );
   if (!persisted.ok) return persisted;
@@ -792,11 +886,18 @@ export async function publishWorkspaceTemplateAction(
   );
   if (!allowed.ok) return allowed;
 
+  const client = await resolveOwnedPjClientId(
+    supabase,
+    workspaceOwnerId,
+    sanitized.clientId,
+  );
+  if (!client.ok) return client;
+
   const persisted = await persistWorkspaceTemplateStructure(
     supabase,
     templateId,
     workspaceOwnerId,
-    sanitized,
+    { ...sanitized, clientId: client.clientId },
     { isDraft: true, bumpVersionIfUsed: false },
   );
   if (!persisted.ok) return persisted;
@@ -816,7 +917,7 @@ export async function publishWorkspaceTemplateAction(
     eventType: "checklist_workspace_draft_published",
     entityType: "checklist_workspace_templates",
     entityId: templateId,
-    metadata: { name: sanitized.name },
+    metadata: { name: sanitized.name, client_id: client.clientId },
   });
 
   revalidatePath("/checklists");
@@ -882,6 +983,12 @@ export async function createWorkspaceTemplateAction(
   if (!user) return { ok: false, error: "Sessão expirada." };
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+  const client = await resolveOwnedPjClientId(
+    supabase,
+    workspaceOwnerId,
+    sanitized.clientId,
+  );
+  if (!client.ok) return client;
 
   const { data: tpl, error: tErr } = await supabase
     .from("checklist_workspace_templates")
@@ -889,6 +996,7 @@ export async function createWorkspaceTemplateAction(
       owner_user_id: workspaceOwnerId,
       created_by_user_id: user.id,
       name: sanitized.name,
+      client_id: client.clientId,
       published_at: new Date().toISOString(),
     })
     .select("id")
@@ -995,11 +1103,18 @@ export async function updateWorkspaceTemplateAction(
     };
   }
 
+  const client = await resolveOwnedPjClientId(
+    supabase,
+    workspaceOwnerId,
+    sanitized.clientId,
+  );
+  if (!client.ok) return client;
+
   const persisted = await persistWorkspaceTemplateStructure(
     supabase,
     templateId,
     workspaceOwnerId,
-    sanitized,
+    { ...sanitized, clientId: client.clientId },
     { isDraft: false, bumpVersionIfUsed: true },
   );
   if (!persisted.ok) return persisted;
@@ -1097,6 +1212,69 @@ export async function unarchiveWorkspaceTemplateAction(
 
 /* ─── Início de preenchimento ─────────────────────────────────────────── */
 
+type WorkspaceFillAccessResult =
+  | { ok: true; workspaceOwnerId: string }
+  | {
+      ok: false;
+      error:
+        | "missing_fields"
+        | "forbidden"
+        | "template_not_found"
+        | "client_mismatch";
+    };
+
+async function assertWorkspaceTemplateFillAccess(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  workspaceOwnerId: string,
+  workspaceTemplateId: string,
+  establishmentId: string,
+): Promise<WorkspaceFillAccessResult> {
+  if (!workspaceTemplateId || !establishmentId) {
+    return { ok: false, error: "missing_fields" };
+  }
+
+  const { data: est } = await supabase
+    .from("establishments")
+    .select("client_id")
+    .eq("id", establishmentId)
+    .maybeSingle();
+  if (!est) return { ok: false, error: "forbidden" };
+
+  const establishmentClientId = String(est.client_id);
+  const { data: cl } = await supabase
+    .from("clients")
+    .select("owner_user_id")
+    .eq("id", establishmentClientId)
+    .maybeSingle();
+  if (!cl || cl.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "forbidden" };
+  }
+
+  const { data: tpl } = await supabase
+    .from("checklist_workspace_templates")
+    .select("id, owner_user_id, archived_at, published_at, client_id")
+    .eq("id", workspaceTemplateId)
+    .maybeSingle();
+  if (
+    !tpl ||
+    tpl.owner_user_id !== workspaceOwnerId ||
+    tpl.archived_at !== null ||
+    tpl.published_at === null
+  ) {
+    return { ok: false, error: "template_not_found" };
+  }
+
+  const templateClientId =
+    tpl.client_id != null ? String(tpl.client_id) : null;
+  if (
+    !workspaceTemplateAllowedForFill(templateClientId, establishmentClientId)
+  ) {
+    return { ok: false, error: "client_mismatch" };
+  }
+
+  return { ok: true, workspaceOwnerId };
+}
+
 export async function startWorkspaceTemplateFill(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {
@@ -1112,37 +1290,19 @@ export async function startWorkspaceTemplateFill(formData: FormData): Promise<vo
   const establishmentId = String(formData.get("establishment_id") ?? "").trim();
   const areaIdRaw = String(formData.get("area_id") ?? "").trim();
 
-  if (!workspaceTemplateId || !establishmentId) {
-    redirect("/checklists?err=missing");
-  }
-
-  const { data: est } = await supabase
-    .from("establishments")
-    .select("client_id")
-    .eq("id", establishmentId)
-    .maybeSingle();
-  if (!est) redirect("/checklists?err=forbidden");
-  const { data: cl } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", est!.client_id as string)
-    .maybeSingle();
-  if (!cl || cl.owner_user_id !== workspaceOwnerId) {
+  const access = await assertWorkspaceTemplateFillAccess(
+    supabase,
+    workspaceOwnerId,
+    workspaceTemplateId,
+    establishmentId,
+  );
+  if (!access.ok) {
+    if (access.error === "missing_fields") redirect("/checklists?err=missing");
+    if (access.error === "client_mismatch") redirect("/checklists?err=client");
+    if (access.error === "template_not_found") {
+      redirect("/checklists?err=template");
+    }
     redirect("/checklists?err=forbidden");
-  }
-
-  const { data: tpl } = await supabase
-    .from("checklist_workspace_templates")
-    .select("id, owner_user_id, archived_at, published_at")
-    .eq("id", workspaceTemplateId)
-    .maybeSingle();
-  if (
-    !tpl ||
-    tpl.owner_user_id !== workspaceOwnerId ||
-    tpl.archived_at !== null ||
-    tpl.published_at === null
-  ) {
-    redirect("/checklists?err=template");
   }
 
   let resolvedAreaId: string | null = null;
@@ -1193,37 +1353,14 @@ export async function startWorkspaceTemplateFillBatch(input: {
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
   const { workspaceTemplateId, establishmentId, areaIds } = input;
 
-  if (!workspaceTemplateId || !establishmentId) {
-    return { ok: false, error: "missing_fields" };
-  }
-
-  const { data: est } = await supabase
-    .from("establishments")
-    .select("client_id")
-    .eq("id", establishmentId)
-    .maybeSingle();
-  if (!est) return { ok: false, error: "forbidden" };
-  const { data: cl } = await supabase
-    .from("clients")
-    .select("owner_user_id")
-    .eq("id", est.client_id as string)
-    .maybeSingle();
-  if (!cl || cl.owner_user_id !== workspaceOwnerId) {
-    return { ok: false, error: "forbidden" };
-  }
-
-  const { data: tpl } = await supabase
-    .from("checklist_workspace_templates")
-    .select("id, owner_user_id, archived_at, published_at")
-    .eq("id", workspaceTemplateId)
-    .maybeSingle();
-  if (
-    !tpl ||
-    tpl.owner_user_id !== workspaceOwnerId ||
-    tpl.archived_at !== null ||
-    tpl.published_at === null
-  ) {
-    return { ok: false, error: "template_not_found" };
+  const access = await assertWorkspaceTemplateFillAccess(
+    supabase,
+    workspaceOwnerId,
+    workspaceTemplateId,
+    establishmentId,
+  );
+  if (!access.ok) {
+    return { ok: false, error: access.error };
   }
 
   const resolvedAreas: (string | null)[] = areaIds.length > 0 ? areaIds : [null];

@@ -48,6 +48,8 @@ export type EstablishmentListItem = EstablishmentRow;
 /** Opção pronta para picker/busca de estabelecimento na UI. */
 export type EstablishmentPickerOption = {
   id: string;
+  /** Cliente PJ dono do estabelecimento — usado para filtrar modelos da equipe. */
+  client_id: string;
   label: string;
   state: string | null;
   establishment_type: EstablishmentTypeValue;

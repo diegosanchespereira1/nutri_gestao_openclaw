@@ -15,7 +15,11 @@ export function normalizeDraftTemplateName(name: string | undefined): string {
 
 export function normalizeDraftTemplateInput(
   input: WorkspaceTemplateInput,
-): { name: string; sections: WorkspaceEditSection[] } {
+): {
+  name: string;
+  sections: WorkspaceEditSection[];
+  clientId: string | null;
+} {
   const sectionsIn = input.sections ?? [];
   const sections: WorkspaceEditSection[] =
     sectionsIn.length > 0
@@ -53,5 +57,6 @@ export function normalizeDraftTemplateInput(
   return {
     name: normalizeDraftTemplateName(input.name),
     sections,
+    clientId: input.clientId ?? null,
   };
 }

@@ -19,6 +19,8 @@ function asIdList(rows: Array<{ id: string }> | null | undefined): string[] {
 
 /**
  * Persiste nome + seções + itens de um modelo da equipe.
+ * `clientId` opcional: quando informado, grava o vínculo com o cliente PJ
+ * (`null` = todos os clientes).
  *
  * Regra crítica: nunca devolve `ok: true` se remoções/atualizações não
  * afetaram as linhas esperadas (PostgREST/RLS costumam retornar sucesso com 0 rows).
@@ -27,7 +29,11 @@ export async function persistWorkspaceTemplateStructure(
   supabase: SupabaseClient,
   templateId: string,
   workspaceOwnerId: string,
-  input: { name: string; sections: WorkspaceEditSection[] },
+  input: {
+    name: string;
+    sections: WorkspaceEditSection[];
+    clientId?: string | null;
+  },
   options: PersistWorkspaceTemplateOptions,
 ): Promise<PersistWorkspaceTemplateResult> {
   // Bloqueios antes de qualquer mutação — evita "salvou o nome e ignorou o resto".
@@ -55,14 +61,21 @@ export async function persistWorkspaceTemplateStructure(
     }
   }
 
+  const templatePatch: { name: string; client_id?: string | null } = {
+    name: input.name,
+  };
+  if (input.clientId !== undefined) {
+    templatePatch.client_id = input.clientId;
+  }
+
   const { data: nameRows, error: nameErr } = await supabase
     .from("checklist_workspace_templates")
-    .update({ name: input.name })
+    .update(templatePatch)
     .eq("id", templateId)
     .eq("owner_user_id", workspaceOwnerId)
     .select("id");
   if (nameErr) {
-    return { ok: false, error: "Não foi possível salvar o nome." };
+    return { ok: false, error: "Não foi possível salvar o modelo." };
   }
   if (!nameRows || nameRows.length === 0) {
     return {

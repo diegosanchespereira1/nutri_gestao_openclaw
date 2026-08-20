@@ -928,3 +928,32 @@ export async function loadClientsForOwner(options: {
   );
   return { rows, total: count ?? 0, pageSize: CLIENTS_PAGE_SIZE };
 }
+
+/** Lista compacta de clientes PJ para pickers (sem paginação). */
+export type PjClientPickerOption = {
+  id: string;
+  legal_name: string;
+  trade_name: string | null;
+};
+
+export async function loadPjClientsForOwnerPicker(): Promise<
+  PjClientPickerOption[]
+> {
+  const { supabase, user, workspaceOwnerId } = await getServerContext();
+  if (!user || !workspaceOwnerId) return [];
+
+  const { data, error } = await supabase
+    .from("clients")
+    .select("id, legal_name, trade_name")
+    .eq("owner_user_id", workspaceOwnerId)
+    .eq("kind", "pj")
+    .order("legal_name", { ascending: true })
+    .limit(500);
+
+  if (error || !data) return [];
+  return data.map((row) => ({
+    id: String(row.id),
+    legal_name: String(row.legal_name ?? ""),
+    trade_name: row.trade_name != null ? String(row.trade_name) : null,
+  }));
+}

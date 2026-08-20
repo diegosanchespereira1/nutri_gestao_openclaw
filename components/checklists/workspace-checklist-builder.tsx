@@ -32,6 +32,8 @@ import {
   type WorkspaceEditSection,
   type WorkspaceTemplateInput,
 } from "@/lib/actions/checklist-workspace";
+import type { PjClientPickerOption } from "@/lib/actions/clients";
+import { workspaceTemplateClientLabel } from "@/lib/checklists/workspace-template-client-scope";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -39,6 +41,8 @@ type Props = {
   templateId?: string;
   initialName?: string;
   initialSections?: WorkspaceEditSection[];
+  initialClientId?: string | null;
+  pjClients?: PjClientPickerOption[];
   /** Disponível apenas em mode="create" — lista de candidatos a base. */
   baseTemplates?: BaseCandidateTemplate[];
   /** Criação com rascunho persistido no servidor (autosave). */
@@ -70,9 +74,15 @@ function defaultSection(): EditableSection {
   };
 }
 
+const selectClassName = cn(
+  "border-input bg-background text-foreground h-9 w-full rounded-md border px-2.5 text-sm shadow-xs",
+  "outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+);
+
 function buildPayload(
   name: string,
   sections: EditableSection[],
+  clientId: string,
 ): WorkspaceTemplateInput {
   return {
     name,
@@ -85,6 +95,7 @@ function buildPayload(
         is_required: it.is_required,
       })),
     })),
+    clientId: clientId.trim() || null,
   };
 }
 
@@ -111,6 +122,8 @@ export function WorkspaceChecklistBuilder({
   templateId,
   initialName = "",
   initialSections,
+  initialClientId = null,
+  pjClients = [],
   baseTemplates = [],
   isDraft = false,
 }: Props) {
@@ -118,6 +131,7 @@ export function WorkspaceChecklistBuilder({
   const [isPending, startTransition] = useTransition();
 
   const [name, setName] = useState<string>(initialName);
+  const [clientId, setClientId] = useState<string>(initialClientId ?? "");
   const [sections, setSections] = useState<EditableSection[]>(() => {
     if (initialSections && initialSections.length > 0) {
       return initialSections.map((sec) => ({
@@ -142,6 +156,9 @@ export function WorkspaceChecklistBuilder({
   /** Último snapshot pendente enquanto um save corre — evita perder exclusões. */
   const pendingAutosaveRef = useRef<AutosaveSnapshot | null>(null);
 
+  const clientIdRef = useRef(clientId);
+  clientIdRef.current = clientId;
+
   const autosaveEnabled = mode === "create" && isDraft && Boolean(templateId);
 
   const runAutosave = useCallback(
@@ -162,7 +179,7 @@ export function WorkspaceChecklistBuilder({
       while (current) {
         const result = await saveWorkspaceTemplateDraftAction(
           templateId,
-          buildPayload(current.name, current.sections),
+          buildPayload(current.name, current.sections, clientIdRef.current),
         );
 
         if (!result.ok) {
@@ -413,6 +430,7 @@ export function WorkspaceChecklistBuilder({
     const payload: WorkspaceTemplateInput = {
       name: trimmedName,
       sections: sanitized,
+      clientId: clientId.trim() || null,
     };
 
     startTransition(async () => {
@@ -590,6 +608,37 @@ export function WorkspaceChecklistBuilder({
           />
           <p className="text-muted-foreground text-xs">
             Esse nome aparecerá no catálogo para todos os membros da sua equipe.
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label htmlFor="workspace-template-client">
+            Disponível para
+          </Label>
+          <select
+            id="workspace-template-client"
+            className={selectClassName}
+            value={clientId}
+            onChange={(e) => {
+              const next = e.target.value;
+              setClientId(next);
+              triggerAutosave({ name, sections });
+            }}
+          >
+            <option value="">Todos os clientes</option>
+            {pjClients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {workspaceTemplateClientLabel(c)}
+              </option>
+            ))}
+            {clientId && !pjClients.some((c) => c.id === clientId) ? (
+              <option value={clientId}>Cliente vinculado</option>
+            ) : null}
+          </select>
+          <p className="text-muted-foreground text-xs">
+            {clientId
+              ? "Este checklist só aparece ao preencher estabelecimentos deste cliente."
+              : "Sem vínculo: o modelo aparece para qualquer cliente do workspace."}
           </p>
         </div>
       </div>

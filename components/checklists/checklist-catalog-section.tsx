@@ -2,6 +2,9 @@ import { ChecklistCatalog } from "@/components/checklists/checklist-catalog";
 import { duplicateGlobalTemplateAction } from "@/lib/actions/checklist-custom";
 import { startChecklistFill } from "@/lib/actions/checklist-fill";
 import { loadChecklistPageData } from "@/lib/checklists/load-page-data";
+import { canAccessAdminArea } from "@/lib/roles";
+import { getServerUser } from "@/lib/supabase/get-server-user";
+import { fetchProfileRole } from "@/lib/supabase/profile";
 
 type Props = {
   focusTemplateId: string | null;
@@ -16,8 +19,12 @@ export async function ChecklistCatalogSection({
   focusCustomTemplateId,
   initialEstablishmentId,
 }: Props) {
-  const { templates, workspaceTemplates, customTemplates, recentEstablishments } =
-    await loadChecklistPageData({ initialEstablishmentId });
+  const [{ templates, workspaceTemplates, customTemplates, recentEstablishments }, { user, supabase }] =
+    await Promise.all([
+      loadChecklistPageData({ initialEstablishmentId }),
+      getServerUser(),
+    ]);
+  const role = user ? await fetchProfileRole(supabase, user.id) : null;
 
   return (
     <ChecklistCatalog
@@ -38,6 +45,7 @@ export async function ChecklistCatalogSection({
       focusWorkspaceTemplateId={focusWorkspaceTemplateId}
       focusCustomTemplateId={focusCustomTemplateId}
       initialEstablishmentId={initialEstablishmentId}
+      canEditSystemTemplates={canAccessAdminArea(role)}
     />
   );
 }

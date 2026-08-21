@@ -28,6 +28,7 @@ import {
   parseEnabledModulesFromForm,
 } from "@/lib/types/modules";
 import type { TeamJobRole } from "@/lib/types/team-members";
+import { canAccessAdminArea } from "@/lib/roles";
 
 type AdminDb = SupabaseClient;
 
@@ -816,9 +817,20 @@ export async function recordPaymentEventAction(
 export async function notifyTenantsAboutPortariaUpdateAction(
   formData: FormData,
 ): Promise<void> {
-  // In a full implementation, this would enqueue emails/push notifications.
-  // For MVP: record the notification event and update checklist template version.
-  const { supabase } = await requireSuperAdmin();
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!canAccessAdminArea(profile?.role)) {
+    redirect("/admin/checklists?err=sem_permissao");
+  }
 
   const templateId = String(formData.get("template_id") ?? "").trim();
   const message = String(formData.get("message") ?? "").trim();

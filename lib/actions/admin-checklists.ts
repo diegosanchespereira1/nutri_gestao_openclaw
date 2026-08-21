@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { canAccessAdminArea } from "@/lib/roles";
 import { normalizeChecklistText } from "@/lib/checklists/capitalize-checklist-text";
 import { parseAppliesTo } from "@/lib/checklists/parse-applies-to";
 import type {
@@ -33,8 +34,7 @@ async function requireAdmin() {
     .eq("user_id", user.id)
     .maybeSingle();
 
-  const allowed = ["admin", "super_admin"];
-  if (!profile || !allowed.includes(profile.role)) {
+  if (!canAccessAdminArea(profile?.role)) {
     redirect("/admin/checklists?err=sem_permissao");
   }
   return { supabase };
@@ -94,15 +94,30 @@ export async function loadTemplateForAdmin(templateId: string): Promise<{
     String(s.id),
   );
 
-  const { data: itemsRaw } =
+  const [{ data: itemsRaw }, { data: anyItemsRaw }] =
     sectionIds.length > 0
-      ? await supabase
-          .from("checklist_template_items")
-          .select("*")
-          .in("section_id", sectionIds)
-          .is("archived_at", null)
-          .order("position", { ascending: true })
-      : { data: [] as Record<string, unknown>[] };
+      ? await Promise.all([
+          supabase
+            .from("checklist_template_items")
+            .select("*")
+            .in("section_id", sectionIds)
+            .is("archived_at", null)
+            .order("position", { ascending: true }),
+          supabase
+            .from("checklist_template_items")
+            .select("section_id")
+            .in("section_id", sectionIds),
+        ])
+      : [
+          { data: [] as Record<string, unknown>[] },
+          { data: [] as Record<string, unknown>[] },
+        ];
+
+  const sectionsWithAnyItem = new Set(
+    (anyItemsRaw ?? []).map((it: Record<string, unknown>) =>
+      String(it.section_id),
+    ),
+  );
 
   const sections = (sectionsRaw ?? [])
     .map((s: Record<string, unknown>) => {
@@ -131,8 +146,8 @@ export async function loadTemplateForAdmin(templateId: string): Promise<{
         items,
       };
     })
-    // Seções cujos itens foram todos arquivados somem do editor.
-    .filter((s) => s.items.length > 0);
+    // Seções só com itens arquivados somem; seções novas (ainda sem itens) ficam.
+    .filter((s) => s.items.length > 0 || !sectionsWithAnyItem.has(s.id));
 
   const allItems = sections.flatMap((s) => s.items);
   const required_item_count = allItems.filter(

@@ -14,11 +14,13 @@ import {
   ListChecks,
   Loader2,
   MapPin,
+  Pencil,
   Search,
   X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { navigateToChecklistFill } from "@/lib/checklist-fill-navigate";
 import { DropdownMenuScroll } from "@/components/ui/dropdown-menu-scroll";
 import {
@@ -100,6 +102,8 @@ type Props = {
   focusCustomTemplateId?: string | null;
   /** Pré-seleciona um estabelecimento ao abrir o catálogo (ex.: vindo do cadastro do cliente). */
   initialEstablishmentId?: string | null;
+  /** Admin/super_admin pode editar o template global em /admin. */
+  canEditSystemTemplates?: boolean;
 };
 
 type SelectedTemplateSource = "system" | "workspace" | "custom";
@@ -242,6 +246,7 @@ export function ChecklistCatalog({
   focusWorkspaceTemplateId = null,
   focusCustomTemplateId = null,
   initialEstablishmentId = null,
+  canEditSystemTemplates = false,
 }: Props) {
   const router = useRouter();
   /* ── estado ── */
@@ -2255,6 +2260,19 @@ export function ChecklistCatalog({
                   </p>
                 )}
                 <div className="flex items-center gap-2">
+                  {canEditSystemTemplates && selectedTemplate ? (
+                    <Link
+                      href={`/admin/checklists/${selectedTemplate.id}/editar`}
+                      className={cn(
+                        buttonVariants({ variant: "outline", size: "sm" }),
+                        "gap-1.5",
+                      )}
+                      title="Editar o modelo global do sistema"
+                    >
+                      <Pencil className="size-3.5" />
+                      Editar modelo
+                    </Link>
+                  ) : null}
                   {selectedTemplate ? (
                     <form
                       ref={duplicateFormRef}

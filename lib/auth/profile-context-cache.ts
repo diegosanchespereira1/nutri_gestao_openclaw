@@ -1,4 +1,5 @@
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
+import { isAdminPath } from "@/lib/auth-paths";
 import type { ProfileContextCookie } from "@/lib/auth/profile-context-cookie";
 
 export function shouldReuseProfileContextCache(input: {
@@ -25,6 +26,10 @@ export function shouldReuseProfileContextCache(input: {
   if (nowSec - cached.cachedAt > ttlSec) return false;
 
   if (bemvindoParam === "1") return false;
+
+  // Papel admin/super_admin pode ter sido promovido após o cookie; /admin
+  // precisa ler o perfil fresco para não barrar quem já tem permissão.
+  if (isAdminPath(pathname)) return false;
 
   if (pathname === APP_DASHBOARD_PATH && cached.needsOnboarding) return false;
 

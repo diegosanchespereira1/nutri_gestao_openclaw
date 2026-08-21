@@ -48,6 +48,20 @@ describe("shouldReuseProfileContextCache", () => {
     ).toBe(false);
   });
 
+  it("não reutiliza cache em rotas /admin", () => {
+    expect(
+      shouldReuseProfileContextCache({
+        isNewAppSession: false,
+        cached: { ...baseCached, needsOnboarding: false, role: "user" },
+        userId: "user-1",
+        nowSec,
+        ttlSec,
+        pathname: "/admin/checklists",
+        bemvindoParam: null,
+      }),
+    ).toBe(false);
+  });
+
   it("invalida dashboard quando cache ainda marca needsOnboarding", () => {
     expect(
       shouldReuseProfileContextCache({

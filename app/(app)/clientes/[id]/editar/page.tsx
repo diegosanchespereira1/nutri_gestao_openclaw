@@ -9,6 +9,7 @@ import { ClientContractsSection } from "@/components/clientes/client-contracts-s
 import { ClientFormLazy } from "@/components/clientes/client-form-lazy";
 import { ChecklistEvolutionExportDialog } from "@/components/checklists/checklist-evolution-export-dialog";
 import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
+import { ClientAvailableChecklistsSection } from "@/components/clientes/client-available-checklists-section";
 import { ClientChecklistHistorySection } from "@/components/clientes/client-checklist-history-section";
 import { loadChecklistScoreHistory } from "@/lib/actions/checklist-history";
 import { DeleteClientButton } from "@/components/clientes/delete-client-button";
@@ -116,6 +117,7 @@ function ClientEditChecklistsSkeleton() {
   return (
     <div className="space-y-6 animate-pulse" role="status" aria-label="A carregar checklists">
       <div className="h-36 rounded-xl border border-border bg-muted/50" />
+      <div className="h-48 rounded-xl border border-border bg-muted/50" />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <div key={i} className="h-20 rounded-lg bg-muted/60" />
@@ -160,8 +162,9 @@ async function ClientEditChecklistsTabPanel({
   clientId: string;
   sp: { est?: string; area?: string; status?: string; page?: string };
 }) {
-  const [scoreHistoryEl, checklistHistoryEl] = await Promise.all([
+  const [scoreHistoryEl, availableEl, checklistHistoryEl] = await Promise.all([
     ChecklistScoreHistoryBlock({ clientId }),
+    ClientAvailableChecklistsSection({ clientId }),
     ClientChecklistHistorySection({
       clientId,
       embeddedInClientEdit: true,
@@ -176,6 +179,7 @@ async function ClientEditChecklistsTabPanel({
   return (
     <div className="space-y-6">
       {scoreHistoryEl}
+      {availableEl}
       {checklistHistoryEl}
     </div>
   );

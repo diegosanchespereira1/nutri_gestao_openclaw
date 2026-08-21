@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { ChecklistEvolutionExportDialog } from "@/components/checklists/checklist-evolution-export-dialog";
 import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
+import { ClientAvailableChecklistsSection } from "@/components/clientes/client-available-checklists-section";
 import { ClientChecklistHistorySection } from "@/components/clientes/client-checklist-history-section";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
@@ -73,6 +74,8 @@ export default async function ClientChecklistHistoryPage({
           </div>
         </div>
       )}
+
+      <ClientAvailableChecklistsSection clientId={clientId} />
 
       <ClientChecklistHistorySection
         clientId={clientId}

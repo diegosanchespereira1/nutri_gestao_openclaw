@@ -93,6 +93,8 @@ type Props = {
   focusTemplateId?: string | null;
   /** Mesma lógica para um workspace template. */
   focusWorkspaceTemplateId?: string | null;
+  /** Mesma lógica para um modelo personalizado. */
+  focusCustomTemplateId?: string | null;
   /** Pré-seleciona um estabelecimento ao abrir o catálogo (ex.: vindo do cadastro do cliente). */
   initialEstablishmentId?: string | null;
 };
@@ -235,6 +237,7 @@ export function ChecklistCatalog({
   duplicateTemplateAction,
   focusTemplateId = null,
   focusWorkspaceTemplateId = null,
+  focusCustomTemplateId = null,
   initialEstablishmentId = null,
 }: Props) {
   const router = useRouter();
@@ -265,7 +268,7 @@ export function ChecklistCatalog({
     string | null
   >(focusWorkspaceTemplateId ?? null);
   const [selectedCustomTemplateId, setSelectedCustomTemplateId] = useState<string | null>(
-    null,
+    focusCustomTemplateId ?? null,
   );
   const selectedSource: SelectedTemplateSource | null = selectedWorkspaceTemplateId
     ? "workspace"
@@ -518,6 +521,15 @@ export function ChecklistCatalog({
         ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   }, [focusWorkspaceTemplateId]);
+
+  useLayoutEffect(() => {
+    if (!focusCustomTemplateId) return;
+    window.setTimeout(() => {
+      document
+        .getElementById(`custom-template-${focusCustomTemplateId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }, [focusCustomTemplateId]);
 
   // Pré-selecionar estabelecimento quando vindo de outra página via URL (?est=)
   useEffect(() => {

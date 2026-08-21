@@ -27,6 +27,11 @@ export default async function ChecklistsPage({
     /^[0-9a-f-]{36}$/i.test(sp.workspace_template)
       ? sp.workspace_template
       : null;
+  const focusCustomTemplateId =
+    typeof sp.custom_template === "string" &&
+    /^[0-9a-f-]{36}$/i.test(sp.custom_template)
+      ? sp.custom_template
+      : null;
   const initialEstablishmentId =
     typeof sp.est === "string" && /^[0-9a-f-]{36}$/i.test(sp.est) ? sp.est : null;
   const returnToOrigin = buildCurrentUrl("/checklists", sp);
@@ -93,6 +98,7 @@ export default async function ChecklistsPage({
         <ChecklistCatalogSection
           focusTemplateId={focusTemplateId}
           focusWorkspaceTemplateId={focusWorkspaceTemplateId}
+          focusCustomTemplateId={focusCustomTemplateId}
           initialEstablishmentId={initialEstablishmentId}
         />
       </Suspense>

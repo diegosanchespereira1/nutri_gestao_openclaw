@@ -6,12 +6,14 @@ import { loadChecklistPageData } from "@/lib/checklists/load-page-data";
 type Props = {
   focusTemplateId: string | null;
   focusWorkspaceTemplateId: string | null;
+  focusCustomTemplateId: string | null;
   initialEstablishmentId: string | null;
 };
 
 export async function ChecklistCatalogSection({
   focusTemplateId,
   focusWorkspaceTemplateId,
+  focusCustomTemplateId,
   initialEstablishmentId,
 }: Props) {
   const { templates, workspaceTemplates, customTemplates, recentEstablishments } =
@@ -23,6 +25,7 @@ export async function ChecklistCatalogSection({
         initialEstablishmentId ??
         focusTemplateId ??
         focusWorkspaceTemplateId ??
+        focusCustomTemplateId ??
         "checklist-catalog-default"
       }
       recentEstablishments={recentEstablishments}
@@ -33,6 +36,7 @@ export async function ChecklistCatalogSection({
       duplicateTemplateAction={duplicateGlobalTemplateAction}
       focusTemplateId={focusTemplateId}
       focusWorkspaceTemplateId={focusWorkspaceTemplateId}
+      focusCustomTemplateId={focusCustomTemplateId}
       initialEstablishmentId={initialEstablishmentId}
     />
   );

@@ -1,9 +1,10 @@
+type StartListener = (href?: string) => void;
 type Listener = () => void;
 
-const listeners = new Set<Listener>();
+const listeners = new Set<StartListener>();
 const cancelListeners = new Set<Listener>();
 
-export function subscribeNavigationStart(listener: Listener): () => void {
+export function subscribeNavigationStart(listener: StartListener): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
@@ -15,8 +16,8 @@ export function subscribeNavigationCancel(listener: Listener): () => void {
 }
 
 /** Dispara o loading padrão antes de `router.push` / `router.replace`. */
-export function signalNavigationStart(): void {
-  listeners.forEach((listener) => listener());
+export function signalNavigationStart(href?: string): void {
+  listeners.forEach((listener) => listener(href));
 }
 
 /**
@@ -32,7 +33,7 @@ export function pushWithLoading(
   router: { push: (href: string) => void },
   href: string,
 ): void {
-  signalNavigationStart();
+  signalNavigationStart(href);
   router.push(href);
 }
 
@@ -40,6 +41,6 @@ export function replaceWithLoading(
   router: { replace: (href: string) => void },
   href: string,
 ): void {
-  signalNavigationStart();
+  signalNavigationStart(href);
   router.replace(href);
 }

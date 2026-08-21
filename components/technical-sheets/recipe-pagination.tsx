@@ -1,9 +1,10 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button-variants";
+import { useFilterNavigation } from "@/lib/navigation/use-filter-navigation";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -14,7 +15,7 @@ type Props = {
 };
 
 export function RecipePagination({ page, totalPages, total, pageSize }: Props) {
-  const router = useRouter();
+  const { isPending, navigate } = useFilterNavigation();
   const searchParams = useSearchParams();
 
   if (totalPages <= 1) return null;
@@ -22,7 +23,7 @@ export function RecipePagination({ page, totalPages, total, pageSize }: Props) {
   function goTo(p: number) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("page", String(p));
-    router.push(`/ficha-tecnica?${params.toString()}`);
+    navigate(`/ficha-tecnica?${params.toString()}`);
   }
 
   const from = (page - 1) * pageSize + 1;
@@ -51,6 +52,7 @@ export function RecipePagination({ page, totalPages, total, pageSize }: Props) {
       <nav
         role="navigation"
         aria-label="Paginação de receitas"
+        aria-busy={isPending}
         className="flex items-center gap-1"
       >
         {/* Previous */}

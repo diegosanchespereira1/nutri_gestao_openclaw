@@ -1,12 +1,11 @@
 "use client";
 
 import { Search, X } from "lucide-react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { Input } from "@/components/ui/input";
-
-const DEBOUNCE_MS = 350;
+import { useFilterNavigation } from "@/lib/navigation/use-filter-navigation";
 
 type RecipeSearchInputProps = {
   basePath?: string;
@@ -19,13 +18,11 @@ export function RecipeSearchInput({
   placeholder = "Buscar receita por nome…",
   "aria-label": ariaLabel = "Buscar ficha técnica por nome",
 }: RecipeSearchInputProps) {
-  const router = useRouter();
+  const { isPending, navigate } = useFilterNavigation();
   const searchParams = useSearchParams();
   const initialQ = searchParams.get("q") ?? "";
   const [value, setValue] = useState(initialQ);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sincronizar com a URL (ex.: voltar/avançar no browser) sem setState síncrono no effect
   useEffect(() => {
     const q = searchParams.get("q") ?? "";
     queueMicrotask(() => setValue(q));
@@ -39,31 +36,22 @@ export function RecipeSearchInput({
       } else {
         params.delete("q");
       }
-      // Reset to page 1 on new search
       params.delete("page");
       const qs = params.toString();
-      router.push(qs ? `${basePath}?${qs}` : basePath);
+      navigate(qs ? `${basePath}?${qs}` : basePath);
     },
-    [basePath, router, searchParams],
+    [basePath, navigate, searchParams],
   );
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const v = e.target.value;
-    setValue(v);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => pushQ(v), DEBOUNCE_MS);
-  }
 
   function handleClear() {
     setValue("");
-    if (timerRef.current) clearTimeout(timerRef.current);
     pushQ("");
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") handleClear();
     if (e.key === "Enter") {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      e.preventDefault();
       pushQ(value);
     }
   }
@@ -78,10 +66,11 @@ export function RecipeSearchInput({
         type="search"
         placeholder={placeholder}
         value={value}
-        onChange={handleChange}
+        onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         className="pl-8 pr-8"
         aria-label={ariaLabel}
+        aria-busy={isPending}
       />
       {value.length > 0 && (
         <button

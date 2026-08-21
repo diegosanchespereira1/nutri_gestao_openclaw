@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
-import { ClientesFilters } from "@/components/clientes/clientes-filters";
+import { ClientesSearchPanel } from "@/components/clientes/clientes-search-panel";
 import { ClientesTableSection } from "@/components/clientes/clientes-table-section";
 import { ClientesTableSkeleton } from "@/components/clientes/clientes-table-skeleton";
 import { PageHeader } from "@/components/layout/page-header";
@@ -60,7 +60,8 @@ export default async function ClientesPage({
         </p>
       ) : null}
 
-      <ClientesFilters
+      <ClientesSearchPanel
+        key={suspenseKey}
         defaultQ={q}
         defaultSituacao={
           situacaoRaw === "ativo" ||
@@ -70,11 +71,11 @@ export default async function ClientesPage({
             : "all"
         }
         defaultSegmentos={segmentos}
-      />
-
-      <Suspense key={suspenseKey} fallback={<ClientesTableSkeleton />}>
-        <ClientesTableSection searchParams={sp} />
-      </Suspense>
+      >
+        <Suspense key={suspenseKey} fallback={<ClientesTableSkeleton />}>
+          <ClientesTableSection searchParams={sp} />
+        </Suspense>
+      </ClientesSearchPanel>
     </PageLayout>
   );
 }

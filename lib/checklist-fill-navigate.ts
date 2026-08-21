@@ -12,7 +12,6 @@ export function navigateToChecklistFill(
   sessionId: string,
   options?: { returnTo?: string },
 ): void {
-  signalNavigationStart();
   const url = new URL(
     `/checklists/preencher/${sessionId}`,
     window.location.origin,
@@ -20,6 +19,8 @@ export function navigateToChecklistFill(
   if (options?.returnTo) {
     url.searchParams.set("returnTo", options.returnTo);
   }
+  const dest = `${url.pathname}${url.search}`;
+  signalNavigationStart(dest);
   suspendNavigationGuardOnce();
-  window.location.assign(`${url.pathname}${url.search}`);
+  window.location.assign(dest);
 }

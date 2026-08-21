@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PageLoadingScreen } from "@/components/ui/page-loading-screen";
 import { RouteProgressBar } from "@/components/ui/route-progress-bar";
+import { isSamePathnameNavigation } from "@/lib/navigation/same-pathname-query";
 import { subscribeNavigationCancel, subscribeNavigationStart } from "@/lib/navigation-pending";
 
 type Props = {
@@ -46,54 +47,15 @@ function isSameRoute(href: string): boolean {
   }
 }
 
-/**
- * Lista com paginação (?page=): mesmo pathname, só muda a página.
- * Evita overlay pesado — a tabela já tem Suspense com skeleton próprio.
- */
-function isListPaginationOnly(href: string): boolean {
-  try {
-    const dest = new URL(href, window.location.origin);
-    const current = new URL(window.location.href);
-    if (dest.pathname !== current.pathname) return false;
-
-    const destParams = new URLSearchParams(dest.search);
-    const curParams = new URLSearchParams(current.search);
-    if (destParams.get("page") === curParams.get("page")) return false;
-
-    destParams.delete("page");
-    curParams.delete("page");
-    return destParams.toString() === curParams.toString();
-  } catch {
-    return false;
-  }
-}
-
-/** Rotas com `loading.tsx` — evita overlay duplo (logo NutriGestão + skeleton da rota). */
+/** Rotas de lista — a página já tem skeleton local; não sobrepor o logo. */
 function hasRouteLoadingSkeleton(pathname: string): boolean {
   return (
     pathname === "/checklists" ||
     pathname === "/clientes" ||
     pathname === "/pacientes" ||
-    pathname === "/visitas"
+    pathname === "/visitas" ||
+    pathname === "/ficha-tecnica"
   );
-}
-
-/**
- * Edição de cliente: mesmo pathname (`/clientes/:id/editar`), só mudam query params
- * (`tab`, `formTab`, filtros de checklists, etc.). Não deve mostrar o overlay com logo
- * — é percepção de "app avariado" sem ganho real (RSC já faz streaming na zona da aba).
- */
-function isClientEditShellOnlyQueryChange(href: string): boolean {
-  try {
-    const dest = new URL(href, window.location.origin);
-    const current = new URL(window.location.href);
-    return (
-      dest.pathname === current.pathname &&
-      /^\/clientes\/[^/]+\/editar$/.test(dest.pathname)
-    );
-  } catch {
-    return false;
-  }
 }
 
 /**
@@ -140,7 +102,13 @@ export function AppMainContent({ children }: Props) {
     }
   }, []);
 
-  const beginNavigation = useCallback(() => {
+  const beginNavigation = useCallback((href?: string) => {
+    if (
+      href &&
+      isSamePathnameNavigation(href, window.location.href)
+    ) {
+      return;
+    }
     if (pendingRef.current) return;
 
     pendingRef.current = true;
@@ -195,8 +163,7 @@ export function AppMainContent({ children }: Props) {
       // Download links não causam navegação de rota — ignorar para não ativar o overlay.
       if (anchor.hasAttribute("download")) return;
       if (isSameRoute(href)) return;
-      if (isClientEditShellOnlyQueryChange(href)) return;
-      if (isListPaginationOnly(href)) return;
+      if (isSamePathnameNavigation(href, window.location.href)) return;
 
       let destPath = "";
       try {

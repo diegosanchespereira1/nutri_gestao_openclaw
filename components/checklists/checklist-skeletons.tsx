@@ -14,6 +14,21 @@ export function ChecklistCatalogSkeleton() {
       aria-hidden
     >
       <div className="h-10 animate-pulse rounded-lg bg-muted" />
+      <ChecklistCatalogResultsSkeleton />
+    </div>
+  );
+}
+
+/** Só a grade — usado na busca (o campo e o chrome permanecem). */
+export function ChecklistCatalogResultsSkeleton() {
+  return (
+    <div
+      className="space-y-4"
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      aria-label="A carregar resultados da busca"
+    >
       <div className="grid gap-3 sm:grid-cols-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-28 animate-pulse rounded-xl bg-muted" />

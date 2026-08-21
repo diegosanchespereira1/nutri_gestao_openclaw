@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertCircle,
@@ -55,13 +55,15 @@ import {
   type CustomTemplateListRow,
 } from "@/lib/actions/checklist-custom";
 import {
-  loadEstablishmentPickerOptionById,
-  loadOwnerChecklistEstablishmentsDropdownAction,
   registerChecklistEstablishmentOpenAction,
-  searchOwnerEstablishmentsAction,
 } from "@/lib/actions/establishments";
+import {
+  fetchEstablishmentAreas,
+  fetchEstablishmentDropdown,
+  fetchEstablishmentPickerById,
+  fetchEstablishmentSearch,
+} from "@/lib/establishments/picker-client";
 import { saveChecklistFillBatch } from "@/lib/checklist-fill-batch-storage";
-import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
 import { loadChecklistTemplatePreviewAction } from "@/lib/actions/checklists";
 import type { EstablishmentAreaOption } from "@/lib/types/establishment-areas";
 import type {
@@ -76,6 +78,7 @@ import type {
 import { TemplateItemRow } from "./template-item-row";
 import { ArchivedTemplateBadge } from "./archived-template-badge";
 import { ExpandableTemplateSections } from "./expandable-template-sections";
+import { ChecklistCatalogResultsSkeleton } from "./checklist-skeletons";
 
 /* ─── tipos ──────────────────────────────────────────────────────────────── */
 
@@ -248,6 +251,7 @@ export function ChecklistCatalog({
   const [recentOptions, setRecentOptions] =
     useState<EstablishmentPickerOption[]>(recentEstablishments);
   const [establishmentSearchTerm, setEstablishmentSearchTerm] = useState("");
+  const [establishmentSearchImmediate, setEstablishmentSearchImmediate] = useState(false);
   const [searchResults, setSearchResults] = useState<EstablishmentPickerOption[]>([]);
   const [isSearchingEstablishments, setIsSearchingEstablishments] = useState(false);
   const [establishmentSearchError, setEstablishmentSearchError] = useState("");
@@ -279,7 +283,10 @@ export function ChecklistCatalog({
         : null;
   const [templateSourceFilter, setTemplateSourceFilter] =
     useState<TemplateSourceFilter>("all");
+  const [searchDraft, setSearchDraft] = useState("");
   const [search, setSearch] = useState("");
+  const [searchPending, startSearchTransition] = useTransition();
+  const [showSearchSkeleton, setShowSearchSkeleton] = useState(false);
   const [typeFilter, setTypeFilter] = useState<EstablishmentType[]>([]);
   const [typeFilterDropdownOpen, setTypeFilterDropdownOpen] = useState(false);
   const typeFilterDropdownRef = useRef<HTMLDivElement>(null);
@@ -548,7 +555,7 @@ export function ChecklistCatalog({
       return;
     }
     let cancelled = false;
-    void loadAreasForEstablishment(establishmentId).then((areas) => {
+    void fetchEstablishmentAreas(establishmentId).then((areas) => {
       if (!cancelled) {
         setAvailableAreas(areas);
         // Auto-selecionar quando há apenas 1 área cadastrada
@@ -558,6 +565,13 @@ export function ChecklistCatalog({
     });
     return () => { cancelled = true; };
   }, [establishmentId]);
+
+  useEffect(() => {
+    if (!showSearchSkeleton) return;
+    if (searchPending) return;
+    const timer = window.setTimeout(() => setShowSearchSkeleton(false), 160);
+    return () => window.clearTimeout(timer);
+  }, [searchPending, showSearchSkeleton]);
 
   useEffect(() => {
     if (!selectedCustomTemplateId) return;
@@ -650,12 +664,13 @@ export function ChecklistCatalog({
       return;
     }
 
+    const delayMs = establishmentSearchImmediate ? 0 : 350;
     let cancelled = false;
     const timeoutId = window.setTimeout(async () => {
       setIsSearchingEstablishments(true);
       setEstablishmentSearchError("");
       try {
-        const { rows } = await searchOwnerEstablishmentsAction({
+        const { rows } = await fetchEstablishmentSearch({
           query,
           limit: 12,
         });
@@ -668,13 +683,13 @@ export function ChecklistCatalog({
       } finally {
         if (!cancelled) setIsSearchingEstablishments(false);
       }
-    }, 350);
+    }, delayMs);
 
     return () => {
       cancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [establishmentSearchTerm, selectedEstablishment]);
+  }, [establishmentSearchTerm, selectedEstablishment, establishmentSearchImmediate]);
 
   /* ── handlers ── */
   async function ensureTemplatePreview(templateId: string) {
@@ -742,15 +757,23 @@ export function ChecklistCatalog({
       return;
     }
     try {
-      const option = await loadEstablishmentPickerOptionById(ct.establishment_id);
+      const option = await fetchEstablishmentPickerById(ct.establishment_id);
       if (option) selectEstablishment(option);
     } catch {
       // usuário pode selecionar o estabelecimento manualmente na etapa 1
     }
   }
 
+  function applyTemplateSearch(next = searchDraft) {
+    const trimmed = next.trim();
+    setSearchDraft(trimmed);
+    if (trimmed === search) return;
+    setShowSearchSkeleton(true);
+    startSearchTransition(() => setSearch(trimmed));
+  }
+
   function clearFilters() {
-    setSearch("");
+    applyTemplateSearch("");
     setTypeFilter([]);
     setUfFilter([]);
     setTemplateSourceFilter("all");
@@ -827,7 +850,7 @@ export function ChecklistCatalog({
     setDropdownLoadError("");
     const nextOffset = reset ? 0 : dropdownOffset;
     try {
-      const { rows, total } = await loadOwnerChecklistEstablishmentsDropdownAction({
+      const { rows, total } = await fetchEstablishmentDropdown({
         limit: DROPDOWN_PAGE_SIZE,
         offset: nextOffset,
       });
@@ -1165,6 +1188,7 @@ export function ChecklistCatalog({
                         value={establishmentSearchTerm}
                         onChange={(e) => {
                           const next = e.target.value;
+                          setEstablishmentSearchImmediate(false);
                           setEstablishmentSearchTerm(next);
                           setEstablishmentSearchError("");
                           if (
@@ -1174,6 +1198,12 @@ export function ChecklistCatalog({
                             setEstablishmentId("");
                             setSelectedEstablishment(null);
                           }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter") return;
+                          e.preventDefault();
+                          setEstablishmentSearchImmediate(true);
+                          setEstablishmentSearchTerm(establishmentSearchTerm.trim());
                         }}
                         className="pl-9"
                         aria-label="Pesquisar estabelecimento para filtrar checklists"
@@ -1382,34 +1412,55 @@ export function ChecklistCatalog({
 
             {/* Busca e filtros — toolbar compacta */}
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <div className="relative min-w-0 flex-1">
-                <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                <input
-                  type="text"
-                  placeholder="Buscar por nome, portaria…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className={cn(
-                    "h-9 w-full rounded-md border pl-8 pr-8 text-sm shadow-xs outline-none",
-                    "border-input bg-background text-foreground placeholder:text-muted-foreground",
-                    "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
-                    touchMinHeight,
-                  )}
-                  aria-label="Buscar template de checklist"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
+              <div className="flex min-w-0 flex-1 gap-2">
+                <div className="relative min-w-0 flex-1">
+                  <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="search"
+                    placeholder="Buscar por nome, portaria…"
+                    value={searchDraft}
+                    onChange={(e) => setSearchDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        applyTemplateSearch();
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        applyTemplateSearch("");
+                      }
+                    }}
                     className={cn(
-                      "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
-                      touchMinTarget,
+                      "h-9 w-full rounded-md border pl-8 pr-8 text-sm shadow-xs outline-none",
+                      "border-input bg-background text-foreground placeholder:text-muted-foreground",
+                      "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
+                      touchMinHeight,
                     )}
-                    aria-label="Limpar busca"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                )}
+                    aria-label="Buscar template de checklist"
+                  />
+                  {searchDraft ? (
+                    <button
+                      type="button"
+                      onClick={() => applyTemplateSearch("")}
+                      className={cn(
+                        "absolute right-1 top-1/2 flex -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground touch-manipulation",
+                        touchMinTarget,
+                      )}
+                      aria-label="Limpar busca"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => applyTemplateSearch()}
+                >
+                  Buscar
+                </Button>
               </div>
 
               <div className="flex min-w-0 items-center gap-2 sm:shrink-0">
@@ -1643,6 +1694,10 @@ export function ChecklistCatalog({
 
       {/* Lista de templates (separada do bloco de escolha) */}
       <div className="space-y-4">
+        {showSearchSkeleton || searchPending ? (
+          <ChecklistCatalogResultsSkeleton />
+        ) : (
+          <>
         {/* Modelos da equipe (workspace) */}
         {showWorkspaceTemplates ? (
           <div className="space-y-2">
@@ -2061,6 +2116,8 @@ export function ChecklistCatalog({
             )}
           </div>
         ) : null}
+          </>
+        )}
       </div>
 
       {/* ─── Etapa 3: Barra de ação flutuante ────────────────────────────── */}

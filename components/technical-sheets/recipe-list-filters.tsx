@@ -1,8 +1,9 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { buttonVariants } from "@/components/ui/button-variants";
+import { useFilterNavigation } from "@/lib/navigation/use-filter-navigation";
 import type { ClientRow } from "@/lib/types/clients";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import {
@@ -37,7 +38,7 @@ export function RecipeListFilters({
   pjClients = [],
   establishments = [],
 }: Props) {
-  const router = useRouter();
+  const { navigate } = useFilterNavigation();
   const searchParams = useSearchParams();
   const active = parseTechnicalRecipeListFilters(
     searchParams.get("filtro") ?? undefined,
@@ -58,7 +59,7 @@ export function RecipeListFilters({
       params.delete("filtro");
     }
     params.delete("page");
-    router.push(`/ficha-tecnica?${params.toString()}`);
+    navigate(`/ficha-tecnica?${params.toString()}`);
   }
 
   function toggleFilter(filtro: TechnicalRecipeListToggleFilter) {
@@ -83,7 +84,7 @@ export function RecipeListFilters({
     // de estabelecimento de um cliente vazar para outro.
     params.delete("estabelecimento");
     params.delete("page");
-    router.push(`/ficha-tecnica?${params.toString()}`);
+    navigate(`/ficha-tecnica?${params.toString()}`);
   }
 
   function setEstablishmentFilter(nextEstablishmentId: string) {
@@ -94,7 +95,7 @@ export function RecipeListFilters({
       params.delete("estabelecimento");
     }
     params.delete("page");
-    router.push(`/ficha-tecnica?${params.toString()}`);
+    navigate(`/ficha-tecnica?${params.toString()}`);
   }
 
   return (

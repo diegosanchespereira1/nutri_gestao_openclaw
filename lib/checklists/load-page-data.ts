@@ -1,10 +1,8 @@
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { listCustomTemplatesForOwner } from "@/lib/actions/checklist-custom";
 import { loadWorkspaceTemplatesForCatalogLight } from "@/lib/actions/checklist-workspace";
-import {
-  loadEstablishmentPickerOptionById,
-  loadRecentChecklistEstablishmentsAction,
-} from "@/lib/actions/establishments";
+import { loadRecentChecklistEstablishmentsAction } from "@/lib/actions/establishments";
+import { loadEstablishmentPickerOptionById } from "@/lib/establishments/picker-query";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { CustomTemplateListRow } from "@/lib/actions/checklist-custom";
 import type { WorkspaceTemplateListRow } from "@/lib/actions/checklist-workspace";

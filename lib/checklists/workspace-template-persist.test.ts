@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  mapWorkspaceTemplateUpdateError,
   persistWorkspaceTemplateMetadata,
   persistWorkspaceTemplateStructure,
 } from "@/lib/checklists/workspace-template-persist";
@@ -299,5 +300,48 @@ describe("persistWorkspaceTemplateMetadata", () => {
     if (!result.ok) {
       expect(result.error).toMatch(/permissão|não foi encontrado/i);
     }
+  });
+
+  it("traduz erro de RLS do update de client_id", async () => {
+    const supabase = createQueuedSupabase({
+      checklist_workspace_templates: [
+        {
+          data: null,
+          error: {
+            message:
+              "new row violates row-level security policy for table \"checklist_workspace_templates\"",
+          },
+        },
+      ],
+    });
+
+    const result = await persistWorkspaceTemplateMetadata(
+      supabase,
+      "tpl-1",
+      "owner-1",
+      { clientId: "client-pj-1" },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toMatch(/sem permissão para vincular/i);
+    }
+  });
+});
+
+describe("mapWorkspaceTemplateUpdateError", () => {
+  it("mapeia cache do PostgREST e RLS", () => {
+    expect(
+      mapWorkspaceTemplateUpdateError({
+        code: "PGRST204",
+        message: "Could not find the 'client_id' column in the schema cache",
+      }),
+    ).toMatch(/não está disponível no banco/i);
+    expect(
+      mapWorkspaceTemplateUpdateError({
+        message:
+          'new row violates row-level security policy for table "checklist_workspace_templates"',
+      }),
+    ).toMatch(/sem permissão para vincular/i);
   });
 });

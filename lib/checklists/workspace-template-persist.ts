@@ -20,6 +20,31 @@ export type PersistWorkspaceTemplateMetadataResult =
   | { ok: true }
   | { ok: false; error: string };
 
+export function mapWorkspaceTemplateUpdateError(error: {
+  message?: string;
+  code?: string;
+}): string {
+  const message = error.message ?? "";
+  const code = error.code ?? "";
+
+  if (code === "PGRST204" || /schema cache/i.test(message)) {
+    return "O vínculo com o cliente ainda não está disponível no banco. Tente novamente em instantes.";
+  }
+  if (/row-level security/i.test(message) || code === "42501") {
+    return "Sem permissão para vincular este cliente a este modelo.";
+  }
+  if (code === "23503" || /foreign key/i.test(message)) {
+    return "Cliente inválido ou removido.";
+  }
+  if (code === "22P02") {
+    return "Cliente inválido.";
+  }
+
+  return message.trim().length > 0
+    ? `Não foi possível salvar o modelo. ${message}`
+    : "Não foi possível salvar o modelo.";
+}
+
 function asIdList(rows: Array<{ id: string }> | null | undefined): string[] {
   return (rows ?? []).map((row) => String(row.id));
 }
@@ -54,7 +79,13 @@ export async function persistWorkspaceTemplateMetadata(
     .select("id");
 
   if (error) {
-    return { ok: false, error: "Não foi possível salvar o modelo." };
+    console.error("[workspace-template] metadata update failed", {
+      templateId,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    });
+    return { ok: false, error: mapWorkspaceTemplateUpdateError(error) };
   }
   if (!rows || rows.length === 0) {
     return {
@@ -117,7 +148,13 @@ export async function persistWorkspaceTemplateStructure(
     .eq("owner_user_id", workspaceOwnerId)
     .select("id");
   if (nameErr) {
-    return { ok: false, error: "Não foi possível salvar o modelo." };
+    console.error("[workspace-template] name update failed", {
+      templateId,
+      code: nameErr.code,
+      message: nameErr.message,
+      details: nameErr.details,
+    });
+    return { ok: false, error: mapWorkspaceTemplateUpdateError(nameErr) };
   }
   if (!nameRows || nameRows.length === 0) {
     return {

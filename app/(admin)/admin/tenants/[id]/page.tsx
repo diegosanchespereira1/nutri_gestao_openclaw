@@ -14,6 +14,8 @@ import {
   deleteAdminNoteAction,
   recordPaymentEventAction,
   toggleTeamMemberActiveAction,
+  updateTenantLimitsAction,
+  loadTenantLimitsWithUsage,
 } from "@/lib/actions/admin-platform";
 import { teamJobRoleLabel } from "@/lib/constants/team-roles";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { tenantDocumentLabel } from "@/lib/tenant/tenant-document";
 import { cn } from "@/lib/utils";
 
 const PLAN_SLUGS = ["free", "starter", "pro", "enterprise"] as const;
@@ -87,7 +90,7 @@ function formatCents(cents: number): string {
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ ok?: string; err?: string }>;
+  searchParams: Promise<{ ok?: string; err?: string; msg?: string }>;
 };
 
 const OK_MESSAGES: Record<string, string> = {
@@ -100,23 +103,29 @@ const OK_MESSAGES: Record<string, string> = {
   payment_recorded: "Pagamento registado.",
   member_activated: "Acesso do membro reativado. Email de redefinição de senha enviado.",
   member_deactivated: "Acesso do membro desativado.",
+  limits_updated: "Limites atualizados.",
 };
 
 const ERR_MESSAGES: Record<string, string> = {
   invalid: "Dados inválidos.",
   save: "Erro ao salvar. Tente novamente.",
   server_config: "Chave de serviço (service role) não configurada no servidor.",
+  limits: "Não foi possível salvar os limites.",
 };
 
 export default async function TenantCockpitPage({ params, searchParams }: Props) {
   const { id } = await params;
-  const { ok, err } = await searchParams;
+  const { ok, err, msg } = await searchParams;
 
   const result = await loadTenantCockpitData(id);
   if ("error" in result) notFound();
 
   const { profile, loginEmail, events, overrides, notes, plans, teamMembers, activityCounts } =
     result.data;
+
+  const { limits, usage, warnings: limitWarnings } = await loadTenantLimitsWithUsage(
+    profile.user_id,
+  );
 
   const isLgpdBlocked =
     profile.lgpd_blocked_at != null && profile.lgpd_unblocked_at == null;
@@ -167,8 +176,15 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
             )}
           </div>
           <p className="text-muted-foreground mt-1 text-xs">
-            Login: <strong className="text-foreground">{loginEmail ?? "—"}</strong> · CRN:{" "}
-            {profile.crn ?? "—"} · Tel: {profile.phone ?? "—"} · Registado em{" "}
+            Login: <strong className="text-foreground">{loginEmail ?? "—"}</strong> ·{" "}
+            {tenantDocumentLabel({
+              document_kind:
+                profile.document_kind === "cpf" || profile.document_kind === "cnpj"
+                  ? profile.document_kind
+                  : null,
+              document_id: profile.document_id,
+            })}{" "}
+            · CRN: {profile.crn ?? "—"} · Tel: {profile.phone ?? "—"} · Registado em{" "}
             {formatDate(profile.created_at)}
             {profile.last_active_at &&
               ` · Último acesso ${formatDate(profile.last_active_at)}`}
@@ -190,7 +206,7 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
           className="text-destructive rounded border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm"
           role="alert"
         >
-          {ERR_MESSAGES[err]}
+          {err === "limits" && msg ? msg : ERR_MESSAGES[err]}
         </p>
       ) : null}
 
@@ -462,6 +478,157 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
               </Button>
             </form>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ─── Limites e assentos ──────────────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Limites e assentos</CardTitle>
+          <p className="text-muted-foreground text-xs">
+            Gravados nesta conta especificamente — não é configuração global.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Uso atual */}
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded border px-3 py-2">
+              <p className="text-muted-foreground text-xs">Clientes</p>
+              <p className="text-sm font-medium">
+                {usage.clients}
+                {limits?.clients_limit_enabled ? ` / ${limits.clients_limit}` : " / ilimitado"}
+              </p>
+            </div>
+            <div className="rounded border px-3 py-2">
+              <p className="text-muted-foreground text-xs">Pacientes</p>
+              <p className="text-sm font-medium">
+                {usage.patients}
+                {limits?.patients_limit_enabled ? ` / ${limits.patients_limit}` : " / ilimitado"}
+              </p>
+            </div>
+            <div className="rounded border px-3 py-2">
+              <p className="text-muted-foreground text-xs">Membros ativos</p>
+              <p className="text-sm font-medium">
+                {usage.teamMembers}
+                {!limits?.team_members_enabled
+                  ? " — equipe desabilitada"
+                  : limits.team_members_unlimited
+                    ? " / ilimitado"
+                    : ` / ${limits.team_members_limit}`}
+              </p>
+            </div>
+          </div>
+
+          {limitWarnings.length > 0 ? (
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200">
+              {limitWarnings.map((w) => (
+                <p key={w}>{w}</p>
+              ))}
+            </div>
+          ) : null}
+
+          <form action={updateTenantLimitsAction} className="space-y-4">
+            <input type="hidden" name="tenant_user_id" value={profile.user_id} />
+            <input type="hidden" name="profile_id" value={profile.id} />
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Clientes</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="clients_limit_enabled"
+                  defaultChecked={limits?.clients_limit_enabled ?? false}
+                  className="border-input size-4 accent-primary"
+                />
+                Aplicar limite de clientes
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground w-28">Limite</span>
+                <input
+                  type="number"
+                  name="clients_limit"
+                  min={1}
+                  defaultValue={limits?.clients_limit ?? 25}
+                  className="border-input h-9 w-28 rounded border px-2 text-sm"
+                  aria-label="Limite de clientes"
+                />
+              </label>
+            </fieldset>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Pacientes</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="patients_limit_enabled"
+                  defaultChecked={limits?.patients_limit_enabled ?? false}
+                  className="border-input size-4 accent-primary"
+                />
+                Aplicar limite de pacientes
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground w-28">Limite</span>
+                <input
+                  type="number"
+                  name="patients_limit"
+                  min={1}
+                  defaultValue={limits?.patients_limit ?? 25}
+                  className="border-input h-9 w-28 rounded border px-2 text-sm"
+                  aria-label="Limite de pacientes"
+                />
+              </label>
+            </fieldset>
+
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">Equipe</legend>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="team_members_enabled"
+                  defaultChecked={limits?.team_members_enabled ?? false}
+                  className="border-input size-4 accent-primary"
+                />
+                Permitir cadastro de membros de equipe
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  name="team_members_unlimited"
+                  defaultChecked={limits?.team_members_unlimited ?? false}
+                  className="border-input size-4 accent-primary"
+                />
+                Assentos ilimitados
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground w-28">Assentos</span>
+                <input
+                  type="number"
+                  name="team_members_limit"
+                  min={0}
+                  defaultValue={limits?.team_members_limit ?? 0}
+                  className="border-input h-9 w-28 rounded border px-2 text-sm"
+                  aria-label="Quantidade de assentos de equipe"
+                />
+              </label>
+            </fieldset>
+
+            <label className="block space-y-1">
+              <span className="text-muted-foreground text-xs">
+                Nota interna (opcional)
+              </span>
+              <Textarea
+                name="notes"
+                rows={2}
+                maxLength={500}
+                defaultValue={limits?.notes ?? ""}
+                placeholder="Ex.: cortesia de 10 assentos até renovar o contrato."
+              />
+            </label>
+
+            <Button type="submit" size="sm">
+              Salvar limites
+            </Button>
+          </form>
         </CardContent>
       </Card>
 

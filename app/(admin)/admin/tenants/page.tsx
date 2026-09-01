@@ -8,6 +8,8 @@ import {
   unblockLgpdTenantAction,
 } from "@/lib/actions/admin-platform";
 import { TenantCapabilitiesBadges } from "@/components/admin/tenant-capabilities-badges";
+import { formatLimitChip } from "@/lib/admin/tenant-limits-summary";
+import { formatBrDocument } from "@/lib/format/br-document";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -158,7 +160,29 @@ export default async function TenantsPage({
                     Desde {formatDate(t.created_at)}
                     {t.plan_expires_at &&
                       ` · Plano expira ${formatDate(t.plan_expires_at)}`}
+                    {t.document_id
+                      ? ` · ${formatBrDocument(t.document_id)}`
+                      : " · sem documento"}
                   </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className="text-[11px] font-normal">
+                      C {formatLimitChip(t.limits_summary.clients)}
+                    </Badge>
+                    <Badge variant="outline" className="text-[11px] font-normal">
+                      P {formatLimitChip(t.limits_summary.patients)}
+                    </Badge>
+                    <Badge variant="outline" className="text-[11px] font-normal">
+                      E {formatLimitChip(t.limits_summary.teamMembers)}
+                    </Badge>
+                    {t.limits_summary.atLimit ? (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-500/50 text-[11px] font-normal text-amber-700 dark:text-amber-300"
+                      >
+                        No limite
+                      </Badge>
+                    ) : null}
+                  </div>
                   {t.suspended_reason && (
                     <p className="text-muted-foreground mt-1 text-xs">
                       Motivo: {t.suspended_reason}

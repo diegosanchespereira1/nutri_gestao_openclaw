@@ -79,6 +79,7 @@ export function CreateTenantConfirmDialog({
         <div className="max-h-[min(60vh,480px)] space-y-5 overflow-y-auto px-6 py-5">
           <SummaryBlock title="Identificação">
             <SummaryRow label="Empresa" value={summary.fullName} />
+            <SummaryRow label="CPF/CNPJ" value={summary.document} />
             <SummaryRow label="Email" value={summary.email} />
             <SummaryRow
               label="Senha inicial"
@@ -150,6 +151,12 @@ export function CreateTenantConfirmDialog({
                 </li>
               ))}
             </ul>
+          </SummaryBlock>
+
+          <SummaryBlock title="Limites">
+            <SummaryRow label="Clientes" value={summary.limits.clients} />
+            <SummaryRow label="Pacientes" value={summary.limits.patients} />
+            <SummaryRow label="Equipe" value={summary.limits.teamMembers} />
           </SummaryBlock>
 
           <SummaryBlock title="Acesso inicial">

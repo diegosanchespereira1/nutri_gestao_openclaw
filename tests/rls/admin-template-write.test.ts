@@ -149,7 +149,8 @@ afterAll(async () => {
 
 async function expectWriteBlocked(
   client: SupabaseClient,
-  operation: () => Promise<{ error: unknown; data?: unknown[] | null }>,
+  // PostgrestFilterBuilder é thenable, mas não é uma Promise nativa — PromiseLike aceita ambos.
+  operation: () => PromiseLike<{ error: unknown; data?: unknown[] | null }>,
 ) {
   const { error, data } = await operation();
   // RLS pode retornar erro explícito ou simplesmente 0 linhas afectadas

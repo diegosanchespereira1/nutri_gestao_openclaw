@@ -36,6 +36,11 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TenantDocumentFields } from "@/components/tenant/tenant-document-fields";
+import {
+  parseTenantDocument,
+  type TenantDocumentKind,
+} from "@/lib/tenant/tenant-document";
 import { cn } from "@/lib/utils";
 
 const sectionLegendClass =
@@ -208,6 +213,8 @@ function OnboardingHiddenFields({
   workContext,
   tenantCompanyName,
   crn,
+  tenantDocumentKind,
+  tenantDocumentId,
   legalName,
   documentId,
   needsEstablishment,
@@ -222,6 +229,8 @@ function OnboardingHiddenFields({
   workContext: OnboardingWorkContext;
   tenantCompanyName: string;
   crn: string;
+  tenantDocumentKind: string;
+  tenantDocumentId: string;
   legalName: string;
   documentId: string;
   needsEstablishment: boolean;
@@ -238,6 +247,12 @@ function OnboardingHiddenFields({
       <input type="hidden" name="work_context" value={workContext} />
       <input type="hidden" name="tenant_name" value={tenantCompanyName} />
       <input type="hidden" name="crn" value={crn} />
+      <input
+        type="hidden"
+        name="tenant_document_kind"
+        value={tenantDocumentKind}
+      />
+      <input type="hidden" name="tenant_document_id" value={tenantDocumentId} />
       <input type="hidden" name="legal_name" value={legalName} />
       <input type="hidden" name="document_id" value={documentId} />
       {needsEstablishment ? (
@@ -265,6 +280,12 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
     initialValues.tenantCompanyName,
   );
   const [crn, setCrn] = useState(initialValues.crn);
+  const [tenantDocumentKind, setTenantDocumentKind] = useState<
+    TenantDocumentKind | ""
+  >(initialValues.tenantDocumentKind);
+  const [tenantDocument, setTenantDocument] = useState(
+    initialValues.tenantDocument,
+  );
   const [workContext, setWorkContext] = useState<OnboardingWorkContext | null>(
     initialValues.suggestedWorkContext,
   );
@@ -352,8 +373,21 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
     FormData
   >(skipOnboardingDetailsAction, undefined);
 
+  /** Erro do documento da conta, ou null quando está bom (ou não é pedido). */
+  function tenantDocumentError(): string | null {
+    if (!initialValues.askTenantDocument) return null;
+    const parsed = parseTenantDocument(tenantDocumentKind, tenantDocument, {
+      required: true,
+    });
+    return parsed.ok ? null : parsed.error;
+  }
+
   function canAdvanceFromStep1(): boolean {
-    return tenantCompanyName.trim().length > 0 && workContext !== null;
+    return (
+      tenantCompanyName.trim().length > 0 &&
+      workContext !== null &&
+      tenantDocumentError() === null
+    );
   }
 
   function canAdvanceFromStep2(): boolean {
@@ -508,6 +542,26 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
                 placeholder="Ex.: CRN-3 12345"
               />
             </div>
+
+            {initialValues.askTenantDocument ||
+            initialValues.tenantDocumentLocked ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TenantDocumentFields
+                  idPrefix="onb-tenant"
+                  kind={tenantDocumentKind}
+                  document={tenantDocument}
+                  onKindChange={setTenantDocumentKind}
+                  onDocumentChange={setTenantDocument}
+                  disabled={initialValues.tenantDocumentLocked}
+                  required={initialValues.askTenantDocument}
+                  helpText={
+                    initialValues.tenantDocumentLocked
+                      ? "Documento já registado na sua conta. Para alterar, fale com o suporte."
+                      : "CPF se você atende como autônomo, CNPJ se tem empresa. É o documento da sua conta — não do cliente."
+                  }
+                />
+              </div>
+            ) : null}
           </fieldset>
 
           <div className="border-border border-t" />
@@ -546,6 +600,12 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
               )}
             </div>
           </div>
+          {tenantDocumentError() && tenantDocument.trim().length > 0 ? (
+            <p className="text-destructive text-sm" role="alert">
+              {tenantDocumentError()}
+            </p>
+          ) : null}
+
           <div className="flex justify-end">
             <Button
               type="button"
@@ -761,6 +821,16 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
             <input type="hidden" name="work_context" value={workContext ?? ""} />
             <input type="hidden" name="tenant_name" value={tenantCompanyName} />
             <input type="hidden" name="crn" value={crn} />
+            <input
+              type="hidden"
+              name="tenant_document_kind"
+              value={tenantDocumentKind}
+            />
+            <input
+              type="hidden"
+              name="tenant_document_id"
+              value={tenantDocument}
+            />
             <Button
               type="submit"
               variant="outline"
@@ -899,6 +969,8 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
             workContext={workContext}
             tenantCompanyName={tenantCompanyName}
             crn={crn}
+            tenantDocumentKind={tenantDocumentKind}
+            tenantDocumentId={tenantDocument}
             legalName={legalName}
             documentId={documentId}
             needsEstablishment={needsEstablishment}

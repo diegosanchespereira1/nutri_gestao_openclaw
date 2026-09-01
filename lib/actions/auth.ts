@@ -9,6 +9,11 @@ import { getServerAppOrigin } from "@/lib/app-origin";
 import { resolveProfilePhotoPathFromForm } from "@/lib/profile/photo-sync";
 import { resolveProfileSignaturePathFromForm } from "@/lib/profile/signature-sync";
 import { createClient } from "@/lib/supabase/server";
+import {
+  mapTenantDocumentDbError,
+  parseTenantDocument,
+} from "@/lib/tenant/tenant-document";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { normalizeBrazilPhone } from "@/lib/validators/br-phone";
 
 export async function signOutAction(): Promise<void> {
@@ -57,11 +62,30 @@ export async function updateProfileAction(
   // CRN é opcional: membros de equipa de áreas não-nutrição podem não ter CRN.
   // O campo fica em branco e é guardado como string vazia — sem bloquear o perfil.
 
-  const { data: currentProfile } = await supabase
-    .from("profiles")
-    .select("photo_storage_path, signature_storage_path")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  const [{ data: currentProfile }, workspaceOwnerId] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("photo_storage_path, signature_storage_path")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+    getWorkspaceAccountOwnerId(supabase, user.id),
+  ]);
+
+  // Documento fiscal é da CONTA: só o titular envia e só ele grava. Opcional
+  // aqui — tenant antigo pode continuar sem, até preencher.
+  const isAccountOwner = workspaceOwnerId === user.id;
+  const documentParsed = parseTenantDocument(
+    formData.get("document_kind"),
+    formData.get("document_id"),
+    { required: false },
+  );
+  if (isAccountOwner && !documentParsed.ok) {
+    return { ok: false, error: documentParsed.error };
+  }
+  const documentFields =
+    isAccountOwner && documentParsed.ok && documentParsed.value.document_id
+      ? documentParsed.value
+      : {};
 
   const photoRes = await resolveProfilePhotoPathFromForm({
     supabase,
@@ -89,6 +113,7 @@ export async function updateProfileAction(
     full_name,
     crn,
     phone,
+    ...documentFields,
     photo_storage_path: photoRes.path,
     signature_storage_path: signatureRes.path,
     updated_at: new Date().toISOString(),
@@ -105,6 +130,8 @@ export async function updateProfileAction(
     .maybeSingle();
 
   if (updateError) {
+    const documentMsg = mapTenantDocumentDbError(updateError);
+    if (documentMsg) return { ok: false, error: documentMsg };
     console.error("[updateProfileAction] profiles update failed", {
       userId: user.id,
       code: updateError.code,
@@ -149,6 +176,8 @@ export async function updateProfileAction(
       .maybeSingle();
 
     if (insertError) {
+      const documentMsg = mapTenantDocumentDbError(insertError);
+      if (documentMsg) return { ok: false, error: documentMsg };
       console.error("[updateProfileAction] profiles insert failed", {
         userId: user.id,
         code: insertError.code,

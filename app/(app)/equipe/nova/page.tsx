@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { TeamMemberForm } from "@/components/team/team-member-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { requireTeamMembersEnabled } from "@/lib/limits/require-team-members-enabled";
 import { canCurrentUserManageTeamMembers } from "@/lib/actions/team-members";
 import {
   getReturnToParam,
@@ -29,6 +30,8 @@ type Props = {
 };
 
 export default async function NovaEquipePage({ searchParams }: Props) {
+  await requireTeamMembersEnabled();
+
   const canManageTeam = await canCurrentUserManageTeamMembers();
   if (!canManageTeam) redirect("/equipe?err=forbidden");
 

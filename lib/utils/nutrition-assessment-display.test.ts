@@ -34,12 +34,9 @@ describe("buildAssessmentSummaryLine", () => {
       recorded_at: "",
       id: "1",
       patient_id: "p",
-      user_id: "u",
       diet_notes: null,
-      nutritional_diagnosis: null,
       clinical_notes: null,
-      created_at: "",
-      updated_at: "",
+      goals: null,
     });
     expect(line).toContain("170 cm");
     expect(line).toContain("70 kg");
@@ -56,12 +53,9 @@ describe("buildAssessmentSummaryLine", () => {
         recorded_at: "",
         id: "1",
         patient_id: "p",
-        user_id: "u",
         diet_notes: null,
-        nutritional_diagnosis: null,
         clinical_notes: null,
-        created_at: "",
-        updated_at: "",
+        goals: null,
       }),
     ).toBe("Sem medidas numéricas");
   });
@@ -104,7 +98,8 @@ describe("buildChildAssessmentSummaryLine", () => {
           value: 0,
         },
       ],
-    } as Parameters<typeof buildChildAssessmentSummaryLine>[0]);
+      // fixture parcial: a função só lê weight_kg, height_cm, bmi e results
+    } as unknown as Parameters<typeof buildChildAssessmentSummaryLine>[0]);
     expect(line).toContain("Eutrofia");
   });
 });

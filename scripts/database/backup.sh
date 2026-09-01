@@ -78,6 +78,17 @@ log "Project ref   : ${PROJECT_REF}"
 log "Destination   : ${DEST}"
 mkdir -p "$DEST"
 
+# Snapshot incompleto e pior que nenhum: da falsa sensacao de protecao.
+# Se o script morrer no meio, o diretorio e removido.
+cleanup_on_fail() {
+  local code=$?
+  if [ "$code" -ne 0 ] && [ -d "$DEST" ]; then
+    printf '%b  ✗ Backup falhou — removendo snapshot incompleto: %s%b\n' "$C_RED" "$DEST" "$C_OFF" >&2
+    rm -rf "$DEST"
+  fi
+}
+trap cleanup_on_fail EXIT
+
 # Roles are best-effort: --no-role-passwords avoids needing superuser on pg_authid.
 log "Dumping roles …"
 if pg_dumpall --dbname="$DB_URL" --roles-only --no-role-passwords > "${DEST}/roles.sql" 2>"${DEST}/.roles.err"; then
@@ -99,6 +110,20 @@ log "Dumping data …"
 pg_dump --dbname="$DB_URL" --data-only > "${DEST}/data.sql" \
   || die "Failed to dump data."
 ok "data → data.sql ($(du -h "${DEST}/data.sql" | cut -f1))"
+
+# ── Verificacao: um dump vazio NAO e um backup ──────────────────────────────
+log "Verificando integridade dos dumps …"
+SCHEMA_BYTES="$(wc -c < "${DEST}/schema.sql" | tr -d ' ')"
+DATA_BYTES="$(wc -c < "${DEST}/data.sql" | tr -d ' ')"
+[ "$SCHEMA_BYTES" -gt 10000 ] || die "schema.sql tem apenas ${SCHEMA_BYTES} bytes — dump invalido."
+[ "$DATA_BYTES"  -gt 1000 ]  || die "data.sql tem apenas ${DATA_BYTES} bytes — dump invalido."
+grep -q 'CREATE TABLE' "${DEST}/schema.sql" || die "schema.sql nao contem CREATE TABLE — dump invalido."
+grep -q 'ROW LEVEL SECURITY\|CREATE POLICY' "${DEST}/schema.sql" || warn "schema.sql sem policies de RLS — confira antes de confiar neste snapshot."
+for t in profiles clients patients team_members; do
+  grep -q "COPY public.${t} \|INSERT INTO public.${t} " "${DEST}/data.sql" \
+    || warn "data.sql sem dados de '${t}' — confirme se a tabela esta mesmo vazia."
+done
+ok "schema ${SCHEMA_BYTES} bytes / data ${DATA_BYTES} bytes — verificado"
 
 # One-shot restore file: roles → schema → data, in order.
 log "Building combined restore.sql …"

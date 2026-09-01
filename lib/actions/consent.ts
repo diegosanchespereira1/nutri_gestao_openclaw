@@ -1,5 +1,6 @@
 'use server';
 
+import { clientIpForInet } from '@/lib/ip/client-ip-utils';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { getWorkspaceAccountOwnerId } from '@/lib/workspace';
@@ -67,7 +68,11 @@ export async function recordConsent(input: RecordConsentInput): Promise<{ succes
   }
 
   // Colecionar IP e user-agent
-  const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'unknown';
+  // `consent_records.ip_address` é uma coluna `inet`. Antes daqui saía o header
+  // x-forwarded-for INTEIRO (que pode ser uma lista de proxies) ou a string
+  // 'unknown' — os dois estouram o INSERT com 22P02 e derrubam o registro de
+  // consentimento, que é a prova legal exigida pela LGPD (art. 32).
+  const ipAddress = clientIpForInet(headersList);
   const userAgent = headersList.get('user-agent') || 'unknown';
 
   // Inserir consentimento

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -157,7 +164,11 @@ export function WorkspaceChecklistBuilder({
   const pendingAutosaveRef = useRef<AutosaveSnapshot | null>(null);
 
   const clientIdRef = useRef(clientId);
-  clientIdRef.current = clientId;
+  // Escrever o ref no efeito, não durante o render: só é lido em callbacks
+  // assíncronos (runAutosave), que rodam depois do commit.
+  useEffect(() => {
+    clientIdRef.current = clientId;
+  }, [clientId]);
 
   const autosaveEnabled = mode === "create" && isDraft && Boolean(templateId);
 

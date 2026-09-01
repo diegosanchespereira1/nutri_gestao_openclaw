@@ -2,16 +2,19 @@ import { describe, expect, it } from "vitest";
 
 import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 
+// Fixture parcial: filterTemplatesForEstablishment só lê uf e applies_to.
+// Cast via unknown segue o padrão já usado em save-batch.test.ts.
 const template = (
   uf: string,
   applies: string[],
-): Parameters<typeof filterTemplatesForEstablishment>[0][0] => ({
-  id: "t1",
-  name: "T",
-  uf,
-  applies_to: applies as never,
-  sections: [],
-});
+): Parameters<typeof filterTemplatesForEstablishment>[0][0] =>
+  ({
+    id: "t1",
+    name: "T",
+    uf,
+    applies_to: applies,
+    sections: [],
+  }) as unknown as Parameters<typeof filterTemplatesForEstablishment>[0][0];
 
 describe("filterTemplatesForEstablishment", () => {
   it("devolve todos sem estabelecimento", () => {

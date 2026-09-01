@@ -7,16 +7,21 @@ on:
     branches: [main, master]
     paths:
       - "supabase/migrations/**"
+      - "supabase/config.toml"
       - "tests/rls/**"
       - "lib/actions/**"
+      - "lib/limits/**"
       - "vitest.config.rls.ts"
   pull_request:
     branches: [main, master]
     paths:
       - "supabase/migrations/**"
+      - "supabase/config.toml"
       - "tests/rls/**"
       - "lib/actions/**"
+      - "lib/limits/**"
       - "vitest.config.rls.ts"
+  workflow_dispatch:
 
 jobs:
   rls-isolation:
@@ -85,6 +90,16 @@ jobs:
           TEST_TENANT_A_PASSWORD: ${{ env.TEST_TENANT_A_PASSWORD }}
           TEST_TENANT_B_EMAIL: ${{ env.TEST_TENANT_B_EMAIL }}
           TEST_TENANT_B_PASSWORD: ${{ env.TEST_TENANT_B_PASSWORD }}
+
+      # ── Guarda: suíte vazia passa despercebida ────────────────────────────
+      - name: Garantir que a suíte RLS não está vazia
+        run: |
+          COUNT=$(find tests/rls -name '*.test.ts' | wc -l | tr -d ' ')
+          echo "Arquivos de teste RLS: $COUNT"
+          if [ "$COUNT" -lt 3 ]; then
+            echo "::error::Esperados pelo menos 3 arquivos de teste RLS, encontrados $COUNT."
+            exit 1
+          fi
 
       # ── Parar Supabase ────────────────────────────────────────────────────
       - name: Stop Supabase local

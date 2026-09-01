@@ -9,6 +9,10 @@ import { ToggleMemberActiveButton } from "@/components/team/toggle-member-active
 import { EmptyState } from "@/components/common/empty-state";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { LimitUsageBadge } from "@/components/limits/limit-usage-badge";
+import { NewRecordButton } from "@/components/limits/new-record-button";
+import { loadLimitUiState } from "@/lib/limits/server";
+import { isTeamMembersEnabled } from "@/lib/limits/require-team-members-enabled";
 import { Separator } from "@/components/ui/separator";
 import {
   canCurrentUserManageTeamMembers,
@@ -29,18 +33,36 @@ export default async function EquipePage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const teamEnabled = await isTeamMembersEnabled();
+  if (!teamEnabled) {
+    return (
+      <PageLayout>
+        <PageHeader
+          title="Equipe"
+          description="Cadastro de membros da equipe."
+        />
+        <EmptyState
+          icon={UserCog}
+          title="Cadastro de equipe não habilitado"
+          description="A sua conta não inclui o cadastro de membros de equipe. Fale com o suporte para habilitar e contratar assentos."
+        />
+      </PageLayout>
+    );
+  }
+
   const sp = await searchParams;
   const portalErr = typeof sp.portalErr === "string" ? sp.portalErr : undefined;
   const portalOk = typeof sp.portalOk === "string" ? sp.portalOk : undefined;
   const email_err = typeof sp.email_err === "string" ? sp.email_err : undefined;
   const returnToOrigin = buildCurrentUrl("/equipe", sp);
   const novaHref = withReturnTo("/equipe/nova", returnToOrigin);
-  const [{ rows }, { rows: portalUsers }, portfolioByMember, canManageTeam] =
+  const [{ rows }, { rows: portalUsers }, portfolioByMember, canManageTeam, limite] =
     await Promise.all([
       loadTeamMembersForOwner(),
       loadExternalPortalUsers(),
       loadResponsiblePortfolioByMemberId(),
       canCurrentUserManageTeamMembers(),
+      loadLimitUiState("team_members"),
     ]);
 
   return (
@@ -50,9 +72,15 @@ export default async function EquipePage({
         description="Membros que pode atribuir a visitas agendadas. O CRN é obrigatório apenas para perfis na área da nutrição."
         actions={
           canManageTeam ? (
-            <Link href={novaHref} className={cn(buttonVariants(), "shrink-0")}>
-              Novo membro
-            </Link>
+            <div className="flex items-center gap-2">
+              <LimitUsageBadge state={limite} noun="assentos" />
+              <NewRecordButton
+                href={novaHref}
+                label="Novo membro"
+                state={limite}
+                className="shrink-0"
+              />
+            </div>
           ) : undefined
         }
       />

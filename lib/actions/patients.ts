@@ -16,7 +16,6 @@ import type { ClientKind } from "@/lib/types/clients";
 import type {
   PatientInScope,
   PatientRow,
-  PatientSex,
   PatientWithContext,
 } from "@/lib/types/patients";
 import {
@@ -24,9 +23,16 @@ import {
   hrefWithOptionalReturnTo,
 } from "@/lib/navigation/return-to";
 import {
-  isValidCpf,
-  onlyDigits,
-} from "@/lib/validators/br-document";
+  comparePatientsInScope,
+  parseOptionalBirthDate,
+  parsePatientDocument,
+  parseSex,
+} from "@/lib/patients/parse-patient-fields";
+import {
+  checkTenantLimit,
+  mapPgLimitError,
+  tenantLimitMessage,
+} from "@/lib/limits/tenant-limits";
 
 export type PatientFormResult =
   | { ok: true }
@@ -47,23 +53,6 @@ function revalidatePatientPaths(
     revalidatePath(`/pacientes/${patientId}/editar`);
     revalidatePath(`/pacientes/${patientId}/historico`);
   }
-}
-
-function parseSex(raw: unknown): PatientSex | null {
-  if (raw === "female" || raw === "male" || raw === "other") return raw;
-  if (raw === "" || raw == null) return null;
-  return null;
-}
-
-function parseOptionalBirthDate(raw: string):
-  | { ok: true; value: string }
-  | { ok: false; error: string } {
-  const t = raw.trim();
-  if (!t) return { ok: false, error: "Data de nascimento é obrigatória." };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) {
-    return { ok: false, error: "Data de nascimento inválida." };
-  }
-  return { ok: true, value: t };
 }
 
 async function resolveResponsibleTeamMemberId(
@@ -108,15 +97,6 @@ async function resolveSchoolGradeId(
   return { ok: true, value: raw };
 }
 
-function parsePatientDocument(raw: string):
-  | { ok: true; value: string | null }
-  | { ok: false; error: string } {
-  const digits = onlyDigits(raw);
-  if (digits.length === 0) return { ok: true, value: null };
-  if (!isValidCpf(digits)) return { ok: false, error: "CPF inválido." };
-  return { ok: true, value: digits };
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Queries
 // ─────────────────────────────────────────────────────────────────────────────
@@ -140,24 +120,6 @@ function mapPatientInScope(row: PatientScopeDbRow): PatientInScope {
   };
 }
 
-function comparePatientsInScope(a: PatientInScope, b: PatientInScope): number {
-  const aHasGrade = a.school_grade_name != null;
-  const bHasGrade = b.school_grade_name != null;
-  if (aHasGrade !== bHasGrade) return aHasGrade ? -1 : 1;
-
-  const posA = a.school_grade_position ?? 0;
-  const posB = b.school_grade_position ?? 0;
-  if (posA !== posB) return posA - posB;
-
-  const gradeCmp = (a.school_grade_name ?? "").localeCompare(
-    b.school_grade_name ?? "",
-    "pt",
-    { sensitivity: "base" },
-  );
-  if (gradeCmp !== 0) return gradeCmp;
-
-  return a.full_name.localeCompare(b.full_name, "pt", { sensitivity: "base" });
-}
 
 export async function loadPatientsForScope(
   scope:
@@ -528,6 +490,13 @@ export async function createPatientAction(
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
+  // Pré-checagem do limite antes de validar o formulário inteiro.
+  // A garantia continua sendo o trigger enforce_tenant_limit().
+  const limite = await checkTenantLimit(supabase, workspaceOwnerId, "patients");
+  if (!limite.ok) {
+    return { ok: false, error: tenantLimitMessage("patients", limite)! };
+  }
+
   // client_id é opcional (Story 2.1b — paciente pode ser independente)
   const clientIdRaw = String(formData.get("client_id") ?? "").trim();
   const client_id = clientIdRaw.length > 0 ? clientIdRaw : null;
@@ -642,6 +611,8 @@ export async function createPatientAction(
     .single();
 
   if (error || !data) {
+    const limiteMsg = mapPgLimitError(error);
+    if (limiteMsg) return { ok: false, error: limiteMsg };
     return { ok: false, error: "Não foi possível criar o paciente." };
   }
 

@@ -10,7 +10,7 @@ import {
 
 describe("canViewAllWorkspaceVisits", () => {
   it("titular vê tudo", () => {
-    expect(canViewAllWorkspaceVisits("u1", "u1", "member")).toBe(true);
+    expect(canViewAllWorkspaceVisits("u1", "u1", "user")).toBe(true);
   });
 
   it("admin vê tudo", () => {
@@ -18,7 +18,7 @@ describe("canViewAllWorkspaceVisits", () => {
   });
 
   it("membro comum não vê tudo", () => {
-    expect(canViewAllWorkspaceVisits("u2", "u1", "member")).toBe(false);
+    expect(canViewAllWorkspaceVisits("u2", "u1", "user")).toBe(false);
   });
 
   it("gestao vê tudo", () => {
@@ -29,13 +29,13 @@ describe("canViewAllWorkspaceVisits", () => {
 describe("canCancelScheduledVisit", () => {
   it("criador pode cancelar", () => {
     expect(
-      canCancelScheduledVisit("u1", "owner", "member", { user_id: "u1" }),
+      canCancelScheduledVisit("u1", "owner", "user", { user_id: "u1" }),
     ).toBe(true);
   });
 
   it("titular pode cancelar", () => {
     expect(
-      canCancelScheduledVisit("owner", "owner", "member", { user_id: "u2" }),
+      canCancelScheduledVisit("owner", "owner", "user", { user_id: "u2" }),
     ).toBe(true);
   });
 

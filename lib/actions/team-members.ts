@@ -4,6 +4,17 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { parseTeamJobRole } from "@/lib/constants/team-roles";
+import {
+  hasSpecialCharacter,
+  mapCreateAuthErrorReason,
+  mapCreateAuthErrorToParam,
+  parseProfessionalArea,
+} from "@/lib/team/parse-team-member-fields";
+import {
+  checkTenantLimit,
+  mapPgLimitError,
+  tenantLimitMessage,
+} from "@/lib/limits/tenant-limits";
 import { canAccessAdminArea } from "@/lib/roles";
 import {
   createServiceRoleClient,
@@ -17,42 +28,7 @@ import {
   canToggleTeamMemberActive,
   getWorkspaceAccountOwnerId,
 } from "@/lib/workspace";
-import type { ProfessionalArea, TeamMemberRow } from "@/lib/types/team-members";
-
-function parseProfessionalArea(raw: unknown): ProfessionalArea | null {
-  if (raw === "nutrition" || raw === "other") return raw;
-  return null;
-}
-
-function hasSpecialCharacter(value: string): boolean {
-  return /[^A-Za-z0-9]/.test(value);
-}
-
-function mapCreateAuthErrorToParam(errorMessage: string): string {
-  const message = errorMessage.toLowerCase();
-  const isDuplicate =
-    message.includes("already") ||
-    message.includes("registered") ||
-    message.includes("exists") ||
-    message.includes("user already");
-  if (isDuplicate) return "email_exists";
-
-  const isWeakPassword =
-    message.includes("password") &&
-    (message.includes("short") ||
-      message.includes("weak") ||
-      message.includes("least") ||
-      message.includes("minimum") ||
-      message.includes("special") ||
-      message.includes("complex"));
-  if (isWeakPassword) return "password_policy";
-
-  if (message.includes("email") && message.includes("invalid")) {
-    return "email_invalid";
-  }
-
-  return "auth_create";
-}
+import type { TeamMemberRow } from "@/lib/types/team-members";
 
 export type CreateTeamMemberResult =
   | { ok: true }
@@ -100,6 +76,15 @@ function createTeamMemberError(
         "Esse e-mail já está cadastrado no sistema. Use outro e-mail ou peça login ao membro.",
     };
   }
+  if (err === "limit") {
+    // A mensagem de limite já vem pronta e em pt-BR de lib/limits/tenant-limits.
+    return {
+      ok: false,
+      error:
+        fallbackReason ??
+        "O cadastro de membros de equipe não está disponível para a sua conta.",
+    };
+  }
   if (err === "auth_create") {
     return {
       ok: false,
@@ -114,23 +99,6 @@ function createTeamMemberError(
     error: "Não foi possível salvar. Tente novamente.",
     reason: fallbackReason,
   };
-}
-
-function mapCreateAuthErrorReason(errorMessage: string): string {
-  const message = errorMessage.toLowerCase();
-  if (message.includes("already") || message.includes("registered")) {
-    return "Esse e-mail já está cadastrado.";
-  }
-  if (message.includes("email") && message.includes("invalid")) {
-    return "O e-mail informado é inválido.";
-  }
-  if (message.includes("password") && message.includes("special")) {
-    return "A senha precisa conter pelo menos 1 caractere especial.";
-  }
-  if (message.includes("password") && message.includes("short")) {
-    return "A senha informada é muito curta.";
-  }
-  return "Não foi possível validar os dados junto ao serviço de autenticação.";
 }
 
 type AuthUserLookup = {
@@ -319,6 +287,16 @@ export async function createTeamMemberAction(
     );
   }
 
+  // Pré-checagem do limite ANTES de criar o usuário no Auth: sem isto, um tenant
+  // sem assentos livres deixaria um usuário órfão no GoTrue a cada tentativa.
+  const limite = await checkTenantLimit(supabase, accountOwnerId, "team_members");
+  if (!limite.ok) {
+    return createTeamMemberError(
+      "limit",
+      tenantLimitMessage("team_members", limite)!,
+    );
+  }
+
   if (password !== confirmPassword) {
     return createTeamMemberError("password_mismatch");
   }
@@ -489,6 +467,8 @@ export async function createTeamMemberAction(
     if (createdAuthUserId) {
       await service.auth.admin.deleteUser(createdAuthUserId);
     }
+    const limiteMsg = mapPgLimitError(error);
+    if (limiteMsg) return createTeamMemberError("limit", limiteMsg);
     return createTeamMemberError(
       "save",
       "A conta foi criada, mas houve falha ao vincular o membro na equipe.",

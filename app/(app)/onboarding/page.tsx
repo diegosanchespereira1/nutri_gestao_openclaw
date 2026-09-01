@@ -5,6 +5,7 @@ import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { buildOnboardingInitialValues } from "@/lib/onboarding/initial-values";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { profileNeedsOnboarding } from "@/lib/supabase/profile";
 import { parseEnabledModules } from "@/lib/types/modules";
 
@@ -15,13 +16,16 @@ export default async function OnboardingPage() {
   const needsOnboarding = await profileNeedsOnboarding(supabase, user.id);
   if (!needsOnboarding) redirect(APP_DASHBOARD_PATH);
 
-  const [{ templates }, { data: profile }] = await Promise.all([
+  const [{ templates }, { data: profile }, workspaceOwnerId] = await Promise.all([
     loadChecklistCatalog(),
     supabase
       .from("profiles")
-      .select("tenant_name, full_name, crn, acquisition_source, enabled_modules")
+      .select(
+        "tenant_name, full_name, crn, acquisition_source, enabled_modules, document_kind, document_id",
+      )
       .eq("user_id", user.id)
       .maybeSingle(),
+    getWorkspaceAccountOwnerId(supabase, user.id),
   ]);
 
   const initialValues = buildOnboardingInitialValues({
@@ -37,6 +41,11 @@ export default async function OnboardingPage() {
     enabledModules: parseEnabledModules(
       (profile as Record<string, unknown> | null)?.enabled_modules,
     ),
+    documentKind:
+      typeof profile?.document_kind === "string" ? profile.document_kind : null,
+    documentId:
+      typeof profile?.document_id === "string" ? profile.document_id : null,
+    isAccountOwner: workspaceOwnerId === user.id,
   });
 
   return (

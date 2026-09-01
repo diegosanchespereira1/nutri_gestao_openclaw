@@ -120,7 +120,7 @@ export function ClientAvailableChecklistsList({
         </p>
       ) : visible.length === 0 ? (
         <p className="mt-3 text-sm text-muted-foreground">
-          Nenhum modelo encontrado para "{query.trim()}".
+          Nenhum modelo encontrado para &quot;{query.trim()}&quot;.
         </p>
       ) : (
         <ul className="mt-3 space-y-3">

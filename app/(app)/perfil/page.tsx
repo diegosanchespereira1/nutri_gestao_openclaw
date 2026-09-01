@@ -5,6 +5,8 @@ import { PROFILE_PHOTOS_BUCKET } from "@/lib/constants/profile-photos-storage";
 import { PROFESSIONAL_SIGNATURES_BUCKET } from "@/lib/constants/professional-signatures-storage";
 import { profileRoleLabel } from "@/lib/roles";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { resolveTenantDocumentState } from "@/lib/onboarding/initial-values";
+import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 export default async function PerfilPage() {
   const { supabase, user: ctxUser } = await getServerContext();
@@ -15,11 +17,14 @@ export default async function PerfilPage() {
     { data: { user } },
     { data: profile },
     { data: teamMember },
+    workspaceOwnerId,
   ] = await Promise.all([
     supabase.auth.getUser(),
     supabase
       .from("profiles")
-      .select("full_name, crn, phone, photo_storage_path, signature_storage_path, role")
+      .select(
+        "full_name, crn, phone, photo_storage_path, signature_storage_path, role, document_kind, document_id",
+      )
       .eq("user_id", ctxUser.id)
       .maybeSingle(),
     supabase
@@ -27,7 +32,17 @@ export default async function PerfilPage() {
       .select("full_name, crn, phone")
       .eq("member_user_id", ctxUser.id)
       .maybeSingle(),
+    getWorkspaceAccountOwnerId(supabase, ctxUser.id),
   ]);
+
+  const isAccountOwner = workspaceOwnerId === ctxUser.id;
+  const tenantDocument = resolveTenantDocumentState({
+    documentKind:
+      typeof profile?.document_kind === "string" ? profile.document_kind : null,
+    documentId:
+      typeof profile?.document_id === "string" ? profile.document_id : null,
+    isAccountOwner,
+  });
 
   const pendingEmail =
     typeof user?.new_email === "string" ? user.new_email.trim() : "";
@@ -80,6 +95,9 @@ export default async function PerfilPage() {
         defaultPhotoUrl={defaultPhotoUrl}
         defaultSignatureUrl={defaultSignatureUrl}
         roleLabel={roleLabel}
+        isAccountOwner={isAccountOwner}
+        defaultDocumentKind={tenantDocument.tenantDocumentKind}
+        defaultDocument={tenantDocument.tenantDocument}
       />
     </PageLayout>
   );

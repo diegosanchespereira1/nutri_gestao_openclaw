@@ -15,6 +15,8 @@ import {
 } from "@/lib/admin/tenant-create-form-draft";
 import { AdminFormSectionCard } from "@/components/admin/admin-form-section-card";
 import { CreateTenantConfirmDialog } from "@/components/admin/create-tenant-confirm-dialog";
+import { CreateTenantLimitsSection } from "@/components/admin/create-tenant-limits-section";
+import { TenantDocumentFields } from "@/components/tenant/tenant-document-fields";
 import {
   CreateTenantModulesSection,
 } from "@/components/admin/create-tenant-modules-section";
@@ -26,16 +28,23 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  parseTenantDocument,
+  type TenantDocumentKind,
+} from "@/lib/tenant/tenant-document";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
   { n: 1, label: "Identificação" },
   { n: 2, label: "Módulos" },
   { n: 3, label: "Plano" },
-  { n: 4, label: "Acesso" },
+  { n: 4, label: "Limites" },
+  { n: 5, label: "Acesso" },
 ] as const;
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
+
+const LAST_STEP: Step = 5;
 
 const SERVER_ERR_MESSAGES: Record<string, string> = {
   invalid: "Nome da empresa e email são obrigatórios.",
@@ -43,6 +52,10 @@ const SERVER_ERR_MESSAGES: Record<string, string> = {
     "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria em Serviços de Alimentação).",
   exists: "Já existe uma conta com este email.",
   create: "Não foi possível criar a conta. Tente novamente.",
+  limits: "Revise os limites informados.",
+  document: "Informe um CPF ou CNPJ válido para a conta.",
+  document_taken:
+    "Este CPF/CNPJ já está em uso por outra conta da plataforma.",
   server_config:
     "Configuração do servidor incompleta. Contacte o administrador da plataforma.",
 };
@@ -69,6 +82,16 @@ function validateStep1(form: HTMLFormElement): string | null {
   if (password && password.length > 0 && password.length < 12) {
     return "A senha deve ter pelo menos 12 caracteres.";
   }
+
+  // Documento do tenant é obrigatório nas contas novas (docs §7). Mesma
+  // validação da Server Action, aqui só para não fazer o admin ir até o fim.
+  const doc = parseTenantDocument(
+    (form.elements.namedItem("document_kind") as HTMLSelectElement | null)?.value,
+    (form.elements.namedItem("document_id") as HTMLInputElement | null)?.value,
+    { required: true },
+  );
+  if (!doc.ok) return doc.error;
+
   return null;
 }
 
@@ -86,9 +109,36 @@ function validateStep2(form: HTMLFormElement): string | null {
   return null;
 }
 
+function validateStep4(form: HTMLFormElement): string | null {
+  const marcado = (nome: string) =>
+    form.querySelector<HTMLInputElement>(
+      `input[name="${nome}"][type="checkbox"]`,
+    )?.checked === true;
+  const numero = (nome: string) =>
+    Number(
+      form.querySelector<HTMLInputElement>(`input[name="${nome}"]`)?.value ?? "0",
+    );
+
+  if (marcado("clients_limit_enabled") && numero("clients_limit") < 1) {
+    return "Limite de clientes ligado precisa de um valor maior que zero. Para bloquear a conta, use a suspensão.";
+  }
+  if (marcado("patients_limit_enabled") && numero("patients_limit") < 1) {
+    return "Limite de pacientes ligado precisa de um valor maior que zero. Para bloquear a conta, use a suspensão.";
+  }
+  if (
+    marcado("team_members_enabled") &&
+    !marcado("team_members_unlimited") &&
+    numero("team_members_limit") < 1
+  ) {
+    return "Equipe habilitada com 0 assentos não permite cadastrar ninguém. Marque assentos ilimitados ou informe uma quantidade.";
+  }
+  return null;
+}
+
 function stepForValidationError(message: string): Step {
   if (message.includes("módulo de atividade")) return 2;
   if (message.includes("plano")) return 3;
+  if (message.includes("Limite de") || message.includes("assentos")) return 4;
   return 1;
 }
 
@@ -98,6 +148,8 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [summary, setSummary] = useState<CreateTenantSummary | null>(null);
   const [restoredPlanSlug, setRestoredPlanSlug] = useState("free");
+  const [documentKind, setDocumentKind] = useState<TenantDocumentKind | "">("");
+  const [documentValue, setDocumentValue] = useState("");
   const [formRestoreVersion, setFormRestoreVersion] = useState(0);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -120,8 +172,20 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (planSlug) setRestoredPlanSlug(planSlug);
 
+    // Campos controlados não recebem o valor pelo DOM: relê do rascunho.
+    const restoredKind = (
+      form.elements.namedItem("document_kind") as HTMLSelectElement | null
+    )?.value;
+    if (restoredKind === "cpf" || restoredKind === "cnpj") {
+      setDocumentKind(restoredKind);
+    }
+    const restoredDocument = (
+      form.elements.namedItem("document_id") as HTMLInputElement | null
+    )?.value;
+    if (restoredDocument) setDocumentValue(restoredDocument);
+
     setFormRestoreVersion((version) => version + 1);
-    setStep(4);
+    setStep(LAST_STEP);
     setStepError(
       SERVER_ERR_MESSAGES[serverError] ??
         "Não foi possível criar a conta. Os dados foram restaurados.",
@@ -175,6 +239,16 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
         return;
       }
       setStep(4);
+      return;
+    }
+
+    if (step === 4) {
+      const err = validateStep4(form);
+      if (err) {
+        setStepError(err);
+        return;
+      }
+      setStep(5);
     }
   }
 
@@ -184,7 +258,7 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
   }
 
   function validateAllSteps(form: HTMLFormElement): string | null {
-    return validateStep1(form) ?? validateStep2(form);
+    return validateStep1(form) ?? validateStep2(form) ?? validateStep4(form);
   }
 
   function openConfirmDialog() {
@@ -300,6 +374,18 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
               />
             </div>
 
+            <TenantDocumentFields
+              idPrefix="tenant"
+              kind={documentKind}
+              document={documentValue}
+              onKindChange={setDocumentKind}
+              onDocumentChange={setDocumentValue}
+              kindName="document_kind"
+              documentName="document_id"
+              required
+              helpText="CPF para profissional autônomo, CNPJ para empresa. É único na plataforma — duas contas não podem ter o mesmo documento."
+            />
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -348,6 +434,10 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
       </div>
 
       <div className={cn(step !== 4 && "hidden")} aria-hidden={step !== 4}>
+        <CreateTenantLimitsSection key={`limits-${formRestoreVersion}`} />
+      </div>
+
+      <div className={cn(step !== 5 && "hidden")} aria-hidden={step !== 5}>
         <AdminFormSectionCard
           title="Acesso inicial"
           description="Comunicação com o cliente após a criação da conta."
@@ -384,7 +474,7 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
 
       <div className="bg-card sticky bottom-4 z-10 flex flex-col-reverse gap-3 rounded-xl p-4 ring-1 ring-foreground/10 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-muted-foreground text-xs sm:max-w-md">
-          {step < 4
+          {step < LAST_STEP
             ? "Avance etapa a etapa. Pode voltar para revisar informações anteriores."
             : "Revise os dados e confirme a criação da conta."}
         </p>
@@ -401,7 +491,7 @@ export function CreateTenantWizard({ plans, serverError }: Props) {
               Voltar
             </Button>
           )}
-          {step < 4 ? (
+          {step < LAST_STEP ? (
             <Button type="button" onClick={goNext} className="min-w-[120px]">
               Continuar
             </Button>

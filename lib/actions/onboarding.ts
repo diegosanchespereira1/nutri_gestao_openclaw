@@ -1,5 +1,6 @@
 "use server";
 
+import { mapPgLimitError } from "@/lib/limits/tenant-limits";
 import { redirect } from "next/navigation";
 
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
@@ -13,6 +14,11 @@ import {
 import { createOnboardingActionTimer } from "@/lib/onboarding/action-timing";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+import {
+  mapTenantDocumentDbError,
+  parseTenantDocument,
+  type TenantDocumentFields,
+} from "@/lib/tenant/tenant-document";
 import { parseEnabledModules } from "@/lib/types/modules";
 import {
   isValidCnpj,
@@ -90,6 +96,36 @@ async function finishOnboardingSession(
 /**
  * Story 2.7: cria primeiro cliente (e estabelecimento PJ se aplicável), grava contexto e fecha onboarding.
  */
+/**
+ * Documento fiscal da conta no onboarding.
+ *
+ * Obrigatório para o TITULAR que ainda não tem documento — é a via de backfill
+ * dos tenants criados antes desta fase. Membro de equipe nunca preenche (o
+ * trigger `profiles_document_owner_only` recusaria), e quem já tem documento
+ * só confere: o valor gravado não é substituído por aqui.
+ */
+function resolveTenantDocumentUpdate(args: {
+  formData: FormData;
+  isAccountOwner: boolean;
+  currentDocumentId: string | null;
+}):
+  | { ok: true; fields: TenantDocumentFields | null }
+  | { ok: false; error: string } {
+  const { formData, isAccountOwner, currentDocumentId } = args;
+  const alreadyHas = Boolean(currentDocumentId);
+
+  if (!isAccountOwner || alreadyHas) return { ok: true, fields: null };
+
+  const parsed = parseTenantDocument(
+    formData.get("tenant_document_kind"),
+    formData.get("tenant_document_id"),
+    { required: true },
+  );
+  if (!parsed.ok) return { ok: false, error: parsed.error };
+
+  return { ok: true, fields: parsed.value };
+}
+
 export async function completeOnboardingAction(
   _prev: CompleteOnboardingResult | undefined,
   formData: FormData,
@@ -106,7 +142,7 @@ export async function completeOnboardingAction(
     getWorkspaceAccountOwnerId(supabase, user.id),
     supabase
       .from("profiles")
-      .select("onboarding_completed_at, enabled_modules")
+      .select("onboarding_completed_at, enabled_modules, document_id")
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
@@ -124,6 +160,16 @@ export async function completeOnboardingAction(
 
   const tenantName = String(formData.get("tenant_name") ?? "").trim();
   const crn = String(formData.get("crn") ?? "").trim().slice(0, 40);
+
+  const tenantDocument = resolveTenantDocumentUpdate({
+    formData,
+    isAccountOwner: workspaceOwnerId === user.id,
+    currentDocumentId:
+      typeof profile?.document_id === "string" ? profile.document_id : null,
+  });
+  if (!tenantDocument.ok) {
+    return { ok: false, error: tenantDocument.error };
+  }
 
   const tenantSaved = await saveWorkspaceTenantName(supabase, tenantName);
   if (!tenantSaved.ok) {
@@ -251,6 +297,8 @@ export async function completeOnboardingAction(
       .single();
 
     if (clientErr || !clientRow) {
+      const limiteMsg = mapPgLimitError(clientErr);
+      if (limiteMsg) return { ok: false, error: limiteMsg };
       return {
         ok: false,
         error: "Não foi possível criar o cliente empresarial. Tente novamente.",
@@ -290,6 +338,8 @@ export async function completeOnboardingAction(
     });
 
     if (clientErr) {
+      const limiteMsg = mapPgLimitError(clientErr);
+      if (limiteMsg) return { ok: false, error: limiteMsg };
       return {
         ok: false,
         error: "Não foi possível criar o cliente particular. Tente novamente.",
@@ -304,12 +354,15 @@ export async function completeOnboardingAction(
     .update({
       work_context,
       crn,
+      ...(tenantDocument.fields ?? {}),
       onboarding_completed_at: completedAt,
       updated_at: completedAt,
     })
     .eq("user_id", user.id);
 
   if (profErr) {
+    const documentMsg = mapTenantDocumentDbError(profErr);
+    if (documentMsg) return { ok: false, error: documentMsg };
     return {
       ok: false,
       error: "Não foi possível concluir o onboarding. Tente novamente.",
@@ -350,7 +403,7 @@ export async function skipOnboardingDetailsAction(
     getWorkspaceAccountOwnerId(supabase, user.id),
     supabase
       .from("profiles")
-      .select("onboarding_completed_at")
+      .select("onboarding_completed_at, document_id")
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
@@ -372,6 +425,18 @@ export async function skipOnboardingDetailsAction(
   const tenantName = String(formData.get("tenant_name") ?? "").trim();
   const crn = String(formData.get("crn") ?? "").trim().slice(0, 40);
 
+  const tenantDocument = resolveTenantDocumentUpdate({
+    formData,
+    isAccountOwner: workspaceOwnerId === user.id,
+    currentDocumentId:
+      typeof profileRes.data?.document_id === "string"
+        ? profileRes.data.document_id
+        : null,
+  });
+  if (!tenantDocument.ok) {
+    return { ok: false, error: tenantDocument.error };
+  }
+
   const tenantSaved = await saveWorkspaceTenantName(supabase, tenantName);
   if (!tenantSaved.ok) {
     return { ok: false, error: tenantSaved.error };
@@ -384,12 +449,15 @@ export async function skipOnboardingDetailsAction(
     .update({
       work_context,
       crn,
+      ...(tenantDocument.fields ?? {}),
       onboarding_completed_at: completedAt,
       updated_at: completedAt,
     })
     .eq("user_id", user.id);
 
   if (profErr) {
+    const documentMsg = mapTenantDocumentDbError(profErr);
+    if (documentMsg) return { ok: false, error: documentMsg };
     return {
       ok: false,
       error: "Não foi possível concluir o onboarding. Tente novamente.",

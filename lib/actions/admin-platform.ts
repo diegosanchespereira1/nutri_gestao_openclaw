@@ -16,6 +16,23 @@ import {
 } from "@/lib/supabase/runtime-env";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
 import { buildTenantCapabilities } from "@/lib/admin/tenant-capabilities";
+import {
+  limitsBelowUsageWarnings,
+  parseTenantLimitsForm,
+} from "@/lib/admin/tenant-limits-form";
+import {
+  mapTenantDocumentDbError,
+  parseTenantDocument,
+  tenantDocumentLabel,
+} from "@/lib/tenant/tenant-document";
+import {
+  buildLimitsSummary,
+  type TenantLimitsSummary,
+} from "@/lib/admin/tenant-limits-summary";
+import {
+  TENANT_LIMITS_COLUMNS,
+  type TenantLimits,
+} from "@/lib/limits/tenant-limits";
 import type { TenantCapabilityItem } from "@/lib/admin/tenant-capabilities";
 import {
   getPlanFeatureDefaults,
@@ -128,7 +145,12 @@ export type TenantRow = {
   lgpd_unblocked_at: string | null;
   modules: TenantCapabilityItem[];
   features: TenantCapabilityItem[];
+  document_kind: string | null;
+  document_id: string | null;
+  limits_summary: TenantLimitsSummary;
 };
+
+
 
 export async function loadTenants(search?: string): Promise<{
   rows: TenantRow[];
@@ -138,7 +160,7 @@ export async function loadTenants(search?: string): Promise<{
   let query = supabase
     .from("profiles")
     .select(
-      "id, user_id, full_name, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at, lgpd_blocked_at, lgpd_unblocked_at, enabled_modules",
+      "id, user_id, full_name, plan_slug, is_suspended, suspended_reason, plan_expires_at, created_at, lgpd_blocked_at, lgpd_unblocked_at, enabled_modules, document_kind, document_id",
     )
     .not("role", "in", '("admin","super_admin")')
     .or("acquisition_source.is.null,acquisition_source.neq.team_member")
@@ -196,6 +218,43 @@ export async function loadTenants(search?: string): Promise<{
     }
   }
 
+  const limitsByUser = new Map<string, TenantLimits>();
+  const clientsByUser = new Map<string, number>();
+  const patientsByUser = new Map<string, number>();
+  const teamByUser = new Map<string, number>();
+
+  if (userIds.length > 0) {
+    // Uma query por tabela e agregação em memória — com dezenas de tenants é
+    // muito mais barato que um count por linha.
+    const [limitsRes, clientsRes, patientsRes, teamRes] = await Promise.all([
+      supabase.from("tenant_limits").select(TENANT_LIMITS_COLUMNS).in("tenant_user_id", userIds),
+      supabase.from("clients").select("owner_user_id").in("owner_user_id", userIds),
+      supabase.from("patients").select("user_id").in("user_id", userIds),
+      supabase
+        .from("team_members")
+        .select("owner_user_id")
+        .in("owner_user_id", userIds)
+        .eq("is_active", true),
+    ]);
+
+    for (const l of (limitsRes.data ?? []) as unknown as TenantLimits[]) {
+      limitsByUser.set(l.tenant_user_id, l);
+    }
+    const tally = (
+      rows: { [k: string]: unknown }[] | null,
+      col: string,
+      target: Map<string, number>,
+    ) => {
+      for (const r of rows ?? []) {
+        const k = String(r[col] ?? "");
+        if (k) target.set(k, (target.get(k) ?? 0) + 1);
+      }
+    };
+    tally(clientsRes.data, "owner_user_id", clientsByUser);
+    tally(patientsRes.data, "user_id", patientsByUser);
+    tally(teamRes.data, "owner_user_id", teamByUser);
+  }
+
   return {
     rows: data.map((row) => {
       const userId = String(row.user_id);
@@ -219,6 +278,16 @@ export async function loadTenants(search?: string): Promise<{
         lgpd_unblocked_at: row.lgpd_unblocked_at,
         modules: capabilities.modules,
         features: capabilities.features,
+        document_kind: (row as Record<string, unknown>).document_kind as string | null,
+        document_id: (row as Record<string, unknown>).document_id as string | null,
+        limits_summary: buildLimitsSummary(
+          limitsByUser.get(userId) ?? null,
+          {
+            clients: clientsByUser.get(userId) ?? 0,
+            patients: patientsByUser.get(userId) ?? 0,
+            teamMembers: teamByUser.get(userId) ?? 0,
+          },
+        ),
       };
     }),
   };
@@ -426,6 +495,8 @@ export type TenantDetailProfile = {
   full_name: string | null;
   crn: string | null;
   phone: string | null;
+  document_kind: string | null;
+  document_id: string | null;
   plan_slug: string;
   plan_expires_at: string | null;
   is_suspended: boolean;
@@ -500,7 +571,7 @@ export async function loadTenantCockpitData(
   const { data: profile, error: profileErr } = await authClient
     .from("profiles")
     .select(
-      "id, user_id, full_name, crn, phone, plan_slug, plan_expires_at, is_suspended, suspended_reason, trial_started_at, last_active_at, acquisition_source, created_at, lgpd_blocked_at, lgpd_unblocked_at",
+      "id, user_id, full_name, crn, phone, document_kind, document_id, plan_slug, plan_expires_at, is_suspended, suspended_reason, trial_started_at, last_active_at, acquisition_source, created_at, lgpd_blocked_at, lgpd_unblocked_at",
     )
     .eq("id", profileId)
     .not("role", "in", '("admin","super_admin")')
@@ -639,6 +710,111 @@ export async function setTenantFeatureOverrideAction(
 
   revalidatePath(`/admin/tenants/${profileId}`);
   redirect(`/admin/tenants/${profileId}?ok=feature_updated`);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Limites por tenant (T4) — docs/plano-limites-tenant-e-billing.md §6.2
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type TenantLimitsWithUsage = {
+  limits: TenantLimits | null;
+  usage: { clients: number; patients: number; teamMembers: number };
+  warnings: string[];
+};
+
+export async function loadTenantLimitsWithUsage(
+  tenantUserId: string,
+): Promise<TenantLimitsWithUsage> {
+  const { db } = await requireSuperAdminDb();
+
+  const [limitsRes, clientsRes, patientsRes, teamRes] = await Promise.all([
+    db
+      .from("tenant_limits")
+      .select(TENANT_LIMITS_COLUMNS)
+      .eq("tenant_user_id", tenantUserId)
+      .maybeSingle(),
+    db
+      .from("clients")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", tenantUserId),
+    db
+      .from("patients")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", tenantUserId),
+    db
+      .from("team_members")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", tenantUserId)
+      .eq("is_active", true),
+  ]);
+
+  const limits = (limitsRes.data as unknown as TenantLimits | null) ?? null;
+  const usage = {
+    clients: clientsRes.count ?? 0,
+    patients: patientsRes.count ?? 0,
+    teamMembers: teamRes.count ?? 0,
+  };
+
+  return {
+    limits,
+    usage,
+    warnings: limits ? limitsBelowUsageWarnings(limits, usage) : [],
+  };
+}
+
+export async function updateTenantLimitsAction(
+  formData: FormData,
+): Promise<void> {
+  const { supabase, user } = await requireSuperAdmin();
+
+  const tenantUserId = String(formData.get("tenant_user_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+
+  if (!tenantUserId) {
+    redirect(`/admin/tenants/${profileId}?err=invalid`);
+  }
+
+  const parsed = parseTenantLimitsForm(formData);
+  if (!parsed.ok) {
+    redirect(
+      `/admin/tenants/${profileId}?err=limits&msg=${encodeURIComponent(parsed.error)}`,
+    );
+  }
+
+  const { data: anterior } = await supabase
+    .from("tenant_limits")
+    .select(TENANT_LIMITS_COLUMNS)
+    .eq("tenant_user_id", tenantUserId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("tenant_limits").upsert(
+    {
+      tenant_user_id: tenantUserId,
+      ...parsed.value,
+      updated_by: user.id,
+    },
+    { onConflict: "tenant_user_id" },
+  );
+
+  if (error) {
+    console.error("[updateTenantLimitsAction]", error.message);
+    redirect(`/admin/tenants/${profileId}?err=save`);
+  }
+
+  // Toda alteração de limite fica registrada — é decisão comercial com efeito
+  // direto no que o cliente consegue fazer.
+  await supabase.from("subscription_events").insert({
+    tenant_user_id: tenantUserId,
+    event_type: "limits_changed",
+    old_value: anterior ? JSON.stringify(anterior) : null,
+    new_value: JSON.stringify(parsed.value),
+    metadata: { changed_by_admin: user.id },
+    created_by: user.id,
+  });
+
+  revalidatePath(`/admin/tenants/${profileId}`);
+  revalidatePath("/admin/tenants");
+  redirect(`/admin/tenants/${profileId}?ok=limits_updated`);
 }
 
 export async function addAdminNoteAction(formData: FormData): Promise<void> {
@@ -914,6 +1090,17 @@ export async function createTenantAsAdminAction(
     redirect("/admin/tenants/novo?err=invalid");
   }
 
+  // Documento fiscal do tenant — obrigatório em conta nova (docs §7).
+  const documentParsed = parseTenantDocument(
+    formData.get("document_kind"),
+    formData.get("document_id"),
+    { required: true },
+  );
+  if (!documentParsed.ok) {
+    redirect("/admin/tenants/novo?err=document");
+  }
+  const tenantDocument = documentParsed.value;
+
   const enabledModules = parseEnabledModulesFromForm(formData);
   if (!hasAnyModuleEnabled(enabledModules)) {
     redirect("/admin/tenants/novo?err=modules");
@@ -929,6 +1116,17 @@ export async function createTenantAsAdminAction(
 
   // Use service role to create auth user (bypasses RLS + email verification)
   const adminSupabase = createServiceRoleClient();
+
+  // O índice único global só falharia depois de o utilizador já existir no Auth.
+  // Verificar antes evita conta órfã sem profile.
+  const { data: documentOwner } = await adminSupabase
+    .from("profiles")
+    .select("user_id")
+    .eq("document_id", tenantDocument.document_id)
+    .maybeSingle();
+  if (documentOwner) {
+    redirect("/admin/tenants/novo?err=document_taken");
+  }
 
   const { data: created, error: createErr } =
     await adminSupabase.auth.admin.createUser({
@@ -957,6 +1155,8 @@ export async function createTenantAsAdminAction(
       user_id: newUserId,
       full_name: fullName,
       tenant_name: fullName,
+      document_kind: tenantDocument.document_kind,
+      document_id: tenantDocument.document_id,
       plan_slug: planSlug,
       acquisition_source: "admin_created",
       timezone: DEFAULT_PROFILE_TIME_ZONE,
@@ -967,6 +1167,10 @@ export async function createTenantAsAdminAction(
 
   if (profileErr) {
     console.error("[createTenantAsAdminAction] profile upsert:", profileErr.message);
+    // Corrida entre a checagem acima e o insert: o índice único é a garantia.
+    if (mapTenantDocumentDbError(profileErr)) {
+      redirect("/admin/tenants/novo?err=document_taken");
+    }
     redirect("/admin/tenants/novo?err=create");
   }
 
@@ -978,6 +1182,7 @@ export async function createTenantAsAdminAction(
       email,
       acquisition_source: "admin_created",
       created_by_admin: adminUser.id,
+      document: tenantDocumentLabel(tenantDocument),
     },
     created_by: adminUser.id,
   });
@@ -994,6 +1199,43 @@ export async function createTenantAsAdminAction(
     },
     created_by: adminUser.id,
   });
+
+  // Limites da etapa 4 do wizard. A linha já existe (trigger em profiles), então
+  // é upsert. Se o formulário vier inválido, mantém os defaults da migration em
+  // vez de derrubar a criação da conta — o admin corrige na ficha.
+  const limitsParsed = parseTenantLimitsForm(formData);
+  if (limitsParsed.ok) {
+    const { error: limitsErr } = await adminSupabase
+      .from("tenant_limits")
+      .upsert(
+        {
+          tenant_user_id: newUserId,
+          ...limitsParsed.value,
+          updated_by: adminUser.id,
+        },
+        { onConflict: "tenant_user_id" },
+      );
+
+    if (limitsErr) {
+      console.error("[createTenantAsAdminAction] tenant_limits:", limitsErr.message);
+    } else {
+      await adminSupabase.from("subscription_events").insert({
+        tenant_user_id: newUserId,
+        event_type: "limits_changed",
+        new_value: JSON.stringify(limitsParsed.value),
+        metadata: {
+          created_by_admin: adminUser.id,
+          note: "Limites definidos na criação pelo admin",
+        },
+        created_by: adminUser.id,
+      });
+    }
+  } else {
+    console.error(
+      "[createTenantAsAdminAction] limites inválidos, mantidos os defaults:",
+      limitsParsed.error,
+    );
+  }
 
   const featureOverrides = parseTenantFeatureOverridesFromForm(formData);
   if (featureOverrides.length > 0) {

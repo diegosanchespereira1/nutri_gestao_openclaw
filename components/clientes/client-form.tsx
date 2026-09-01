@@ -335,6 +335,9 @@ export function ClientForm({
   // Watchdog: se a action/transition travar, não deixar o modal eterno.
   useEffect(() => {
     if (!isPending || state?.ok === true) {
+      // Reset síncrono é o comportamento desejado: ao sair de "salvando",
+      // o watchdog tem de limpar antes de qualquer novo render do modal.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSaveTimedOut(false);
       return;
     }
@@ -1536,7 +1539,39 @@ export function ClientForm({
         </CardContent>
 
         <CardFooter className="flex-col items-stretch gap-3 border-t border-foreground/10 bg-muted/30 sm:flex-row sm:items-center sm:justify-between">
-          {state?.ok === false ? (
+          {state?.ok === false && state.warning ? (
+            <div
+              id="client-form-err"
+              className="border-amber-500/40 bg-amber-500/10 rounded-md border p-3 text-sm"
+              role="alert"
+            >
+              <p className="font-medium">Documento já cadastrado nesta conta</p>
+              <ul className="text-muted-foreground mt-1 list-disc ps-5">
+                {state.warning.existing.map((c) => (
+                  <li key={c.id}>
+                    {c.trade_name && c.trade_name !== c.legal_name
+                      ? `${c.legal_name} (${c.trade_name})`
+                      : c.legal_name}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-muted-foreground mt-2">
+                Se for outra unidade da mesma empresa, pode continuar. Se foi
+                engano, corrija o documento.
+              </p>
+              <Button
+                type="submit"
+                name="confirm_duplicate_document"
+                value="true"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                disabled={savingDialogOpen}
+              >
+                {mode === "create" ? "Cadastrar mesmo assim" : "Salvar mesmo assim"}
+              </Button>
+            </div>
+          ) : state?.ok === false ? (
             <p
               id="client-form-err"
               className="text-destructive text-sm"

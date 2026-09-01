@@ -235,6 +235,11 @@ describe("seed tenant4 assessments (DEV)", () => {
         weightKg,
         heightCm,
         method: "percentile",
+        // Parâmetros WHO adicionados depois deste seed — sem medida neste cenário.
+        armCircumferenceCm: null,
+        tricepsSkinfoldMm: null,
+        subscapularSkinfoldMm: null,
+        headCircumferenceCm: null,
       });
       return {
         patient_id: sofia!.id,

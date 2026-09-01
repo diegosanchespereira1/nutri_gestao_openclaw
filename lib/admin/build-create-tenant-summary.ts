@@ -6,6 +6,10 @@ import {
   type TenantFeatureKey,
 } from "@/lib/constants/tenant-features";
 import {
+  parseTenantDocument,
+  tenantDocumentLabel,
+} from "@/lib/tenant/tenant-document";
+import {
   ENABLED_MODULE_KEYS,
   ENABLED_MODULE_LABELS,
   type EnabledModuleKey,
@@ -31,20 +35,68 @@ export type CreateTenantSummaryFeature = {
   status: string;
 };
 
+export type CreateTenantSummaryLimits = {
+  clients: string;
+  patients: string;
+  teamMembers: string;
+};
+
 export type CreateTenantSummary = {
   fullName: string;
+  document: string;
   email: string;
   passwordMode: "defined" | "auto";
   modules: CreateTenantSummaryModule[];
   planName: string;
   planPrice: string;
   features: CreateTenantSummaryFeature[];
+  limits: CreateTenantSummaryLimits;
   sendConfirmationEmail: boolean;
 };
 
 function formatPlanPrice(cents: number): string {
   if (cents <= 0) return "Gratuito";
   return `R$ ${(cents / 100).toFixed(0)}/mês`;
+}
+
+function readChecked(form: HTMLFormElement, name: string): boolean {
+  return (
+    form.querySelector<HTMLInputElement>(
+      `input[name="${name}"][type="checkbox"]`,
+    )?.checked === true
+  );
+}
+
+function readNumber(form: HTMLFormElement, name: string): number {
+  const raw = form.querySelector<HTMLInputElement>(
+    `input[name="${name}"]`,
+  )?.value;
+  const n = Number(String(raw ?? "").trim());
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Texto legível dos limites para o diálogo de confirmação. */
+export function readLimitsSummary(
+  form: HTMLFormElement,
+): CreateTenantSummaryLimits {
+  const clientsOn = readChecked(form, "clients_limit_enabled");
+  const patientsOn = readChecked(form, "patients_limit_enabled");
+  const teamOn = readChecked(form, "team_members_enabled");
+  const teamUnlimited = readChecked(form, "team_members_unlimited");
+
+  return {
+    clients: clientsOn
+      ? `Até ${readNumber(form, "clients_limit")} clientes`
+      : "Sem limite de clientes",
+    patients: patientsOn
+      ? `Até ${readNumber(form, "patients_limit")} pacientes`
+      : "Sem limite de pacientes",
+    teamMembers: !teamOn
+      ? "Cadastro de equipe desabilitado"
+      : teamUnlimited
+        ? "Equipe habilitada — assentos ilimitados"
+        : `Equipe habilitada — ${readNumber(form, "team_members_limit")} assentos`,
+  };
 }
 
 function readModuleEnabled(
@@ -124,8 +176,17 @@ export function buildCreateTenantSummary(
       'input[name="send_invite"][type="checkbox"]',
     )?.checked === true;
 
+  const parsedDocument = parseTenantDocument(
+    (form.elements.namedItem("document_kind") as HTMLSelectElement | null)?.value,
+    (form.elements.namedItem("document_id") as HTMLInputElement | null)?.value,
+    { required: false },
+  );
+
   return {
     fullName,
+    document: parsedDocument.ok
+      ? tenantDocumentLabel(parsedDocument.value)
+      : "Não informado",
     email,
     passwordMode: (password?.length ?? 0) >= 12 ? "defined" : "auto",
     modules,
@@ -134,6 +195,7 @@ export function buildCreateTenantSummary(
       ? formatPlanPrice(selectedPlan.price_monthly_cents)
       : "—",
     features,
+    limits: readLimitsSummary(form),
     sendConfirmationEmail,
   };
 }

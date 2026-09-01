@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { TeamMemberForm } from "@/components/team/team-member-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { requireTeamMembersEnabled } from "@/lib/limits/require-team-members-enabled";
 import {
   Card,
   CardContent,
@@ -36,6 +37,8 @@ type Props = {
 };
 
 export default async function EditarEquipePage({ params, searchParams }: Props) {
+  await requireTeamMembersEnabled();
+
   const { id } = await params;
   const sp = await searchParams;
   const err = typeof sp.err === "string" ? sp.err : undefined;

@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 
 import { PasswordField } from "@/components/auth/password-field";
+import { TenantDocumentFields } from "@/components/tenant/tenant-document-fields";
+import type { TenantDocumentKind } from "@/lib/tenant/tenant-document";
 import {
   type UpdateProfileResult,
   updateProfileAction,
@@ -73,6 +75,9 @@ export function PerfilForm({
   defaultPhotoUrl,
   defaultSignatureUrl,
   roleLabel,
+  isAccountOwner,
+  defaultDocumentKind,
+  defaultDocument,
 }: {
   defaultFullName: string;
   defaultEmail: string;
@@ -82,6 +87,11 @@ export function PerfilForm({
   defaultPhotoUrl: string | null;
   defaultSignatureUrl: string | null;
   roleLabel: string;
+  /** Só o titular tem documento fiscal; membro de equipe nem vê o campo. */
+  isAccountOwner: boolean;
+  defaultDocumentKind: TenantDocumentKind | "";
+  /** Já mascarado. */
+  defaultDocument: string;
 }) {
   const router = useRouter();
   const [state, formAction] = useActionState(updateProfileAction, initial);
@@ -93,6 +103,10 @@ export function PerfilForm({
     formatBrazilPhoneInput(defaultPhone),
   );
   const [crnValue, setCrnValue] = useState(defaultCrn);
+  const [documentKind, setDocumentKind] = useState<TenantDocumentKind | "">(
+    defaultDocumentKind,
+  );
+  const [documentValue, setDocumentValue] = useState(defaultDocument);
   const [newPasswordValue, setNewPasswordValue] = useState("");
   const [confirmPasswordValue, setConfirmPasswordValue] = useState("");
   const [passwordLoading, setPasswordLoading] = useState(false);
@@ -153,7 +167,17 @@ export function PerfilForm({
     setEmailValue(defaultEmail);
     setPhoneValue(formatBrazilPhoneInput(defaultPhone));
     setCrnValue(defaultCrn);
-  }, [defaultFullName, defaultEmail, defaultPhone, defaultCrn, isEditing]);
+    setDocumentKind(defaultDocumentKind);
+    setDocumentValue(defaultDocument);
+  }, [
+    defaultFullName,
+    defaultEmail,
+    defaultPhone,
+    defaultCrn,
+    defaultDocumentKind,
+    defaultDocument,
+    isEditing,
+  ]);
 
   useEffect(() => {
     if (!toast?.visible) return;
@@ -545,6 +569,19 @@ export function PerfilForm({
                       Obrigatório para nutricionistas.
                     </p>
                   </div>
+
+                  {isAccountOwner ? (
+                    <TenantDocumentFields
+                      idPrefix="perfil"
+                      kind={documentKind}
+                      document={documentValue}
+                      onKindChange={setDocumentKind}
+                      onDocumentChange={setDocumentValue}
+                      kindName="document_kind"
+                      documentName="document_id"
+                      helpText="CPF ou CNPJ da conta, usado na cobrança e nos documentos fiscais. É único na plataforma e só o titular pode alterar."
+                    />
+                  ) : null}
                 </div>
 
                 {state?.ok === false ? (

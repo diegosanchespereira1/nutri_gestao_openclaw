@@ -69,6 +69,9 @@ export function EstablishmentTypeSelect({
   useEffect(() => {
     let cancelled = false;
     if (customTypesProp) {
+      // Reflete a prop de imediato enquanto o carregamento assíncrono corre;
+      // sem isto o select pisca vazio ao trocar de categoria.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCustomTypes(customTypesProp.filter((t) => t.category === category));
     }
     void loadEstablishmentCustomTypesAction(category).then((rows) => {

@@ -28,11 +28,24 @@ import {
   isEstablishmentTypeAllowedForModules,
 } from "@/lib/modules/establishment-category-access";
 import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
+import { isValidCpf, onlyDigits } from "@/lib/validators/br-document";
 import {
-  isValidCnpj,
-  isValidCpf,
-  onlyDigits,
-} from "@/lib/validators/br-document";
+  escapeIlikeValue,
+  parseClientDocument,
+  parseClientKind,
+  sanitizeSearchWildcards,
+} from "@/lib/clientes/parse-client-fields";
+import {
+  buildDuplicateDocumentWarning,
+  type DuplicateDocumentClient,
+  type DuplicateDocumentWarning,
+} from "@/lib/clientes/duplicate-document";
+import { formatBrDocument } from "@/lib/format/br-document";
+import {
+  checkTenantLimit,
+  mapPgLimitError,
+  tenantLimitMessage,
+} from "@/lib/limits/tenant-limits";
 import type { EstablishmentCategory } from "@/lib/types/establishments";
 
 type PfProfileFields = {
@@ -345,7 +358,53 @@ async function parseEstablishmentInlineFields(
 
 export type ClientFormResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: string; warning?: DuplicateDocumentWarning };
+
+/**
+ * Procura outros clientes da mesma conta com o mesmo documento.
+ *
+ * Não existe índice único aqui de propósito: a mesma empresa pode ter várias
+ * unidades sob um único CNPJ (ver lib/clientes/duplicate-document.ts). O
+ * resultado alimenta um aviso que o utilizador pode confirmar.
+ */
+async function findDuplicateDocumentWarning(args: {
+  supabase: Awaited<ReturnType<typeof createClient>>;
+  workspaceOwnerId: string;
+  documentId: string | null;
+  excludeClientId?: string;
+}): Promise<DuplicateDocumentWarning | null> {
+  const { supabase, workspaceOwnerId, documentId, excludeClientId } = args;
+  const digits = onlyDigits(documentId ?? "");
+  if (digits.length === 0) return null;
+
+  let query = supabase
+    .from("clients")
+    .select("id, legal_name, trade_name")
+    .eq("owner_user_id", workspaceOwnerId)
+    .eq("document_id", documentId)
+    .limit(10);
+  if (excludeClientId) query = query.neq("id", excludeClientId);
+
+  const { data, error } = await query;
+  if (error) {
+    // Aviso é conveniência: se a consulta falhar, o cadastro segue.
+    console.error("[findDuplicateDocumentWarning] query failed:", error.message);
+    return null;
+  }
+
+  const existing: DuplicateDocumentClient[] = (data ?? []).map((r) => ({
+    id: String(r.id),
+    legal_name: String(r.legal_name ?? ""),
+    trade_name: typeof r.trade_name === "string" ? r.trade_name : null,
+  }));
+
+  return buildDuplicateDocumentWarning(formatBrDocument(digits), existing);
+}
+
+/** O formulário reenvia com este campo depois de o utilizador confirmar. */
+function duplicateDocumentConfirmed(formData: FormData): boolean {
+  return String(formData.get("confirm_duplicate_document") ?? "") === "true";
+}
 
 async function rollbackCreatedClient(args: {
   supabase: Awaited<ReturnType<typeof createClient>>;
@@ -393,35 +452,6 @@ async function resolveResponsibleTeamMemberId(
   return { ok: true, value: raw };
 }
 
-function parseKind(raw: unknown): ClientKind | null {
-  if (raw === "pf" || raw === "pj") return raw;
-  return null;
-}
-
-function sanitizeSearchWildcards(q: string): string {
-  return q.replace(/[%_\\]/g, "").replace(/,/g, " ");
-}
-
-function escapeIlikeValue(s: string): string {
-  return s.replace(/"/g, '""');
-}
-
-function parseDocument(
-  kind: ClientKind,
-  raw: string,
-):
-  | { ok: true; value: string | null }
-  | { ok: false; error: string } {
-  const digits = onlyDigits(raw);
-  if (digits.length === 0) return { ok: true, value: null };
-  if (kind === "pf") {
-    if (!isValidCpf(digits)) return { ok: false, error: "CPF inválido." };
-    return { ok: true, value: digits };
-  }
-  if (!isValidCnpj(digits)) return { ok: false, error: "CNPJ inválido." };
-  return { ok: true, value: digits };
-}
-
 export async function createClientAction(
   _prev: ClientFormResult | undefined,
   formData: FormData,
@@ -436,7 +466,14 @@ export async function createClientAction(
   const teamMember = isTeamMember(user.id, workspaceOwnerId);
   const newId = crypto.randomUUID();
 
-  const kind = parseKind(formData.get("kind"));
+  // Pré-checagem do limite: evita o utilizador preencher o formulário inteiro
+  // para levar erro do banco no fim. A garantia continua sendo o trigger.
+  const limite = await checkTenantLimit(supabase, workspaceOwnerId, "clients");
+  if (!limite.ok) {
+    return { ok: false, error: tenantLimitMessage("clients", limite)! };
+  }
+
+  const kind = parseClientKind(formData.get("kind"));
   if (!kind) {
     return { ok: false, error: "Selecione o tipo de cliente." };
   }
@@ -451,11 +488,20 @@ export async function createClientAction(
     kind === "pj" && trade_nameRaw.length > 0 ? trade_nameRaw : null;
 
   const docRaw = String(formData.get("document_id") ?? "").trim();
-  const parsedDoc = parseDocument(kind, docRaw);
+  const parsedDoc = parseClientDocument(kind, docRaw);
   if (!parsedDoc.ok) {
     return { ok: false, error: parsedDoc.error };
   }
   const document_id = parsedDoc.value;
+
+  if (!duplicateDocumentConfirmed(formData)) {
+    const dup = await findDuplicateDocumentWarning({
+      supabase,
+      workspaceOwnerId,
+      documentId: document_id,
+    });
+    if (dup) return { ok: false, error: dup.message, warning: dup };
+  }
 
   const emailRaw = String(formData.get("email") ?? "").trim();
   const email = emailRaw.length > 0 ? emailRaw : null;
@@ -556,6 +602,8 @@ export async function createClientAction(
     if (logoPath) {
       await deleteLogoAtPathIfAny(supabase, logoPath);
     }
+    const limiteMsg = mapPgLimitError(error);
+    if (limiteMsg) return { ok: false, error: limiteMsg };
     console.error("[createClientAction] insert failed:", error?.message);
     return { ok: false, error: "Não foi possível criar o cliente." };
   }
@@ -643,7 +691,7 @@ export async function updateClientAction(
       ? existing.logo_storage_path
       : null;
 
-  const kind = parseKind(formData.get("kind"));
+  const kind = parseClientKind(formData.get("kind"));
   if (!kind) {
     return { ok: false, error: "Selecione o tipo de cliente." };
   }
@@ -658,11 +706,21 @@ export async function updateClientAction(
     kind === "pj" && trade_nameRaw.length > 0 ? trade_nameRaw : null;
 
   const docRaw = String(formData.get("document_id") ?? "").trim();
-  const parsedDoc = parseDocument(kind, docRaw);
+  const parsedDoc = parseClientDocument(kind, docRaw);
   if (!parsedDoc.ok) {
     return { ok: false, error: parsedDoc.error };
   }
   const document_id = parsedDoc.value;
+
+  if (!duplicateDocumentConfirmed(formData)) {
+    const dup = await findDuplicateDocumentWarning({
+      supabase,
+      workspaceOwnerId,
+      documentId: document_id,
+      excludeClientId: id,
+    });
+    if (dup) return { ok: false, error: dup.message, warning: dup };
+  }
 
   const emailRaw = String(formData.get("email") ?? "").trim();
   const email = emailRaw.length > 0 ? emailRaw : null;

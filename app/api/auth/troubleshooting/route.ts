@@ -1,3 +1,4 @@
+import { clientIpForInet } from "@/lib/ip/client-ip-utils";
 import { checkAuthRateLimit } from "@/lib/rate-limit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { NextRequest, NextResponse } from "next/server";
@@ -16,26 +17,6 @@ type TroubleshootingPayload = {
   requestId?: unknown;
 };
 
-function getClientIp(request: NextRequest): string | null {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  const raw = (forwarded ? forwarded.split(",")[0]?.trim() : null) ?? realIp;
-  if (!raw || raw === "unknown") return null;
-
-  // Remove porta em IPv4 (ex.: 201.43.104.66:443)
-  const withoutPortV4 = raw.replace(/:\d+$/, "");
-  // Remove colchetes e porta em IPv6 (ex.: [2001:db8::1]:443)
-  const withoutBrackets = withoutPortV4.replace(/^\[|\]$/g, "");
-  const withoutPortV6 = withoutBrackets.replace(/\]:\d+$/, "");
-
-  const candidate = withoutPortV6.trim();
-  if (!candidate) return null;
-
-  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/;
-  const ipv6LikeRegex = /^[0-9a-fA-F:]+$/;
-  if (!ipv4Regex.test(candidate) && !ipv6LikeRegex.test(candidate)) return null;
-  return candidate;
-}
 
 function asCleanString(value: unknown, max = 200): string | null {
   if (typeof value !== "string") return null;
@@ -118,7 +99,9 @@ export async function POST(request: NextRequest) {
     typeof payload.hasSession === "boolean" ? payload.hasSession : null;
   const metadata = sanitizeMetadata(payload.metadata);
   const userAgent = asCleanString(request.headers.get("user-agent"), 1000);
-  const ipAddress = getClientIp(request);
+  // Coluna `inet`: helper compartilhado e testado (lib/ip/client-ip-utils.ts).
+  // A implementação local anterior transformava `::1` em `":"` e derrubava o insert.
+  const ipAddress = clientIpForInet(request.headers);
 
   try {
     const service = createServiceRoleClient();

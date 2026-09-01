@@ -1,19 +1,19 @@
-import Link from "next/link";
 import { Suspense } from "react";
 
 import { ClientesSearchPanel } from "@/components/clientes/clientes-search-panel";
 import { ClientesTableSection } from "@/components/clientes/clientes-table-section";
 import { ClientesTableSkeleton } from "@/components/clientes/clientes-table-skeleton";
+import { LimitUsageBadge } from "@/components/limits/limit-usage-badge";
+import { NewRecordButton } from "@/components/limits/new-record-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { isClientBusinessSegment } from "@/lib/constants/client-business-segment";
+import { loadLimitUiState } from "@/lib/limits/server";
 import {
   buildCurrentUrl,
   withReturnTo,
 } from "@/lib/navigation/return-to";
 import type { ClientBusinessSegment } from "@/lib/types/clients";
-import { cn } from "@/lib/utils";
 
 function parseSegmentos(
   raw: string | string[] | undefined,
@@ -37,6 +37,7 @@ export default async function ClientesPage({
   const pageKey = typeof sp.page === "string" ? sp.page : "1";
   const suspenseKey = `${q}|${situacaoRaw ?? "all"}|${segmentos.join(",")}|${pageKey}`;
   const novoHref = withReturnTo("/clientes/novo", buildCurrentUrl("/clientes", sp));
+  const limite = await loadLimitUiState("clients");
 
   return (
     <PageLayout>
@@ -44,9 +45,14 @@ export default async function ClientesPage({
         title="Clientes"
         description="Carteira de clientes — empresas, hospitais e clínicas."
         actions={
-          <Link href={novoHref} prefetch className={cn(buttonVariants())}>
-            Novo cliente
-          </Link>
+          <div className="flex items-center gap-2">
+            <LimitUsageBadge state={limite} noun="clientes" />
+            <NewRecordButton
+              href={novoHref}
+              label="Novo cliente"
+              state={limite}
+            />
+          </div>
         }
       />
 
@@ -61,7 +67,6 @@ export default async function ClientesPage({
       ) : null}
 
       <ClientesSearchPanel
-        key={suspenseKey}
         defaultQ={q}
         defaultSituacao={
           situacaoRaw === "ativo" ||

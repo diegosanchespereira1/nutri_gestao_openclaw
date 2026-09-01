@@ -4,6 +4,7 @@ import {
   buildOnboardingInitialValues,
   defaultWorkContextFromEnabledModules,
   resolveInitialTenantCompanyName,
+  resolveTenantDocumentState,
 } from "@/lib/onboarding/initial-values";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
 
@@ -78,11 +79,71 @@ describe("buildOnboardingInitialValues", () => {
           atendimento_nutricional: true,
           assessoria_alimentacao: false,
         },
+        documentKind: "cnpj",
+        documentId: "11222333000181",
+        isAccountOwner: true,
       }),
     ).toEqual({
       tenantCompanyName: "Empresa X",
       crn: "CRN-1",
       suggestedWorkContext: "clinical",
+      tenantDocumentKind: "cnpj",
+      tenantDocument: "11.222.333/0001-81",
+      tenantDocumentLocked: true,
+      askTenantDocument: false,
     });
+  });
+});
+
+describe("resolveTenantDocumentState", () => {
+  it("titular sem documento: pede no passo 1", () => {
+    expect(
+      resolveTenantDocumentState({
+        documentKind: null,
+        documentId: null,
+        isAccountOwner: true,
+      }),
+    ).toEqual({
+      tenantDocumentKind: "",
+      tenantDocument: "",
+      tenantDocumentLocked: false,
+      askTenantDocument: true,
+    });
+  });
+
+  it("documento já registado: mostra mascarado e bloqueado", () => {
+    expect(
+      resolveTenantDocumentState({
+        documentKind: "cnpj",
+        documentId: "11222333000181",
+        isAccountOwner: true,
+      }),
+    ).toEqual({
+      tenantDocumentKind: "cnpj",
+      tenantDocument: "11.222.333/0001-81",
+      tenantDocumentLocked: true,
+      askTenantDocument: false,
+    });
+  });
+
+  it("membro de equipe nunca preenche", () => {
+    const r = resolveTenantDocumentState({
+      documentKind: null,
+      documentId: null,
+      isAccountOwner: false,
+    });
+    expect(r.askTenantDocument).toBe(false);
+    expect(r.tenantDocumentLocked).toBe(false);
+  });
+
+  it("tipo inválido vindo do banco não vira lixo na UI", () => {
+    const r = resolveTenantDocumentState({
+      documentKind: "rg",
+      documentId: "52998224725",
+      isAccountOwner: true,
+    });
+    expect(r.tenantDocumentKind).toBe("");
+    expect(r.tenantDocument).toBe("529.982.247-25");
+    expect(r.tenantDocumentLocked).toBe(true);
   });
 });

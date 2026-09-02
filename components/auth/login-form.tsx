@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 
 import { AppBuildLabel } from "@/components/app-version-guard";
+import { AuthModeTabs, type AuthMode } from "@/components/auth/auth-mode-tabs";
 import { PasswordField } from "@/components/auth/password-field";
+import { SignupWizard } from "@/components/auth/signup-wizard";
 import { navigateAfterAuth } from "@/lib/app-build-navigate";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { mapSupabaseLoginError } from "@/lib/map-supabase-auth-error";
@@ -42,7 +44,14 @@ function persistNativeClientIfNeeded(): void {
 export function LoginForm() {
   const searchParams = useSearchParams();
   const next = safeNextPath(searchParams.get("next"));
+  const [mode, setMode] = useState<AuthMode>("entrar");
   const [requestId] = useState(() => generateUUID());
+
+  useEffect(() => {
+    if (searchParams.get("aba") === "cadastro") {
+      setMode("cadastro");
+    }
+  }, [searchParams]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -427,13 +436,14 @@ export function LoginForm() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Entrar
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Acesse com seu e-mail e senha.
-        </p>
+      <div className="space-y-3">
+        <h1 className="sr-only">{mode === "cadastro" ? "Cadastre-se" : "Entrar"}</h1>
+        <AuthModeTabs value={mode} onChange={setMode} />
+        {mode === "entrar" ? (
+          <p className="text-muted-foreground text-sm">
+            Acesse com seu e-mail e senha.
+          </p>
+        ) : null}
       </div>
 
       {searchParams.get("error") === "auth" ? (
@@ -471,7 +481,28 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      {step === "password" ? (
+      {searchParams.get("pagamento") === "ok" ? (
+        <p
+          className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-200"
+          role="status"
+        >
+          Pagamento recebido. Enviamos um e-mail para confirmar sua conta. Você
+          só entra depois de clicar no link.
+        </p>
+      ) : null}
+
+      {searchParams.get("pagamento") === "cancelado" ? (
+        <p
+          className="text-amber-900 dark:text-amber-100 bg-amber-50 dark:text-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2 text-sm"
+          role="status"
+        >
+          Pagamento não concluído. Você pode escolher o plano e tentar de novo.
+        </p>
+      ) : null}
+
+      {mode === "cadastro" ? (
+        <SignupWizard />
+      ) : step === "password" ? (
         <form
           onSubmit={handlePasswordSubmit}
           className="space-y-4"
@@ -586,14 +617,16 @@ export function LoginForm() {
         </form>
       )}
 
-      <p className="text-muted-foreground text-center text-sm">
-        <Link
-          href="/forgot-password"
-          className="text-primary font-medium underline-offset-4 hover:underline focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-        >
-          Recuperar senha
-        </Link>
-      </p>
+      {mode === "entrar" ? (
+        <p className="text-muted-foreground text-center text-sm">
+          <Link
+            href="/forgot-password"
+            className="text-primary font-medium underline-offset-4 hover:underline focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none"
+          >
+            Recuperar senha
+          </Link>
+        </p>
+      ) : null}
 
       <p className="text-muted-foreground text-center text-xs leading-relaxed">
         Ao entrar, você concorda com nossa{" "}

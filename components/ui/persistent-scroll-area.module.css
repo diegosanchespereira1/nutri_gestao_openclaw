@@ -38,6 +38,12 @@
   align-self: stretch;
 }
 
+/* Mantém a largura reservada; só esconde o chrome (evita loop de layout). */
+.persistentColumnIdle {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .persistentRail {
   display: flex;
   height: 100%;

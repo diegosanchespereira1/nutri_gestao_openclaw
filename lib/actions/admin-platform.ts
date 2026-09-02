@@ -41,6 +41,7 @@ import {
   type TenantFeatureKey,
 } from "@/lib/constants/tenant-features";
 import { parseTeamMemberJobRoleForm } from "@/lib/admin/parse-team-member-job-role-form";
+import { parseSubscriptionPlanForm } from "@/lib/admin/parse-subscription-plan-form";
 import {
   hasAnyModuleEnabled,
   parseEnabledModulesFromForm,
@@ -442,20 +443,51 @@ export type SubscriptionPlan = {
   feature_csv_import: boolean;
   feature_api_access: boolean;
   is_active: boolean;
+  stripe_product_id?: string | null;
+  stripe_price_monthly_id?: string | null;
+  stripe_price_annual_id?: string | null;
+  sales_whatsapp?: string | null;
 };
 
 export async function loadSubscriptionPlans(): Promise<{
   rows: SubscriptionPlan[];
 }> {
-  const { supabase } = await requireSuperAdmin();
+  const { db } = await requireSuperAdminDb();
 
-  const { data, error } = await supabase
+  const { data, error } = await db
     .from("subscription_plans")
     .select("*")
     .order("price_monthly_cents", { ascending: true });
 
   if (error || !data) return { rows: [] };
   return { rows: data as SubscriptionPlan[] };
+}
+
+export async function updateSubscriptionPlanAction(
+  formData: FormData,
+): Promise<void> {
+  const { db } = await requireSuperAdminDb();
+  const parsed = parseSubscriptionPlanForm(formData);
+  if (!parsed.ok) {
+    redirect(
+      `/admin/planos?err=invalid&msg=${encodeURIComponent(parsed.error)}`,
+    );
+  }
+
+  const { id, ...patch } = parsed.value;
+  const { error } = await db
+    .from("subscription_plans")
+    .update(patch)
+    .eq("id", id);
+
+  if (error) {
+    console.error("[updateSubscriptionPlanAction]", error.message);
+    redirect("/admin/planos?err=save");
+  }
+
+  revalidatePath("/admin/planos");
+  revalidatePath("/login");
+  redirect("/admin/planos?ok=plan_saved");
 }
 
 // ── 10.3 — Métricas ──────────────────────────────────────────────────────────

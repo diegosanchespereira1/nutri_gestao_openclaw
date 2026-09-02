@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Cadastro público desativado temporariamente — novos acessos em fase posterior. */
+/** Cadastro público na mesma tela de login, aba Cadastre-se. */
 export default function RegisterPage() {
-  redirect("/login");
+  redirect("/login?aba=cadastro");
 }

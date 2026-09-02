@@ -85,7 +85,7 @@ export function ForgotPasswordForm() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "A enviar…" : "Enviar instruções"}
+            {loading ? "Enviando..." : "Enviar instruções"}
           </Button>
         </form>
       )}

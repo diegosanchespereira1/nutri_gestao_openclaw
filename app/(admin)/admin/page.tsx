@@ -37,6 +37,12 @@ const adminSections = [
     emoji: "🧪",
   },
   {
+    href: "/admin/cadastros",
+    title: "Cadastros públicos",
+    description: "Funil de signup e abandonos no pagamento Stripe.",
+    emoji: "🧲",
+  },
+  {
     href: "/admin/planos",
     title: "Planos e limites",
     description: "Configuração de planos, limites e feature flags.",

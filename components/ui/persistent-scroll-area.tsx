@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ComponentPropsWithoutRef,
@@ -33,6 +34,18 @@ type Props = Omit<ComponentPropsWithoutRef<"div">, "children"> & {
   controls?: "full" | "overflow-only";
 };
 
+function thumbsEqual(a: ThumbMetrics, b: ThumbMetrics): boolean {
+  return (
+    Math.abs(a.top - b.top) < 0.5 && Math.abs(a.height - b.height) < 0.5
+  );
+}
+
+function boundsEqual(a: ScrollBounds, b: ScrollBounds): boolean {
+  return (
+    a.canScrollUp === b.canScrollUp && a.canScrollDown === b.canScrollDown
+  );
+}
+
 /**
  * Área de scroll com trilho + polegar sempre visíveis em tablet/desktop.
  * Esconde a barra nativa (que some no macOS) e reserva faixa à direita.
@@ -45,6 +58,7 @@ export function PersistentScrollArea({
   ...props
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<ThumbMetrics>({ top: 0, height: 0 });
   const [bounds, setBounds] = useState<ScrollBounds>({
@@ -55,43 +69,53 @@ export function PersistentScrollArea({
 
   const syncThumb = useCallback(function syncThumbImpl() {
     const viewport = viewportRef.current;
-    const track = trackRef.current;
     if (!viewport) return;
 
     const { scrollTop, scrollHeight, clientHeight } = viewport;
     const scrollable = scrollHeight > clientHeight + 1;
-    setIsScrollable(scrollable);
+
+    setIsScrollable((prev) => (prev === scrollable ? prev : scrollable));
 
     if (!scrollable) {
-      setThumb({ top: 0, height: 0 });
-      setBounds({ canScrollUp: false, canScrollDown: false });
+      setThumb((prev) =>
+        prev.top === 0 && prev.height === 0 ? prev : { top: 0, height: 0 },
+      );
+      setBounds((prev) =>
+        !prev.canScrollUp && !prev.canScrollDown
+          ? prev
+          : { canScrollUp: false, canScrollDown: false },
+      );
       return;
     }
 
-    if (controls === "full" && !track) {
-      requestAnimationFrame(() => syncThumbImpl());
-      return;
-    }
+    const nextBounds: ScrollBounds = {
+      canScrollUp: scrollTop > 1,
+      canScrollDown: scrollTop + clientHeight < scrollHeight - 1,
+    };
+    setBounds((prev) => (boundsEqual(prev, nextBounds) ? prev : nextBounds));
 
+    const track = trackRef.current;
     if (!track) return;
 
     const trackHeight = track.clientHeight;
     if (clientHeight <= 0 || trackHeight <= 0) return;
 
-    setBounds({
-      canScrollUp: scrollTop > 1,
-      canScrollDown: scrollTop + clientHeight < scrollHeight - 1,
-    });
-
-    const thumbHeight = Math.max((clientHeight / scrollHeight) * trackHeight, 20);
+    const thumbHeight = Math.max(
+      (clientHeight / scrollHeight) * trackHeight,
+      20,
+    );
     const maxThumbTop = Math.max(trackHeight - thumbHeight, 0);
-    const scrollRatio = scrollTop / (scrollHeight - clientHeight);
+    const scrollRatio =
+      scrollHeight > clientHeight
+        ? scrollTop / (scrollHeight - clientHeight)
+        : 0;
 
-    setThumb({
+    const nextThumb: ThumbMetrics = {
       top: scrollRatio * maxThumbTop,
       height: thumbHeight,
-    });
-  }, [controls]);
+    };
+    setThumb((prev) => (thumbsEqual(prev, nextThumb) ? prev : nextThumb));
+  }, []);
 
   const scrollByDirection = useCallback((direction: -1 | 1) => {
     const viewport = viewportRef.current;
@@ -112,9 +136,7 @@ export function PersistentScrollArea({
 
     const resizeObserver = new ResizeObserver(syncThumb);
     resizeObserver.observe(viewport);
-    const track = trackRef.current;
-    if (track) resizeObserver.observe(track);
-    const content = viewport.firstElementChild;
+    const content = contentRef.current;
     if (content) resizeObserver.observe(content);
 
     return () => {
@@ -122,9 +144,22 @@ export function PersistentScrollArea({
       window.removeEventListener("resize", syncThumb);
       resizeObserver.disconnect();
     };
-  }, [syncThumb, children, isScrollable]);
+  }, [syncThumb]);
 
-  const showScrollbar = isScrollable && controls === "full";
+  // Coluna sempre montada no modo `full` para não oscilar o layout (monta/desmonta
+  // mudava clientHeight/width e gerava Maximum update depth no sync).
+  const useFullControls = controls === "full";
+
+  useLayoutEffect(() => {
+    if (!useFullControls) return;
+    const track = trackRef.current;
+    if (!track) return;
+
+    syncThumb();
+    const resizeObserver = new ResizeObserver(syncThumb);
+    resizeObserver.observe(track);
+    return () => resizeObserver.disconnect();
+  }, [useFullControls, syncThumb]);
 
   return (
     <div className={cn(styles.persistentRoot, className)}>
@@ -134,14 +169,11 @@ export function PersistentScrollArea({
         className={cn(
           styles.persistentViewport,
           controls === "overflow-only" && styles.persistentViewportOverflowOnly,
-          !isScrollable &&
-            controls !== "overflow-only" &&
-            styles.persistentViewportNatural,
-          isScrollable &&
-            controls === "full" &&
-            styles.persistentViewportScrollable,
-          isScrollable &&
-            controls === "overflow-only" &&
+          // No modo full, overflow fica estável no desktop (classe media-query).
+          // Evita alternar natural↔scrollable, que oscilava isScrollable.
+          useFullControls && styles.persistentViewportScrollable,
+          controls === "overflow-only" &&
+            isScrollable &&
             cn(
               scrollStyles.scroll,
               styles.persistentViewportOverflowOnlyScrollable,
@@ -149,25 +181,35 @@ export function PersistentScrollArea({
         )}
         {...props}
       >
-        {children}
+        <div ref={contentRef}>{children}</div>
       </div>
-      {showScrollbar ? (
+      {useFullControls ? (
         <div
-          className={cn(styles.persistentColumn, styles.persistentColumnVisible)}
+          className={cn(
+            styles.persistentColumn,
+            styles.persistentColumnVisible,
+            !isScrollable && styles.persistentColumnIdle,
+          )}
           role="group"
           aria-label="Barra de deslocamento"
+          aria-hidden={!isScrollable}
         >
           <div className={styles.persistentRail}>
             <button
               type="button"
               className={styles.scrollButton}
               aria-label="Rolar para cima"
-              disabled={!bounds.canScrollUp}
+              disabled={!bounds.canScrollUp || !isScrollable}
+              tabIndex={isScrollable ? undefined : -1}
               onClick={() => scrollByDirection(-1)}
             >
               <ChevronUp className={styles.scrollButtonIcon} aria-hidden />
             </button>
-            <div ref={trackRef} className={styles.persistentTrack} aria-hidden="true">
+            <div
+              ref={trackRef}
+              className={styles.persistentTrack}
+              aria-hidden="true"
+            >
               <div
                 className={styles.persistentThumb}
                 style={{
@@ -180,7 +222,8 @@ export function PersistentScrollArea({
               type="button"
               className={styles.scrollButton}
               aria-label="Rolar para baixo"
-              disabled={!bounds.canScrollDown}
+              disabled={!bounds.canScrollDown || !isScrollable}
+              tabIndex={isScrollable ? undefined : -1}
               onClick={() => scrollByDirection(1)}
             >
               <ChevronDown className={styles.scrollButtonIcon} aria-hidden />

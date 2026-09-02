@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
-const AUTH_PANEL_VARIANT = process.env.NEXT_PUBLIC_AUTH_PANEL_VARIANT ?? "classic";
+const AUTH_PANEL_VARIANT = process.env.NEXT_PUBLIC_AUTH_PANEL_VARIANT ?? "marketing";
 const MARKETING_SLIDE_INTERVAL_MS = 4500;
 /**
  * Slides do carrossel de marketing.

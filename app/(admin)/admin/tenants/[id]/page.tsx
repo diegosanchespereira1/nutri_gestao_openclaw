@@ -17,7 +17,7 @@ import {
   updateTenantLimitsAction,
   loadTenantLimitsWithUsage,
 } from "@/lib/actions/admin-platform";
-import { teamJobRoleLabel } from "@/lib/constants/team-roles";
+import { TenantMemberRoleForm } from "@/components/admin/tenant-member-role-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -103,6 +103,7 @@ const OK_MESSAGES: Record<string, string> = {
   payment_recorded: "Pagamento registado.",
   member_activated: "Acesso do membro reativado. Email de redefinição de senha enviado.",
   member_deactivated: "Acesso do membro desativado.",
+  member_role_updated: "Cargo do membro atualizado.",
   limits_updated: "Limites atualizados.",
 };
 
@@ -218,7 +219,8 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
           </CardTitle>
           <p className="text-muted-foreground text-xs">
             Titular da conta (login usado como admin) e membros da equipe
-            cadastrados neste tenant.
+            cadastrados neste tenant. O cargo do titular é fixo; o de cada
+            membro pode ser alterado abaixo.
           </p>
         </CardHeader>
         <CardContent>
@@ -256,17 +258,18 @@ export default async function TenantCockpitPage({ params, searchParams }: Props)
                   className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div>
-                    <p className="font-medium">
-                      {member.full_name}{" "}
-                      <span className="text-muted-foreground font-normal">
-                        — {teamJobRoleLabel[member.job_role] ?? member.job_role}
-                      </span>
-                    </p>
+                    <p className="font-medium">{member.full_name}</p>
                     <p className="text-muted-foreground text-xs">
                       {member.email ?? "sem e-mail"}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <TenantMemberRoleForm
+                      memberId={member.id}
+                      profileId={profile.id}
+                      currentRole={member.job_role}
+                      memberName={member.full_name}
+                    />
                     <span
                       className={cn(
                         "inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-xs font-medium",

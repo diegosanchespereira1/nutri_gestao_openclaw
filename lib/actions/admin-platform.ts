@@ -40,6 +40,7 @@ import {
   parseTenantFeatureOverridesFromForm,
   type TenantFeatureKey,
 } from "@/lib/constants/tenant-features";
+import { parseTeamMemberJobRoleForm } from "@/lib/admin/parse-team-member-job-role-form";
 import {
   hasAnyModuleEnabled,
   parseEnabledModulesFromForm,
@@ -955,6 +956,73 @@ export async function toggleTeamMemberActiveAction(
 
   revalidatePath(`/admin/tenants/${profileId}`);
   redirect(`/admin/tenants/${profileId}?ok=member_deactivated`);
+}
+
+/**
+ * Altera o cargo (job_role) de um membro da equipe a partir do cockpit.
+ * Permissões do workspace (Gestão/Administrativo vs. demais) são lidas
+ * de team_members a cada request — a mudança vale no próximo acesso.
+ */
+export async function updateTeamMemberJobRoleAction(
+  formData: FormData,
+): Promise<void> {
+  const { db, authClient } = await requireSuperAdminDb();
+
+  const parsed = parseTeamMemberJobRoleForm(formData);
+  if (!parsed.ok) {
+    const profileId = String(formData.get("profile_id") ?? "").trim();
+    redirect(`/admin/tenants/${profileId}?err=invalid`);
+  }
+
+  const { memberId, profileId, jobRole } = parsed;
+
+  const { data: profile, error: profileErr } = await authClient
+    .from("profiles")
+    .select("id, user_id")
+    .eq("id", profileId)
+    .not("role", "in", '("admin","super_admin")')
+    .maybeSingle();
+
+  if (profileErr || !profile) {
+    redirect(`/admin/tenants/${profileId}?err=invalid`);
+  }
+
+  const tenantUserId = profile.user_id as string;
+
+  const { data: member, error: memberErr } = await db
+    .from("team_members")
+    .select("id, owner_user_id, job_role")
+    .eq("id", memberId)
+    .eq("owner_user_id", tenantUserId)
+    .maybeSingle();
+
+  if (memberErr || !member) {
+    redirect(`/admin/tenants/${profileId}?err=invalid`);
+  }
+
+  if (member.job_role === jobRole) {
+    revalidatePath(`/admin/tenants/${profileId}`);
+    redirect(`/admin/tenants/${profileId}?ok=member_role_updated`);
+  }
+
+  const { error } = await db
+    .from("team_members")
+    .update({ job_role: jobRole })
+    .eq("id", memberId)
+    .eq("owner_user_id", tenantUserId);
+
+  if (error) {
+    console.error("[updateTeamMemberJobRoleAction] update falhou", {
+      memberId,
+      profileId,
+      jobRole,
+      message: error.message,
+    });
+    redirect(`/admin/tenants/${profileId}?err=save`);
+  }
+
+  revalidatePath(`/admin/tenants/${profileId}`);
+  redirect(`/admin/tenants/${profileId}?ok=member_role_updated`);
 }
 
 export async function recordPaymentEventAction(

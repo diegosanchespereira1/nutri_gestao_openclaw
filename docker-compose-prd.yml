@@ -24,6 +24,23 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
+      # Cadastro público / Stripe — adicionadas 2026-09-02. O `environment:` é uma
+      # lista fechada: variável definida no Portainer que não aparece aqui NÃO chega
+      # ao container. Era por isso que o checkout devolvia "Pagamento indisponível".
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      SIGNUP_INTENT_SECRET: ${SIGNUP_INTENT_SECRET:-}
+      SIGNUP_SALES_EMAIL: ${SIGNUP_SALES_EMAIL:-}
+      SIGNUP_ABANDONMENT_NOTIFY_EMAIL: ${SIGNUP_ABANDONMENT_NOTIFY_EMAIL:-}
+      # SMTP — usado pelo email de abandono do cadastro, dossiê, portal e LGPD.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      NOTIFICATION_EMAIL_FROM: ${NOTIFICATION_EMAIL_FROM:-}
     healthcheck:
       # /api/app-version: endpoint leve (sem render de página, sem query ao
       # banco) — /login renderizava a página completa a cada 90s.

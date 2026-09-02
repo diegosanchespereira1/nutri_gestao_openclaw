@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { processStripeWebhookEvent } from "@/lib/signup/process-stripe-event";
+import {
+  processStripeWebhookEvent,
+  readSubscriptionPeriodEndUnix,
+} from "@/lib/signup/process-stripe-event";
 import type {
   SignupWebhookDeps,
   StripeWebhookEventLike,
@@ -122,5 +125,101 @@ describe("processStripeWebhookEvent", () => {
     );
     expect(result).toEqual({ ok: true, action: "duplicate" });
     expect(d.completePaidSignup).not.toHaveBeenCalled();
+  });
+});
+/**
+ * Regressão: `current_period_end` saiu do root de Subscription e foi para SubscriptionItem
+ * no stripe@20 (API 2025-03-31.basil). Como o payload do webhook usa a API version da conta,
+ * as duas formas circulam ao mesmo tempo — e ler só o root deixava `plan_expires_at` nulo.
+ */
+describe("readSubscriptionPeriodEndUnix", () => {
+  it("lê do item (forma nova do stripe@20)", () => {
+    expect(
+      readSubscriptionPeriodEndUnix({ items: { data: [{ current_period_end: 1800000000 }] } }),
+    ).toBe(1800000000);
+  });
+
+  it("cai no root quando o payload vem na forma antiga", () => {
+    expect(readSubscriptionPeriodEndUnix({ current_period_end: 1700000000 })).toBe(1700000000);
+  });
+
+  it("prefere o item quando as duas formas vêm juntas", () => {
+    expect(
+      readSubscriptionPeriodEndUnix({
+        current_period_end: 1700000000,
+        items: { data: [{ current_period_end: 1800000000 }] },
+      }),
+    ).toBe(1800000000);
+  });
+
+  it("devolve null sem nenhuma das formas", () => {
+    expect(readSubscriptionPeriodEndUnix({})).toBeNull();
+    expect(readSubscriptionPeriodEndUnix({ items: { data: [] } })).toBeNull();
+    expect(readSubscriptionPeriodEndUnix({ current_period_end: 0 })).toBeNull();
+    expect(readSubscriptionPeriodEndUnix({ current_period_end: null })).toBeNull();
+  });
+});
+
+describe("processStripeWebhookEvent — customer.subscription.*", () => {
+  it("propaga o fim do período vindo do item da assinatura", async () => {
+    const d = deps();
+    const result = await processStripeWebhookEvent(
+      event("customer.subscription.updated", {
+        id: "sub_1",
+        customer: "cus_1",
+        status: "active",
+        cancel_at_period_end: false,
+        metadata: { plan_slug: "pro" },
+        items: {
+          data: [
+            { current_period_end: 1800000000, price: { recurring: { interval: "year" } } },
+          ],
+        },
+      }),
+      d,
+    );
+
+    expect(result).toEqual({ ok: true, action: "synced" });
+    expect(d.syncSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subscriptionId: "sub_1",
+        customerId: "cus_1",
+        status: "active",
+        planSlug: "pro",
+        billingInterval: "year",
+        currentPeriodEnd: new Date(1800000000 * 1000).toISOString(),
+      }),
+    );
+  });
+
+  it("ainda entende o payload na forma antiga, com o campo no root", async () => {
+    const d = deps();
+    await processStripeWebhookEvent(
+      event("customer.subscription.updated", {
+        id: "sub_2",
+        current_period_end: 1700000000,
+        items: { data: [{ price: { recurring: { interval: "month" } } }] },
+      }),
+      d,
+    );
+
+    expect(d.syncSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({
+        currentPeriodEnd: new Date(1700000000 * 1000).toISOString(),
+        billingInterval: "month",
+      }),
+    );
+  });
+
+  it("marca canceled quando a assinatura é apagada", async () => {
+    const d = deps();
+    await processStripeWebhookEvent(
+      event("customer.subscription.deleted", { id: "sub_3" }),
+      d,
+    );
+
+    expect(d.syncSubscription).toHaveBeenCalledWith(
+      expect.objectContaining({ subscriptionId: "sub_3", status: "canceled", currentPeriodEnd: null }),
+    );
   });
 });

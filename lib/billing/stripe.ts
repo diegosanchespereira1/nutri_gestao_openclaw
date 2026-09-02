@@ -19,7 +19,10 @@ export function createStripeClient(): Stripe {
   if (!key) {
     throw new Error("STRIPE_SECRET_KEY ausente no servidor.");
   }
-  return new Stripe(key);
+  // Pinado de propósito: sem isto o SDK usa a versão default dele enquanto o payload do
+  // webhook chega na versão da conta, e os dois lados podem discordar da forma do objeto
+  // (foi o que escondeu o current_period_end). Subir esta string é uma decisão consciente.
+  return new Stripe(key, { apiVersion: "2026-02-25.clover" });
 }
 
 export async function createSignupCheckoutSession(input: {

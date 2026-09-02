@@ -45,6 +45,25 @@ export type ProcessStripeEventResult =
   | { ok: true; action: "duplicate" | "ignored" | "abandoned" | "paid" | "synced" }
   | { ok: false; error: string };
 
+/**
+ * Lê o fim do período de uma Subscription tolerando as duas formas do campo.
+ *
+ * A partir de `stripe@20` (API 2025-03-31.basil) `current_period_end` saiu do root de
+ * `Subscription` e passou a viver em cada `SubscriptionItem`. O payload do webhook usa a
+ * API version **da conta**, que pode ser mais antiga que a do SDK, então as duas formas
+ * podem aparecer — daí a leitura em cascata em vez de trocar uma pela outra.
+ */
+export function readSubscriptionPeriodEndUnix(sub: {
+  current_period_end?: number | null;
+  items?: { data?: Array<{ current_period_end?: number | null }> };
+}): number | null {
+  const fromItem = sub.items?.data?.[0]?.current_period_end;
+  if (typeof fromItem === "number" && fromItem > 0) return fromItem;
+  const fromRoot = sub.current_period_end;
+  if (typeof fromRoot === "number" && fromRoot > 0) return fromRoot;
+  return null;
+}
+
 export async function processStripeWebhookEvent(
   event: StripeWebhookEventLike,
   deps: SignupWebhookDeps,
@@ -110,7 +129,13 @@ export async function processStripeWebhookEvent(
       cancel_at_period_end?: boolean;
       current_period_end?: number;
       metadata?: Record<string, string> | null;
-      items?: { data?: Array<{ plan?: { interval?: string }; price?: { recurring?: { interval?: string } } }> };
+      items?: {
+        data?: Array<{
+          current_period_end?: number | null;
+          plan?: { interval?: string };
+          price?: { recurring?: { interval?: string } };
+        }>;
+      };
     };
     const subscriptionId = obj.id ?? "";
     if (!subscriptionId) {
@@ -130,9 +155,10 @@ export async function processStripeWebhookEvent(
       customerId: typeof obj.customer === "string" ? obj.customer : null,
       status: obj.status ?? (event.type === "customer.subscription.deleted" ? "canceled" : null),
       cancelAtPeriodEnd: Boolean(obj.cancel_at_period_end),
-      currentPeriodEnd: obj.current_period_end
-        ? new Date(obj.current_period_end * 1000).toISOString()
-        : null,
+      currentPeriodEnd: (() => {
+        const end = readSubscriptionPeriodEndUnix(obj);
+        return end ? new Date(end * 1000).toISOString() : null;
+      })(),
       planSlug: obj.metadata?.plan_slug ?? null,
       billingInterval: interval,
     });

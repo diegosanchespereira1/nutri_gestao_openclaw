@@ -7,6 +7,7 @@ import { readSignupIntentSecret } from "@/lib/signup/profile-from-intent";
 import { createStripeClient } from "@/lib/billing/stripe";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import type { SignupIntentRow } from "@/lib/signup/types";
+import { readSubscriptionPeriodEndUnix } from "@/lib/signup/process-stripe-event";
 import type {
   SignupWebhookDeps,
   StripeCheckoutSessionLike,
@@ -176,7 +177,7 @@ async function readSubscriptionPeriodEnd(
   try {
     const stripe = createStripeClient();
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
-    const end = (sub as { current_period_end?: number }).current_period_end;
+    const end = readSubscriptionPeriodEndUnix(sub);
     if (!end) return null;
     return new Date(end * 1000).toISOString();
   } catch {

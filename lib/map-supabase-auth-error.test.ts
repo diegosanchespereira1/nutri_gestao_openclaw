@@ -12,7 +12,7 @@ describe("mapSupabaseLoginError", () => {
         message: "x",
         code: "email_not_confirmed",
       }),
-    ).toContain("Confirme o email");
+    ).toContain("Confirme o e-mail");
   });
 
   it("mapeia credenciais inválidas por código", () => {
@@ -38,7 +38,7 @@ describe("mapSupabaseLoginError", () => {
         message: "x",
         code: "provider_email_needs_verification",
       }),
-    ).toContain("Confirme o email");
+    ).toContain("Confirme o e-mail");
   });
 
   it("mapeia rate limit", () => {

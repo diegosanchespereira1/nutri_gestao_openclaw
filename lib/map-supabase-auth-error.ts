@@ -12,7 +12,7 @@ export function mapSupabaseLoginError(err: SupabaseAuthLikeError): string {
     code === "email_not_confirmed" ||
     code === "provider_email_needs_verification"
   ) {
-    return "Confirme o email antes de entrar (use a ligação enviada para a sua caixa de entrada).";
+    return "Confirme o e-mail antes de entrar (use o link enviado para a sua caixa de entrada).";
   }
   if (code === "invalid_credentials") {
     return "Email ou senha incorretos.";
@@ -27,7 +27,7 @@ export function mapSupabaseLoginError(err: SupabaseAuthLikeError): string {
   const m = err.message.toLowerCase();
 
   if (m.includes("email not confirmed") || m.includes("not confirmed")) {
-    return "Confirme o email antes de entrar (use a ligação enviada para a sua caixa de entrada).";
+    return "Confirme o e-mail antes de entrar (use o link enviado para a sua caixa de entrada).";
   }
   if (
     m.includes("invalid login credentials") ||

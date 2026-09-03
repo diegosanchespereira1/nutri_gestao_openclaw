@@ -2,9 +2,22 @@ import { isValidCnpj, isValidCpf, onlyDigits } from "@/lib/validators/br-documen
 import { normalizeBrazilPhone } from "@/lib/validators/br-phone";
 import type { SignupLeadInput, SignupLeadParsed } from "@/lib/signup/types";
 
-export const SIGNUP_MIN_PASSWORD_LENGTH = 12;
+export const SIGNUP_MIN_PASSWORD_LENGTH = 6;
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Maiúscula + número + caractere especial (além do mínimo de caracteres). */
+export function isSignupPasswordStrong(password: string): boolean {
+  if (password.length < SIGNUP_MIN_PASSWORD_LENGTH) return false;
+  if (!/[A-ZÀ-Ý]/.test(password)) return false;
+  if (!/[0-9]/.test(password)) return false;
+  if (!/[^A-Za-z0-9À-ÿ]/.test(password)) return false;
+  return true;
+}
+
+export function signupPasswordPolicyMessage(): string {
+  return `Mínimo de ${SIGNUP_MIN_PASSWORD_LENGTH} caracteres, com letra maiúscula, número e caractere especial.`;
+}
 
 export type SignupLeadField =
   | "fullName"
@@ -31,8 +44,8 @@ export function parseSignupLead(input: SignupLeadInput): SignupLeadParseResult {
   if (!phoneResult.ok) errors.phone = phoneResult.error;
   else if (!phoneResult.value) errors.phone = "Informe o telefone.";
 
-  if (input.password.length < SIGNUP_MIN_PASSWORD_LENGTH) {
-    errors.password = `A senha deve ter pelo menos ${SIGNUP_MIN_PASSWORD_LENGTH} caracteres.`;
+  if (!isSignupPasswordStrong(input.password)) {
+    errors.password = signupPasswordPolicyMessage();
   }
   if (input.password !== input.confirmPassword) {
     errors.confirmPassword = "As senhas não coincidem.";

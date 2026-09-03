@@ -37,6 +37,26 @@ describe("parseSignupLead", () => {
     expect(parsed.errors.confirmPassword).toBeDefined();
   });
 
+  it("aceita senha com 6 caracteres forte (maiúscula, número e especial)", () => {
+    const parsed = parseSignupLead({
+      ...validPf(),
+      password: "Ab1@cd",
+      confirmPassword: "Ab1@cd",
+    });
+    expect(parsed.ok).toBe(true);
+  });
+
+  it("rejeita senha longa sem maiúscula/número/especial", () => {
+    const parsed = parseSignupLead({
+      ...validPf(),
+      password: "senhasemforca",
+      confirmPassword: "senhasemforca",
+    });
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.errors.password).toMatch(/maiúscula/i);
+  });
+
   it("aceita PJ com CNPJ válido", () => {
     const parsed = parseSignupLead({
       personKind: "pj",

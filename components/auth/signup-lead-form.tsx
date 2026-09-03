@@ -9,6 +9,7 @@ import { PasswordField } from "@/components/auth/password-field";
 import { maskBrDocumentInput } from "@/lib/format/br-document";
 import {
   parseSignupLead,
+  signupPasswordPolicyMessage,
   type SignupLeadField,
 } from "@/lib/signup/parse-signup-lead";
 import { signupStepperNextLabel } from "@/lib/signup/format-plan-price";
@@ -176,7 +177,9 @@ export function SignupLeadStep({ value, onChange, onContinue }: Props) {
             {shown.password}
           </p>
         ) : (
-          <p className="text-muted-foreground text-xs">Mínimo de 12 caracteres.</p>
+          <p className="text-muted-foreground text-xs">
+            {signupPasswordPolicyMessage()}
+          </p>
         )}
       </div>
 

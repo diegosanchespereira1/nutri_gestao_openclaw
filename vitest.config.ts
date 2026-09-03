@@ -77,6 +77,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./"),
+      // Ver test/stubs/server-only.ts: o pacote real lança fora de um Server
+      // Component, o que tornava intestável todo módulo marcado como server-only.
+      "server-only": path.resolve(__dirname, "./test/stubs/server-only.ts"),
     },
   },
 });

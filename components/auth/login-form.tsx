@@ -48,8 +48,11 @@ export function LoginForm() {
   const [requestId] = useState(() => generateUUID());
 
   useEffect(() => {
-    if (searchParams.get("aba") === "cadastro") {
-      setMode("cadastro");
+    // Honra os dois valores: o retorno do Stripe usa ?aba=entrar para trocar de aba
+    // e dar ao utilizador um sinal visual de que a etapa de pagamento terminou.
+    const aba = searchParams.get("aba");
+    if (aba === "cadastro" || aba === "entrar") {
+      setMode(aba);
     }
   }, [searchParams]);
 

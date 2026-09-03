@@ -46,7 +46,11 @@ export async function createSignupCheckoutSession(input: {
     customer_email: input.email,
     client_reference_id: input.intentId,
     expires_at: input.expiresAtUnix,
-    success_url: `${input.origin}/login?aba=cadastro&pagamento=ok`,
+    // Sucesso volta na aba **Entrar**: a conta já existe, o que falta é confirmar o
+    // e-mail e entrar. Cair no wizard de cadastro depois de pagar sugere que algo
+    // não terminou. Cancelamento volta no cadastro, onde dá para escolher o plano
+    // e tentar de novo.
+    success_url: `${input.origin}/login?aba=entrar&pagamento=ok`,
     cancel_url: `${input.origin}/login?aba=cadastro&pagamento=cancelado`,
     line_items: [{ price: input.priceId, quantity: 1 }],
     subscription_data: { metadata },

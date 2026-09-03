@@ -23,9 +23,11 @@ type Props = {
   value: SignupLeadInput;
   onChange: (next: SignupLeadInput) => void;
   onContinue: () => void;
+  /** Consulta de disponibilidade em curso: evita duplo envio. */
+  busy?: boolean;
 };
 
-export function SignupLeadStep({ value, onChange, onContinue }: Props) {
+export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
   const [showErrors, setShowErrors] = useState(false);
   const errors = peekErrors(value);
 
@@ -209,8 +211,8 @@ export function SignupLeadStep({ value, onChange, onContinue }: Props) {
         ) : null}
       </div>
 
-      <Button type="submit" className="w-full">
-        {signupStepperNextLabel(1)}
+      <Button type="submit" className="w-full" disabled={busy}>
+        {busy ? "Verificando…" : signupStepperNextLabel(1)}
       </Button>
     </form>
   );

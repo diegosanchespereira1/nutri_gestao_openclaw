@@ -7,6 +7,7 @@ import { SignupLeadStep } from "@/components/auth/signup-lead-form";
 import { SignupPlanStep } from "@/components/auth/signup-plan-step";
 import { SignupStepper } from "@/components/auth/signup-stepper";
 import {
+  checkSignupLeadAvailabilityAction,
   completeFreeSignupAction,
   listPublicSignupPlansAction,
   startPaidCheckoutAction,
@@ -54,6 +55,31 @@ export function SignupWizard() {
   }, []);
 
   const selected = plans.find((p) => p.slug === planSlug) ?? null;
+
+  /**
+   * E-mail e CPF/CNPJ são conferidos aqui, na saída do passo 1.
+   *
+   * A mesma checagem existe antes do Checkout e dentro do webhook, mas descobrir o
+   * conflito lá obriga o utilizador a voltar dois passos com o formulário já
+   * fechado. Se a consulta falhar, o passo segue: as camadas seguintes ainda
+   * barram, e travar o cadastro por uma indisponibilidade seria pior.
+   */
+  async function handleLeadContinue() {
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await checkSignupLeadAvailabilityAction(lead);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setStep(2);
+    } catch {
+      setStep(2);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handlePlanContinue() {
     if (!selected) return;
@@ -137,10 +163,8 @@ export function SignupWizard() {
         <SignupLeadStep
           value={lead}
           onChange={setLead}
-          onContinue={() => {
-            setError(null);
-            setStep(2);
-          }}
+          busy={loading}
+          onContinue={() => void handleLeadContinue()}
         />
       ) : null}
 

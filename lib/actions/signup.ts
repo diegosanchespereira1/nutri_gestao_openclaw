@@ -20,7 +20,10 @@ import { getServerAppOrigin } from "@/lib/app-origin";
 import { encryptSignupPassword } from "@/lib/signup/encrypt-password";
 import { parseSignupLead } from "@/lib/signup/parse-signup-lead";
 import { checkoutKindForPlan, sortPublicSignupPlans, stripePriceColumn, toPublicSignupPlan } from "@/lib/signup/plan-checkout";
-import { checkSignupAvailability } from "@/lib/signup/signup-availability";
+import {
+  checkSignupAvailability,
+  type SignupAvailabilityDeps,
+} from "@/lib/signup/signup-availability";
 import { resolveSignupOutcome, type SignupOutcome } from "@/lib/signup/signup-outcome";
 import { checkoutExpiresAt } from "@/lib/signup/abandonment";
 import { completeSignupAccount } from "@/lib/signup/complete-account";
@@ -183,6 +186,33 @@ export async function completeFreeSignupAction(input: {
  * viaja na URL de retorno e é um UUID, mas mesmo assim esta action não pode virar
  * um oráculo de dados pessoais para quem tenha o link.
  */
+/**
+ * Disponibilidade de e-mail e CPF/CNPJ para o passo 1 do wizard.
+ *
+ * A checagem existe também antes do Checkout, mas ali o utilizador já escolheu o
+ * plano e clicou em pagar — descobrir o conflito nesse ponto obriga a voltar dois
+ * passos. Aqui ele é avisado com o formulário ainda aberto à frente.
+ */
+export async function checkSignupLeadAvailabilityAction(
+  lead: SignupLeadInput,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = parseSignupLead(lead);
+  if (!parsed.ok) {
+    return { ok: false, error: Object.values(parsed.errors)[0] ?? "Dados inválidos." };
+  }
+  // Sem service role não há como consultar; o passo seguinte não é bloqueado por
+  // isso — quem barra de facto continua sendo o checkout e o webhook.
+  if (!isServiceRoleConfigured()) return { ok: true };
+
+  const availability = await checkSignupAvailability(
+    signupAvailabilityDeps(createServiceRoleClient()),
+    { email: parsed.value.email, documentId: parsed.value.documentId },
+  );
+  return availability.available
+    ? { ok: true }
+    : { ok: false, error: availability.error };
+}
+
 export async function checkSignupOutcomeAction(
   intentId: string,
 ): Promise<{ outcome: SignupOutcome }> {
@@ -267,41 +297,7 @@ export async function startPaidCheckoutAction(input: {
   // roda no webhook — depois do pagamento — e o utilizador ficava com assinatura
   // ativa e sem conta. Aqui ele ainda pode corrigir o formulário.
   const availability = await checkSignupAvailability(
-    {
-      async findProfileIdByDocument(documentId) {
-        const { data } = await service
-          .from("profiles")
-          .select("user_id")
-          .eq("document_id", documentId)
-          .maybeSingle();
-        return data?.user_id ?? null;
-      },
-      async findAuthUserIdByEmail(email) {
-        // Mesmo padrão de findAuthUserByEmail em lib/actions/team-members.ts:
-        // o GoTrue não expõe busca por e-mail, então percorre as páginas do admin.
-        const perPage = 200;
-        for (let page = 1; page <= 10; page += 1) {
-          const { data, error } = await service.auth.admin.listUsers({
-            page,
-            perPage,
-          });
-          if (error) {
-            // Sem resposta não dá para afirmar que o e-mail está livre. Deixa
-            // passar: createUser ainda barra no webhook, e falhar aqui bloquearia
-            // todo cadastro pago por uma indisponibilidade do Auth.
-            console.error("[startPaidCheckout] listUsers falhou", error);
-            return null;
-          }
-          const users = data?.users ?? [];
-          const hit = users.find(
-            (u) => u.email?.trim().toLowerCase() === email,
-          );
-          if (hit?.id) return hit.id;
-          if (users.length < perPage) break;
-        }
-        return null;
-      },
-    },
+    signupAvailabilityDeps(service),
     { email: parsed.value.email, documentId: parsed.value.documentId },
   );
   if (!availability.available) {
@@ -343,4 +339,44 @@ export async function startPaidCheckoutAction(input: {
     const message = err instanceof Error ? err.message : "Não foi possível iniciar o pagamento.";
     return { ok: false, error: message };
   }
+}
+
+
+/** I/O da checagem de disponibilidade, partilhado pelas duas actions. */
+function signupAvailabilityDeps(
+  service: ReturnType<typeof createServiceRoleClient>,
+): SignupAvailabilityDeps {
+  return {
+    async findProfileIdByDocument(documentId) {
+      const { data } = await service
+        .from("profiles")
+        .select("user_id")
+        .eq("document_id", documentId)
+        .maybeSingle();
+      return data?.user_id ?? null;
+    },
+    async findAuthUserIdByEmail(email) {
+      // Mesmo padrão de findAuthUserByEmail em lib/actions/team-members.ts: o
+      // GoTrue não expõe busca por e-mail, então percorre as páginas do admin.
+      const perPage = 200;
+      for (let page = 1; page <= 10; page += 1) {
+        const { data, error } = await service.auth.admin.listUsers({
+          page,
+          perPage,
+        });
+        if (error) {
+          // Sem resposta não dá para afirmar que o e-mail está livre. Deixa
+          // passar: createUser ainda barra no webhook, e falhar fechado
+          // bloquearia todo cadastro por uma indisponibilidade do Auth.
+          console.error("[signupAvailability] listUsers falhou", error);
+          return null;
+        }
+        const users = data?.users ?? [];
+        const hit = users.find((u) => u.email?.trim().toLowerCase() === email);
+        if (hit?.id) return hit.id;
+        if (users.length < perPage) break;
+      }
+      return null;
+    },
+  };
 }

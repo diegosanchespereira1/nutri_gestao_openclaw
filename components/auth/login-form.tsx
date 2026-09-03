@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState, useEffect } from "react";
 
 import { AppBuildLabel } from "@/components/app-version-guard";
@@ -47,14 +47,50 @@ export function LoginForm() {
   const [mode, setMode] = useState<AuthMode>("entrar");
   const [requestId] = useState(() => generateUUID());
 
+  const router = useRouter();
+  const pathname = usePathname();
+
+  /**
+   * O aviso de pagamento é consumido UMA vez e a query é limpa em seguida.
+   *
+   * Antes ele era lido direto de `searchParams` a cada render: como `?pagamento=ok`
+   * ficava na barra de endereços, a faixa verde continuava visível enquanto o
+   * utilizador já preenchia um cadastro novo, dizendo que o pagamento tinha sido
+   * recebido. Trocar de aba não adiantava — a query não muda com isso.
+   */
+  const [paymentNotice, setPaymentNotice] = useState<
+    "ok" | "cancelado" | null
+  >(null);
+
   useEffect(() => {
+    const aba = searchParams.get("aba");
     // Honra os dois valores: o retorno do Stripe usa ?aba=entrar para trocar de aba
     // e dar ao utilizador um sinal visual de que a etapa de pagamento terminou.
-    const aba = searchParams.get("aba");
     if (aba === "cadastro" || aba === "entrar") {
       setMode(aba);
     }
-  }, [searchParams]);
+
+    const pagamento = searchParams.get("pagamento");
+    if (pagamento === "ok" || pagamento === "cancelado") {
+      setPaymentNotice(pagamento);
+    }
+
+    if (!aba && !pagamento) return;
+
+    // Remove só estes dois; `next`, `error` e `reason` seguem sendo tratados a
+    // partir da URL e não podem ser descartados aqui.
+    const rest = new URLSearchParams(searchParams.toString());
+    rest.delete("aba");
+    rest.delete("pagamento");
+    const query = rest.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [searchParams, router, pathname]);
+
+  /** Troca de aba pelo utilizador: o aviso já cumpriu o papel dele. */
+  function handleModeChange(novaAba: AuthMode) {
+    setMode(novaAba);
+    setPaymentNotice(null);
+  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -441,7 +477,7 @@ export function LoginForm() {
     <div className="space-y-8">
       <div className="space-y-3">
         <h1 className="sr-only">{mode === "cadastro" ? "Cadastre-se" : "Entrar"}</h1>
-        <AuthModeTabs value={mode} onChange={setMode} />
+        <AuthModeTabs value={mode} onChange={handleModeChange} />
         {mode === "entrar" ? (
           <p className="text-muted-foreground text-sm">
             Acesse com seu e-mail e senha.
@@ -484,7 +520,7 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      {searchParams.get("pagamento") === "ok" ? (
+      {paymentNotice === "ok" ? (
         <p
           className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-200"
           role="status"
@@ -494,7 +530,7 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      {searchParams.get("pagamento") === "cancelado" ? (
+      {paymentNotice === "cancelado" ? (
         <p
           className="text-amber-900 dark:text-amber-100 bg-amber-50 dark:text-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2 text-sm"
           role="status"

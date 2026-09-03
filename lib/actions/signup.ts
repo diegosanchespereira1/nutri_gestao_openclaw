@@ -20,6 +20,7 @@ import { getServerAppOrigin } from "@/lib/app-origin";
 import { encryptSignupPassword } from "@/lib/signup/encrypt-password";
 import { parseSignupLead } from "@/lib/signup/parse-signup-lead";
 import { checkoutKindForPlan, sortPublicSignupPlans, stripePriceColumn, toPublicSignupPlan } from "@/lib/signup/plan-checkout";
+import { checkSignupAvailability } from "@/lib/signup/signup-availability";
 import { checkoutExpiresAt } from "@/lib/signup/abandonment";
 import { completeSignupAccount } from "@/lib/signup/complete-account";
 import {
@@ -229,6 +230,51 @@ export async function startPaidCheckoutAction(input: {
   const priceId = (plan as Record<string, unknown>)[priceCol];
   if (typeof priceId !== "string" || !priceId.trim()) {
     return { ok: false, error: "Pagamento deste plano ainda não está configurado." };
+  }
+
+  // ANTES de cobrar. A mesma checagem existe em completeSignupAccount, mas lá ela
+  // roda no webhook — depois do pagamento — e o utilizador ficava com assinatura
+  // ativa e sem conta. Aqui ele ainda pode corrigir o formulário.
+  const availability = await checkSignupAvailability(
+    {
+      async findProfileIdByDocument(documentId) {
+        const { data } = await service
+          .from("profiles")
+          .select("user_id")
+          .eq("document_id", documentId)
+          .maybeSingle();
+        return data?.user_id ?? null;
+      },
+      async findAuthUserIdByEmail(email) {
+        // Mesmo padrão de findAuthUserByEmail em lib/actions/team-members.ts:
+        // o GoTrue não expõe busca por e-mail, então percorre as páginas do admin.
+        const perPage = 200;
+        for (let page = 1; page <= 10; page += 1) {
+          const { data, error } = await service.auth.admin.listUsers({
+            page,
+            perPage,
+          });
+          if (error) {
+            // Sem resposta não dá para afirmar que o e-mail está livre. Deixa
+            // passar: createUser ainda barra no webhook, e falhar aqui bloquearia
+            // todo cadastro pago por uma indisponibilidade do Auth.
+            console.error("[startPaidCheckout] listUsers falhou", error);
+            return null;
+          }
+          const users = data?.users ?? [];
+          const hit = users.find(
+            (u) => u.email?.trim().toLowerCase() === email,
+          );
+          if (hit?.id) return hit.id;
+          if (users.length < perPage) break;
+        }
+        return null;
+      },
+    },
+    { email: parsed.value.email, documentId: parsed.value.documentId },
+  );
+  if (!availability.available) {
+    return { ok: false, error: availability.error };
   }
 
   try {

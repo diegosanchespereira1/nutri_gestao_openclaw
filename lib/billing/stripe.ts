@@ -50,7 +50,10 @@ export async function createSignupCheckoutSession(input: {
     // e-mail e entrar. Cair no wizard de cadastro depois de pagar sugere que algo
     // não terminou. Cancelamento volta no cadastro, onde dá para escolher o plano
     // e tentar de novo.
-    success_url: `${input.origin}/login?aba=entrar&pagamento=ok`,
+    // O `intent` vai junto para a página de retorno poder consultar o estado real do
+    // cadastro. Sem ele a faixa de sucesso seria decidida só pelo redirect, e uma
+    // falha do webhook depois do pagamento passaria por sucesso.
+    success_url: `${input.origin}/login?aba=entrar&pagamento=ok&intent=${input.intentId}`,
     cancel_url: `${input.origin}/login?aba=cadastro&pagamento=cancelado`,
     line_items: [{ price: input.priceId, quantity: 1 }],
     subscription_data: { metadata },

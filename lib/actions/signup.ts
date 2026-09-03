@@ -21,6 +21,7 @@ import { encryptSignupPassword } from "@/lib/signup/encrypt-password";
 import { parseSignupLead } from "@/lib/signup/parse-signup-lead";
 import { checkoutKindForPlan, sortPublicSignupPlans, stripePriceColumn, toPublicSignupPlan } from "@/lib/signup/plan-checkout";
 import { checkSignupAvailability } from "@/lib/signup/signup-availability";
+import { resolveSignupOutcome, type SignupOutcome } from "@/lib/signup/signup-outcome";
 import { checkoutExpiresAt } from "@/lib/signup/abandonment";
 import { completeSignupAccount } from "@/lib/signup/complete-account";
 import {
@@ -173,6 +174,36 @@ export async function completeFreeSignupAction(input: {
     const message = err instanceof Error ? err.message : "Não foi possível criar a conta.";
     return { ok: false, error: message };
   }
+}
+
+/**
+ * Desfecho de um cadastro pago, para a página de retorno do Stripe.
+ *
+ * Devolve **apenas** o estado — nada de e-mail, nome ou documento. O id do intent
+ * viaja na URL de retorno e é um UUID, mas mesmo assim esta action não pode virar
+ * um oráculo de dados pessoais para quem tenha o link.
+ */
+export async function checkSignupOutcomeAction(
+  intentId: string,
+): Promise<{ outcome: SignupOutcome }> {
+  const id = intentId.trim();
+  // O webhook ainda pode estar a correr: na dúvida, "processando" nunca alarma.
+  if (!id || !isServiceRoleConfigured()) return { outcome: "processando" };
+
+  const { data, error } = await createServiceRoleClient()
+    .from("signup_intents")
+    .select("status, created_user_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return { outcome: "processando" };
+
+  return {
+    outcome: resolveSignupOutcome({
+      status: data.status ?? null,
+      createdUserId: data.created_user_id ?? null,
+    }),
+  };
 }
 
 export async function startPaidCheckoutAction(input: {

@@ -8,6 +8,11 @@ import { AppBuildLabel } from "@/components/app-version-guard";
 import { AuthModeTabs, type AuthMode } from "@/components/auth/auth-mode-tabs";
 import { PasswordField } from "@/components/auth/password-field";
 import { SignupWizard } from "@/components/auth/signup-wizard";
+import { checkSignupOutcomeAction } from "@/lib/actions/signup";
+import {
+  SIGNUP_OUTCOME_MESSAGE,
+  type SignupOutcome,
+} from "@/lib/signup/signup-outcome";
 import { navigateAfterAuth } from "@/lib/app-build-navigate";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
 import { mapSupabaseLoginError } from "@/lib/map-supabase-auth-error";
@@ -61,6 +66,9 @@ export function LoginForm() {
   const [paymentNotice, setPaymentNotice] = useState<
     "ok" | "cancelado" | null
   >(null);
+  const [intentId, setIntentId] = useState<string | null>(null);
+  /** null enquanto a primeira consulta não volta; até lá vale "processando". */
+  const [outcome, setOutcome] = useState<SignupOutcome | null>(null);
 
   useEffect(() => {
     const aba = searchParams.get("aba");
@@ -75,21 +83,63 @@ export function LoginForm() {
       setPaymentNotice(pagamento);
     }
 
-    if (!aba && !pagamento) return;
+    const intent = searchParams.get("intent");
+    if (intent) setIntentId(intent);
 
-    // Remove só estes dois; `next`, `error` e `reason` seguem sendo tratados a
+    if (!aba && !pagamento && !intent) return;
+
+    // Remove só estes três; `next`, `error` e `reason` seguem sendo tratados a
     // partir da URL e não podem ser descartados aqui.
     const rest = new URLSearchParams(searchParams.toString());
     rest.delete("aba");
     rest.delete("pagamento");
+    rest.delete("intent");
     const query = rest.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }, [searchParams, router, pathname]);
+
+  /**
+   * A conta é criada pelo webhook do Stripe, que é assíncrono — o utilizador quase
+   * sempre volta antes dele terminar. Daí a consulta ser repetida algumas vezes em
+   * vez de decidir na primeira resposta: sem isso, todo retorno pareceria falha.
+   */
+  useEffect(() => {
+    if (paymentNotice !== "ok" || !intentId) return;
+
+    let cancelado = false;
+    let tentativas = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    async function consultar() {
+      tentativas += 1;
+      try {
+        const { outcome: atual } = await checkSignupOutcomeAction(intentId!);
+        if (cancelado) return;
+        setOutcome(atual);
+        // "processando" é provisório: continua tentando até o webhook decidir.
+        if (atual === "processando" && tentativas < 6) {
+          timer = setTimeout(consultar, 2500);
+        }
+      } catch {
+        if (!cancelado && tentativas < 6) {
+          timer = setTimeout(consultar, 2500);
+        }
+      }
+    }
+
+    void consultar();
+    return () => {
+      cancelado = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [paymentNotice, intentId]);
 
   /** Troca de aba pelo utilizador: o aviso já cumpriu o papel dele. */
   function handleModeChange(novaAba: AuthMode) {
     setMode(novaAba);
     setPaymentNotice(null);
+    setOutcome(null);
+    setIntentId(null);
   }
 
   const [email, setEmail] = useState("");
@@ -522,11 +572,15 @@ export function LoginForm() {
 
       {paymentNotice === "ok" ? (
         <p
-          className="rounded-md border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-800 dark:text-green-200"
-          role="status"
+          className={cn(
+            "rounded-md border px-3 py-2 text-sm",
+            (outcome ?? "processando") === "falhou"
+              ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100"
+              : "border-green-500/30 bg-green-500/10 text-green-800 dark:text-green-200",
+          )}
+          role={(outcome ?? "processando") === "falhou" ? "alert" : "status"}
         >
-          Pagamento recebido. Enviamos um e-mail para confirmar sua conta. Você
-          só entra depois de clicar no link.
+          {SIGNUP_OUTCOME_MESSAGE[outcome ?? "processando"]}
         </p>
       ) : null}
 

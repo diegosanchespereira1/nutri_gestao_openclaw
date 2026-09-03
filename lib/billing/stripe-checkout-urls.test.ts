@@ -31,13 +31,24 @@ const base = {
 };
 
 describe("createSignupCheckoutSession — URLs de retorno", () => {
-  it("manda o sucesso para a aba Entrar", async () => {
+  it("manda o sucesso para a aba Entrar, com o intent para consultar o desfecho", async () => {
     const capture: { args?: Record<string, unknown> } = {};
     await createSignupCheckoutSession({ stripe: stripeFake(capture), ...base });
 
     expect(capture.args?.success_url).toBe(
-      "https://dev-nutricao.nutrigestao.app/login?aba=entrar&pagamento=ok",
+      "https://dev-nutricao.nutrigestao.app/login?aba=entrar&pagamento=ok&intent=intent-1",
     );
+  });
+
+  it("sem o intent na success_url a página não teria como detectar falha do webhook", async () => {
+    const capture: { args?: Record<string, unknown> } = {};
+    await createSignupCheckoutSession({
+      stripe: stripeFake(capture),
+      ...base,
+      intentId: "outro-intent",
+    });
+
+    expect(String(capture.args?.success_url)).toContain("intent=outro-intent");
   });
 
   it("manda o cancelamento de volta ao cadastro, onde dá para escolher outro plano", async () => {
@@ -58,7 +69,7 @@ describe("createSignupCheckoutSession — URLs de retorno", () => {
     });
 
     expect(capture.args?.success_url).toBe(
-      "https://nutrigestao.app/login?aba=entrar&pagamento=ok",
+      "https://nutrigestao.app/login?aba=entrar&pagamento=ok&intent=intent-1",
     );
     expect(String(capture.args?.cancel_url)).not.toContain("localhost");
   });

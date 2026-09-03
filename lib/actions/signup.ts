@@ -195,10 +195,20 @@ export async function completeFreeSignupAction(input: {
  */
 export async function checkSignupLeadAvailabilityAction(
   lead: SignupLeadInput,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; field: "email" | "document"; error: string }
+> {
   const parsed = parseSignupLead(lead);
   if (!parsed.ok) {
-    return { ok: false, error: Object.values(parsed.errors)[0] ?? "Dados inválidos." };
+    // O passo 1 já valida formato no cliente; se chegou aqui inválido, o campo
+    // exato não importa tanto quanto não deixar passar.
+    const [field, error] = Object.entries(parsed.errors)[0] ?? [];
+    return {
+      ok: false,
+      field: field === "document" ? "document" : "email",
+      error: error ?? "Dados inválidos.",
+    };
   }
   // Sem service role não há como consultar; o passo seguinte não é bloqueado por
   // isso — quem barra de facto continua sendo o checkout e o webhook.
@@ -210,7 +220,7 @@ export async function checkSignupLeadAvailabilityAction(
   );
   return availability.available
     ? { ok: true }
-    : { ok: false, error: availability.error };
+    : { ok: false, field: availability.field, error: availability.error };
 }
 
 export async function checkSignupOutcomeAction(

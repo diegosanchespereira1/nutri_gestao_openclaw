@@ -41,6 +41,11 @@ export function SignupWizard() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState<"free" | "paid" | null>(null);
+  /** Erro do servidor ancorado a um campo do passo 1, em vez da faixa no topo. */
+  const [leadFieldError, setLeadFieldError] = useState<{
+    field: "email" | "document";
+    message: string;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,11 +71,12 @@ export function SignupWizard() {
    */
   async function handleLeadContinue() {
     setError(null);
+    setLeadFieldError(null);
     setLoading(true);
     try {
       const result = await checkSignupLeadAvailabilityAction(lead);
       if (!result.ok) {
-        setError(result.error);
+        setLeadFieldError({ field: result.field, message: result.error });
         return;
       }
       setStep(2);
@@ -162,8 +168,21 @@ export function SignupWizard() {
       {step === 1 ? (
         <SignupLeadStep
           value={lead}
-          onChange={setLead}
+          onChange={(next) => {
+            // Editar o campo apontado descarta o aviso: insistir com o balão
+            // enquanto a pessoa corrige é ruído.
+            if (
+              leadFieldError &&
+              (leadFieldError.field === "email"
+                ? next.email !== lead.email
+                : next.document !== lead.document)
+            ) {
+              setLeadFieldError(null);
+            }
+            setLead(next);
+          }}
           busy={loading}
+          fieldError={leadFieldError}
           onContinue={() => void handleLeadContinue()}
         />
       ) : null}

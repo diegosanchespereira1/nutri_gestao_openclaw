@@ -16,6 +16,10 @@ import { signupStepperNextLabel } from "@/lib/signup/format-plan-price";
 import type { SignupLeadInput, SignupPersonKind } from "@/lib/signup/types";
 import { cn } from "@/lib/utils";
 import {
+  FIELD_ERROR_RING,
+  FieldErrorTooltip,
+} from "@/components/auth/field-error-tooltip";
+import {
   formatBrazilPhoneInput,
 } from "@/lib/validators/br-phone";
 
@@ -25,9 +29,17 @@ type Props = {
   onContinue: () => void;
   /** Consulta de disponibilidade em curso: evita duplo envio. */
   busy?: boolean;
+  /** Erro vindo do servidor (e-mail ou documento já em uso), ancorado ao campo. */
+  fieldError?: { field: "email" | "document"; message: string } | null;
 };
 
-export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
+export function SignupLeadStep({
+  value,
+  onChange,
+  onContinue,
+  busy,
+  fieldError,
+}: Props) {
   const [showErrors, setShowErrors] = useState(false);
   const errors = peekErrors(value);
 
@@ -53,7 +65,12 @@ export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
     onContinue();
   }
 
-  const shown = showErrors ? errors : {};
+  // O erro do servidor aparece mesmo antes do primeiro envio falhado, porque ele
+  // só existe depois de um envio.
+  const shown: Partial<Record<SignupLeadField, string>> = {
+    ...(showErrors ? errors : {}),
+    ...(fieldError ? { [fieldError.field]: fieldError.message } : {}),
+  };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4" noValidate>
@@ -161,7 +178,7 @@ export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
         </>
       )}
 
-      <div className="space-y-2">
+      <div className="relative space-y-2">
         <Label htmlFor="signup-password">Senha</Label>
         <PasswordField
           id="signup-password"
@@ -170,14 +187,12 @@ export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
           required
           value={value.password}
           onChange={(ev) => patch({ password: ev.target.value })}
-          className={cn(shown.password && "border-destructive")}
+          className={cn(shown.password && FIELD_ERROR_RING)}
           aria-invalid={Boolean(shown.password)}
           aria-describedby={shown.password ? "signup-password-error" : undefined}
         />
         {shown.password ? (
-          <p id="signup-password-error" className="text-destructive text-xs" role="alert">
-            {shown.password}
-          </p>
+          <FieldErrorTooltip id="signup-password-error" message={shown.password} />
         ) : (
           <p className="text-muted-foreground text-xs">
             {signupPasswordPolicyMessage()}
@@ -185,7 +200,7 @@ export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="relative space-y-2">
         <Label htmlFor="signup-password-confirm">Confirmar senha</Label>
         <PasswordField
           id="signup-password-confirm"
@@ -194,20 +209,17 @@ export function SignupLeadStep({ value, onChange, onContinue, busy }: Props) {
           required
           value={value.confirmPassword}
           onChange={(ev) => patch({ confirmPassword: ev.target.value })}
-          className={cn(shown.confirmPassword && "border-destructive")}
+          className={cn(shown.confirmPassword && FIELD_ERROR_RING)}
           aria-invalid={Boolean(shown.confirmPassword)}
           aria-describedby={
             shown.confirmPassword ? "signup-password-confirm-error" : undefined
           }
         />
         {shown.confirmPassword ? (
-          <p
+          <FieldErrorTooltip
             id="signup-password-confirm-error"
-            className="text-destructive text-xs"
-            role="alert"
-          >
-            {shown.confirmPassword}
-          </p>
+            message={shown.confirmPassword}
+          />
         ) : null}
       </div>
 
@@ -241,7 +253,7 @@ function TextField({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <Label htmlFor={id}>{label}</Label>
       <Input
         id={id}
@@ -250,14 +262,12 @@ function TextField({
         required
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
-        className={cn(error && "border-destructive")}
+        className={cn(error && FIELD_ERROR_RING)}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
       />
       {error ? (
-        <p id={`${id}-error`} className="text-destructive text-xs" role="alert">
-          {error}
-        </p>
+        <FieldErrorTooltip id={`${id}-error`} message={error} />
       ) : null}
     </div>
   );
@@ -273,7 +283,7 @@ function EmailField({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <Label htmlFor="signup-email">Email</Label>
       <Input
         id="signup-email"
@@ -283,14 +293,12 @@ function EmailField({
         required
         value={value}
         onChange={(ev) => onChange(ev.target.value)}
-        className={cn(error && "border-destructive")}
+        className={cn(error && FIELD_ERROR_RING)}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "signup-email-error" : undefined}
       />
       {error ? (
-        <p id="signup-email-error" className="text-destructive text-xs" role="alert">
-          {error}
-        </p>
+        <FieldErrorTooltip id="signup-email-error" message={error} />
       ) : null}
     </div>
   );
@@ -306,7 +314,7 @@ function PhoneField({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <Label htmlFor="signup-phone">Telefone</Label>
       <Input
         id="signup-phone"
@@ -317,14 +325,12 @@ function PhoneField({
         required
         value={value}
         onChange={(ev) => onChange(formatBrazilPhoneInput(ev.target.value))}
-        className={cn(error && "border-destructive")}
+        className={cn(error && FIELD_ERROR_RING)}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "signup-phone-error" : undefined}
       />
       {error ? (
-        <p id="signup-phone-error" className="text-destructive text-xs" role="alert">
-          {error}
-        </p>
+        <FieldErrorTooltip id="signup-phone-error" message={error} />
       ) : null}
     </div>
   );
@@ -343,7 +349,7 @@ function DocumentField({
 }) {
   const label = kind === "cpf" ? "CPF" : "CNPJ";
   return (
-    <div className="space-y-2">
+    <div className="relative space-y-2">
       <Label htmlFor="signup-document">{label}</Label>
       <Input
         id="signup-document"
@@ -353,14 +359,12 @@ function DocumentField({
         required
         value={value}
         onChange={(ev) => onChange(maskBrDocumentInput(kind, ev.target.value))}
-        className={cn(error && "border-destructive")}
+        className={cn(error && FIELD_ERROR_RING)}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? "signup-document-error" : undefined}
       />
       {error ? (
-        <p id="signup-document-error" className="text-destructive text-xs" role="alert">
-          {error}
-        </p>
+        <FieldErrorTooltip id="signup-document-error" message={error} />
       ) : null}
     </div>
   );

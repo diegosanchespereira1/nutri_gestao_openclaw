@@ -1,0 +1,102 @@
+# NutriGestão — Portainer + Traefik — STACK DE **DEV**
+#
+# NOTAS IMPORTANTES
+# ─────────────────
+# 1) Rede externa: cria antes (ou o deploy falha):
+#    docker network create HMLStratosNetwork
+#
+# 2) Não uses volume em /app/.next/cache com USER nextjs na imagem: o volume fica
+#    root-owned e o Next não consegue escrever → erro 500 em runtime.
+#
+# 3) Em Docker Swarm (stack), não uses `container_name` (não suportado).
+#
+# 4) Build da imagem com NEXT_PUBLIC_* em --build-arg; no Portainer define também
+#    SUPABASE_SERVICE_ROLE_KEY na stack e Recreate após alterar.
+#
+# 5) Para múltiplas stacks no mesmo Portainer/Traefik, define variáveis diferentes:
+#    - APP_HOST (ex: dev-nutricao.nutrigestao.app)
+#    - TRAEFIK_ROUTER_NAME / TRAEFIK_SERVICE_NAME / TRAEFIK_MIDDLEWARE_NAME
+#    Evita conflito de labels entre stacks.
+#
+# 6) O bloco `environment:` é uma LISTA FECHADA. Variável definida na env da stack
+#    que não apareça aqui NÃO chega ao container — nenhum erro no deploy, a feature
+#    só age como se nada estivesse configurado. Foi o que segurou o Stripe.
+#
+# 7) Nunca usar default aninhado `${A:-${B:-}}`: o Portainer não interpola isso e
+#    injeta a string literal "${B:-}" como valor — pior que ausente, porque o código
+#    só descarta string vazia e o literal passa, virando "Invalid supabaseUrl" e 500
+#    em todas as páginas.
+
+services:
+  nutricao_app:
+    image: ${NUTRICAO_IMAGE:-stratostech/nutricao-stratostech:dev}
+    extra_hosts:
+      - "dbhmlnutricao.stratostech.com.br:129.121.46.43"
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+
+      # ── Supabase DEV ────────────────────────────────────────────────────────
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+      # Alguns caminhos do servidor leem estas primeiro; vazias são ignoradas pelo
+      # código, então defini-las é opcional — mas sem elas aqui não há como definir.
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+
+      # Default de DEV, não de produção. Se ficar vazia, getServerAppOrigin() cai em
+      # http://localhost:3000 e o Checkout do Stripe devolve o utilizador para lá.
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://dev-nutricao.nutrigestao.app}
+
+      # ── Cadastro público / Stripe ───────────────────────────────────────────
+      # Em DEV usar sempre chave de TESTE (sk_test_). Confirma em
+      # GET /api/admin/env-check (autenticado) — ele valida o prefixo.
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      SIGNUP_INTENT_SECRET: ${SIGNUP_INTENT_SECRET:-}
+      SIGNUP_SALES_EMAIL: ${SIGNUP_SALES_EMAIL:-}
+      SIGNUP_ABANDONMENT_NOTIFY_EMAIL: ${SIGNUP_ABANDONMENT_NOTIFY_EMAIL:-}
+
+      # ── Email ───────────────────────────────────────────────────────────────
+      # SMTP move o email de abandono do cadastro, dossiê, portal e LGPD.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-}
+      NOTIFICATION_EMAIL_FROM: ${NOTIFICATION_EMAIL_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      DOSSIER_EMAIL_FROM: ${DOSSIER_EMAIL_FROM:-}
+    # Rota estática com 200 (evita 307 de /)
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(\"http://127.0.0.1:3000/login\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 90s
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.rule=Host(`${APP_HOST:-dev-nutricao.nutrigestao.app}`)"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.entrypoints=websecure"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.tls.certresolver=letsencryptresolver"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.priority=1"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.service=${TRAEFIK_SERVICE_NAME:-nutricao-app}"
+      - "traefik.http.middlewares.${TRAEFIK_MIDDLEWARE_NAME:-nutricao-sslheader}.headers.customrequestheaders.X-Forwarded-Proto=https"
+      - "traefik.http.routers.${TRAEFIK_ROUTER_NAME:-nutricao-app}.middlewares=${TRAEFIK_MIDDLEWARE_NAME:-nutricao-sslheader}"
+      - "traefik.http.services.${TRAEFIK_SERVICE_NAME:-nutricao-app}.loadbalancer.server.port=3000"
+      - "traefik.http.services.${TRAEFIK_SERVICE_NAME:-nutricao-app}.loadbalancer.passHostHeader=true"
+      - traefik.docker.network=HMLStratosNetwork
+    networks:
+      - HMLStratosNetwork
+
+networks:
+  HMLStratosNetwork:
+    external: true
+    name: HMLStratosNetwork

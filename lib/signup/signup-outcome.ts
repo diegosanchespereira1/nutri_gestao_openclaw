@@ -39,5 +39,5 @@ export const SIGNUP_OUTCOME_MESSAGE: Record<SignupOutcome, string> = {
   processando:
     "Pagamento recebido. Estamos preparando sua conta — o e-mail de confirmação chega em instantes.",
   falhou:
-    `Seu pagamento foi confirmado, mas não conseguimos concluir a criação da conta. Entre em contato com o suporte em ${SUPPORT_EMAIL} informando o e-mail usado na compra — vamos resolver sem cobrança adicional.`,
+    `Seu pagamento foi confirmado, mas não conseguimos concluir a criação da conta. Entre em contato com o suporte em ${SUPPORT_EMAIL} informando o e-mail usado na compra — vamos resolver o mais rápido possível para você.`,
 };

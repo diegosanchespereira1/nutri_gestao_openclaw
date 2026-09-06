@@ -43,6 +43,16 @@ export const CHILD_ASSESSMENT_FIELDS: FieldDef[] = [
   { key: "clinical_notes", label: "Observações (opcional)", required: false },
 ];
 
+/** Motivo de uma linha ignorada — para a tela de resultado mostrar o porquê de
+ *  cada linha, em vez de um contador genérico "erro ou limite".
+ *  Ver docs/plano-mensagens-limite-importacao-infantil.md. */
+export type ChildAssessmentImportSkipDetail = {
+  /** "Nome (dd/mm/aaaa)" — identifica a linha sem expor o índice interno. */
+  row: string;
+  /** Mensagem em pt-BR, pronta para exibir. */
+  reason: string;
+};
+
 export type ChildAssessmentImportResult =
   | {
       ok: true;
@@ -50,5 +60,7 @@ export type ChildAssessmentImportResult =
       patientsMatched: number;
       assessmentsImported: number;
       skipped: number;
+      /** Presente só quando skipped > 0 — um item por linha ignorada. */
+      skippedDetails?: ChildAssessmentImportSkipDetail[];
     }
   | { ok: false; error: string };

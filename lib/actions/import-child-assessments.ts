@@ -17,6 +17,7 @@ import {
   MAX_CHILD_ASSESSMENT_IMPORT_ROWS,
   parseImportChildAssessmentsPayload,
 } from "@/lib/validators/import-child-assessment-rows";
+import { mapPgLimitError } from "@/lib/limits/tenant-limits";
 
 /** AAAA-MM-DD → DD/MM/AAAA, para texto legível no histórico. */
 function isoDateToBR(iso: string): string {
@@ -112,6 +113,11 @@ export async function importChildAssessmentsAction(
   let assessmentsImported = 0;
   let skipped = 0;
   const duplicateRows: string[] = [];
+  /** Um item por linha ignorada, com o motivo em pt-BR — ver
+   *  docs/plano-mensagens-limite-importacao-infantil.md. */
+  const skippedDetails: { row: string; reason: string }[] = [];
+  const rowLabel = (row: { full_name: string; birth_date: string }) =>
+    `${row.full_name} (${isoDateToBR(row.birth_date)})`;
 
   // ── Bloqueia duplicados dentro do próprio arquivo (mesmo nome + nascimento) ─
   // Defesa em profundidade: o wizard já filtra isso na pré-visualização (etapa 3)
@@ -125,7 +131,11 @@ export async function importChildAssessmentsAction(
     const key = matchChildKey(row.full_name, row.birth_date);
     if ((nameBirthCounts.get(key) ?? 0) > 1) {
       skipped += 1;
-      duplicateRows.push(`${row.full_name} (${isoDateToBR(row.birth_date)})`);
+      duplicateRows.push(rowLabel(row));
+      skippedDetails.push({
+        row: rowLabel(row),
+        reason: "Duplicado no arquivo (mesmo nome e nascimento).",
+      });
       return false;
     }
     return true;
@@ -175,6 +185,10 @@ export async function importChildAssessmentsAction(
     if (patientId && existingAssessmentDateKeys.has(`${patientId}|${row.recorded_at}`)) {
       // Pesagem duplicada: paciente já existe e já tem avaliação nesta data exata.
       skipped += 1;
+      skippedDetails.push({
+        row: rowLabel(row),
+        reason: `Paciente já tem uma avaliação registrada em ${isoDateToBR(row.recorded_at)} — pesagem duplicada.`,
+      });
       continue;
     }
 
@@ -198,6 +212,13 @@ export async function importChildAssessmentsAction(
       if (patientError || !created) {
         console.error("[import:child-assessments] erro ao criar paciente:", patientError?.code);
         skipped += 1;
+        skippedDetails.push({
+          row: rowLabel(row),
+          // mapPgLimitError traduz o erro do trigger de tenant_limits (limite de
+          // pacientes do plano) para a mesma mensagem usada no resto do app;
+          // devolve null para qualquer outro erro, daí o fallback genérico.
+          reason: mapPgLimitError(patientError) ?? "Erro ao gravar o cadastro do paciente.",
+        });
         continue;
       }
 
@@ -209,6 +230,13 @@ export async function importChildAssessmentsAction(
     const months = ageInMonths(new Date(row.birth_date), new Date(row.recorded_at));
     if (months == null || months > 240) {
       skipped += 1;
+      skippedDetails.push({
+        row: rowLabel(row),
+        reason:
+          months == null
+            ? "Data inválida para calcular a idade na pesagem."
+            : "Idade na data da pesagem passa de 20 anos (240 meses) — fora do escopo de avaliação infantil.",
+      });
       continue;
     }
 
@@ -248,6 +276,10 @@ export async function importChildAssessmentsAction(
         assessmentError.code,
       );
       skipped += 1;
+      skippedDetails.push({
+        row: rowLabel(row),
+        reason: "Erro ao gravar a avaliação — tente novamente.",
+      });
       continue;
     }
 
@@ -283,5 +315,6 @@ export async function importChildAssessmentsAction(
     patientsMatched,
     assessmentsImported,
     skipped: skipped + overLimitSkipped,
+    skippedDetails: skippedDetails.length > 0 ? skippedDetails : undefined,
   };
 }

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 
+import { ClientAvatar } from "@/components/clientes/client-avatar";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { formatCpfDisplay } from "@/lib/format/br-document";
@@ -30,11 +31,13 @@ function calcAge(birthDate: string): string {
 
 export function EstablishmentPatientsList({
   patients,
+  photoUrlById = {},
   novoHref,
   returnToOrigin,
   associateSlot,
 }: {
   patients: PatientInScope[];
+  photoUrlById?: Record<string, string>;
   novoHref: string;
   /** URL actual da página (path+query) para o botão voltar. */
   returnToOrigin: string;
@@ -55,16 +58,16 @@ export function EstablishmentPatientsList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <Input
           type="search"
           placeholder="Buscar por nome ou série/turma…"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="max-w-sm"
+          className="min-w-0 flex-1"
           aria-label="Buscar paciente"
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           {associateSlot}
           <Link href={novoHrefWithReturn} className={cn(buttonVariants())}>
             Novo paciente
@@ -114,17 +117,27 @@ export function EstablishmentPatientsList({
                   className="border-b border-border last:border-0 hover:bg-muted/50"
                 >
                   <td className="px-4 py-3">
-                    <Link
-                      href={withReturnTo(`/pacientes/${p.id}`, returnToOrigin)}
-                      className="rounded-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      {p.full_name}
-                    </Link>
-                    {p.birth_date ? (
-                      <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">
-                        Nasc.: {formatBirthDate(p.birth_date)}
-                      </span>
-                    ) : null}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ClientAvatar
+                        name={p.full_name}
+                        imageUrl={photoUrlById[p.id] ?? null}
+                        size="sm"
+                        className="rounded-full"
+                      />
+                      <div className="min-w-0">
+                        <Link
+                          href={withReturnTo(`/pacientes/${p.id}`, returnToOrigin)}
+                          className="rounded-sm font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          {p.full_name}
+                        </Link>
+                        {p.birth_date ? (
+                          <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">
+                            Nasc.: {formatBirthDate(p.birth_date)}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {p.school_grade_name ?? (

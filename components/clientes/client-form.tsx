@@ -478,7 +478,7 @@ export function ClientForm({
 
   return (
     <>
-    <Card className="max-w-3xl">
+    <Card className={mode === "edit" ? "w-full" : "max-w-3xl"}>
       <form
         key={formInstanceKey}
         action={formAction}

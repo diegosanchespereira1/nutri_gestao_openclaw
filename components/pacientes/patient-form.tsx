@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
+import { useActionState, useEffect, useState, type ReactNode } from "react";
 
 import { ReturnToHiddenField } from "@/components/navigation/return-to-hidden-field";
 import {
@@ -18,8 +19,23 @@ import type { PatientSex } from "@/lib/types/patients";
 import type { ClientRow } from "@/lib/types/clients";
 import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 const initial: PatientFormResult | undefined = undefined;
@@ -30,9 +46,101 @@ const sexOptions: { value: PatientSex; label: string }[] = [
   { value: "other", label: "Outro" },
 ];
 
-// Classe partilhada para <select> nativos — alinha visualmente com <Input>
+const NONE_SELECT = "__none__";
+
 const selectClass =
-  "border-input bg-card ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
+  "border-input bg-card appearance-none touch-manipulation flex h-9 min-h-11 w-full min-w-0 rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50";
+
+const textareaClass =
+  "border-input bg-card appearance-none placeholder:text-muted-foreground flex min-h-[88px] w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
+
+function Field({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  return <div className={cn("min-w-0 space-y-1.5", className)}>{children}</div>;
+}
+
+function SchoolGradeSelect({
+  id,
+  value,
+  grades,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  grades: ClientSchoolGradeOption[];
+  onChange: (next: string) => void;
+}) {
+  const selected = value || NONE_SELECT;
+  return (
+    <Select
+      value={selected}
+      onValueChange={(next) => {
+        onChange(!next || next === NONE_SELECT ? "" : next);
+      }}
+    >
+      <SelectTrigger
+        id={id}
+        className={cn("w-full", !value && "text-muted-foreground")}
+      >
+        <SelectValue placeholder="Opcional">
+          {(current) => {
+            if (!current || current === NONE_SELECT) return "Opcional";
+            return grades.find((g) => g.id === current)?.name ?? "Opcional";
+          }}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NONE_SELECT}>Opcional</SelectItem>
+        {grades.map((g) => (
+          <SelectItem key={g.id} value={g.id}>
+            {g.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function SectionShell({
+  useCards,
+  title,
+  description,
+  children,
+}: {
+  useCards: boolean;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  if (!useCards) {
+    return (
+      <section className="space-y-3">
+        <div className="space-y-0.5">
+          <h2 className="text-foreground text-sm font-semibold">{title}</h2>
+          {description ? (
+            <p className="text-muted-foreground text-xs">{description}</p>
+          ) : null}
+        </div>
+        {children}
+      </section>
+    );
+  }
+
+  return (
+    <Card className="overflow-visible border border-border ring-0">
+      <CardHeader className="border-b border-border">
+        <CardTitle>{title}</CardTitle>
+        {description ? <CardDescription>{description}</CardDescription> : null}
+      </CardHeader>
+      <CardContent className="pt-4">{children}</CardContent>
+    </Card>
+  );
+}
 
 export function PatientForm({
   mode,
@@ -53,6 +161,8 @@ export function PatientForm({
   schoolGradesByClient,
   teamMembers = [],
   defaultPhotoUrl = null,
+  cancelHref,
+  surface,
   defaults,
 }: {
   mode: "create" | "edit";
@@ -66,6 +176,9 @@ export function PatientForm({
   schoolGradesByClient?: Record<string, ClientSchoolGradeOption[]>;
   teamMembers?: TeamMemberSelectOption[];
   defaultPhotoUrl?: string | null;
+  cancelHref?: string;
+  /** `cards` em páginas de criação; `plain` quando o formulário já vive dentro de um card. */
+  surface?: "cards" | "plain";
   defaults: {
     full_name: string;
     birth_date: string;
@@ -80,6 +193,7 @@ export function PatientForm({
 }) {
   const action =
     mode === "create" ? createPatientAction : updatePatientAction;
+  const useCards = surface ? surface === "cards" : mode === "create";
 
   const [pendingPhoto, setPendingPhoto] = useState<File | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
@@ -99,6 +213,9 @@ export function PatientForm({
   const sexDefault = defaults.sex ?? "";
   const [sex, setSex] = useState<string>(sexDefault);
   const [fullNameValue, setFullNameValue] = useState(defaults.full_name);
+  const [responsibleId, setResponsibleId] = useState(
+    defaults.responsible_team_member_id ?? "",
+  );
 
   function handlePhotoChange({ file, remove }: PatientPhotoFieldChange) {
     setPendingPhoto(file);
@@ -137,6 +254,8 @@ export function PatientForm({
   const [selectedGradeId, setSelectedGradeId] = useState<string>(
     defaults.school_grade_id ?? "",
   );
+  const showFixedSchoolGrade =
+    showSchoolGradeSelector && !showEstablishmentSelector;
 
   // Séries disponíveis para o cliente selecionado no selector de cliente (create sem clientId fixo)
   const clientGrades =
@@ -147,7 +266,7 @@ export function PatientForm({
   const [selectedClientGradeId, setSelectedClientGradeId] = useState<string>("");
 
   return (
-    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-6">
+    <form action={formAction} onReset={(e) => e.preventDefault()} className="space-y-4">
       <ReturnToHiddenField />
       {/* Campos ocultos de contexto */}
       {clientId ? (
@@ -176,117 +295,116 @@ export function PatientForm({
         <input type="hidden" name="id" value={patientId} />
       ) : null}
 
-      {/* ── Grupo 1: Identificação ───────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Identificação
-        </legend>
-
-        <PatientPhotoField
-          patientName={fullNameValue}
-          defaultPhotoUrl={defaultPhotoUrl}
-          onChange={handlePhotoChange}
-        />
-
-        <div className="space-y-2">
-          <Label htmlFor="patient-name">Nome completo</Label>
-          <Input
-            id="patient-name"
-            name="full_name"
-            required
-            value={fullNameValue}
-            onChange={(event) => setFullNameValue(event.target.value)}
-            autoComplete="name"
-            aria-invalid={
-              state?.ok === false &&
-              state.error === "Indique o nome do paciente."
-            }
-            aria-describedby={
-              state?.ok === false ? "patient-form-err" : undefined
-            }
+      <SectionShell
+        useCards={useCards}
+        title="Quem é o paciente"
+        description="Nome e nascimento são obrigatórios. Foto, sexo, série e CPF podem ficar para depois."
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <PatientPhotoField
+            patientName={fullNameValue}
+            defaultPhotoUrl={defaultPhotoUrl}
+            onChange={handlePhotoChange}
+            compact
+            className="lg:shrink-0"
           />
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="patient-birth">Data de nascimento <span aria-hidden="true" className="text-destructive">*</span></Label>
-            <Input
-              id="patient-birth"
-              name="birth_date"
-              type="date"
-              required
-              defaultValue={defaults.birth_date}
-            />
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Field className="sm:col-span-2 xl:col-span-4">
+              <Label htmlFor="patient-name">
+                Nome completo{" "}
+                <span aria-hidden="true" className="text-destructive">
+                  *
+                </span>
+              </Label>
+              <Input
+                id="patient-name"
+                name="full_name"
+                required
+                value={fullNameValue}
+                onChange={(event) => setFullNameValue(event.target.value)}
+                autoComplete="name"
+                placeholder="Nome como no documento ou na lista da escola"
+                aria-invalid={
+                  state?.ok === false &&
+                  state.error === "Indique o nome do paciente."
+                }
+                aria-describedby={
+                  state?.ok === false ? "patient-form-err" : undefined
+                }
+              />
+            </Field>
+
+            <Field>
+              <Label htmlFor="patient-birth">
+                Nascimento{" "}
+                <span aria-hidden="true" className="text-destructive">
+                  *
+                </span>
+              </Label>
+              <Input
+                id="patient-birth"
+                name="birth_date"
+                type="date"
+                required
+                defaultValue={defaults.birth_date}
+              />
+            </Field>
+
+            <Field>
+              <Label htmlFor="patient-sex">Sexo</Label>
+              <select
+                id="patient-sex"
+                name="sex"
+                value={sex}
+                onChange={(e) => setSex(e.target.value)}
+                className={cn(selectClass, sex === "" && "text-muted-foreground")}
+              >
+                <option value="">Opcional</option>
+                {sexOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            {showFixedSchoolGrade ? (
+              <Field>
+                <Label htmlFor="patient-grade">Série / turma</Label>
+                <SchoolGradeSelect
+                  id="patient-grade"
+                  value={selectedGradeId}
+                  grades={schoolGrades!}
+                  onChange={setSelectedGradeId}
+                />
+              </Field>
+            ) : null}
+
+            <Field>
+              <Label htmlFor="patient-doc">CPF</Label>
+              <Input
+                id="patient-doc"
+                name="document_id"
+                defaultValue={defaults.document_id}
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="Opcional"
+                className="font-mono"
+              />
+            </Field>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="patient-sex">Sexo</Label>
-            <select
-              id="patient-sex"
-              name="sex"
-              value={sex}
-              onChange={(e) => setSex(e.target.value)}
-              className={cn(selectClass, sex === "" && "text-muted-foreground")}
-            >
-              <option value="">— opcional —</option>
-              {sexOptions.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
+      </SectionShell>
 
-        <div className="space-y-2">
-          <Label htmlFor="patient-doc">CPF</Label>
-          <Input
-            id="patient-doc"
-            name="document_id"
-            defaultValue={defaults.document_id}
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="000.000.000-00 (opcional)"
-            className="font-mono"
-          />
-        </div>
-
-        {teamMembers.length > 0 ? (
-          <div className="space-y-2">
-            <Label htmlFor="patient-responsible">
-              Profissional responsável pelo atendimento (opcional)
-            </Label>
-            <select
-              id="patient-responsible"
-              name="responsible_team_member_id"
-              defaultValue={defaults.responsible_team_member_id ?? ""}
-              className={cn(selectClass, !defaults.responsible_team_member_id && "text-muted-foreground")}
-            >
-              <option value="">— Nenhum —</option>
-              {teamMembers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.full_name}
-                </option>
-              ))}
-            </select>
-            <p className="text-muted-foreground text-xs">
-              Atualize o nome de quem está fazendo acompanhamento do paciente.
-            </p>
-          </div>
-        ) : (
-          <input type="hidden" name="responsible_team_member_id" value="" />
-        )}
-      </fieldset>
-
-      <div className="border-t border-border" />
-
-      {/* ── Grupo 1b: Associação a cliente (opcional, só create independente) ── */}
       {showClientSelector && clients && clients.length > 0 ? (
-        <>
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Associação (opcional)
-            </legend>
-            <div className="space-y-2">
+        <SectionShell
+          useCards={useCards}
+          title="Associação"
+          description="Opcional. Pode ligar o paciente a um cliente agora ou depois."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Field>
               <Label htmlFor="patient-client">Cliente</Label>
               <select
                 id="patient-client"
@@ -301,7 +419,7 @@ export function PatientForm({
                   selectedClientId === "" && "text-muted-foreground",
                 )}
               >
-                <option value="">— Nenhum (paciente particular) —</option>
+                <option value="">Particular (sem cliente)</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.legal_name}
@@ -309,15 +427,15 @@ export function PatientForm({
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-muted-foreground">
-                Pode associar ou alterar o cliente mais tarde.
-              </p>
-            </div>
+            </Field>
 
             {showClientEstSelector ? (
-              <div className="space-y-2">
+              <Field>
                 <Label htmlFor="patient-client-est">
-                  Estabelecimento <span aria-hidden="true" className="text-destructive">*</span>
+                  Estabelecimento{" "}
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
                 </Label>
                 <select
                   id="patient-client-est"
@@ -329,53 +447,40 @@ export function PatientForm({
                   )}
                   required
                 >
-                  <option value="">— Selecione o estabelecimento —</option>
+                  <option value="">Selecione</option>
                   {clientEstablishments.map((e) => (
                     <option key={e.id} value={e.id}>
                       {e.name}
                     </option>
                   ))}
                 </select>
-              </div>
+              </Field>
             ) : null}
 
             {showClientGradeSelector ? (
-              <div className="space-y-2">
-                <Label htmlFor="patient-client-grade">Série (opcional)</Label>
-                <select
+              <Field>
+                <Label htmlFor="patient-client-grade">Série / turma</Label>
+                <SchoolGradeSelect
                   id="patient-client-grade"
                   value={selectedClientGradeId}
-                  onChange={(e) => setSelectedClientGradeId(e.target.value)}
-                  className={cn(
-                    selectClass,
-                    selectedClientGradeId === "" && "text-muted-foreground",
-                  )}
-                >
-                  <option value="">— Nenhuma —</option>
-                  {clientGrades.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  grades={clientGrades}
+                  onChange={setSelectedClientGradeId}
+                />
+              </Field>
             ) : null}
-          </fieldset>
-          <div className="border-t border-border" />
-        </>
+          </div>
+        </SectionShell>
       ) : null}
 
-      {/* ── Grupo 1c: Seletor de estabelecimento (cliente PJ) ─── */}
       {showEstablishmentSelector ? (
-        <>
-          <fieldset className="space-y-4">
-            <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              Estabelecimento
-            </legend>
-            <div className="space-y-2">
-              <Label htmlFor="patient-establishment">
-                Estabelecimento associado
-              </Label>
+        <SectionShell
+          useCards={useCards}
+          title="Estabelecimento"
+          description="Unidade e série em que este paciente está acompanhado."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field>
+              <Label htmlFor="patient-establishment">Estabelecimento</Label>
               <select
                 id="patient-establishment"
                 value={selectedEstId}
@@ -385,49 +490,37 @@ export function PatientForm({
                   selectedEstId === "" && "text-muted-foreground",
                 )}
               >
-                <option value="">— Selecione o estabelecimento —</option>
+                <option value="">Selecione</option>
                 {establishments!.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.name}
                   </option>
                 ))}
               </select>
-            </div>
+            </Field>
 
             {showSchoolGradeSelector ? (
-              <div className="space-y-2">
-                <Label htmlFor="patient-grade">Série (opcional)</Label>
-                <select
+              <Field>
+                <Label htmlFor="patient-grade">Série / turma</Label>
+                <SchoolGradeSelect
                   id="patient-grade"
                   value={selectedGradeId}
-                  onChange={(e) => setSelectedGradeId(e.target.value)}
-                  className={cn(
-                    selectClass,
-                    selectedGradeId === "" && "text-muted-foreground",
-                  )}
-                >
-                  <option value="">— Nenhuma —</option>
-                  {schoolGrades!.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  grades={schoolGrades!}
+                  onChange={setSelectedGradeId}
+                />
+              </Field>
             ) : null}
-          </fieldset>
-          <div className="border-t border-border" />
-        </>
+          </div>
+        </SectionShell>
       ) : null}
 
-      {/* ── Grupo 2: Contato ────────────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Contato
-        </legend>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
+      <SectionShell
+        useCards={useCards}
+        title="Contato e acompanhamento"
+        description="Tudo opcional — útil para avisos e para saber quem conduz o caso."
+      >
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Field>
             <Label htmlFor="patient-email">Email</Label>
             <Input
               id="patient-email"
@@ -437,8 +530,8 @@ export function PatientForm({
               autoComplete="email"
               placeholder="Opcional"
             />
-          </div>
-          <div className="space-y-2">
+          </Field>
+          <Field>
             <Label htmlFor="patient-phone">Telefone</Label>
             <Input
               id="patient-phone"
@@ -448,40 +541,73 @@ export function PatientForm({
               autoComplete="tel"
               placeholder="Opcional"
             />
-          </div>
+          </Field>
+          {teamMembers.length > 0 ? (
+            <Field>
+              <Label htmlFor="patient-responsible">Profissional responsável</Label>
+              <input
+                type="hidden"
+                name="responsible_team_member_id"
+                value={responsibleId}
+              />
+              <Select
+                value={responsibleId || NONE_SELECT}
+                onValueChange={(next) => {
+                  setResponsibleId(!next || next === NONE_SELECT ? "" : next);
+                }}
+              >
+                <SelectTrigger
+                  id="patient-responsible"
+                  className={cn("w-full", !responsibleId && "text-muted-foreground")}
+                >
+                  <SelectValue placeholder="Nenhum">
+                    {(current) => {
+                      if (!current || current === NONE_SELECT) return "Nenhum";
+                      return (
+                        teamMembers.find((m) => m.id === current)?.full_name ??
+                        "Nenhum"
+                      );
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_SELECT}>Nenhum</SelectItem>
+                  {teamMembers.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : (
+            <input type="hidden" name="responsible_team_member_id" value="" />
+          )}
         </div>
-      </fieldset>
+      </SectionShell>
 
-      <div className="border-t border-border" />
-
-      {/* ── Grupo 3: Notas clínicas ──────────────────────────── */}
-      <fieldset className="space-y-4">
-        <legend className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          Notas clínicas
-        </legend>
-
-        <div className="space-y-2">
+      <SectionShell
+        useCards={useCards}
+        title="Notas clínicas"
+        description="Alergias, restrições e medicações — dado protegido por LGPD."
+      >
+        <Field>
           <Label htmlFor="patient-notes">Observações</Label>
           <textarea
             id="patient-notes"
             name="notes"
-            rows={4}
+            rows={3}
             defaultValue={defaults.notes}
-            placeholder="Alergias, intolerâncias, restrições alimentares, medicações crónicas… (opcional)"
-            className="border-input bg-card ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[96px] w-full resize-none rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            placeholder="Alergias, intolerâncias, restrições alimentares, medicações…"
+            className={textareaClass}
           />
-          <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <span aria-hidden>🔒</span>
-            Dado clínico protegido por LGPD — não partilhado sem consentimento.
-          </p>
-        </div>
-      </fieldset>
+        </Field>
+      </SectionShell>
 
-      {/* ── Feedback ─────────────────────────────────────────── */}
       {state?.ok === false ? (
         <p
           id="patient-form-err"
-          className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+          className="border-destructive/30 bg-destructive/5 text-destructive rounded-md border px-3 py-2 text-sm"
           role="alert"
         >
           {state.error}
@@ -496,10 +622,18 @@ export function PatientForm({
         </p>
       ) : null}
 
-      <div className="pt-2">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button type="submit">
           {mode === "create" ? "Criar paciente" : "Salvar alterações"}
         </Button>
+        {cancelHref ? (
+          <Link
+            href={cancelHref}
+            className={cn(buttonVariants({ variant: "outline" }))}
+          >
+            Cancelar
+          </Link>
+        ) : null}
       </div>
     </form>
   );

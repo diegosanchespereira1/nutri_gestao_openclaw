@@ -7,6 +7,7 @@ import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { createClient } from "@/lib/supabase/server";
 import { loadPatientsForScope } from "@/lib/actions/patients";
+import { getPatientPhotoSignedUrls } from "@/lib/patients/patient-photo-urls";
 import {
   buildCurrentUrl,
   getReturnToParam,
@@ -47,6 +48,17 @@ export default async function EstabelecimentoPacientesPage({
     establishmentId: estId,
   });
 
+  const photoPaths = rows
+    .map((p) => p.photo_storage_path)
+    .filter((path): path is string => Boolean(path));
+  const photoUrlMap = await getPatientPhotoSignedUrls(supabase, photoPaths);
+  const photoUrlById: Record<string, string> = {};
+  for (const p of rows) {
+    if (!p.photo_storage_path) continue;
+    const url = photoUrlMap.get(p.photo_storage_path);
+    if (url) photoUrlById[p.id] = url;
+  }
+
   const pagePath = `/clientes/${clientId}/estabelecimentos/${estId}/pacientes`;
   const returnToOrigin = buildCurrentUrl(pagePath, sp);
   const back = resolveBackNavigation({
@@ -63,7 +75,7 @@ export default async function EstabelecimentoPacientesPage({
   );
 
   return (
-    <PageLayout variant="form">
+    <PageLayout variant="wide">
       <PageHeader
         title={`Pacientes — ${establishment.name}`}
         description="Selecione um paciente para ver ou registar avaliações nutricionais."
@@ -72,6 +84,7 @@ export default async function EstabelecimentoPacientesPage({
 
       <EstablishmentPatientsList
         patients={rows}
+        photoUrlById={photoUrlById}
         novoHref={novoHref}
         returnToOrigin={returnToOrigin}
         associateSlot={

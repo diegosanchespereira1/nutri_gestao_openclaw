@@ -1,7 +1,9 @@
-import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { PatientForm } from "@/components/pacientes/patient-form";
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { loadTeamMembersForSelect } from "@/lib/actions/team-members";
 import { loadGradesForClient } from "@/lib/actions/school-grades";
 import {
@@ -10,8 +12,6 @@ import {
 } from "@/lib/navigation/return-to";
 import { createClient } from "@/lib/supabase/server";
 import type { EstablishmentRow } from "@/lib/types/establishments";
-import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
 
 export default async function NovoPacienteEstabelecimentoPage({
   params,
@@ -49,37 +49,41 @@ export default async function NovoPacienteEstabelecimentoPage({
 
   const back = resolveBackNavigation({
     returnTo: getReturnToParam(sp),
-    fallbackHref: `/clientes/${clientId}/estabelecimentos/${estId}/editar`,
-    fallbackLabel: row.name,
+    fallbackHref: `/clientes/${clientId}/estabelecimentos/${estId}/pacientes`,
+    fallbackLabel: "Pacientes",
     currentPath: `/clientes/${clientId}/estabelecimentos/${estId}/pacientes/novo`,
   });
 
   return (
-    <div className="space-y-6">
-      <Link
-        href={back.href}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "text-muted-foreground hover:text-foreground -ml-2 h-auto px-2 py-1",
-        )}
-      >
-        ← {back.label}
-      </Link>
-      <div>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Novo paciente
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {client.legal_name} ·{" "}
-          <span className="text-foreground">{row.name}</span>
-        </p>
+    <PageLayout variant="wide" className="px-0.5">
+      <PageHeader
+        title="Novo paciente"
+        description="Cadastre a criança neste estabelecimento. Nome e data de nascimento bastam para começar."
+        back={back}
+      />
+
+      <div className="border-primary/20 bg-primary/5 flex items-start gap-3 rounded-xl border px-4 py-3">
+        <div className="bg-primary/15 text-primary flex size-10 shrink-0 items-center justify-center rounded-lg">
+          <Building2 className="size-5" aria-hidden />
+        </div>
+        <div className="min-w-0">
+          <p className="text-primary text-xs font-semibold uppercase tracking-wide">
+            A cadastrar em
+          </p>
+          <p className="text-foreground truncate font-semibold">{row.name}</p>
+          <p className="text-muted-foreground truncate text-sm">
+            {client.legal_name}
+          </p>
+        </div>
       </div>
+
       <PatientForm
         mode="create"
         clientId={clientId}
         establishmentId={estId}
         schoolGrades={schoolGrades}
         teamMembers={teamMembers}
+        cancelHref={back.href}
         defaults={{
           full_name: "",
           birth_date: "",
@@ -91,6 +95,6 @@ export default async function NovoPacienteEstabelecimentoPage({
           responsible_team_member_id: null,
         }}
       />
-    </div>
+    </PageLayout>
   );
 }

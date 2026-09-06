@@ -24,11 +24,11 @@ describe("app-version", () => {
   });
 
   it("readPackageVersion devolve semver do package.json", () => {
-    expect(readPackageVersion()).toBe("1.2.24");
+    expect(readPackageVersion()).toBe("1.2.25");
   });
 
   it("getServerAppVersion devolve semver do package.json em ambiente de teste", () => {
-    expect(getServerAppVersion()).toBe("1.2.24");
+    expect(getServerAppVersion()).toBe("1.2.25");
   });
 
   it("getAppVersion usa NEXT_PUBLIC_APP_VERSION quando definida", () => {

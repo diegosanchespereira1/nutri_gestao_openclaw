@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Images, Loader2, Trash2 } from "lucide-react";
+import { Camera, Loader2, Pencil, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ type Props = {
   defaultPhotoUrl?: string | null;
   onChange: (value: PatientPhotoFieldChange) => void;
   className?: string;
+  compact?: boolean;
 };
 
 export function PatientPhotoField({
@@ -35,6 +36,7 @@ export function PatientPhotoField({
   defaultPhotoUrl = null,
   onChange,
   className,
+  compact = false,
 }: Props) {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
@@ -60,8 +62,6 @@ export function PatientPhotoField({
 
       setProcessing(true);
       try {
-        // Converte HEIC/AVIF/etc., redimensiona e comprime no dispositivo —
-        // fotos de 12–48MP deixam de estourar o limite do servidor.
         const prepared = await prepareImageForUpload(file, {
           maxDimension: 1600,
           maxBytes: MAX_PATIENT_PHOTO_BYTES,
@@ -119,6 +119,15 @@ export function PatientPhotoField({
     galleryInputRef.current?.click();
   };
 
+  const handleEditPhoto = () => {
+    if (processing) return;
+    if (isNativeApp()) {
+      void openCamera();
+      return;
+    }
+    void openGallery();
+  };
+
   const handleRemovePhoto = () => {
     setRemovePhotoChecked(true);
     setPreviewUrl((prev) => {
@@ -134,13 +143,12 @@ export function PatientPhotoField({
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <div className="space-y-1">
-        <Label>Foto do paciente</Label>
-        <p className="text-muted-foreground text-xs">
-          Opcional. JPEG, PNG, WebP, HEIC (iPhone/Samsung) ou AVIF — a foto é
-          otimizada automaticamente antes do envio.
-        </p>
+    <div className={cn("flex flex-col items-start gap-1.5", className)}>
+      <div className="space-y-0.5">
+        <Label>Foto</Label>
+        {compact ? null : (
+          <p className="text-muted-foreground text-xs">Opcional</p>
+        )}
       </div>
 
       <input
@@ -163,8 +171,17 @@ export function PatientPhotoField({
         onChange={handleFileChange}
       />
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="bg-muted ring-primary/20 relative size-24 shrink-0 overflow-hidden rounded-full ring-2 ring-offset-2 ring-offset-background">
+      <button
+        type="button"
+        onClick={handleEditPhoto}
+        disabled={processing}
+        aria-label="Alterar foto do paciente"
+        className={cn(
+          "group relative shrink-0 rounded-full text-lg font-semibold text-foreground transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-70",
+          compact ? "size-20" : "size-24",
+        )}
+      >
+        <span className="bg-muted ring-primary/25 ring-offset-background block size-full overflow-hidden rounded-full ring-2 ring-offset-2">
           {displayPhotoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -173,69 +190,62 @@ export function PatientPhotoField({
               className="size-full object-cover"
             />
           ) : (
-            <span className="text-foreground flex size-full items-center justify-center text-xl font-semibold">
+            <span className="flex size-full items-center justify-center">
               {initialsFromName(patientName)}
             </span>
           )}
           {processing ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
               <Loader2 className="size-6 animate-spin text-white" aria-hidden />
-            </div>
+            </span>
           ) : null}
-        </div>
+        </span>
+        <span
+          className="bg-primary text-primary-foreground ring-background absolute -right-0.5 -bottom-0.5 flex size-7 items-center justify-center rounded-full shadow-sm ring-2"
+          aria-hidden
+        >
+          <Pencil className="size-3.5" />
+        </span>
+      </button>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={processing}
-              onClick={() => void openCamera()}
-            >
-              <Camera className="size-4" aria-hidden />
-              Tirar foto
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={processing}
-              onClick={() => void openGallery()}
-            >
-              <Images className="size-4" aria-hidden />
-              Enviar foto
-            </Button>
-          </div>
+      {!displayPhotoUrl ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="gap-1.5"
+          disabled={processing}
+          onClick={() => void openCamera()}
+        >
+          <Camera className="size-4" aria-hidden />
+          Tirar foto
+        </Button>
+      ) : null}
 
-          {hasStoredPhoto && !previewUrl && !removePhotoChecked ? (
-            <button
-              type="button"
-              onClick={handleRemovePhoto}
-              className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1 text-xs transition-colors"
-            >
-              <Trash2 className="size-3" aria-hidden />
-              Remover foto
-            </button>
-          ) : removePhotoChecked && !previewUrl ? (
-            <button
-              type="button"
-              onClick={handleUndoRemove}
-              className="text-primary text-xs font-medium hover:underline"
-            >
-              Desfazer remoção
-            </button>
-          ) : null}
+      {hasStoredPhoto && !previewUrl && !removePhotoChecked ? (
+        <button
+          type="button"
+          onClick={handleRemovePhoto}
+          className="text-muted-foreground hover:text-destructive inline-flex items-center gap-1 text-xs transition-colors"
+        >
+          <Trash2 className="size-3" aria-hidden />
+          Remover
+        </button>
+      ) : removePhotoChecked && !previewUrl ? (
+        <button
+          type="button"
+          onClick={handleUndoRemove}
+          className="text-primary text-xs font-medium hover:underline"
+        >
+          Desfazer remoção
+        </button>
+      ) : null}
 
-          {error ? (
-            <p className="text-destructive text-xs" role="alert">
-              {error}
-            </p>
-          ) : null}
-        </div>
-      </div>
+      {error ? (
+        <p className="text-destructive text-xs" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -557,7 +557,7 @@ export default async function EditarClientePage({
   });
 
   return (
-    <PageLayout variant="form">
+    <PageLayout variant="wide">
       <div className="flex flex-wrap items-start gap-4">
         <ClientEditHeaderAvatar row={shell} imageUrl={logoPreviewUrl} />
         <PageHeader

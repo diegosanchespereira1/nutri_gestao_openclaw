@@ -32,6 +32,11 @@ type Props = Omit<ComponentPropsWithoutRef<"div">, "children"> & {
   children: ReactNode;
   /** `full` = trilho com setas; `overflow-only` = só scroll nativo (ex.: menu lateral). */
   controls?: "full" | "overflow-only";
+  /** Centra o conteúdo verticalmente quando ele for mais baixo que a área visível
+   *  (ex.: telas de login/cadastro) — via `margin-block: auto` no próprio conteúdo,
+   *  então continua rolando normalmente se o conteúdo crescer além da altura
+   *  disponível. Não altera o comportamento default (scroll do topo). */
+  centerContent?: boolean;
 };
 
 function thumbsEqual(a: ThumbMetrics, b: ThumbMetrics): boolean {
@@ -55,6 +60,7 @@ export function PersistentScrollArea({
   className,
   id,
   controls = "full",
+  centerContent = false,
   ...props
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -178,10 +184,13 @@ export function PersistentScrollArea({
               scrollStyles.scroll,
               styles.persistentViewportOverflowOnlyScrollable,
             ),
+          centerContent && styles.persistentViewportCenter,
         )}
         {...props}
       >
-        <div ref={contentRef}>{children}</div>
+        <div ref={contentRef} className={cn(centerContent && styles.persistentContentCenter)}>
+          {children}
+        </div>
       </div>
       {useFullControls ? (
         <div

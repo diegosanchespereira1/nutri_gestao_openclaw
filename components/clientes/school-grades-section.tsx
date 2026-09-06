@@ -21,10 +21,7 @@ type Props = {
   initialGrades: ClientSchoolGradeOption[];
 };
 
-type EditState =
-  | { kind: "idle" }
-  | { kind: "adding" }
-  | { kind: "editing"; gradeId: string };
+type EditState = { kind: "idle" } | { kind: "adding" } | { kind: "editing"; gradeId: string };
 
 function GradeItem({
   grade,
@@ -136,7 +133,7 @@ export function SchoolGradesSection({ clientId, initialGrades }: Props) {
         setError(result.error);
         return;
       }
-      setGrades((prev) => [...prev, { id: `tmp-${Date.now()}`, name }]);
+      setGrades((prev) => [...prev, result.grade ?? { id: `tmp-${Date.now()}`, name }]);
       setEditState({ kind: "idle" });
     });
   }
@@ -156,9 +153,7 @@ export function SchoolGradesSection({ clientId, initialGrades }: Props) {
 
   function handleDelete(gradeId: string) {
     if (
-      !window.confirm(
-        "Remover esta série? Pacientes associados a ela ficarão sem série definida.",
-      )
+      !window.confirm("Remover esta série? Pacientes associados a ela ficarão sem série definida.")
     )
       return;
     clearError();
@@ -176,7 +171,10 @@ export function SchoolGradesSection({ clientId, initialGrades }: Props) {
   return (
     <section aria-labelledby="school-grades-heading" className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 id="school-grades-heading" className="text-foreground text-base font-semibold tracking-tight">
+        <h2
+          id="school-grades-heading"
+          className="text-foreground text-base font-semibold tracking-tight"
+        >
           Séries / turmas
         </h2>
         {editState.kind === "idle" && (
@@ -194,9 +192,9 @@ export function SchoolGradesSection({ clientId, initialGrades }: Props) {
       </div>
 
       <p className="text-muted-foreground text-xs">
-        Cadastre as séries/turmas desta escola (ex.: Maternal II, 3º ano B). No
-        cadastro de cada paciente desta escola, a série vira uma lista fixa —
-        assim evita nomes divergentes para a mesma turma. Campo opcional.
+        Cadastre as séries/turmas desta escola (ex.: Maternal II, 3º ano B). No cadastro de cada
+        paciente desta escola, a série vira uma lista fixa — assim evita nomes divergentes para a
+        mesma turma. Campo opcional.
       </p>
 
       {error && (
@@ -210,9 +208,7 @@ export function SchoolGradesSection({ clientId, initialGrades }: Props) {
 
       {grades.length === 0 && editState.kind !== "adding" ? (
         <div className="border-border bg-muted/30 rounded-lg border border-dashed p-6 text-center space-y-3">
-          <p className="text-muted-foreground text-sm">
-            Nenhuma série cadastrada ainda.
-          </p>
+          <p className="text-muted-foreground text-sm">Nenhuma série cadastrada ainda.</p>
           <Button
             type="button"
             variant="outline"

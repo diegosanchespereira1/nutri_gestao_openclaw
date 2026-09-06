@@ -11,7 +11,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import type { ClientSchoolGradeOption } from "@/lib/types/school-grades";
 
-export type SchoolGradeActionResult = { ok: true } | { ok: false; error: string };
+export type SchoolGradeActionResult =
+  | { ok: true; grade?: ClientSchoolGradeOption }
+  | { ok: false; error: string };
 
 /* ─── helper: valida que o cliente pertence ao usuário (e é PJ) ──────────── */
 
@@ -66,9 +68,7 @@ function revalidateClientPaths(clientId: string) {
 
 /* ─── loadGradesForClient ─────────────────────────────────────────────────── */
 
-export async function loadGradesForClient(
-  clientId: string,
-): Promise<ClientSchoolGradeOption[]> {
+export async function loadGradesForClient(clientId: string): Promise<ClientSchoolGradeOption[]> {
   const supabase = await createClient();
   const {
     data: { user },
@@ -159,28 +159,35 @@ export async function createGradeAction(
     .select("id", { count: "exact", head: true })
     .eq("client_id", clientId);
 
-  const { error } = await supabase.from("client_school_grades").insert({
-    client_id: clientId,
-    name: nameTrim,
-    position: count ?? 0,
-  });
+  const { data: inserted, error } = await supabase
+    .from("client_school_grades")
+    .insert({
+      client_id: clientId,
+      name: nameTrim,
+      position: count ?? 0,
+    })
+    .select("id, name")
+    .single();
 
-  if (error) {
+  if (error || !inserted) {
     console.error("[school-grades:create] insert failed", {
       clientId,
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint,
+      code: error?.code,
+      message: error?.message,
+      details: error?.details,
+      hint: error?.hint,
     });
-    if (error.code === "23505") {
+    if (error?.code === "23505") {
       return { ok: false, error: "Já existe uma série com esse nome nesta escola." };
     }
-    return { ok: false, error: `Não foi possível criar a série. (${error.code ?? error.message})` };
+    return {
+      ok: false,
+      error: `Não foi possível criar a série. (${error?.code ?? error?.message})`,
+    };
   }
 
   revalidateClientPaths(clientId);
-  return { ok: true };
+  return { ok: true, grade: { id: inserted.id as string, name: inserted.name as string } };
 }
 
 /* ─── renameGradeAction ──────────────────────────────────────────────────── */
@@ -220,7 +227,10 @@ export async function renameGradeAction(
     if (error.code === "23505") {
       return { ok: false, error: "Já existe uma série com esse nome nesta escola." };
     }
-    return { ok: false, error: `Não foi possível atualizar a série. (${error.code ?? error.message})` };
+    return {
+      ok: false,
+      error: `Não foi possível atualizar a série. (${error.code ?? error.message})`,
+    };
   }
 
   revalidateClientPaths(owned.clientId);
@@ -250,7 +260,10 @@ export async function deleteGradeAction(gradeId: string): Promise<SchoolGradeAct
       details: error.details,
       hint: error.hint,
     });
-    return { ok: false, error: `Não foi possível remover a série. (${error.code ?? error.message})` };
+    return {
+      ok: false,
+      error: `Não foi possível remover a série. (${error.code ?? error.message})`,
+    };
   }
 
   revalidateClientPaths(owned.clientId);

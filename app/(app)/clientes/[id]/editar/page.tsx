@@ -48,6 +48,7 @@ import {
   buildCurrentUrl,
   getReturnToParam,
   resolveBackNavigation,
+  withReturnTo,
 } from "@/lib/navigation/return-to";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
@@ -243,10 +244,17 @@ async function ClientEditLoadedPanels({
     ]);
 
   const estRow = (estRes.data as EstablishmentRow | null) ?? null;
-  const establishmentAreas =
-    row.kind === "pj" && estRow?.id ? await loadAreasForEstablishment(estRow.id) : [];
+  const pacientesHref = estRow?.id
+    ? withReturnTo(
+        `/clientes/${row.id}/estabelecimentos/${estRow.id}/pacientes`,
+        returnToOrigin,
+      )
+    : null;
   const isSchoolClient = row.kind === "pj" && row.business_segment === "escola";
-  const schoolGrades = isSchoolClient ? await loadGradesForClient(row.id) : [];
+  const [establishmentAreas, schoolGrades] = await Promise.all([
+    row.kind === "pj" && estRow?.id ? loadAreasForEstablishment(estRow.id) : Promise.resolve([]),
+    isSchoolClient ? loadGradesForClient(row.id) : Promise.resolve([]),
+  ]);
 
   const social = row.social_links ?? {};
   const tKey = todayKey(new Date(), tz);
@@ -351,19 +359,6 @@ async function ClientEditLoadedPanels({
           <PatientsSection
             variant="client_pf"
             clientId={row.id}
-            returnToOrigin={returnToOrigin}
-          />
-        </>
-      ) : null}
-
-      {row.kind === "pj" && estRow?.id ? (
-        <>
-          <Separator className="my-8" />
-          <PatientsSection
-            variant="establishment"
-            clientId={row.id}
-            establishmentId={estRow.id}
-            establishmentName={estRow.name}
             returnToOrigin={returnToOrigin}
           />
         </>
@@ -484,6 +479,7 @@ async function ClientEditLoadedPanels({
       initialTab={activeTab}
       contractErr={contractErr}
       checklistQuery={{ est: sp.est, status: sp.status, page: sp.page }}
+      pacientesHref={pacientesHref}
       panels={{
         dados: dadosPanel,
         financeiro: financeiroPanel,
@@ -536,11 +532,6 @@ export default async function EditarClientePage({
   }
 
   const activeTab = resolveClientEditTab(sp.tab, shell.kind);
-  const canDelete = await canDeleteWorkspaceMasterData(
-    supabase,
-    user.id,
-    workspaceOwnerId,
-  );
   const canEdit = true;
 
   const statusLabel =
@@ -550,9 +541,12 @@ export default async function EditarClientePage({
         ? "Inativo"
         : "Finalizado";
 
-  const logoPreviewUrl = row.logo_storage_path
-    ? await getClientLogoSignedUrl(supabase, row.logo_storage_path)
-    : null;
+  const [canDelete, logoPreviewUrl] = await Promise.all([
+    canDeleteWorkspaceMasterData(supabase, user.id, workspaceOwnerId),
+    row.logo_storage_path
+      ? getClientLogoSignedUrl(supabase, row.logo_storage_path)
+      : Promise.resolve(null),
+  ]);
 
   const returnToOrigin = buildCurrentUrl(`/clientes/${id}/editar`, sp);
   const back = resolveBackNavigation({

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ClipboardList } from "lucide-react";
+import { ClipboardList, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -22,6 +22,10 @@ type Props = {
   initialTab: ClientEditTabValue;
   contractErr?: string;
   checklistQuery?: { est?: string; status?: string; page?: string };
+  /** Link para a lista de pacientes do estabelecimento — null quando o cliente
+   *  PJ ainda não tem estabelecimento cadastrado, ou o cliente é PF (nesse caso
+   *  os pacientes ficam na própria aba "Dados do cliente"). */
+  pacientesHref?: string | null;
   panels: ClientEditTabShellPanels;
 };
 
@@ -38,6 +42,7 @@ export function ClientEditTabShell({
   initialTab,
   contractErr,
   checklistQuery,
+  pacientesHref,
   panels,
 }: Props) {
   const [tab, setTab] = useState<ClientEditTabValue>(initialTab);
@@ -133,6 +138,12 @@ export function ClientEditTabShell({
           >
             <ClipboardList className="size-3.5" aria-hidden />
             Ficha técnica
+          </Link>
+        ) : null}
+        {pacientesHref ? (
+          <Link href={pacientesHref} className={cn(TAB_BTN, "gap-1.5")}>
+            <Users className="size-3.5" aria-hidden />
+            Pacientes
           </Link>
         ) : null}
       </nav>

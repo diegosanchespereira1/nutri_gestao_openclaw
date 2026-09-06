@@ -14,6 +14,19 @@
   overflow: visible;
 }
 
+/* Centraliza verticalmente o conteúdo quando ele é mais baixo que a área visível
+ * (ex.: telas de login/cadastro) — ver PersistentScrollArea `centerContent`. */
+.persistentViewportCenter {
+  display: flex;
+  flex-direction: column;
+}
+
+.persistentContentCenter {
+  width: 100%;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
 /* Menu lateral / overflow-only: só scroll vertical — nunca lateral. */
 .persistentViewportOverflowOnly {
   min-width: 0;

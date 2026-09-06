@@ -6,7 +6,7 @@
 // sexo é obrigatório na planilha; percentis/diagnóstico são sempre recalculados no
 // servidor (não são lidos do arquivo).
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -18,13 +18,21 @@ import {
 } from "lucide-react";
 
 import { importChildAssessmentsAction } from "@/lib/actions/import-child-assessments";
+import { createGradeAction } from "@/lib/actions/school-grades";
 import { MAX_ROWS, applyMappings, readFileRows } from "@/lib/import/parser";
 import {
   CHILD_ASSESSMENT_TEMPLATE_HEADERS,
   downloadChildAssessmentXlsxTemplate,
   matchChildAssessmentColumn,
+  parseFlexibleDateToISO,
   validateChildAssessmentRows,
 } from "@/lib/import/child-assessment-parser";
+import {
+  matchChildKey,
+  resolveChildRowMatchStatus,
+  type ChildPatientMatchCandidate,
+  type ChildRowMatchStatus,
+} from "@/lib/import/child-assessment-match";
 import {
   CHILD_ASSESSMENT_FIELDS,
   type ChildAssessmentImportLink,
@@ -61,8 +69,19 @@ const selectClass =
 const inputClass =
   "border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none";
 
-type ClientOption = { id: string; legal_name: string; trade_name: string | null };
-type EstablishmentOption = { id: string; name: string };
+type ClientOption = {
+  id: string;
+  legal_name: string;
+  trade_name: string | null;
+  /** Só clientes PJ podem ter séries cadastradas (mesma regra de assertClientOwned). */
+  kind?: "pf" | "pj";
+};
+type EstablishmentOption = {
+  id: string;
+  name: string;
+  establishment_type?: string;
+};
+type EstablishmentTypeOption = { value: string; label: string };
 type SchoolGradeOption = { id: string; name: string };
 
 /** Rótulos em PT-BR para o cabeçalho da tabela de pré-visualização (etapa 3). */
@@ -104,18 +123,28 @@ function ImportStepIndicator({ step }: { step: WizardStep }) {
 export function ChildAssessmentImportWizard({
   clients = [],
   establishmentsByClient = {},
+  establishmentTypeOptions = [],
   schoolGradesByClient = {},
   existingAssessmentDates = {},
+  patients = [],
+  remainingPatientSlots = null,
 }: {
   /** Clientes do tenant, para o seletor de vínculo (não pede UUID ao usuário). */
   clients?: ClientOption[];
   /** Mapa clientId → estabelecimentos desse cliente (só clientes PJ têm entradas). */
   establishmentsByClient?: Record<string, EstablishmentOption[]>;
+  /** Tipos de estabelecimento existentes no tenant (escola, clínica…) para filtrar
+   *  a lista de clientes — vazio esconde o filtro. */
+  establishmentTypeOptions?: EstablishmentTypeOption[];
   /** Mapa clientId → séries cadastradas desse cliente-escola (só quando houver). */
   schoolGradesByClient?: Record<string, SchoolGradeOption[]>;
   /** Datas (AAAA-MM-DD) já registradas por paciente existente — chave via matchChildKey.
    *  Usado na pré-visualização para bloquear reenvio da mesma pesagem. */
   existingAssessmentDates?: Record<string, string[]>;
+  /** Pacientes do tenant — usado para casamento e alerta de duplicidade na pré-visualização. */
+  patients?: ChildPatientMatchCandidate[];
+  /** Vagas de pacientes restantes no plano do tenant — null quando não há limite configurado. */
+  remainingPatientSlots?: number | null;
 }) {
   const [step, setStep] = useState<WizardStep>(1);
 
@@ -125,15 +154,61 @@ export function ChildAssessmentImportWizard({
   const [selectedSchoolGradeId, setSelectedSchoolGradeId] = useState("");
   const [batchNote, setBatchNote] = useState(""); // ex.: "2026/1 Maternal"
 
+  // Filtro por tipo de estabelecimento (etapa 1) — "" = todos. Só muda o que
+  // aparece nas listas; não é enviado à Server Action.
+  const [typeFilter, setTypeFilter] = useState("");
+  const showTypeFilter = establishmentTypeOptions.length > 0;
+
+  const matchesTypeFilter = (e: EstablishmentOption) =>
+    typeFilter === "" || e.establishment_type === typeFilter;
+
+  // Com filtro ativo, só clientes com ao menos um estabelecimento daquele tipo.
+  const visibleClients = typeFilter
+    ? clients.filter((c) => (establishmentsByClient[c.id] ?? []).some(matchesTypeFilter))
+    : clients;
+
   const clientEstablishments = selectedClientId
-    ? (establishmentsByClient[selectedClientId] ?? [])
+    ? (establishmentsByClient[selectedClientId] ?? []).filter(matchesTypeFilter)
     : [];
   const requiresEstablishment = selectedClientId !== "" && clientEstablishments.length > 0;
 
+  // Séries criadas nesta sessão do wizard (id real, via createGradeAction) — mescladas
+  // com as já cadastradas na ficha do cliente, para não depender de recarregar a página
+  // para usar uma série que acabou de ser criada aqui mesmo.
+  const [addedGrades, setAddedGrades] = useState<Record<string, SchoolGradeOption[]>>({});
+  const [newGradeName, setNewGradeName] = useState("");
+  const [gradeError, setGradeError] = useState<string | null>(null);
+  const [isCreatingGrade, startCreateGradeTransition] = useTransition();
+
   const clientSchoolGrades = selectedClientId
-    ? (schoolGradesByClient[selectedClientId] ?? [])
+    ? [...(schoolGradesByClient[selectedClientId] ?? []), ...(addedGrades[selectedClientId] ?? [])]
     : [];
-  const showSchoolGradeSelect = clientSchoolGrades.length > 0;
+  const selectedClient = clients.find((c) => c.id === selectedClientId);
+  // Série é um atributo do cliente (não do estabelecimento) — só faz sentido para
+  // PJ (mesma regra do servidor em assertClientOwned). Mostra sempre que houver um
+  // cliente PJ selecionado, mesmo sem nenhuma série cadastrada ainda, para permitir
+  // criar a primeira série sem sair do wizard.
+  const showSchoolGradeSection = selectedClientId !== "" && selectedClient?.kind === "pj";
+
+  const handleCreateGrade = useCallback(() => {
+    const name = newGradeName.trim();
+    if (!name || !selectedClientId) return;
+    setGradeError(null);
+    startCreateGradeTransition(async () => {
+      const result = await createGradeAction(selectedClientId, name);
+      if (!result.ok) {
+        setGradeError(result.error);
+        return;
+      }
+      const grade = result.grade ?? { id: `tmp-${Date.now()}`, name };
+      setAddedGrades((prev) => ({
+        ...prev,
+        [selectedClientId]: [...(prev[selectedClientId] ?? []), grade],
+      }));
+      setSelectedSchoolGradeId(grade.id);
+      setNewGradeName("");
+    });
+  }, [newGradeName, selectedClientId]);
 
   const [upload, setUpload] = useState<UploadState | null>(null);
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
@@ -145,6 +220,9 @@ export function ChildAssessmentImportWizard({
   const [fileError, setFileError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  // Gate de confirmação: obrigatório quando há alerta de possível duplicidade ou
+  // vínculo cruzado na pré-visualização (ver matchAlertEntries mais abaixo).
+  const [alertsConfirmed, setAlertsConfirmed] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -195,6 +273,7 @@ export function ChildAssessmentImportWizard({
     setIgnoredRows(new Set());
     setResult(null);
     setFileError(null);
+    setAlertsConfirmed(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -214,6 +293,7 @@ export function ChildAssessmentImportWizard({
     setParsedRows(rows);
     setErrorsByRow(errMap);
     setIgnoredRows(new Set());
+    setAlertsConfirmed(false);
     setStep(3);
   };
 
@@ -230,7 +310,10 @@ export function ChildAssessmentImportWizard({
 
   const handleImport = async () => {
     if (requiresEstablishment && !selectedEstablishmentId) {
-      setResult({ ok: false, error: "Selecione o estabelecimento para este cliente." });
+      setResult({
+        ok: false,
+        error: "Selecione o estabelecimento para este cliente.",
+      });
       return;
     }
 
@@ -253,7 +336,7 @@ export function ChildAssessmentImportWizard({
           kind: "linked",
           clientId: selectedClientId,
           establishmentId: requiresEstablishment ? selectedEstablishmentId : null,
-          schoolGradeId: showSchoolGradeSelect && selectedSchoolGradeId ? selectedSchoolGradeId : null,
+          schoolGradeId: selectedSchoolGradeId || null,
         }
       : { kind: "independent" };
 
@@ -261,7 +344,10 @@ export function ChildAssessmentImportWizard({
     try {
       res = await importChildAssessmentsAction(toImport, link);
     } catch {
-      res = { ok: false, error: "Erro inesperado ao importar. Tente novamente." };
+      res = {
+        ok: false,
+        error: "Erro inesperado ao importar. Tente novamente.",
+      };
     }
 
     setResult(res);
@@ -272,6 +358,55 @@ export function ChildAssessmentImportWizard({
     (_, i) => !errorsByRow.has(i) && !ignoredRows.has(i),
   ).length;
 
+  const patientByExactKey = useMemo(() => {
+    const map = new Map<string, ChildPatientMatchCandidate>();
+    for (const p of patients) map.set(matchChildKey(p.full_name, p.birth_date), p);
+    return map;
+  }, [patients]);
+
+  const currentLink = useMemo(
+    () => ({
+      clientId: selectedClientId || null,
+      establishmentId: requiresEstablishment ? selectedEstablishmentId || null : null,
+    }),
+    [selectedClientId, requiresEstablishment, selectedEstablishmentId],
+  );
+
+  // Status de casamento por linha (só para linhas válidas e não ignoradas) — avisa
+  // ANTES de importar se a linha vai criar paciente novo, casar com um já
+  // existente, ou tem alerta de possível duplicidade/vínculo cruzado. A Server
+  // Action continua sendo quem decide de verdade (matchChildKey exato); isto é
+  // só visibilidade. Ver docs/plano-preview-casamento-importacao-infantil.md.
+  const rowMatchStatuses = useMemo(() => {
+    const map = new Map<number, ChildRowMatchStatus>();
+    parsedRows.forEach((row, i) => {
+      if (errorsByRow.has(i) || ignoredRows.has(i)) return;
+      const full_name = (row.full_name ?? "").trim();
+      const birth_date = parseFlexibleDateToISO(row.birth_date);
+      if (!full_name || !birth_date) return;
+      map.set(
+        i,
+        resolveChildRowMatchStatus(
+          { full_name, birth_date },
+          patients,
+          patientByExactKey,
+          currentLink,
+        ),
+      );
+    });
+    return map;
+  }, [parsedRows, errorsByRow, ignoredRows, patients, patientByExactKey, currentLink]);
+
+  const newPatientCount = [...rowMatchStatuses.values()].filter(
+    (s) => s.kind === "new" || s.kind === "near_duplicate",
+  ).length;
+  const matchedPatientCount = [...rowMatchStatuses.values()].filter(
+    (s) => s.kind === "matched",
+  ).length;
+  const matchAlertEntries = [...rowMatchStatuses.entries()].filter(
+    ([, s]) => s.kind === "near_duplicate" || s.kind === "cross_link",
+  );
+
   // ── Render ──────────────────────────────────────────────────────────────
 
   return (
@@ -279,10 +414,10 @@ export function ChildAssessmentImportWizard({
       <CardHeader className="border-b border-foreground/10 pb-4">
         <CardTitle className="text-base">Importação de avaliações infantis</CardTitle>
         <CardDescription>
-          Importe pesagens de uma turma (peso, estatura e nascimento) a partir de um
-          arquivo CSV ou Excel. O paciente é criado automaticamente se ainda não existir
-          (casado por nome + data de nascimento), e a avaliação é calculada pelo sistema
-          a partir das curvas de referência — os percentis do arquivo não são usados.
+          Importe pesagens de uma turma (peso, estatura e nascimento) a partir de um arquivo CSV ou
+          Excel. O paciente é criado automaticamente se ainda não existir (casado por nome + data de
+          nascimento), e a avaliação é calculada pelo sistema a partir das curvas de referência — os
+          percentis do arquivo não são usados.
         </CardDescription>
         <div className="mt-2">
           <ImportStepIndicator step={step} />
@@ -295,34 +430,81 @@ export function ChildAssessmentImportWizard({
           <CardContent className="space-y-6 pt-6">
             {/* Vínculo dos pacientes */}
             <div className="space-y-3 rounded-lg border border-foreground/10 bg-muted/30 p-4">
-              <Label htmlFor="link-client-select">Vínculo dos pacientes desta importação</Label>
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Cliente desta importação</p>
+                <p className="text-muted-foreground text-xs">
+                  Escolha o cliente (escola, clínica, instituição…) ao qual os pacientes desta turma
+                  serão vinculados. Os pacientes em si são criados a partir do arquivo, na etapa
+                  seguinte.
+                </p>
+              </div>
 
               {clients.length === 0 ? (
                 <p className="text-muted-foreground text-xs">
-                  Nenhum cliente cadastrado ainda — os pacientes serão importados como
-                  particulares. Cadastre um cliente/estabelecimento primeiro se quiser
-                  vincular esta turma a uma escola ou instituição.
+                  Nenhum cliente cadastrado ainda — os pacientes serão importados como particulares.
+                  Cadastre um cliente/estabelecimento primeiro se quiser vincular esta turma a uma
+                  escola ou instituição.
                 </p>
               ) : (
                 <>
-                  <select
-                    id="link-client-select"
-                    value={selectedClientId}
-                    onChange={(e) => {
-                      setSelectedClientId(e.target.value);
-                      setSelectedEstablishmentId("");
-                      setSelectedSchoolGradeId("");
-                    }}
-                    className={selectClass}
-                  >
-                    <option value="">— Paciente particular (sem cliente) —</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.legal_name}
-                        {c.trade_name ? ` · ${c.trade_name}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                  {showTypeFilter && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="link-type-filter-select">Tipo de estabelecimento</Label>
+                      <select
+                        id="link-type-filter-select"
+                        value={typeFilter}
+                        onChange={(e) => {
+                          const next = e.target.value;
+                          setTypeFilter(next);
+                          // Cliente selecionado que não tem estabelecimento do novo tipo
+                          // sai da lista — limpa a seleção para não ficar um valor oculto.
+                          const stillVisible =
+                            next === "" ||
+                            (establishmentsByClient[selectedClientId] ?? []).some(
+                              (est) => est.establishment_type === next,
+                            );
+                          if (!stillVisible) setSelectedClientId("");
+                          setSelectedEstablishmentId("");
+                          setSelectedSchoolGradeId("");
+                        }}
+                        className={selectClass}
+                      >
+                        <option value="">— Todos os tipos —</option>
+                        {establishmentTypeOptions.map((t) => (
+                          <option key={t.value} value={t.value}>
+                            {t.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="link-client-select">Cliente</Label>
+                    <select
+                      id="link-client-select"
+                      value={selectedClientId}
+                      onChange={(e) => {
+                        setSelectedClientId(e.target.value);
+                        setSelectedEstablishmentId("");
+                        setSelectedSchoolGradeId("");
+                      }}
+                      className={selectClass}
+                    >
+                      <option value="">— Paciente particular (sem cliente) —</option>
+                      {visibleClients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.legal_name}
+                          {c.trade_name ? ` · ${c.trade_name}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {typeFilter && visibleClients.length === 0 && (
+                      <p className="text-muted-foreground text-xs">
+                        Nenhum cliente com estabelecimento deste tipo.
+                      </p>
+                    )}
+                  </div>
 
                   {requiresEstablishment && (
                     <div className="space-y-1.5 pt-1">
@@ -356,25 +538,68 @@ export function ChildAssessmentImportWizard({
                     </p>
                   )}
 
-                  {showSchoolGradeSelect && (
+                  {showSchoolGradeSection && (
                     <div className="space-y-1.5 pt-1">
-                      <Label htmlFor="link-school-grade-select">Série (opcional)</Label>
-                      <select
-                        id="link-school-grade-select"
-                        value={selectedSchoolGradeId}
-                        onChange={(e) => setSelectedSchoolGradeId(e.target.value)}
-                        className={selectClass}
-                      >
-                        <option value="">— Nenhuma —</option>
-                        {clientSchoolGrades.map((g) => (
-                          <option key={g.id} value={g.id}>
-                            {g.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Label htmlFor="link-school-grade-select">Série</Label>
+                      {clientSchoolGrades.length > 0 ? (
+                        <select
+                          id="link-school-grade-select"
+                          value={selectedSchoolGradeId}
+                          onChange={(e) => setSelectedSchoolGradeId(e.target.value)}
+                          className={selectClass}
+                        >
+                          <option value="">— Nenhuma —</option>
+                          {clientSchoolGrades.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-muted-foreground text-xs">
+                          Este cliente ainda não tem série cadastrada — crie uma abaixo (aplicada a
+                          todos os pacientes novos desta importação).
+                        </p>
+                      )}
+
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          type="text"
+                          value={newGradeName}
+                          onChange={(e) => setNewGradeName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCreateGrade();
+                            }
+                          }}
+                          placeholder="Nova série (ex.: Mini Baby, Jardim 2A)"
+                          maxLength={80}
+                          disabled={isCreatingGrade}
+                          className={inputClass}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isCreatingGrade || !newGradeName.trim()}
+                          onClick={handleCreateGrade}
+                        >
+                          {isCreatingGrade ? (
+                            <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                          ) : (
+                            "Adicionar"
+                          )}
+                        </Button>
+                      </div>
+                      {gradeError && (
+                        <p className="text-destructive text-xs" role="alert">
+                          {gradeError}
+                        </p>
+                      )}
                       <p className="text-muted-foreground text-xs">
-                        Aplicada a todos os pacientes novos desta importação (cadastre as
-                        séries desta escola na ficha do cliente).
+                        A série escolhida (ou criada aqui) é aplicada a todos os pacientes novos
+                        desta importação. Também pode ser gerenciada depois na ficha do cliente.
                       </p>
                     </div>
                   )}
@@ -460,9 +685,7 @@ export function ChildAssessmentImportWizard({
                   <>
                     <Upload className="size-8 text-muted-foreground" aria-hidden />
                     <div className="text-center">
-                      <p className="text-sm font-medium">
-                        Arraste aqui ou clique para selecionar
-                      </p>
+                      <p className="text-sm font-medium">Arraste aqui ou clique para selecionar</p>
                       <p className="text-muted-foreground text-xs mt-0.5">
                         Formatos aceitos: .csv, .xlsx — até {MAX_ROWS} linhas
                       </p>
@@ -490,9 +713,8 @@ export function ChildAssessmentImportWizard({
             <div className="rounded-lg bg-muted/40 p-4 text-sm space-y-2">
               <p className="font-medium">Não sabe o formato?</p>
               <p className="text-muted-foreground text-xs">
-                Baixe o modelo em Excel (.xlsx) com as colunas esperadas (nome,
-                nascimento, data da pesagem, sexo, peso e estatura) e preencha com seus
-                dados.
+                Baixe o modelo em Excel (.xlsx) com as colunas esperadas (nome, nascimento, data da
+                pesagem, sexo, peso e estatura) e preencha com seus dados.
               </p>
               <Button
                 variant="ghost"
@@ -527,9 +749,9 @@ export function ChildAssessmentImportWizard({
         <>
           <CardContent className="space-y-6 pt-6">
             <p className="text-sm text-muted-foreground">
-              Para cada coluna do seu arquivo, selecione o campo correspondente no
-              sistema. Colunas sem mapeamento serão ignoradas — inclusive percentis e
-              diagnóstico já calculados, que o sistema recalcula automaticamente.
+              Para cada coluna do seu arquivo, selecione o campo correspondente no sistema. Colunas
+              sem mapeamento serão ignoradas — inclusive percentis e diagnóstico já calculados, que
+              o sistema recalcula automaticamente.
             </p>
 
             <div className="space-y-3">
@@ -606,12 +828,27 @@ export function ChildAssessmentImportWizard({
                       {result.assessmentsImported} avaliaç
                       {result.assessmentsImported !== 1 ? "ões importadas" : "ão importada"}.{" "}
                       {result.patientsCreated} paciente
-                      {result.patientsCreated !== 1 ? "s criados" : " criado"}, {result.patientsMatched}{" "}
-                      já existente{result.patientsMatched !== 1 ? "s" : ""}.
+                      {result.patientsCreated !== 1 ? "s criados" : " criado"},{" "}
+                      {result.patientsMatched} já existente
+                      {result.patientsMatched !== 1 ? "s" : ""}.
                       {result.skipped > 0
-                        ? ` ${result.skipped} linha${result.skipped !== 1 ? "s" : ""} ignorada${result.skipped !== 1 ? "s" : ""} (erro ou limite).`
+                        ? ` ${result.skipped} linha${result.skipped !== 1 ? "s" : ""} ignorada${result.skipped !== 1 ? "s" : ""}.`
                         : ""}
                     </p>
+                    {result.skippedDetails && result.skippedDetails.length > 0 && (
+                      <details className="text-xs text-muted-foreground">
+                        <summary className="cursor-pointer font-medium text-foreground">
+                          Ver detalhes das linhas ignoradas
+                        </summary>
+                        <ul className="mt-1.5 space-y-1 pl-4 list-disc">
+                          {result.skippedDetails.map((d, i) => (
+                            <li key={i}>
+                              {d.row}: {d.reason}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
                   </>
                 ) : (
                   <>
@@ -636,13 +873,107 @@ export function ChildAssessmentImportWizard({
                     />
                     <div>
                       <p className="font-medium text-amber-700 dark:text-amber-400">
-                        {errorsByRow.size} linha{errorsByRow.size !== 1 ? "s" : ""} com erro
+                        {errorsByRow.size} linha
+                        {errorsByRow.size !== 1 ? "s" : ""} com erro
                       </p>
                       <p className="text-muted-foreground text-xs mt-0.5">
-                        Linhas com erro serão ignoradas na importação. Você pode marcar
-                        linhas corretas para ignorar manualmente.
+                        Linhas com erro serão ignoradas na importação. Você pode marcar linhas
+                        corretas para ignorar manualmente.
                       </p>
                     </div>
+                  </div>
+                )}
+
+                {remainingPatientSlots !== null && parsedRows.length > 0 && (
+                  <div
+                    className={[
+                      "rounded-lg border p-4 text-sm",
+                      newPatientCount > remainingPatientSlots
+                        ? "border-amber-400/40 bg-amber-50/40 dark:bg-amber-950/20"
+                        : "border-foreground/10 bg-muted/20",
+                    ].join(" ")}
+                  >
+                    Restam <strong>{remainingPatientSlots}</strong> vaga
+                    {remainingPatientSlots !== 1 ? "s" : ""} de paciente
+                    {remainingPatientSlots !== 1 ? "s" : ""} no seu plano. Esta importação vai criar{" "}
+                    <strong>{newPatientCount}</strong> cadastro
+                    {newPatientCount !== 1 ? "s" : ""} novo
+                    {newPatientCount !== 1 ? "s" : ""}.
+                    {newPatientCount > remainingPatientSlots
+                      ? " Algumas linhas podem não ser importadas por falta de vagas — fale com o suporte para ampliar o limite."
+                      : ""}
+                  </div>
+                )}
+
+                {parsedRows.length > 0 && (
+                  <div className="rounded-lg border border-foreground/10 bg-muted/20 p-4 text-sm">
+                    <p className="font-medium">Casamento de pacientes</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">
+                      {newPatientCount} linha{newPatientCount !== 1 ? "s" : ""} vai
+                      {newPatientCount !== 1 ? "ão" : ""} criar paciente novo, {matchedPatientCount}{" "}
+                      vai
+                      {matchedPatientCount !== 1 ? "ão" : ""} casar com paciente já existente
+                      {matchAlertEntries.length > 0
+                        ? `, ${matchAlertEntries.length} com alerta de possível duplicidade (veja abaixo).`
+                        : "."}
+                    </p>
+                  </div>
+                )}
+
+                {matchAlertEntries.length > 0 && (
+                  <div
+                    className="space-y-3 rounded-lg border border-amber-400/40 bg-amber-50/40 dark:bg-amber-950/20 p-4 text-sm"
+                    role="alert"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertCircle
+                        className="size-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5"
+                        aria-hidden
+                      />
+                      <div className="min-w-0">
+                        <p className="font-medium text-amber-700 dark:text-amber-400">
+                          {matchAlertEntries.length} linha
+                          {matchAlertEntries.length !== 1 ? "s" : ""} com alerta — confira antes de
+                          importar
+                        </p>
+                        <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+                          {matchAlertEntries.map(([rowIndex, status]) => {
+                            const rowData = parsedRows[rowIndex];
+                            const label = `Linha ${rowIndex + 1} — ${rowData.full_name ?? ""}`;
+                            if (status.kind === "near_duplicate") {
+                              return (
+                                <li key={rowIndex}>
+                                  <span className="font-medium text-foreground">{label}:</span> nome
+                                  parecido com o paciente já cadastrado{" "}
+                                  <strong>{status.candidate.full_name}</strong> (mesma data de
+                                  nascimento) — confira se não é a mesma criança antes de importar.
+                                </li>
+                              );
+                            }
+                            if (status.kind === "cross_link") {
+                              return (
+                                <li key={rowIndex}>
+                                  <span className="font-medium text-foreground">{label}:</span> já
+                                  cadastrado como <strong>{status.patient.full_name}</strong>, mas
+                                  vinculado a outro cliente/estabelecimento do que o selecionado
+                                  nesta importação.
+                                </li>
+                              );
+                            }
+                            return null;
+                          })}
+                        </ul>
+                      </div>
+                    </div>
+                    <label className="flex items-start gap-2 text-xs pl-6">
+                      <input
+                        type="checkbox"
+                        checked={alertsConfirmed}
+                        onChange={(e) => setAlertsConfirmed(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      Revisei os alertas acima e confirmo a importação.
+                    </label>
                   </div>
                 )}
 
@@ -668,7 +999,11 @@ export function ChildAssessmentImportWizard({
                 </Button>
                 <Button
                   onClick={handleImport}
-                  disabled={importing || validToImport === 0}
+                  disabled={
+                    importing ||
+                    validToImport === 0 ||
+                    (matchAlertEntries.length > 0 && !alertsConfirmed)
+                  }
                   aria-busy={importing}
                 >
                   {importing ? (

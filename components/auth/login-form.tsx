@@ -524,7 +524,12 @@ export function LoginForm() {
   }
 
   return (
-    <div className="space-y-8">
+    <div
+      className={cn(
+        "mx-auto w-full space-y-8",
+        mode === "cadastro" ? "max-w-2xl" : "max-w-md",
+      )}
+    >
       <div className="space-y-3">
         <h1 className="sr-only">{mode === "cadastro" ? "Cadastre-se" : "Entrar"}</h1>
         <AuthModeTabs value={mode} onChange={handleModeChange} />

@@ -9,7 +9,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     <div className="bg-background grid min-h-screen lg:grid-cols-2">
       <div className="safe-top flex min-h-screen flex-col md:min-h-0 md:h-screen md:overflow-hidden">
         <AppPageScroll centerContent className="flex-1">
-          <div className="mx-auto flex w-full max-w-md flex-col px-6 py-10 sm:px-10 lg:px-16 xl:px-24">
+          <div className="mx-auto flex w-full max-w-2xl flex-col px-6 py-10 sm:px-8 lg:px-12">
             {children}
           </div>
         </AppPageScroll>

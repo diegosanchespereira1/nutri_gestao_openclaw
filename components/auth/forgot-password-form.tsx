@@ -51,7 +51,7 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto w-full max-w-md space-y-8">
       <div>
         <h1 className="text-foreground text-2xl font-semibold tracking-tight">
           Recuperar acesso

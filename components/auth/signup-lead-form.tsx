@@ -111,116 +111,120 @@ export function SignupLeadStep({
         </div>
       </fieldset>
 
-      {value.personKind === "pf" ? (
-        <>
-          <TextField
-            id="signup-name"
-            label="Nome"
-            name="full_name"
-            autoComplete="name"
-            value={value.fullName}
-            error={shown.fullName}
-            onChange={(fullName) => patch({ fullName })}
-          />
-          <EmailField
-            value={value.email}
-            error={shown.email}
-            onChange={(email) => patch({ email })}
-          />
-          <PhoneField
-            value={value.phone}
-            error={shown.phone}
-            onChange={(phone) => patch({ phone })}
-          />
-          <DocumentField
-            kind="cpf"
-            value={value.document}
-            error={shown.document}
-            onChange={(document) => patch({ document })}
-          />
-        </>
-      ) : (
-        <>
-          <TextField
-            id="signup-legal-name"
-            label="Razão social"
-            name="legal_name"
-            autoComplete="organization"
-            value={value.legalName}
-            error={shown.legalName}
-            onChange={(legalName) => patch({ legalName })}
-          />
-          <EmailField
-            value={value.email}
-            error={shown.email}
-            onChange={(email) => patch({ email })}
-          />
-          <DocumentField
-            kind="cnpj"
-            value={value.document}
-            error={shown.document}
-            onChange={(document) => patch({ document })}
-          />
-          <PhoneField
-            value={value.phone}
-            error={shown.phone}
-            onChange={(phone) => patch({ phone })}
-          />
-          <TextField
-            id="signup-responsible"
-            label="Nome do responsável"
-            name="responsible_name"
-            autoComplete="name"
-            value={value.responsibleName}
-            error={shown.responsibleName}
-            onChange={(responsibleName) => patch({ responsibleName })}
-          />
-        </>
-      )}
-
-      <div className="relative space-y-2">
-        <Label htmlFor="signup-password">Senha</Label>
-        <PasswordField
-          id="signup-password"
-          name="password"
-          autoComplete="new-password"
-          required
-          value={value.password}
-          onChange={(ev) => patch({ password: ev.target.value })}
-          className={cn(shown.password && FIELD_ERROR_RING)}
-          aria-invalid={Boolean(shown.password)}
-          aria-describedby={shown.password ? "signup-password-error" : undefined}
-        />
-        {shown.password ? (
-          <FieldErrorTooltip id="signup-password-error" message={shown.password} />
+      <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
+        {value.personKind === "pf" ? (
+          <>
+            <TextField
+              id="signup-name"
+              label="Nome"
+              name="full_name"
+              autoComplete="name"
+              value={value.fullName}
+              error={shown.fullName}
+              onChange={(fullName) => patch({ fullName })}
+            />
+            <EmailField
+              value={value.email}
+              error={shown.email}
+              onChange={(email) => patch({ email })}
+            />
+            <PhoneField
+              value={value.phone}
+              error={shown.phone}
+              onChange={(phone) => patch({ phone })}
+            />
+            <DocumentField
+              kind="cpf"
+              value={value.document}
+              error={shown.document}
+              onChange={(document) => patch({ document })}
+            />
+          </>
         ) : (
-          <p className="text-muted-foreground text-xs">
-            {signupPasswordPolicyMessage()}
-          </p>
+          <>
+            <TextField
+              id="signup-legal-name"
+              label="Razão social"
+              name="legal_name"
+              autoComplete="organization"
+              value={value.legalName}
+              error={shown.legalName}
+              onChange={(legalName) => patch({ legalName })}
+            />
+            <EmailField
+              value={value.email}
+              error={shown.email}
+              onChange={(email) => patch({ email })}
+            />
+            <DocumentField
+              kind="cnpj"
+              value={value.document}
+              error={shown.document}
+              onChange={(document) => patch({ document })}
+            />
+            <PhoneField
+              value={value.phone}
+              error={shown.phone}
+              onChange={(phone) => patch({ phone })}
+            />
+            <div className="sm:col-span-2">
+              <TextField
+                id="signup-responsible"
+                label="Nome do responsável"
+                name="responsible_name"
+                autoComplete="name"
+                value={value.responsibleName}
+                error={shown.responsibleName}
+                onChange={(responsibleName) => patch({ responsibleName })}
+              />
+            </div>
+          </>
         )}
-      </div>
 
-      <div className="relative space-y-2">
-        <Label htmlFor="signup-password-confirm">Confirmar senha</Label>
-        <PasswordField
-          id="signup-password-confirm"
-          name="confirm_password"
-          autoComplete="new-password"
-          required
-          value={value.confirmPassword}
-          onChange={(ev) => patch({ confirmPassword: ev.target.value })}
-          className={cn(shown.confirmPassword && FIELD_ERROR_RING)}
-          aria-invalid={Boolean(shown.confirmPassword)}
-          aria-describedby={
-            shown.confirmPassword ? "signup-password-confirm-error" : undefined
-          }
-        />
-        {shown.confirmPassword ? (
-          <FieldErrorTooltip
-            id="signup-password-confirm-error"
-            message={shown.confirmPassword}
+        <div className="relative space-y-2">
+          <Label htmlFor="signup-password">Senha</Label>
+          <PasswordField
+            id="signup-password"
+            name="password"
+            autoComplete="new-password"
+            required
+            value={value.password}
+            onChange={(ev) => patch({ password: ev.target.value })}
+            className={cn(shown.password && FIELD_ERROR_RING)}
+            aria-invalid={Boolean(shown.password)}
+            aria-describedby={shown.password ? "signup-password-error" : undefined}
           />
-        ) : null}
+          {shown.password ? (
+            <FieldErrorTooltip id="signup-password-error" message={shown.password} />
+          ) : (
+            <p className="text-muted-foreground text-xs">
+              {signupPasswordPolicyMessage()}
+            </p>
+          )}
+        </div>
+
+        <div className="relative space-y-2">
+          <Label htmlFor="signup-password-confirm">Confirmar senha</Label>
+          <PasswordField
+            id="signup-password-confirm"
+            name="confirm_password"
+            autoComplete="new-password"
+            required
+            value={value.confirmPassword}
+            onChange={(ev) => patch({ confirmPassword: ev.target.value })}
+            className={cn(shown.confirmPassword && FIELD_ERROR_RING)}
+            aria-invalid={Boolean(shown.confirmPassword)}
+            aria-describedby={
+              shown.confirmPassword ? "signup-password-confirm-error" : undefined
+            }
+          />
+          {shown.confirmPassword ? (
+            <FieldErrorTooltip
+              id="signup-password-confirm-error"
+              message={shown.confirmPassword}
+            />
+          ) : null}
+        </div>
       </div>
 
       <Button type="submit" className="w-full" disabled={busy}>

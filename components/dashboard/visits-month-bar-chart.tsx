@@ -12,16 +12,19 @@ import {
 } from "recharts";
 
 import { chartCssVar, CHART_TOKEN_COUNT } from "@/lib/constants/chart-theme";
-import type { VisitsByMonthBucket } from "@/lib/dashboard/visits-by-month";
+import type { VisitsPerformedBucket } from "@/lib/dashboard/visits-performed";
 
 type Props = {
-  data: VisitsByMonthBucket[];
+  data: VisitsPerformedBucket[];
 };
 
 /**
  * Barras com `fill: var(--chart-*)` para cumprir UX-DR16 / story 5.6.
+ * Altura fixa para o filtro de período não deslocar o restante do painel.
  */
 export function VisitsMonthBarChart({ data }: Props) {
+  const showAllTicks = data.length <= 8;
+
   return (
     <div className="text-card-foreground h-[240px] w-full min-h-[200px] min-w-0">
       <ResponsiveContainer width="100%" height="100%">
@@ -36,10 +39,13 @@ export function VisitsMonthBarChart({ data }: Props) {
           />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            tick={{
+              fontSize: showAllTicks ? 10 : 9,
+              fill: "var(--muted-foreground)",
+            }}
             tickLine={{ stroke: "var(--border)" }}
             axisLine={{ stroke: "var(--border)" }}
-            interval={0}
+            interval={showAllTicks ? 0 : "preserveStartEnd"}
             angle={-30}
             textAnchor="end"
             height={52}
@@ -66,15 +72,21 @@ export function VisitsMonthBarChart({ data }: Props) {
             ]}
             labelFormatter={(_, payload) => {
               const row = payload?.[0]?.payload as
-                | VisitsByMonthBucket
+                | VisitsPerformedBucket
                 | undefined;
               return row?.label ?? "";
             }}
           />
-          <Bar dataKey="count" name="Visitas" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false}>
+          <Bar
+            dataKey="count"
+            name="Visitas"
+            radius={[4, 4, 0, 0]}
+            maxBarSize={40}
+            isAnimationActive={false}
+          >
             {data.map((row, i) => (
               <Cell
-                key={row.monthKey}
+                key={row.key}
                 fill={chartCssVar((i % CHART_TOKEN_COUNT) + 1)}
               />
             ))}

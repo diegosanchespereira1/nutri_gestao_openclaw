@@ -13,6 +13,18 @@ import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { getProfileSignatureDataUrl } from "@/lib/profile/signature-sync";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { safeNextPath } from "@/lib/auth/safe-next-path";
+import {
+  APP_DASHBOARD_PATH,
+  CHECKLISTS_A_VENCER_PATH,
+  CHECKLISTS_VENCIDOS_PATH,
+} from "@/lib/routes";
+
+function backLabelForReturnTo(href: string | undefined): string | undefined {
+  if (href === CHECKLISTS_VENCIDOS_PATH) return "Voltar aos vencidos";
+  if (href === CHECKLISTS_A_VENCER_PATH) return "Voltar aos a vencer";
+  if (href === APP_DASHBOARD_PATH) return "Voltar ao dashboard";
+  return undefined;
+}
 
 const ChecklistFillWizard = dynamic(
   () =>
@@ -33,6 +45,7 @@ export default async function ChecklistPreencherPage({
   const sp = await searchParams;
   const viewOnlyDossier = sp.view === "dossie";
   const backHref = sp.returnTo ? safeNextPath(sp.returnTo) : undefined;
+  const backLabel = backLabelForReturnTo(backHref);
 
   const { supabase, user } = await getServerContext();
 
@@ -191,6 +204,7 @@ export default async function ChecklistPreencherPage({
         key={bundle.session.id}
         sessionId={bundle.session.id}
         {...(backHref ? { backHref } : {})}
+        {...(backLabel ? { backLabel } : {})}
         template={bundle.template}
         initialResponses={bundle.responses}
         establishmentLabel={bundle.establishmentLabel}

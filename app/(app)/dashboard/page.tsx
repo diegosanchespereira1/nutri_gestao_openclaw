@@ -1,16 +1,11 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { LayoutDashboard } from "lucide-react";
 
 import { AppShellUserGreeting } from "@/components/app-shell-user-greeting";
 import { DashboardClientReminder } from "@/components/dashboard/dashboard-client-reminder";
-import { DashboardClinicalPanel } from "@/components/dashboard/dashboard-clinical-panel";
-import { DashboardFinancialPanel } from "@/components/dashboard/dashboard-financial-panel";
+import { DashboardHome } from "@/components/dashboard/dashboard-home";
+import { DashboardHomeSkeleton } from "@/components/dashboard/dashboard-panel-skeleton";
 import { DashboardQuickActions } from "@/components/dashboard/dashboard-quick-actions";
-import {
-  DashboardClinicalPanelSkeleton,
-  DashboardFinancialPanelSkeleton,
-} from "@/components/dashboard/dashboard-panel-skeleton";
 import { DashboardWelcomeBanner } from "@/components/dashboard/dashboard-welcome-banner";
 import { PageLayout } from "@/components/layout/page-layout";
 import { getServerContext } from "@/lib/supabase/get-server-user";
@@ -54,17 +49,12 @@ export default async function DashboardPage({
         />
       </Suspense>
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
           <AppShellUserGreeting firstName={userFirstName} />
-          <DashboardQuickActions />
+          <h2 className="sr-only">Dashboard</h2>
         </div>
-        <div className="flex items-center gap-2">
-          <LayoutDashboard className="text-primary size-4" aria-hidden />
-          <h2 className="text-foreground text-lg font-semibold tracking-tight">
-            Dashboard
-          </h2>
-        </div>
+        <DashboardQuickActions />
       </div>
 
       {deferHeavyPanels ? (
@@ -76,33 +66,17 @@ export default async function DashboardPage({
                 atalhos acima para agendar uma visita ou cadastrar outro
                 cliente.
               </p>
-              <DashboardClinicalPanelSkeleton />
-              <DashboardFinancialPanelSkeleton />
+              <DashboardHomeSkeleton />
             </div>
           }
         >
-          <DashboardPostWelcomePanels />
+          <DashboardHome />
         </Suspense>
       ) : (
-        <>
-          <Suspense fallback={<DashboardClinicalPanelSkeleton />}>
-            <DashboardClinicalPanel />
-          </Suspense>
-
-          <Suspense fallback={<DashboardFinancialPanelSkeleton />}>
-            <DashboardFinancialPanel />
-          </Suspense>
-        </>
+        <Suspense fallback={<DashboardHomeSkeleton />}>
+          <DashboardHome />
+        </Suspense>
       )}
     </PageLayout>
-  );
-}
-
-async function DashboardPostWelcomePanels() {
-  return (
-    <>
-      <DashboardClinicalPanel />
-      <DashboardFinancialPanel />
-    </>
   );
 }

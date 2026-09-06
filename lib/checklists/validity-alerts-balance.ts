@@ -1,4 +1,7 @@
-import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
+import type {
+  ChecklistValidityAlert,
+  ChecklistValidityAlertStatus,
+} from "@/lib/types/checklist-validity-alerts";
 
 /** Vencidos até 1 ano atrás. */
 export const VALIDITY_ALERTS_PAST_DAYS = 365;
@@ -8,6 +11,54 @@ export const VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT = 90;
 
 /** Limite por defeito — espaço para vencidos e a vencer após balanceamento. */
 export const VALIDITY_ALERTS_LIMIT_DEFAULT = 48;
+
+/** Limite das páginas de lista e das contagens do Dashboard. */
+export const VALIDITY_ALERTS_LIST_LIMIT = 400;
+
+export type ValidityAlertWindow = {
+  withinDays: number;
+  pastDays: number;
+};
+
+/**
+ * Janela da query: lista de um só estado não deve gastar o limite no outro.
+ * Vencidos = último ano até ontem. A vencer = hoje até 90 dias.
+ */
+export function resolveValidityAlertWindow(options?: {
+  status?: ChecklistValidityAlertStatus;
+  withinDays?: number;
+  pastDays?: number;
+}): ValidityAlertWindow {
+  const status = options?.status;
+  return {
+    withinDays:
+      options?.withinDays ??
+      (status === "vencido" ? 0 : VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT),
+    pastDays:
+      options?.pastDays ??
+      (status === "proximo" ? 0 : VALIDITY_ALERTS_PAST_DAYS),
+  };
+}
+
+export function filterValidityAlertsByStatus(
+  alerts: ChecklistValidityAlert[],
+  status: ChecklistValidityAlertStatus,
+): ChecklistValidityAlert[] {
+  return alerts.filter((alert) => alert.status === status);
+}
+
+export function countValidityAlertsByStatus(alerts: ChecklistValidityAlert[]): {
+  vencidos: number;
+  proximos: number;
+} {
+  let vencidos = 0;
+  let proximos = 0;
+  for (const alert of alerts) {
+    if (alert.status === "vencido") vencidos += 1;
+    else proximos += 1;
+  }
+  return { vencidos, proximos };
+}
 
 /**
  * Garante representação de vencidos e a vencer quando o limite corta a lista.

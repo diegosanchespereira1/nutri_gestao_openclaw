@@ -12,6 +12,8 @@ type Props = {
   hideClientName?: boolean;
   /** Layout compacto para grelha de 2 colunas no dashboard. */
   stacked?: boolean;
+  /** Destino do «voltar» no dossiê. */
+  returnTo?: string;
 };
 
 function formatDueDatePt(dueDateKey: string, timeZone: string): string {
@@ -37,6 +39,7 @@ export function ChecklistValidityAlertCard({
   timeZone,
   hideClientName = false,
   stacked = false,
+  returnTo = APP_DASHBOARD_PATH,
 }: Props) {
   const dueLabel = formatDueDatePt(alert.validUntil, timeZone);
   const statusLabel = buildStatusLabel(alert);
@@ -46,8 +49,7 @@ export function ChecklistValidityAlertCard({
       : "border-l-[3px] border-l-warning bg-amber-50/50 dark:bg-amber-950/20";
 
   const titleId = `validity-alert-title-${alert.responseId}`;
-  const returnTo = encodeURIComponent(APP_DASHBOARD_PATH);
-  const href = `/checklists/preencher/${alert.sessionId}?view=dossie&returnTo=${returnTo}`;
+  const href = `/checklists/preencher/${alert.sessionId}?view=dossie&returnTo=${encodeURIComponent(returnTo)}`;
   const ariaLabel = `Ver dossiê do checklist ${alert.checklistName} de ${alert.clientName}, ${statusLabel}`;
 
   return (

@@ -16,24 +16,27 @@ test.describe("Páginas públicas", () => {
     await page.goto("/login");
 
     await expect(
-      page.getByRole("heading", { name: "Entrar" }),
+      page.getByRole("button", { name: "Entrar", pressed: true }),
     ).toBeVisible();
     await expect(page.getByLabel("Email")).toBeVisible();
     await expect(page.getByLabel("Senha", { exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
+    await expect(
+      page.locator("form").getByRole("button", { name: "Entrar" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Recuperar senha" }),
     ).toBeVisible();
   });
 
-  test("registo público desativado redireciona para /login", async ({
+  test("registo público abre a aba Cadastre-se", async ({
     page,
   }) => {
-    // Cadastro público desativado temporariamente (ver app/(auth)/register/page.tsx).
     await page.goto("/register");
 
-    await expect(page).toHaveURL(/\/login/);
-    await expect(page.getByRole("heading", { name: "Entrar" })).toBeVisible();
+    await expect(page).toHaveURL(/\/login\?aba=cadastro/);
+    await expect(
+      page.getByRole("button", { name: "Cadastre-se", pressed: true }),
+    ).toBeVisible();
   });
 
   test("página de recuperação de senha renderiza", async ({ page }) => {
@@ -43,7 +46,14 @@ test.describe("Páginas públicas", () => {
 });
 
 test.describe("Guard de autenticação", () => {
-  for (const path of ["/dashboard", "/clientes", "/perfil", "/checklists"]) {
+  for (const path of [
+    "/dashboard",
+    "/clientes",
+    "/perfil",
+    "/checklists",
+    "/checklists/vencidos",
+    "/checklists/a-vencer",
+  ]) {
     test(`rota protegida ${path} redireciona para login com next`, async ({
       page,
     }) => {
@@ -53,7 +63,7 @@ test.describe("Guard de autenticação", () => {
         new RegExp(`/login\\?next=${encodeURIComponent(path)}`),
       );
       await expect(
-        page.getByRole("heading", { name: "Entrar" }),
+        page.getByRole("button", { name: "Entrar", pressed: true }),
       ).toBeVisible();
     });
   }

@@ -14,6 +14,14 @@ import {
 
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { visitPriorityAgendaSurface, visitPriorityLabel } from "@/lib/constants/visit-priorities";
 import { visitIsCancellable, visitStatusLabel } from "@/lib/constants/visit-status";
 import {
@@ -45,6 +53,12 @@ import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
 import type { VisitAssigneeFormContext } from "@/lib/visits/assignee-context";
 import { visitDisplayTitle, visitProfessionalLabel, visitTargetName } from "@/lib/visits/display-title";
+import {
+  ALL_PROFESSIONALS,
+  buildVisitProfessionalOptions,
+  parseProfessionalFilter,
+  visitMatchesProfessionalFilter,
+} from "@/lib/visits/visit-professional-filter";
 import { compareScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
 import { cn } from "@/lib/utils";
 
@@ -89,7 +103,10 @@ function groupVisitsByDay(
   return map;
 }
 
-function visitMatchesFilter(v: ScheduledVisitWithTargets, f: PriorityFilter): boolean {
+function visitMatchesPriorityFilter(
+  v: ScheduledVisitWithTargets,
+  f: PriorityFilter,
+): boolean {
   if (f === "all") return true;
   return v.priority === f;
 }
@@ -123,6 +140,18 @@ export function VisitsAgendaClient({
     [currentUserId, isAgendaAdmin],
   );
 
+  const professionalOptions = useMemo(
+    () => buildVisitProfessionalOptions(visits, teamMembersProp),
+    [visits, teamMembersProp],
+  );
+  const memberUserIdByTeamMemberId = useMemo(
+    () =>
+      new Map(
+        teamMembersProp.map((member) => [member.id, member.member_user_id]),
+      ),
+    [teamMembersProp],
+  );
+
   const byDay = useMemo(
     () => groupVisitsByDay(visits, tz),
     [visits, tz],
@@ -137,6 +166,7 @@ export function VisitsAgendaClient({
   const [selectedDayKey, setSelectedDayKey] = useState(todayKey);
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("all");
+  const [professionalFilter, setProfessionalFilter] = useState(ALL_PROFESSIONALS);
   const [miniMonthAnchor, setMiniMonthAnchor] = useState(todayKey);
   const [scheduleView, setScheduleView] = useState<ScheduleView>("week");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
@@ -153,6 +183,20 @@ export function VisitsAgendaClient({
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
 
+  const hasActiveFilters =
+    priorityFilter !== "all" || professionalFilter !== ALL_PROFESSIONALS;
+
+  const visitMatchesFilters = useCallback(
+    (v: ScheduledVisitWithTargets) =>
+      visitMatchesPriorityFilter(v, priorityFilter) &&
+      visitMatchesProfessionalFilter(
+        v,
+        professionalFilter,
+        memberUserIdByTeamMemberId,
+      ),
+    [priorityFilter, professionalFilter, memberUserIdByTeamMemberId],
+  );
+
   const weekKeys = useMemo(
     () => weekDayKeysFromMonday(weekMonday, tz),
     [weekMonday, tz],
@@ -160,10 +204,8 @@ export function VisitsAgendaClient({
 
   const getVisitsForDay = useCallback(
     (dayKey: string) =>
-      (byDay.get(dayKey) ?? []).filter((v) =>
-        visitMatchesFilter(v, priorityFilter),
-      ),
-    [byDay, priorityFilter],
+      (byDay.get(dayKey) ?? []).filter((v) => visitMatchesFilters(v)),
+    [byDay, visitMatchesFilters],
   );
 
   /** Dia em foco na UI: na semana/lista mantém-se dentro da semana visível. */
@@ -216,13 +258,13 @@ export function VisitsAgendaClient({
   const weekVisitsForList = useMemo(
     () =>
       [...weekVisits]
-        .filter((v) => visitMatchesFilter(v, priorityFilter))
+        .filter((v) => visitMatchesFilters(v))
         .sort(
           (a, b) =>
             new Date(a.scheduled_start).getTime() -
             new Date(b.scheduled_start).getTime(),
         ),
-    [weekVisits, priorityFilter],
+    [weekVisits, visitMatchesFilters],
   );
 
   const stats = useMemo(() => {
@@ -243,8 +285,8 @@ export function VisitsAgendaClient({
 
   const dayVisitsSelected = useMemo(() => {
     const raw = byDay.get(effectiveDayKey) ?? [];
-    return raw.filter((v) => visitMatchesFilter(v, priorityFilter));
-  }, [byDay, effectiveDayKey, priorityFilter]);
+    return raw.filter((v) => visitMatchesFilters(v));
+  }, [byDay, effectiveDayKey, visitMatchesFilters]);
 
   const goWeek = useCallback((delta: number) => {
     setWeekMonday((m) => {
@@ -466,6 +508,45 @@ export function VisitsAgendaClient({
             </button>
           ))}
         </div>
+
+        {professionalOptions.length > 1 ? (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Label
+              htmlFor="agenda-profissional"
+              className="text-muted-foreground whitespace-nowrap text-sm"
+            >
+              Profissional
+            </Label>
+            <Select
+              value={professionalFilter}
+              onValueChange={(value) =>
+                setProfessionalFilter(
+                  parseProfessionalFilter(value, professionalOptions),
+                )
+              }
+            >
+              <SelectTrigger
+                id="agenda-profissional"
+                className="h-9 w-full sm:w-[16rem]"
+                aria-label="Filtrar agenda por profissional"
+              >
+                <SelectValue>
+                  {(selected) =>
+                    professionalOptions.find((option) => option.value === selected)
+                      ?.label ?? "Todos os profissionais"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {professionalOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <div className="space-y-5 xl:hidden">
           <div className="grid grid-cols-3 gap-2">
@@ -934,7 +1015,7 @@ export function VisitsAgendaClient({
               {dayVisitsSelected.length === 0 ? (
                 <p className="text-muted-foreground mt-3 text-sm">
                   Sem compromissos neste dia
-                  {priorityFilter !== "all" ? " com este filtro" : ""}. Agende ou
+                  {hasActiveFilters ? " com este filtro" : ""}. Agende ou
                   escolha outro dia no calendário.
                 </p>
               ) : (

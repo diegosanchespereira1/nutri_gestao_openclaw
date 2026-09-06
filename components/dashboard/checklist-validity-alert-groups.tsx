@@ -24,6 +24,10 @@ type Props = {
    *  filtrados a um único cliente (ex.: página do cliente), onde a busca por
    *  nome de empresa não faz sentido. Mantém o filtro de status e a paginação. */
   hideCompanySearch?: boolean;
+  /** Esconde o filtro de status quando a página já é de um único estado. */
+  hideStatusFilter?: boolean;
+  /** Destino do «voltar» no dossiê de cada card. */
+  returnTo?: string;
 };
 
 type StatusFilter = "todos" | "proximo" | "vencido";
@@ -54,6 +58,8 @@ export function ChecklistValidityAlertGroups({
   alerts,
   timeZone,
   hideCompanySearch = false,
+  hideStatusFilter = false,
+  returnTo,
 }: Props) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
@@ -79,12 +85,15 @@ export function ChecklistValidityAlertGroups({
   const from = total === 0 ? 0 : offset + 1;
   const to = Math.min(offset + pageSize, total);
 
+  const showFilters = !hideCompanySearch || !hideStatusFilter;
+
   return (
     <div className="space-y-4">
+      {showFilters ? (
       <div
         className={cn(
           "grid gap-3 rounded-lg border border-border bg-muted/20 p-3 sm:p-4",
-          hideCompanySearch ? "sm:grid-cols-1" : "sm:grid-cols-2",
+          hideCompanySearch || hideStatusFilter ? "sm:grid-cols-1" : "sm:grid-cols-2",
         )}
       >
         {hideCompanySearch ? null : (
@@ -104,11 +113,12 @@ export function ChecklistValidityAlertGroups({
                   setPage(1);
                 }}
                 placeholder="Digite o nome da empresa"
-                className="pl-8"
+                className="pl-8 min-h-11"
               />
             </div>
           </div>
         )}
+        {hideStatusFilter ? null : (
         <div className={cn("space-y-1.5", hideCompanySearch && "sm:max-w-xs")}>
           <Label htmlFor="validity-status-filter">Filtrar por status</Label>
           <Select
@@ -118,7 +128,7 @@ export function ChecklistValidityAlertGroups({
               setPage(1);
             }}
           >
-            <SelectTrigger id="validity-status-filter">
+            <SelectTrigger id="validity-status-filter" className="min-h-11">
               <SelectValue placeholder="Selecione o status">
                 {(selected) =>
                   selected ? STATUS_FILTER_LABELS[selected as StatusFilter] : null
@@ -132,7 +142,9 @@ export function ChecklistValidityAlertGroups({
             </SelectContent>
           </Select>
         </div>
+        )}
       </div>
+      ) : null}
 
       {filteredAlerts.length === 0 ? (
         <p className="text-muted-foreground text-sm">
@@ -150,6 +162,7 @@ export function ChecklistValidityAlertGroups({
                   alert={alert}
                   timeZone={timeZone}
                   stacked
+                  returnTo={returnTo}
                 />
               </li>
             ))}
@@ -158,7 +171,7 @@ export function ChecklistValidityAlertGroups({
           {totalPages > 1 && (
             <div className="flex flex-col items-center justify-between gap-3 border-t border-border pt-4 sm:flex-row">
               <p className="text-muted-foreground text-sm">
-                {`Exibindo ${from}–${to} de ${total} item${total !== 1 ? "s" : ""}`}
+                {`Exibindo ${from}–${to} de ${total} ${total === 1 ? "item" : "itens"}`}
               </p>
               <PaginationControls
                 page={safePage}

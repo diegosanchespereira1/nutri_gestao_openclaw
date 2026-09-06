@@ -2,20 +2,26 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 
 import { ChecklistValidityAlertGroups } from "@/components/dashboard/checklist-validity-alert-groups";
+import { ChecklistValidityKpiCards } from "@/components/dashboard/checklist-validity-kpi-cards";
 import { DashboardClinicalSubsection } from "@/components/dashboard/dashboard-clinical-subsection";
 import { DashboardFocusPanel } from "@/components/dashboard/dashboard-focus-panel";
 import { RegulatoryAlertCard } from "@/components/dashboard/regulatory-alert-card";
-import { VisitsMonthBarChart } from "@/components/dashboard/visits-month-bar-chart";
+import { VisitsPerformedChartCard } from "@/components/dashboard/visits-performed-chart-card";
 import { WeeklyBriefingWidget } from "@/components/dashboard/weekly-briefing-widget";
 import { VisitAgendaBlock } from "@/components/visits/visit-agenda-block";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { loadComplianceDashboardAlerts } from "@/lib/actions/compliance-deadlines";
 import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-alerts";
 import {
-  buildVisitsByMonthSeries,
-  visitsByMonthHasData,
-} from "@/lib/dashboard/visits-by-month";
+  balanceValidityAlerts,
+  countValidityAlertsByStatus,
+  VALIDITY_ALERTS_LIST_LIMIT,
+} from "@/lib/checklists/validity-alerts-balance";
 import { buildWeeklyBriefing } from "@/lib/dashboard/weekly-briefing";
+import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
+import { visitKindLabel } from "@/lib/constants/visit-kinds";
+import { visitPriorityLabel } from "@/lib/constants/visit-priorities";
+import { visitDisplayTitle, visitProfessionalLabel } from "@/lib/visits/display-title";
 import { loadScheduledVisitsForAgenda } from "@/lib/visits/load-scheduled-visits";
 import { isSameCalendarDay } from "@/lib/datetime/calendar-tz";
 import { sortScheduledVisitsForDashboard } from "@/lib/visits/sort-scheduled-visits-dashboard";
@@ -45,24 +51,29 @@ export async function DashboardClinicalPanel() {
 
   const now = new Date();
   const visitsFrom = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 6, now.getUTCDate()),
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 12, now.getUTCDate()),
   ).toISOString();
   const visitsTo = new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90),
   ).toISOString();
 
-  const [{ rows }, complianceAlerts, validityAlerts] = await Promise.all([
-    loadScheduledVisitsForAgenda({
-      supabase,
-      authUserId: user.id,
-      workspaceOwnerId,
-      role: profileCtx?.role,
-      from: visitsFrom,
-      to: visitsTo,
-    }),
-    loadComplianceDashboardAlerts(tz),
-    loadChecklistValidityAlerts(tz),
-  ]);
+  const [{ rows }, complianceAlerts, validityAlerts, { rows: teamMembers }] =
+    await Promise.all([
+      loadScheduledVisitsForAgenda({
+        supabase,
+        authUserId: user.id,
+        workspaceOwnerId,
+        role: profileCtx?.role,
+        from: visitsFrom,
+        to: visitsTo,
+      }),
+      loadComplianceDashboardAlerts(tz),
+      loadChecklistValidityAlerts(tz, {
+        limit: VALIDITY_ALERTS_LIST_LIMIT,
+        skipBalance: true,
+      }),
+      loadTeamMembersForOwner(),
+    ]);
 
   const today = sortScheduledVisitsForDashboard(
     rows.filter(
@@ -72,9 +83,28 @@ export async function DashboardClinicalPanel() {
     ),
   );
 
+  const validityCounts = countValidityAlertsByStatus(validityAlerts);
+  const validityPreview = balanceValidityAlerts(validityAlerts, 8);
+
   const weeklyBriefing = buildWeeklyBriefing(rows, complianceAlerts, tz);
-  const visitsByMonth = buildVisitsByMonthSeries(rows, tz, 6);
-  const showVisitsChart = visitsByMonthHasData(visitsByMonth);
+  const completedVisits = rows
+    .filter((visit) => visit.status === "completed")
+    .map((visit) => ({
+      scheduled_start: visit.scheduled_start,
+      status: visit.status,
+      assigned_team_member_id: visit.assigned_team_member_id,
+      user_id: visit.user_id,
+      team_members: visit.team_members,
+      creator_full_name: visit.creator_full_name,
+      target_type: visit.target_type,
+      target_name: visitDisplayTitle(visit),
+      visit_kind_label: visitKindLabel[visit.visit_kind],
+      priority_label: visitPriorityLabel[visit.priority],
+      professional_label: visitProfessionalLabel(
+        visit,
+        visit.creator_full_name,
+      ),
+    }));
 
   return (
     <DashboardFocusPanel
@@ -106,28 +136,28 @@ export async function DashboardClinicalPanel() {
 
       <WeeklyBriefingWidget briefing={weeklyBriefing} timeZone={tz} />
 
-      {showVisitsChart ? (
-        <DashboardClinicalSubsection
-          id="dashboard-visits-chart-heading"
-          title="Visitas por mês"
-          actions={
-            <Link
-              href="/visitas"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "w-full justify-center sm:w-auto",
-              )}
-            >
-              Agenda completa
-            </Link>
-          }
-        >
-          <p className="text-muted-foreground mb-3 text-xs">
-            Gráfico abaixo mostra as visitas realizadas nos últimos 6 meses.
-          </p>
-          <VisitsMonthBarChart data={visitsByMonth} />
-        </DashboardClinicalSubsection>
-      ) : null}
+      <DashboardClinicalSubsection
+        id="dashboard-visits-chart-heading"
+        title="Visitas realizadas"
+        actions={
+          <Link
+            href="/visitas"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "w-full justify-center sm:w-auto",
+            )}
+          >
+            Agenda completa
+          </Link>
+        }
+      >
+        <VisitsPerformedChartCard
+          visits={completedVisits}
+          teamMembers={teamMembers}
+          timeZone={tz}
+          referenceIso={now.toISOString()}
+        />
+      </DashboardClinicalSubsection>
 
       <DashboardClinicalSubsection
         id="validity-alerts-heading"
@@ -144,13 +174,19 @@ export async function DashboardClinicalPanel() {
           </Link>
         }
       >
-        {validityAlerts.length === 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Sem itens vencidos (último ano) ou com validade nos próximos 90 dias.
-          </p>
-        ) : (
-          <ChecklistValidityAlertGroups alerts={validityAlerts} timeZone={tz} />
-        )}
+        <div className="space-y-4">
+          <ChecklistValidityKpiCards
+            vencidos={validityCounts.vencidos}
+            proximos={validityCounts.proximos}
+          />
+          {validityPreview.length === 0 ? (
+            <p className="text-muted-foreground text-sm">
+              Sem itens vencidos (último ano) ou com validade nos próximos 90 dias.
+            </p>
+          ) : (
+            <ChecklistValidityAlertGroups alerts={validityPreview} timeZone={tz} />
+          )}
+        </div>
       </DashboardClinicalSubsection>
 
       <DashboardClinicalSubsection

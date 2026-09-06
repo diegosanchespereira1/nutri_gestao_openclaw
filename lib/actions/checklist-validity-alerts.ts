@@ -7,13 +7,25 @@ import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { addCalendarDays, calendarDaysUntilDueDate, todayKey } from "@/lib/datetime/calendar-tz";
 import {
   balanceValidityAlerts,
+  filterValidityAlertsByStatus,
+  resolveValidityAlertWindow,
   VALIDITY_ALERTS_LIMIT_DEFAULT,
-  VALIDITY_ALERTS_PAST_DAYS,
-  VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT,
 } from "@/lib/checklists/validity-alerts-balance";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import type { ChecklistValidityAlert } from "@/lib/types/checklist-validity-alerts";
+import type {
+  ChecklistValidityAlert,
+  ChecklistValidityAlertStatus,
+} from "@/lib/types/checklist-validity-alerts";
+
+export type LoadChecklistValidityAlertsOptions = {
+  withinDays?: number;
+  pastDays?: number;
+  limit?: number;
+  clientId?: string | null;
+  status?: ChecklistValidityAlertStatus;
+  skipBalance?: boolean;
+};
 
 type RpcAlertRow = {
   response_id: string;
@@ -131,15 +143,15 @@ async function loadChecklistValidityAlertsViaRpc(
   supabase: SupabaseClient,
   workspaceOwnerId: string,
   timeZone: string,
-  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+  options?: LoadChecklistValidityAlertsOptions,
 ): Promise<ChecklistValidityAlert[] | null> {
-  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const { withinDays, pastDays } = resolveValidityAlertWindow(options);
   const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
   const clientFilter = options?.clientId ?? null;
 
   const tKey = todayKey(new Date(), timeZone);
   const horizon = addCalendarDays(tKey, withinDays, timeZone);
-  const pastCap = addCalendarDays(tKey, -VALIDITY_ALERTS_PAST_DAYS, timeZone);
+  const pastCap = addCalendarDays(tKey, -pastDays, timeZone);
 
   const baseArgs = {
     p_owner_user_id: workspaceOwnerId,
@@ -179,14 +191,14 @@ async function loadChecklistValidityAlertsViaRpc(
   }
 
   const mapped = mapRpcRows((data ?? []) as RpcAlertRow[], timeZone);
-  return balanceValidityAlerts(mapped, limit);
+  return finalizeValidityAlerts(mapped, limit, options);
 }
 
 async function loadChecklistValidityAlertsResolved(
   supabase: SupabaseClient,
   workspaceOwnerId: string,
   timeZone: string,
-  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+  options?: LoadChecklistValidityAlertsOptions,
 ): Promise<ChecklistValidityAlert[]> {
   const viaRpc = await loadChecklistValidityAlertsViaRpc(
     supabase,
@@ -210,15 +222,15 @@ async function loadChecklistValidityAlertsLegacy(
   supabase: SupabaseClient,
   workspaceOwnerId: string,
   timeZone: string,
-  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+  options?: LoadChecklistValidityAlertsOptions,
 ): Promise<ChecklistValidityAlert[]> {
-  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const { withinDays, pastDays } = resolveValidityAlertWindow(options);
   const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
   const clientFilter = options?.clientId ?? null;
 
   const tKey = todayKey(new Date(), timeZone);
   const horizon = addCalendarDays(tKey, withinDays, timeZone);
-  const pastCap = addCalendarDays(tKey, -VALIDITY_ALERTS_PAST_DAYS, timeZone);
+  const pastCap = addCalendarDays(tKey, -pastDays, timeZone);
 
   let clientsQuery = supabase
     .from("clients")
@@ -399,15 +411,33 @@ async function loadChecklistValidityAlertsLegacy(
     return aTime - bTime;
   });
 
-  return balanceValidityAlerts(alerts, Math.max(1, limit));
+  return finalizeValidityAlerts(alerts, Math.max(1, limit), options);
+}
+
+function finalizeValidityAlerts(
+  alerts: ChecklistValidityAlert[],
+  limit: number,
+  options?: LoadChecklistValidityAlertsOptions,
+): ChecklistValidityAlert[] {
+  const filtered = options?.status
+    ? filterValidityAlertsByStatus(alerts, options.status)
+    : alerts;
+  const skipBalance = options?.skipBalance ?? Boolean(options?.status);
+  if (skipBalance) {
+    return filtered.slice(0, Math.max(1, limit));
+  }
+  return balanceValidityAlerts(filtered, Math.max(1, limit));
 }
 
 function getCachedChecklistValidityAlerts(
   workspaceOwnerId: string,
   timeZone: string,
   withinDays: number,
+  pastDays: number,
   limit: number,
   clientId: string | null,
+  status: ChecklistValidityAlertStatus | null,
+  skipBalance: boolean,
 ): Promise<ChecklistValidityAlert[]> {
   return unstable_cache(
     () =>
@@ -415,15 +445,25 @@ function getCachedChecklistValidityAlerts(
         createServiceRoleClient(),
         workspaceOwnerId,
         timeZone,
-        { withinDays, limit, clientId },
+        {
+          withinDays,
+          pastDays,
+          limit,
+          clientId,
+          status: status ?? undefined,
+          skipBalance,
+        },
       ),
     [
-      "checklist-validity-alerts-v1",
+      "checklist-validity-alerts-v2",
       workspaceOwnerId,
       timeZone,
       String(withinDays),
+      String(pastDays),
       String(limit),
       clientId ?? "",
+      status ?? "",
+      skipBalance ? "1" : "0",
     ],
     {
       revalidate: 90,
@@ -434,29 +474,34 @@ function getCachedChecklistValidityAlerts(
 
 export async function loadChecklistValidityAlerts(
   timeZone: string,
-  options?: { withinDays?: number; limit?: number; clientId?: string | null },
+  options?: LoadChecklistValidityAlertsOptions,
 ): Promise<ChecklistValidityAlert[]> {
   const { supabase, workspaceOwnerId } = await getServerContext();
   if (!workspaceOwnerId) return [];
 
-  const withinDays = options?.withinDays ?? VALIDITY_ALERTS_UPCOMING_DAYS_DEFAULT;
+  const { withinDays, pastDays } = resolveValidityAlertWindow(options);
   const limit = options?.limit ?? VALIDITY_ALERTS_LIMIT_DEFAULT;
   const clientId = options?.clientId ?? null;
+  const status = options?.status ?? null;
+  const skipBalance = options?.skipBalance ?? Boolean(status);
 
   try {
     return await getCachedChecklistValidityAlerts(
       workspaceOwnerId,
       timeZone,
       withinDays,
+      pastDays,
       limit,
       clientId,
+      status,
+      skipBalance,
     );
   } catch {
     return loadChecklistValidityAlertsResolved(
       supabase,
       workspaceOwnerId,
       timeZone,
-      { withinDays, limit, clientId },
+      { withinDays, pastDays, limit, clientId, status: status ?? undefined, skipBalance },
     );
   }
 }

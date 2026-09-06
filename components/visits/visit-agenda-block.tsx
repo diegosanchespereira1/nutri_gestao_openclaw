@@ -11,7 +11,7 @@ import {
 } from "@/lib/constants/visit-priorities";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
-import { visitDisplayTitle } from "@/lib/visits/display-title";
+import { visitDisplayTitle, visitProfessionalLabel } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -20,12 +20,18 @@ type Props = {
   timeZone: string;
   /** Se true, mostra CTA “Iniciar visita” quando for o dia civil local e estado agendada. */
   showStartCta?: boolean;
+  /** Mostra o profissional responsável (visão de gestão). */
+  showProfessional?: boolean;
+  /** Linha densa para listas do dashboard (2 linhas + scroll). */
+  compact?: boolean;
 };
 
 export function VisitAgendaBlock({
   visit,
   timeZone,
   showStartCta = true,
+  showProfessional = false,
+  compact = false,
 }: Props) {
   const title = visitDisplayTitle(visit);
   const when = formatDateTimeShort(visit.scheduled_start, timeZone);
@@ -36,6 +42,58 @@ export function VisitAgendaBlock({
   const canStart = showStartCta && isTodaySlot;
 
   const kind = (visit.visit_kind ?? "other") as VisitKind;
+  const professional = showProfessional
+    ? visitProfessionalLabel(visit, visit.creator_full_name)
+    : null;
+
+  if (compact) {
+    return (
+      <article
+        className={cn(
+          "border-border flex items-center gap-2 rounded-lg border border-l-4 p-2.5",
+          visitPriorityAgendaSurface[visit.priority],
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-foreground truncate text-sm leading-5 font-medium">
+            {title}
+          </p>
+          <p className="text-muted-foreground truncate text-xs leading-4">
+            {when}
+            <span aria-hidden> · </span>
+            {priorityLabel}
+            {professional ? (
+              <>
+                <span aria-hidden> · </span>
+                {professional}
+              </>
+            ) : null}
+            <span aria-hidden> · </span>
+            {visitKindLabel[kind]}
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1.5">
+          <Link
+            href={`/visitas/${visit.id}`}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "h-8 min-h-8 px-2.5",
+            )}
+          >
+            Ver
+          </Link>
+          {canStart ? (
+            <Link
+              href={`/visitas/${visit.id}/iniciar`}
+              className={cn(buttonVariants({ size: "sm" }), "h-8 min-h-8 px-2.5")}
+            >
+              {visit.status === "in_progress" ? "Continuar" : "Iniciar"}
+            </Link>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
 
   return (
     <article
@@ -49,6 +107,9 @@ export function VisitAgendaBlock({
         <p className="text-foreground font-medium">{title}</p>
         <p className="text-muted-foreground text-sm">
           {when} · Prioridade: {priorityLabel}
+          {showProfessional
+            ? ` · ${visitProfessionalLabel(visit, visit.creator_full_name)}`
+            : ""}
         </p>
         <p className="text-muted-foreground mt-1 text-xs">
           <span className="text-foreground/90 font-medium">

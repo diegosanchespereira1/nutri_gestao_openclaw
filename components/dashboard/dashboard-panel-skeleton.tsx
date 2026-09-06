@@ -9,6 +9,30 @@ function Block({ className }: { className?: string }) {
   );
 }
 
+export function DashboardHomeSkeleton() {
+  return (
+    <div
+      className="space-y-6"
+      role="status"
+      aria-live="polite"
+      aria-label="Carregando dashboard"
+    >
+      <Block className="h-4 w-64" />
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <Block className="h-24" />
+        <Block className="h-24" />
+        <Block className="h-24" />
+        <Block className="h-24" />
+      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <Block className="h-48 xl:col-span-7" />
+        <Block className="h-48 xl:col-span-5" />
+      </div>
+      <Block className="h-40 w-full" />
+    </div>
+  );
+}
+
 export function DashboardClinicalPanelSkeleton() {
   return (
     <div

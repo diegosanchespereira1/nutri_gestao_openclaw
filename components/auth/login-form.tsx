@@ -8,6 +8,7 @@ import { AppBuildLabel } from "@/components/app-version-guard";
 import { AuthModeTabs, type AuthMode } from "@/components/auth/auth-mode-tabs";
 import { PasswordField } from "@/components/auth/password-field";
 import { SignupWizard } from "@/components/auth/signup-wizard";
+import { assertAuthRateLimitAction } from "@/lib/actions/auth-rate-limit";
 import { checkSignupOutcomeAction } from "@/lib/actions/signup";
 import {
   SIGNUP_OUTCOME_MESSAGE,
@@ -282,6 +283,21 @@ export function LoginForm() {
         outcome: "attempt",
       });
 
+      const rateLimit = await withAuthTimeout(
+        assertAuthRateLimitAction(),
+        "auth_rate_limit",
+      );
+      if (!rateLimit.ok) {
+        void logAuthTroubleshootingEvent({
+          event: "password_signin_rate_limited",
+          step: "password",
+          outcome: "error",
+          errorMessage: rateLimit.error,
+        });
+        setError(rateLimit.error);
+        return;
+      }
+
       let signInData:
         | Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>["data"]
         | null = null;
@@ -438,6 +454,21 @@ export function LoginForm() {
     const startedAt = performance.now();
 
     try {
+      const rateLimit = await withAuthTimeout(
+        assertAuthRateLimitAction(),
+        "mfa_rate_limit",
+      );
+      if (!rateLimit.ok) {
+        void logAuthTroubleshootingEvent({
+          event: "mfa_verify_rate_limited",
+          step: "mfa",
+          outcome: "error",
+          errorMessage: rateLimit.error,
+        });
+        setError(rateLimit.error);
+        return;
+      }
+
       const { error: vErr } = await withAuthTimeout<
         Awaited<ReturnType<typeof supabase.auth.mfa.verify>>
       >(

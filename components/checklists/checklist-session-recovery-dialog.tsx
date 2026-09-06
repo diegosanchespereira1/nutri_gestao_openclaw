@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { assertAuthRateLimitAction } from "@/lib/actions/auth-rate-limit";
 import { waitForServerAuthReady } from "@/lib/client/wait-for-server-auth";
 import { STALE_SERVER_ACTION_MESSAGE } from "@/lib/client/server-action-errors";
 import { mapSupabaseLoginError } from "@/lib/map-supabase-auth-error";
@@ -46,6 +47,12 @@ export function ChecklistSessionRecoveryDialog({
     const supabase = createClient();
 
     try {
+      const rateLimit = await assertAuthRateLimitAction();
+      if (!rateLimit.ok) {
+        setError(rateLimit.error);
+        return;
+      }
+
       const { data, error: signErr } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,

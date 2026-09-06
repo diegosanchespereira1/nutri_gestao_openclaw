@@ -78,16 +78,6 @@ export const accountClosureIpRatelimit = new Ratelimit({
 });
 
 /**
- * Rate limiter para API calls (100 por minuto por usuário)
- */
-export const apiRatelimit = new Ratelimit({
-  redis,
-  limiter: Ratelimit.fixedWindow(100, '1 m'),
-  analytics: true,
-  prefix: 'ratelimit:api',
-});
-
-/**
  * Extrai IP do request
  */
 export function getClientIp(request: NextRequest): string {
@@ -112,12 +102,11 @@ function rateLimitUnavailable(retryAfterSeconds: number) {
 }
 
 /**
- * Check auth rate limit (for login/signup)
+ * Check auth rate limit by IP (login, MFA, callback).
  * Returns { success, remaining, reset, retryAfter }
  */
-export async function checkAuthRateLimit(request: NextRequest) {
+export async function checkAuthRateLimitByIp(ip: string) {
   if (!isRateLimitConfigured) return rateLimitDisabled();
-  const ip = getClientIp(request);
 
   try {
     const { success, remaining, reset } = await authRatelimit.limit(ip);
@@ -131,6 +120,14 @@ export async function checkAuthRateLimit(request: NextRequest) {
     console.error('[Rate Limit Error]', error);
     return rateLimitUnavailable(60);
   }
+}
+
+/**
+ * Check auth rate limit (for login/signup)
+ * Returns { success, remaining, reset, retryAfter }
+ */
+export async function checkAuthRateLimit(request: NextRequest) {
+  return checkAuthRateLimitByIp(getClientIp(request));
 }
 
 /**
@@ -151,27 +148,6 @@ export async function checkPasswordResetRateLimit(email: string) {
   } catch (error) {
     console.error('[Rate Limit Error]', error);
     return rateLimitUnavailable(3600);
-  }
-}
-
-/**
- * Check API rate limit (for authenticated users)
- */
-export async function checkApiRateLimit(userId: string) {
-  if (!isRateLimitConfigured) return rateLimitDisabled();
-  try {
-    const { success, remaining, reset } = await apiRatelimit.limit(
-      `api:${userId}`
-    );
-    return {
-      success,
-      remaining,
-      reset,
-      retryAfter: reset ? Math.ceil((reset - Date.now()) / 1000) : null,
-    };
-  } catch (error) {
-    console.error('[Rate Limit Error]', error);
-    return rateLimitUnavailable(60);
   }
 }
 

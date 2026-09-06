@@ -3,9 +3,7 @@
 import Link from "next/link";
 import { useRef, useState } from "react";
 
-import { getBrowserAppOrigin } from "@/lib/app-origin";
-import { mapSupabaseRecoverPasswordError } from "@/lib/map-supabase-auth-error";
-import { createClient } from "@/lib/supabase/client";
+import { requestPasswordResetAction } from "@/lib/actions/auth-rate-limit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,19 +26,11 @@ export function ForgotPasswordForm() {
     setError(null);
     submitInFlight.current = true;
     setLoading(true);
-    const supabase = createClient();
-    const origin = getBrowserAppOrigin();
 
     try {
-      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
-        email,
-        {
-          redirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/auth/reset-password")}`,
-        },
-      );
-
-      if (resetErr) {
-        setError(mapSupabaseRecoverPasswordError(resetErr));
+      const result = await requestPasswordResetAction(email);
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
       setSent(true);

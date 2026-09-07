@@ -98,8 +98,8 @@ export function AgendaSettingsForm({
       </div>
 
       <p id="agenda-hours-hint" className="text-muted-foreground text-xs">
-        A grelha semanal apresenta apenas o intervalo configurado. Visitas fora
-        deste horário continuam acessíveis na vista Lista.
+        A grelha semanal apresenta apenas este intervalo. Não é possível
+        agendar nem reagendar visitas fora deste horário.
       </p>
 
       {state?.ok === false ? (

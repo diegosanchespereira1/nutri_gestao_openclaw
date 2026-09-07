@@ -27,6 +27,11 @@ import { VISIT_KINDS, visitKindLabel } from "@/lib/constants/visit-kinds";
 import { VISIT_PRIORITIES, visitPriorityLabel } from "@/lib/constants/visit-priorities";
 import { MAX_DOSSIER_EMAIL_RECIPIENTS } from "@/lib/constants/dossier-email";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import {
+  agendaHoursOutOfRangeMessage,
+  formatAgendaHourLabel,
+  isLocalDatetimeWithinAgendaHours,
+} from "@/lib/visits/agenda-hours";
 import type { VisitAssigneeFormContext } from "@/lib/visits/assignee-context";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
@@ -61,6 +66,8 @@ type Props = {
   teamMembers: TeamMemberRow[];
   assigneeContext: VisitAssigneeFormContext;
   isLoadingTargets?: boolean;
+  agendaStartHour: number;
+  agendaEndHour: number;
 };
 
 export function VisitScheduleDialog({
@@ -72,6 +79,8 @@ export function VisitScheduleDialog({
   teamMembers,
   assigneeContext,
   isLoadingTargets = false,
+  agendaStartHour,
+  agendaEndHour,
 }: Props) {
   const tz = useAppTimeZone();
   const router = useRouter();
@@ -82,6 +91,7 @@ export function VisitScheduleDialog({
       : "patient",
   );
   const [state, formAction, isPending] = useActionState(createVisitDialogAction, null);
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   const selfAssigneeValue =
     assigneeContext.currentTeamMemberId ?? SELF_ASSIGNEE_EMPTY;
@@ -105,6 +115,7 @@ export function VisitScheduleDialog({
 
   useEffect(() => {
     if (!open) return;
+    setTimeError(null);
     setAssigneeId(assigneeContext.defaultAssigneeId || SELF_ASSIGNEE_EMPTY);
     setVisitKind(
       targetType === "patient" ? "patient_care" : "technical_compliance",
@@ -124,7 +135,22 @@ export function VisitScheduleDialog({
     const form = e.currentTarget;
     const local = form.elements.namedItem("scheduled_start_local") as HTMLInputElement | null;
     const hidden = form.elements.namedItem("scheduled_start_iso") as HTMLInputElement | null;
-    if (local?.value && hidden) {
+    if (!local?.value) return;
+    if (
+      !isLocalDatetimeWithinAgendaHours(
+        local.value,
+        agendaStartHour,
+        agendaEndHour,
+      )
+    ) {
+      e.preventDefault();
+      setTimeError(
+        agendaHoursOutOfRangeMessage(agendaStartHour, agendaEndHour),
+      );
+      return;
+    }
+    setTimeError(null);
+    if (hidden) {
       const iso = localDateTimeInTimeZoneToUtcIso(local.value, tz);
       if (iso) hidden.value = iso;
     }
@@ -412,9 +438,14 @@ export function VisitScheduleDialog({
                     required
                     defaultValue={defaultScheduledStart}
                     className="w-full focus-visible:ring-inset focus-visible:ring-ring/40"
+                    aria-invalid={timeError ? true : undefined}
+                    onChange={() => {
+                      if (timeError) setTimeError(null);
+                    }}
                   />
                   <p className="text-muted-foreground break-words text-xs">
-                    Horário no fuso configurado em Definições → Região.
+                    Só é possível agendar entre {formatAgendaHourLabel(agendaStartHour)} e{" "}
+                    {formatAgendaHourLabel(agendaEndHour)} (Definições → Agenda).
                   </p>
                 </div>
 
@@ -476,8 +507,10 @@ export function VisitScheduleDialog({
               </div>
             </div>
 
-            {state?.ok === false ? (
-              <p className="text-destructive mt-3 min-w-0 shrink-0 break-words text-sm">{state.error}</p>
+            {timeError || state?.ok === false ? (
+              <p className="text-destructive mt-3 min-w-0 shrink-0 break-words text-sm" role="alert">
+                {timeError ?? (state?.ok === false ? state.error : null)}
+              </p>
             ) : null}
 
             <div className="bg-popover mt-4 flex min-w-0 shrink-0 gap-2 border-t pt-4">

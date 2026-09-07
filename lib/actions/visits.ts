@@ -9,7 +9,11 @@ import { parseVisitPriority } from "@/lib/constants/visit-priorities";
 import { parseVisitKind } from "@/lib/constants/visit-kinds";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
 import type { ProfileRole } from "@/lib/roles";
-import { fetchProfileTimeZone } from "@/lib/supabase/profile";
+import { fetchAgendaSettings } from "@/lib/supabase/profile";
+import {
+  agendaHoursOutOfRangeMessage,
+  isIsoWithinAgendaHours,
+} from "@/lib/visits/agenda-hours";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId, isWorkspaceGestaoMember } from "@/lib/workspace";
 import type { VisitTargetType } from "@/lib/types/visits";
@@ -41,10 +45,11 @@ export async function createScheduledVisitAction(
     formData.get("establishment_id") ?? "",
   ).trim();
   const patientId = String(formData.get("patient_id") ?? "").trim();
+  const { timeZone: tz, agendaStartHour, agendaEndHour } =
+    await fetchAgendaSettings(supabase, user.id);
   const localRaw = String(formData.get("scheduled_start_local") ?? "").trim();
   let scheduledIso = String(formData.get("scheduled_start_iso") ?? "").trim();
   if (localRaw) {
-    const tz = await fetchProfileTimeZone(supabase, user.id);
     const fromProfileTz = localDateTimeInTimeZoneToUtcIso(localRaw, tz);
     if (fromProfileTz) scheduledIso = fromProfileTz;
   }
@@ -80,6 +85,17 @@ export async function createScheduledVisitAction(
   const start = new Date(scheduledIso);
   if (Number.isNaN(start.getTime())) {
     redirect("/visitas/nova?err=date");
+  }
+
+  if (
+    !isIsoWithinAgendaHours(
+      start.toISOString(),
+      tz,
+      agendaStartHour,
+      agendaEndHour,
+    )
+  ) {
+    redirect("/visitas/nova?err=agenda_hours");
   }
 
   if (targetType === "establishment" && !establishmentId) {
@@ -208,10 +224,11 @@ export async function createVisitDialogAction(
     return { ok: false, error: "Selecione um paciente." };
   }
 
+  const { timeZone: tz, agendaStartHour, agendaEndHour } =
+    await fetchAgendaSettings(supabase, user.id);
   const localRaw = String(formData.get("scheduled_start_local") ?? "").trim();
   let scheduledIso = String(formData.get("scheduled_start_iso") ?? "").trim();
   if (localRaw) {
-    const tz = await fetchProfileTimeZone(supabase, user.id);
     const converted = localDateTimeInTimeZoneToUtcIso(localRaw, tz);
     if (converted) scheduledIso = converted;
   }
@@ -219,6 +236,20 @@ export async function createVisitDialogAction(
 
   const start = new Date(scheduledIso);
   if (Number.isNaN(start.getTime())) return { ok: false, error: "Data ou hora inválida." };
+
+  if (
+    !isIsoWithinAgendaHours(
+      start.toISOString(),
+      tz,
+      agendaStartHour,
+      agendaEndHour,
+    )
+  ) {
+    return {
+      ok: false,
+      error: agendaHoursOutOfRangeMessage(agendaStartHour, agendaEndHour),
+    };
+  }
 
   const visitKind = parseVisitKind(formData.get("visit_kind"));
   if (!visitKind) return { ok: false, error: "Selecione o tipo de visita." };
@@ -351,6 +382,27 @@ export async function rescheduleVisitAction(
 
   if (!visit || !canManage) {
     return { ok: false, error: "Visita não encontrada." };
+  }
+
+  const start = new Date(newScheduledStart);
+  if (Number.isNaN(start.getTime())) {
+    return { ok: false, error: "Data ou hora inválida." };
+  }
+
+  const { timeZone: tz, agendaStartHour, agendaEndHour } =
+    await fetchAgendaSettings(supabase, user.id);
+  if (
+    !isIsoWithinAgendaHours(
+      start.toISOString(),
+      tz,
+      agendaStartHour,
+      agendaEndHour,
+    )
+  ) {
+    return {
+      ok: false,
+      error: agendaHoursOutOfRangeMessage(agendaStartHour, agendaEndHour),
+    };
   }
 
   const { error } = await supabase

@@ -22,6 +22,11 @@ import { Label } from "@/components/ui/label";
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { createScheduledVisitAction } from "@/lib/actions/visits";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import {
+  agendaHoursOutOfRangeMessage,
+  formatAgendaHourLabel,
+  isLocalDatetimeWithinAgendaHours,
+} from "@/lib/visits/agenda-hours";
 
 const selectClassName =
   "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-lg border px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
@@ -43,6 +48,8 @@ type Props = {
   teamMembers: TeamMemberRow[];
   defaultScheduledStart?: string;
   assigneeContext: VisitAssigneeFormContext;
+  agendaStartHour: number;
+  agendaEndHour: number;
 };
 
 function hasSchedulableEstablishment(
@@ -63,8 +70,11 @@ export function VisitScheduleForm({
   teamMembers,
   defaultScheduledStart,
   assigneeContext,
+  agendaStartHour,
+  agendaEndHour,
 }: Props) {
   const profileTimeZone = useAppTimeZone();
+  const [timeError, setTimeError] = useState<string | null>(null);
   const [targetType, setTargetType] = useState<VisitTargetType>(() => {
     if (hasSchedulableEstablishment(establishments)) return "establishment";
     return "patient";
@@ -87,6 +97,20 @@ export function VisitScheduleForm({
       e.preventDefault();
       return;
     }
+    if (
+      !isLocalDatetimeWithinAgendaHours(
+        local.value,
+        agendaStartHour,
+        agendaEndHour,
+      )
+    ) {
+      e.preventDefault();
+      setTimeError(
+        agendaHoursOutOfRangeMessage(agendaStartHour, agendaEndHour),
+      );
+      return;
+    }
+    setTimeError(null);
     hidden.value = iso;
   }
 
@@ -267,10 +291,23 @@ export function VisitScheduleForm({
           required
           defaultValue={defaultScheduledStart}
           className="w-full max-w-xs"
+          aria-invalid={timeError ? true : undefined}
+          aria-describedby={
+            timeError ? "scheduled-start-error" : "scheduled-start-hint"
+          }
+          onChange={() => {
+            if (timeError) setTimeError(null);
+          }}
         />
-        <p className="text-muted-foreground text-xs">
-          Horário no fuso configurado em Definições → Região.
+        <p id="scheduled-start-hint" className="text-muted-foreground text-xs">
+          Só é possível agendar entre {formatAgendaHourLabel(agendaStartHour)} e{" "}
+          {formatAgendaHourLabel(agendaEndHour)} (Definições → Agenda).
         </p>
+        {timeError ? (
+          <p id="scheduled-start-error" className="text-destructive text-sm" role="alert">
+            {timeError}
+          </p>
+        ) : null}
       </div>
 
       <div className="space-y-2">

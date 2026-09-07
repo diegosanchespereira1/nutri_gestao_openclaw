@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadAllPatientsForOwner } from "@/lib/actions/patients";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
+import { fetchAgendaSettings } from "@/lib/supabase/profile";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { loadCurrentUserAssigneeContext } from "@/lib/visits/assignee-context";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,8 @@ const errMessages: Record<string, string> = {
     "Este cliente está inativo (pausa). Reative o contrato na ficha do cliente para agendar visitas.",
   client_finalizado:
     "Este contrato está finalizado. Reative o contrato na ficha do cliente para agendar novas visitas.",
+  agenda_hours:
+    "Este horário está fora do intervalo configurado da agenda. Escolha um horário dentro do período definido em Definições → Agenda.",
 };
 
 type Props = {
@@ -39,11 +42,13 @@ export default async function NovaVisitaPage({ searchParams }: Props) {
     { rows: patients },
     { rows: teamMembers },
     assigneeContext,
+    { agendaStartHour, agendaEndHour },
   ] = await Promise.all([
     loadEstablishmentsForOwner(),
     loadAllPatientsForOwner(),
     loadTeamMembersForOwner(),
     loadCurrentUserAssigneeContext(supabase, user.id, workspaceOwnerId),
+    fetchAgendaSettings(supabase, user.id),
   ]);
 
   return (
@@ -98,6 +103,8 @@ export default async function NovaVisitaPage({ searchParams }: Props) {
           teamMembers={teamMembers}
           defaultScheduledStart={scheduled_start_local}
           assigneeContext={assigneeContext}
+          agendaStartHour={agendaStartHour}
+          agendaEndHour={agendaEndHour}
         />
       )}
     </div>

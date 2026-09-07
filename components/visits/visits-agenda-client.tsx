@@ -46,13 +46,20 @@ import { VisitRescheduleConfirmDialog } from "@/components/visits/visit-reschedu
 import { VisitScheduleDialog } from "@/components/visits/visit-schedule-dialog";
 import { VisitWeekTimeGrid } from "@/components/visits/visit-week-time-grid";
 import { rescheduleVisitAction } from "@/lib/actions/visits";
+import { VISITS_REPORT_PATH } from "@/lib/routes";
 import { visitKindLabel } from "@/lib/constants/visit-kinds";
 import type { TeamMemberRow } from "@/lib/types/team-members";
 import type { ScheduledVisitWithTargets, VisitKind, VisitPriority } from "@/lib/types/visits";
 import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 import type { PatientWithContext } from "@/lib/types/patients";
 import type { VisitAssigneeFormContext } from "@/lib/visits/assignee-context";
-import { visitDisplayTitle, visitProfessionalLabel, visitTargetName } from "@/lib/visits/display-title";
+import {
+  enrichVisitWithProfessional,
+  visitDisplayTitle,
+  visitProfessionalLabel,
+  visitProfessionalName,
+  visitTargetName,
+} from "@/lib/visits/display-title";
 import {
   ALL_PROFESSIONALS,
   buildVisitProfessionalOptions,
@@ -129,8 +136,11 @@ export function VisitsAgendaClient({
   const router = useRouter();
 
   const visits = useMemo(
-    () => visitsProp.filter((v) => v.status !== "cancelled"),
-    [visitsProp],
+    () =>
+      visitsProp
+        .filter((v) => v.status !== "cancelled")
+        .map((v) => enrichVisitWithProfessional(v, teamMembersProp)),
+    [visitsProp, teamMembersProp],
   );
 
   const canCancelVisit = useCallback(
@@ -614,7 +624,8 @@ export function VisitsAgendaClient({
                       <span className="font-medium">{visitDisplayTitle(v)}</span>
                       <span className="text-muted-foreground block text-xs">
                         {formatTimeShort(v.scheduled_start, tz)} ·{" "}
-                        {visitPriorityLabel[v.priority]}
+                        {visitKindLabel[(v.visit_kind ?? "other") as VisitKind]}{" "}
+                        · {visitProfessionalName(v, v.creator_full_name)}
                       </span>
                     </button>
                   </li>
@@ -780,11 +791,15 @@ export function VisitsAgendaClient({
                               {visitDisplayTitle(v)}
                             </span>
                             <span className="text-muted-foreground mt-0.5 block text-xs">
-                              {formatDateTimeShort(v.scheduled_start, tz)}{" "}
-                              · {visitPriorityLabel[v.priority]} ·{" "}
-                              {v.target_type === "establishment"
-                                ? "Estabelecimento"
-                                : "Paciente"}
+                              {formatDateTimeShort(v.scheduled_start, tz)}
+                              {" · "}
+                              {visitKindLabel[
+                                (v.visit_kind ?? "other") as VisitKind
+                              ]}
+                              {" · "}
+                              {visitProfessionalName(v, v.creator_full_name)}
+                              {" · "}
+                              {visitPriorityLabel[v.priority]}
                             </span>
                           </div>
                           <span className="text-muted-foreground shrink-0 text-xs capitalize">
@@ -954,18 +969,18 @@ export function VisitsAgendaClient({
                     ]}
                   </dd>
                 </div>
-                <div className="flex gap-2">
-                  <dt className="min-w-[5rem] shrink-0 font-medium text-foreground/80">
-                    Profissional
-                  </dt>
-                  <dd>
-                    {visitProfessionalLabel(
-                      selectedVisit,
-                      selectedVisit.creator_full_name,
-                    )}
-                  </dd>
-                </div>
               </dl>
+              <div className="bg-primary/5 border-primary/20 mt-3 rounded-xl border px-3 py-2.5">
+                <p className="text-muted-foreground text-xs font-medium">
+                  Quem atende
+                </p>
+                <p className="text-foreground mt-0.5 text-sm font-semibold">
+                  {visitProfessionalLabel(
+                    selectedVisit,
+                    selectedVisit.creator_full_name,
+                  )}
+                </p>
+              </div>
               {selectedVisit.notes ? (
                 <p className="text-muted-foreground mt-3 border-t pt-3 text-sm">
                   <span className="text-foreground font-medium">Notas: </span>
@@ -1042,6 +1057,25 @@ export function VisitsAgendaClient({
             </>
           )}
         </div>
+
+        {isAgendaAdmin ? (
+          <div className="border-primary/25 bg-card rounded-2xl border p-4 shadow-xs">
+            <p className="text-primary text-[0.65rem] font-semibold uppercase tracking-wide">
+              Gestão
+            </p>
+            <h2 className="mt-1 text-sm font-semibold">Relatório de visitas</h2>
+            <p className="text-muted-foreground mt-1.5 text-xs leading-relaxed">
+              Audite o trabalho da equipe. Filtre por cliente, profissional, data e
+              atividade.
+            </p>
+            <Link
+              href={VISITS_REPORT_PATH}
+              className={cn(buttonVariants(), "mt-3 min-h-11 w-full justify-center")}
+            >
+              Abrir relatório
+            </Link>
+          </div>
+        ) : null}
       </aside>
 
       <VisitQuickDetailDialog
@@ -1050,6 +1084,8 @@ export function VisitsAgendaClient({
         onOpenChange={setDetailDialogOpen}
         canStartVisit={canStartVisit}
         canCancelVisit={canCancelVisit}
+        agendaStartHour={agendaStartHour}
+        agendaEndHour={agendaEndHour}
       />
 
       <VisitScheduleDialog
@@ -1060,6 +1096,8 @@ export function VisitsAgendaClient({
         patients={patientsProp}
         teamMembers={teamMembersProp}
         assigneeContext={assigneeContext}
+        agendaStartHour={agendaStartHour}
+        agendaEndHour={agendaEndHour}
       />
 
       {pendingReschedule ? (
@@ -1070,6 +1108,8 @@ export function VisitsAgendaClient({
           newStart={pendingReschedule.newStart}
           isLoading={isRescheduling}
           error={rescheduleError}
+          agendaStartHour={agendaStartHour}
+          agendaEndHour={agendaEndHour}
           onConfirm={handleRescheduleConfirm}
           onCancel={handleRescheduleCancel}
         />

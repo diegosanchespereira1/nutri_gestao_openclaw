@@ -19,6 +19,11 @@ import { visitStatusLabel } from "@/lib/constants/visit-status";
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
 import { rescheduleVisitAction } from "@/lib/actions/visits";
+import {
+  agendaHoursOutOfRangeMessage,
+  formatAgendaHourLabel,
+  isLocalDatetimeWithinAgendaHours,
+} from "@/lib/visits/agenda-hours";
 import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
 import { visitDisplayTitle, visitProfessionalLabel, visitTargetName } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
@@ -44,6 +49,8 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   canStartVisit: (v: ScheduledVisitWithTargets) => boolean;
   canCancelVisit?: (v: ScheduledVisitWithTargets) => boolean;
+  agendaStartHour: number;
+  agendaEndHour: number;
 };
 
 function assigneeLabel(visit: ScheduledVisitWithTargets): string {
@@ -56,6 +63,8 @@ type VisitBodyProps = {
   onOpenChange: (open: boolean) => void;
   canStartVisit: (v: ScheduledVisitWithTargets) => boolean;
   canCancelVisit?: (v: ScheduledVisitWithTargets) => boolean;
+  agendaStartHour: number;
+  agendaEndHour: number;
 };
 
 function VisitQuickDetailBody({
@@ -64,6 +73,8 @@ function VisitQuickDetailBody({
   onOpenChange,
   canStartVisit,
   canCancelVisit,
+  agendaStartHour,
+  agendaEndHour,
 }: VisitBodyProps) {
   const router = useRouter();
   const originalLocal = toDatetimeLocalValue(visit.scheduled_start, tz);
@@ -73,6 +84,18 @@ function VisitQuickDetailBody({
   const hasChanged = editedLocal !== originalLocal;
 
   async function handleSaveTime() {
+    if (
+      !isLocalDatetimeWithinAgendaHours(
+        editedLocal,
+        agendaStartHour,
+        agendaEndHour,
+      )
+    ) {
+      setSaveError(
+        agendaHoursOutOfRangeMessage(agendaStartHour, agendaEndHour),
+      );
+      return;
+    }
     const iso = localDateTimeInTimeZoneToUtcIso(editedLocal, tz);
     if (!iso) return;
     setIsSaving(true);
@@ -141,8 +164,14 @@ function VisitQuickDetailBody({
                 </button>
               </div>
             )}
+            <p className="text-muted-foreground mt-1 text-[0.65rem]">
+              Entre {formatAgendaHourLabel(agendaStartHour)} e{" "}
+              {formatAgendaHourLabel(agendaEndHour)}.
+            </p>
             {saveError && (
-              <p className="text-destructive mt-1 text-xs">{saveError}</p>
+              <p className="text-destructive mt-1 text-xs" role="alert">
+                {saveError}
+              </p>
             )}
           </dd>
         </div>
@@ -157,9 +186,9 @@ function VisitQuickDetailBody({
         </div>
         <div className="flex gap-2">
           <dt className="text-foreground/80 w-28 shrink-0 font-medium">
-            Profissional
+            Quem atende
           </dt>
-          <dd>{assignee}</dd>
+          <dd className="text-foreground font-medium">{assignee}</dd>
         </div>
       </dl>
 
@@ -213,6 +242,8 @@ export function VisitQuickDetailDialog({
   onOpenChange,
   canStartVisit,
   canCancelVisit,
+  agendaStartHour,
+  agendaEndHour,
 }: Props) {
   const tz = useAppTimeZone();
 
@@ -240,6 +271,8 @@ export function VisitQuickDetailDialog({
         onOpenChange={onOpenChange}
         canStartVisit={canStartVisit}
         canCancelVisit={canCancelVisit}
+        agendaStartHour={agendaStartHour}
+        agendaEndHour={agendaEndHour}
       />
     </Dialog>
   );

@@ -13,6 +13,11 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { useAppTimeZone } from "@/components/app-timezone-provider";
 import { formatDateTimeShort } from "@/lib/datetime/calendar-tz";
 import { localDateTimeInTimeZoneToUtcIso } from "@/lib/datetime/local-datetime-tz";
+import {
+  agendaHoursOutOfRangeMessage,
+  formatAgendaHourLabel,
+  isLocalDatetimeWithinAgendaHours,
+} from "@/lib/visits/agenda-hours";
 import { cn } from "@/lib/utils";
 
 /** Converts a UTC ISO string to the "YYYY-MM-DDTHH:mm" format expected by datetime-local inputs. */
@@ -38,6 +43,8 @@ type Props = {
   newStart: string;
   isLoading: boolean;
   error: string | null;
+  agendaStartHour: number;
+  agendaEndHour: number;
   onConfirm: (newStartIso: string) => void;
   onCancel: () => void;
 };
@@ -49,12 +56,15 @@ export function VisitRescheduleConfirmDialog({
   newStart,
   isLoading,
   error,
+  agendaStartHour,
+  agendaEndHour,
   onConfirm,
   onCancel,
 }: Props) {
   const tz = useAppTimeZone();
 
   const [editedLocal, setEditedLocal] = useState(() => toDatetimeLocalValue(newStart, tz));
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   // Sync whenever the drag produces a new newStart
   useEffect(() => {
@@ -62,8 +72,21 @@ export function VisitRescheduleConfirmDialog({
   }, [newStart, tz]);
 
   function handleConfirm() {
+    if (
+      !isLocalDatetimeWithinAgendaHours(
+        editedLocal,
+        agendaStartHour,
+        agendaEndHour,
+      )
+    ) {
+      setTimeError(
+        agendaHoursOutOfRangeMessage(agendaStartHour, agendaEndHour),
+      );
+      return;
+    }
     const iso = localDateTimeInTimeZoneToUtcIso(editedLocal, tz);
     if (!iso) return;
+    setTimeError(null);
     onConfirm(iso);
   }
 
@@ -96,7 +119,10 @@ export function VisitRescheduleConfirmDialog({
               id="reschedule-new-start"
               type="datetime-local"
               value={editedLocal}
-              onChange={(e) => setEditedLocal(e.target.value)}
+              onChange={(e) => {
+                setEditedLocal(e.target.value);
+                if (timeError) setTimeError(null);
+              }}
               disabled={isLoading}
               className={cn(
                 "border-input bg-background text-foreground focus-visible:ring-ring h-9 w-full rounded-md border px-2.5 text-sm font-semibold shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
@@ -104,13 +130,16 @@ export function VisitRescheduleConfirmDialog({
               )}
             />
             <p className="text-muted-foreground text-xs">
-              Horário no fuso de Definições → Região.
+              Só é possível agendar entre {formatAgendaHourLabel(agendaStartHour)} e{" "}
+              {formatAgendaHourLabel(agendaEndHour)} (Definições → Agenda).
             </p>
           </div>
         </div>
 
-        {error ? (
-          <p className="text-destructive text-sm">{error}</p>
+        {timeError || error ? (
+          <p className="text-destructive text-sm" role="alert">
+            {timeError ?? error}
+          </p>
         ) : null}
 
         <div className="flex gap-2 border-t pt-2">

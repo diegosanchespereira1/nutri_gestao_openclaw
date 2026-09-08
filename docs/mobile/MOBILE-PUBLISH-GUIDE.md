@@ -451,6 +451,8 @@ Criar uma página pública em `https://seudominio.com.br/privacidade` com:
    - Android: em android/app/build.gradle, campos versionName e versionCode
 5. Gerar novo build (Archive no Xcode / AAB no Android Studio)
 6. Upload nas stores → submit for review
+   - Android: tag `vX.Y.Z` ou Actions → Play Store — Android
+     (ver [PLAY-STORE-GITHUB-ACTIONS.md](PLAY-STORE-GITHUB-ACTIONS.md))
 ```
 
 > 💡 **Dica:** Se apenas o código web mudou (sem alterações nativas),

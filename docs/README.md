@@ -7,7 +7,7 @@
 | [architecture/](architecture/) | Estrutura do repositório, convenções e [permissões do workspace](architecture/workspace-permissions.md) |
 | [deployment/](deployment/) | Docker, Portainer, checklist de produção |
 | [security/](security/) | Auditorias, relatórios de segurança |
-| [mobile/](mobile/) | Publicação e testes do app Capacitor |
+| [mobile/](mobile/) | Publicação e testes do app Capacitor ([Play Store via GitHub Actions](mobile/PLAY-STORE-GITHUB-ACTIONS.md)) |
 | [operations/](operations/) | Monitorização, limites de upload, implementações operacionais |
 | [design/](design/) | Design system e notas de refatoração UI |
 | [assets/](assets/) | Modelos XLSX, PDFs e HTML de referência (não usados em runtime) |

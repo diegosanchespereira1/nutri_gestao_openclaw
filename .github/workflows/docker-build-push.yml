@@ -195,7 +195,7 @@ jobs:
   # Build de verificação Android (APK debug, sem assinatura).
   # Garante que o projeto nativo compila. O app é uma casca Capacitor que
   # aponta para a URL de produção, então não depende do build do Next.js.
-  # Para gerar o AAB assinado de release, configure a keystore e secrets.
+  # AAB assinado e envio à Play Store: .github/workflows/play-store-android.yml
   # ──────────────────────────────────────────────────────────────────────────
   android-build:
     name: Build mobile (Android — APK debug, unsigned)

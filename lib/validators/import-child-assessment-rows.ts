@@ -28,23 +28,31 @@ export const childAssessmentImportRowSchema = z.object({
 
 export type ChildAssessmentImportRowInput = z.infer<typeof childAssessmentImportRowSchema>;
 
-const linkedSchema = z.object({
+export const childAssessmentImportLinkSchema = z.object({
   kind: z.literal("linked"),
   clientId: z.string().uuid(),
   establishmentId: z.union([z.string().uuid(), z.null()]),
   schoolGradeId: z.union([z.string().uuid(), z.null()]).optional(),
 });
 
-const independentSchema = z.object({ kind: z.literal("independent") });
-
-export const childAssessmentImportLinkSchema = z.union([linkedSchema, independentSchema]);
-
 export type ChildAssessmentImportLinkInput = z.infer<typeof childAssessmentImportLinkSchema>;
 
 export function parseImportChildAssessmentsPayload(rows: unknown, link: unknown) {
+  if (
+    link &&
+    typeof link === "object" &&
+    "kind" in link &&
+    (link as { kind?: unknown }).kind === "independent"
+  ) {
+    return {
+      ok: false as const,
+      error: "Informe o cliente desta importação.",
+    };
+  }
+
   const linkParsed = childAssessmentImportLinkSchema.safeParse(link);
   if (!linkParsed.success) {
-    return { ok: false as const, error: "Vínculo de importação inválido." };
+    return { ok: false as const, error: "Informe o cliente desta importação." };
   }
 
   const arr = z

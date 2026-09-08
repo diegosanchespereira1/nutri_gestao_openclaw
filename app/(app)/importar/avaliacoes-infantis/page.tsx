@@ -139,7 +139,7 @@ export default async function ImportarAvaliacoesInfantisPage() {
     if (establishment_type) typeSlugsInUse.add(establishment_type);
   }
 
-  // Opções do filtro "Tipo de estabelecimento": só os tipos que realmente existem
+  // Opções do filtro "Filtrar por tipo de cliente": só os tipos que realmente existem
   // entre os estabelecimentos do tenant (um filtro com tipos sem nenhum cliente
   // só geraria listas vazias). Labels: built-in via constantes, custom via tabela.
   const customTypes = (customTypeRows ?? []).map((t) => ({

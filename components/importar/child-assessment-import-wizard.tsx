@@ -148,8 +148,9 @@ export function ChildAssessmentImportWizard({
 }) {
   const [step, setStep] = useState<WizardStep>(1);
 
-  // Vínculo do lote (etapa 1) — "" = paciente independente
+  // Vínculo do lote (etapa 1) — cliente obrigatório
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [selectedEstablishmentId, setSelectedEstablishmentId] = useState("");
   const [selectedSchoolGradeId, setSelectedSchoolGradeId] = useState("");
   const [batchNote, setBatchNote] = useState(""); // ex.: "2026/1 Maternal"
@@ -308,7 +309,23 @@ export function ChildAssessmentImportWizard({
     });
   };
 
+  const goToMapping = () => {
+    if (!selectedClientId) {
+      setLinkError("Selecione o cliente desta importação.");
+      return;
+    }
+    setLinkError(null);
+    setStep(2);
+  };
+
   const handleImport = async () => {
+    if (!selectedClientId) {
+      setResult({
+        ok: false,
+        error: "Selecione o cliente desta importação.",
+      });
+      return;
+    }
     if (requiresEstablishment && !selectedEstablishmentId) {
       setResult({
         ok: false,
@@ -331,14 +348,12 @@ export function ChildAssessmentImportWizard({
         : row.clinical_notes,
     }));
 
-    const link: ChildAssessmentImportLink = selectedClientId
-      ? {
-          kind: "linked",
-          clientId: selectedClientId,
-          establishmentId: requiresEstablishment ? selectedEstablishmentId : null,
-          schoolGradeId: selectedSchoolGradeId || null,
-        }
-      : { kind: "independent" };
+    const link: ChildAssessmentImportLink = {
+      kind: "linked",
+      clientId: selectedClientId,
+      establishmentId: requiresEstablishment ? selectedEstablishmentId : null,
+      schoolGradeId: selectedSchoolGradeId || null,
+    };
 
     let res: ChildAssessmentImportResult;
     try {
@@ -431,25 +446,31 @@ export function ChildAssessmentImportWizard({
             {/* Vínculo dos pacientes */}
             <div className="space-y-3 rounded-lg border border-foreground/10 bg-muted/30 p-4">
               <div className="space-y-1">
-                <p className="text-sm font-medium">Cliente desta importação</p>
+                <p className="text-sm font-medium">
+                  Cliente desta importação{" "}
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
+                </p>
                 <p className="text-muted-foreground text-xs">
-                  Escolha o cliente (escola, clínica, instituição…) ao qual os pacientes desta turma
-                  serão vinculados. Os pacientes em si são criados a partir do arquivo, na etapa
-                  seguinte.
+                  Obrigatório. Escolha o cliente (escola, clínica, instituição…) ao qual os
+                  pacientes desta turma serão vinculados. Os pacientes são criados a partir do
+                  arquivo, na etapa seguinte.
                 </p>
               </div>
 
               {clients.length === 0 ? (
-                <p className="text-muted-foreground text-xs">
-                  Nenhum cliente cadastrado ainda — os pacientes serão importados como particulares.
-                  Cadastre um cliente/estabelecimento primeiro se quiser vincular esta turma a uma
-                  escola ou instituição.
+                <p className="text-destructive text-xs" role="alert">
+                  Cadastre um cliente antes de importar avaliações. Sem cliente não é possível
+                  concluir esta importação.
                 </p>
               ) : (
                 <>
                   {showTypeFilter && (
                     <div className="space-y-1.5">
-                      <Label htmlFor="link-type-filter-select">Tipo de estabelecimento</Label>
+                      <Label htmlFor="link-type-filter-select">
+                        Filtrar por tipo de cliente
+                      </Label>
                       <select
                         id="link-type-filter-select"
                         value={typeFilter}
@@ -480,18 +501,26 @@ export function ChildAssessmentImportWizard({
                   )}
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="link-client-select">Cliente</Label>
+                    <Label htmlFor="link-client-select">
+                      Cliente{" "}
+                      <span aria-hidden="true" className="text-destructive">
+                        *
+                      </span>
+                    </Label>
                     <select
                       id="link-client-select"
                       value={selectedClientId}
+                      required
+                      aria-required
                       onChange={(e) => {
                         setSelectedClientId(e.target.value);
                         setSelectedEstablishmentId("");
                         setSelectedSchoolGradeId("");
+                        setLinkError(null);
                       }}
                       className={selectClass}
                     >
-                      <option value="">— Paciente particular (sem cliente) —</option>
+                      <option value="">— Selecione o cliente —</option>
                       {visibleClients.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.legal_name}
@@ -501,7 +530,7 @@ export function ChildAssessmentImportWizard({
                     </select>
                     {typeFilter && visibleClients.length === 0 && (
                       <p className="text-muted-foreground text-xs">
-                        Nenhum cliente com estabelecimento deste tipo.
+                        Nenhum cliente deste tipo.
                       </p>
                     )}
                   </div>
@@ -736,8 +765,16 @@ export function ChildAssessmentImportWizard({
             </div>
           </CardContent>
 
-          <CardFooter className="justify-end gap-3">
-            <Button onClick={() => setStep(2)} disabled={!upload}>
+          <CardFooter className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {linkError ? (
+              <p className="text-destructive text-xs sm:mr-auto" role="alert">
+                {linkError}
+              </p>
+            ) : null}
+            <Button
+              onClick={goToMapping}
+              disabled={!upload || clients.length === 0}
+            >
               Próximo: Mapeamento
             </Button>
           </CardFooter>

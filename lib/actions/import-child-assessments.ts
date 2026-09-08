@@ -56,56 +56,53 @@ export async function importChildAssessmentsAction(
   const parsed = parseImportChildAssessmentsPayload(rows, link);
   if (!parsed.ok) return { ok: false, error: parsed.error };
 
-  // ── Resolver vínculo (cliente/estabelecimento/série) para o lote inteiro ───
-  let clientId: string | null = null;
+  // ── Resolver vínculo (cliente obrigatório + estabelecimento/série) ───
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("id, kind, owner_user_id")
+    .eq("id", parsed.link.clientId)
+    .maybeSingle();
+
+  if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Cliente não encontrado ou sem permissão de acesso." };
+  }
+
   let establishmentId: string | null = null;
   let schoolGradeId: string | null = null;
 
-  if (parsed.link.kind === "linked") {
-    const { data: clientRow } = await supabase
-      .from("clients")
-      .select("id, kind, owner_user_id")
-      .eq("id", parsed.link.clientId)
+  if (clientRow.kind === "pj") {
+    if (!parsed.link.establishmentId) {
+      return {
+        ok: false,
+        error: "Cliente PJ requer um estabelecimento. Informe o estabelecimento.",
+      };
+    }
+    const { data: est } = await supabase
+      .from("establishments")
+      .select("id, client_id")
+      .eq("id", parsed.link.establishmentId)
       .maybeSingle();
-
-    if (!clientRow || clientRow.owner_user_id !== workspaceOwnerId) {
-      return { ok: false, error: "Cliente não encontrado ou sem permissão de acesso." };
+    if (!est || est.client_id !== parsed.link.clientId) {
+      return { ok: false, error: "Estabelecimento inválido para este cliente." };
     }
+    establishmentId = est.id as string;
+  } else if (parsed.link.establishmentId) {
+    return { ok: false, error: "Clientes PF não podem ter estabelecimento." };
+  }
 
-    if (clientRow.kind === "pj") {
-      if (!parsed.link.establishmentId) {
-        return {
-          ok: false,
-          error: "Cliente PJ requer um estabelecimento. Informe o ID do estabelecimento.",
-        };
-      }
-      const { data: est } = await supabase
-        .from("establishments")
-        .select("id, client_id")
-        .eq("id", parsed.link.establishmentId)
-        .maybeSingle();
-      if (!est || est.client_id !== parsed.link.clientId) {
-        return { ok: false, error: "Estabelecimento inválido para este cliente." };
-      }
-      establishmentId = est.id as string;
-    } else if (parsed.link.establishmentId) {
-      return { ok: false, error: "Clientes PF não podem ter estabelecimento." };
+  const clientId = clientRow.id as string;
+
+  const gradeIdRaw = parsed.link.schoolGradeId ?? null;
+  if (gradeIdRaw) {
+    const { data: grade } = await supabase
+      .from("client_school_grades")
+      .select("id, client_id")
+      .eq("id", gradeIdRaw)
+      .maybeSingle();
+    if (!grade || grade.client_id !== clientId) {
+      return { ok: false, error: "Série inválida para este cliente." };
     }
-
-    clientId = clientRow.id as string;
-
-    const gradeIdRaw = parsed.link.schoolGradeId ?? null;
-    if (gradeIdRaw) {
-      const { data: grade } = await supabase
-        .from("client_school_grades")
-        .select("id, client_id")
-        .eq("id", gradeIdRaw)
-        .maybeSingle();
-      if (!grade || grade.client_id !== clientId) {
-        return { ok: false, error: "Série inválida para este cliente." };
-      }
-      schoolGradeId = grade.id as string;
-    }
+    schoolGradeId = grade.id as string;
   }
 
   let patientsCreated = 0;

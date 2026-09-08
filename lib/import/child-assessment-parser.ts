@@ -10,6 +10,7 @@ import {
 } from "@/lib/types/child-assessment-import";
 import type { ChildSex } from "@/lib/nutrition/child/types";
 import { matchChildKey } from "@/lib/import/child-assessment-match";
+import { ageInMonths } from "@/lib/nutrition/child/age";
 
 /** Minúsculas + sem acento, para comparar cabeçalhos de forma tolerante. */
 function normalizeHeader(s: string): string {
@@ -98,6 +99,20 @@ export function validateChildAssessmentRows(
 
     if (recorded_at < birth_date) {
       errors.push({ rowIndex: i, message: "Data da pesagem é anterior à data de nascimento." });
+      return;
+    }
+
+    // Limite de 240 meses (20 anos) — mesmo critério que a Server Action aplica
+    // hoje só no servidor (lib/actions/import-child-assessments.ts). Checar aqui
+    // também dá ao usuário uma mensagem específica ANTES de tentar importar, em
+    // vez de a linha simplesmente cair num contador genérico de "ignorada".
+    const ageMonthsAtRecording = ageInMonths(new Date(birth_date), new Date(recorded_at));
+    if (ageMonthsAtRecording == null || ageMonthsAtRecording > 240) {
+      errors.push({
+        rowIndex: i,
+        message:
+          "Idade na data da pesagem passa de 20 anos (240 meses) — fora do escopo de avaliação infantil.",
+      });
       return;
     }
 

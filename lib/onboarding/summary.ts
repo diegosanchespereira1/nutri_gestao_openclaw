@@ -36,10 +36,11 @@ export function buildOnboardingSummaryItems(
     items.push({ label: "CRN", value: input.crn.trim() });
   }
 
-  items.push(
-    { label: "Contexto de trabalho", value: input.workContextLabel },
-    { label: "Primeiro cliente", value: input.legalName.trim() },
-  );
+  items.push({ label: "Contexto de trabalho", value: input.workContextLabel });
+
+  if (input.legalName.trim()) {
+    items.push({ label: "Primeiro cliente", value: input.legalName.trim() });
+  }
 
   if (input.documentId.trim()) {
     items.push({

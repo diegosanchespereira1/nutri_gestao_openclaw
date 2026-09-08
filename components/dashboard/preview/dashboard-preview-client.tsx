@@ -688,7 +688,7 @@ export function DashboardPreviewClient({
         <div className="xl:col-span-7">
           <SectionCard
             id="preview-semana"
-            title="Próximos 7 dias"
+            title="Agenda da semana"
             description="06 a 13 de setembro — horizonte da semana, sem esconder em acordeão."
             actions={
               <Link

@@ -359,7 +359,7 @@ export async function DashboardHome() {
         <div className="xl:col-span-7">
           <DashboardSectionCard
             id="dashboard-semana"
-            title="Próximos 7 dias"
+            title="Agenda da semana"
             description={weeklyBriefing.rangeLabel}
             actions={
               <Link href="/visitas" className={ACTION_LINK}>

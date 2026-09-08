@@ -31,6 +31,7 @@ type Props = {
   clientName: string;
   patientsHref: string | null;
   overview: SchoolNutritionOverview;
+  back: { href: string; label: string };
 };
 
 function CoverageCard({
@@ -74,6 +75,7 @@ export function SchoolNutritionOverviewView({
   clientName,
   patientsHref,
   overview,
+  back,
 }: Props) {
   const router = useRouter();
   const cov = overview.coverage;
@@ -82,17 +84,18 @@ export function SchoolNutritionOverviewView({
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Visão nutricional da escola"
+        description={`Avaliação mais recente de cada aluno · ${clientName}${overview.filter === SCHOOL_OVERVIEW_ALL ? "" : ` · ${overview.scopeLabel}`}`}
+        back={back}
+        actions={
+          <SchoolNutritionOverviewActions clientId={clientId} filter={overview.filter} />
+        }
+      />
       <ClientSchoolSectionTabNav
         clientId={clientId}
         pacientesHref={patientsHref}
         active="nutricional"
-      />
-      <PageHeader
-        title="Visão nutricional da escola"
-        description={`Avaliação mais recente de cada aluno · ${clientName}${overview.filter === SCHOOL_OVERVIEW_ALL ? "" : ` · ${overview.scopeLabel}`}`}
-        actions={
-          <SchoolNutritionOverviewActions clientId={clientId} filter={overview.filter} />
-        }
       />
 
       {cov.total === 0 ? (

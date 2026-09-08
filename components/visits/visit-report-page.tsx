@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Label } from "@/components/ui/label";
 import {
@@ -157,26 +159,12 @@ export function VisitReportPage({
     "border-input bg-background mt-1 min-h-11 w-full rounded-md border px-2 text-sm";
 
   return (
-    <div className="space-y-5 print:space-y-4">
-      <div>
-        <Link
-          href="/visitas"
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "text-muted-foreground -ml-2 mb-2")}
-        >
-          ← Voltar à agenda
-        </Link>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-primary text-[0.65rem] font-semibold uppercase tracking-wide">
-              Auditoria da equipe
-            </p>
-            <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-              Relatório de visitas realizadas
-            </h1>
-            <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-              Recorte, ranking e lista completa para avaliar a performance da equipe.
-            </p>
-          </div>
+    <PageLayout className="print:space-y-4">
+      <PageHeader
+        title="Relatório de visitas realizadas"
+        description="Recorte, ranking e lista completa para avaliar a performance da equipe."
+        back={{ href: "/visitas", label: "Agenda" }}
+        actions={
           <div className="flex flex-wrap gap-2 print:hidden">
             <button
               type="button"
@@ -194,8 +182,8 @@ export function VisitReportPage({
               Imprimir
             </button>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <form
         className="border-border bg-card rounded-2xl border p-4 shadow-xs print:shadow-none"
@@ -440,7 +428,7 @@ export function VisitReportPage({
       <p className="text-muted-foreground text-xs">
         Relatório no fuso {timeZone}. Só entram visitas concluídas dos últimos 12 meses.
       </p>
-    </div>
+    </PageLayout>
   );
 }
 

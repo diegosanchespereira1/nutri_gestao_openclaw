@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-
 import dynamic from "next/dynamic";
 
 const RecipeForm = dynamic(
@@ -10,28 +9,42 @@ const RecipeForm = dynamic(
     ),
   { loading: () => null },
 );
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
 import { loadClientsForOwner } from "@/lib/actions/clients";
 import { loadEstablishmentsForOwner } from "@/lib/actions/establishments";
 import { loadRawMaterialsForOwner } from "@/lib/actions/raw-materials";
 import { loadTechnicalRecipeById } from "@/lib/actions/technical-recipes";
 import { TECHNICAL_RECIPE_IMAGES_BUCKET } from "@/lib/constants/technical-recipe-images-storage";
+import {
+  getReturnToParam,
+  resolveBackNavigation,
+} from "@/lib/navigation/return-to";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 
 export default async function EditarReceitaPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const [{ recipe }, { rows: establishments }, { rows: rawMaterials }, { rows: pjClients }] =
-    await Promise.all([
-      loadTechnicalRecipeById(id),
-      loadEstablishmentsForOwner(),
-      loadRawMaterialsForOwner(),
-      loadClientsForOwner({ kind: "pj" }),
-    ]);
+  const [
+    sp,
+    { recipe },
+    { rows: establishments },
+    { rows: rawMaterials },
+    { rows: pjClients },
+  ] = await Promise.all([
+    searchParams,
+    loadTechnicalRecipeById(id),
+    loadEstablishmentsForOwner(),
+    loadRawMaterialsForOwner(),
+    loadClientsForOwner({ kind: "pj" }),
+  ]);
 
   if (!recipe) notFound();
 
@@ -44,24 +57,28 @@ export default async function EditarReceitaPage({
     defaultImageUrl = data?.signedUrl ?? null;
   }
 
+  const back = resolveBackNavigation({
+    returnTo: getReturnToParam(sp),
+    fallbackHref: "/ficha-tecnica",
+    fallbackLabel: "Ficha técnica",
+    currentPath: `/ficha-tecnica/${id}/editar`,
+  });
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Editar receita
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {recipe.name} — rascunho com linhas de ingrediente.
-          </p>
-        </div>
-        <Link
-          href={`/ficha-tecnica/${id}/pdf`}
-          className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
-        >
-          Exportar PDF
-        </Link>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title="Editar receita"
+        description={`${recipe.name} — rascunho com linhas de ingrediente.`}
+        back={back}
+        actions={
+          <Link
+            href={`/ficha-tecnica/${id}/pdf`}
+            className={cn(buttonVariants({ variant: "outline" }), "shrink-0")}
+          >
+            Exportar PDF
+          </Link>
+        }
+      />
       <RecipeForm
         establishments={establishments}
         pjClients={pjClients}
@@ -69,6 +86,6 @@ export default async function EditarReceitaPage({
         rawMaterials={rawMaterials}
         defaultImageUrl={defaultImageUrl}
       />
-    </div>
+    </PageLayout>
   );
 }

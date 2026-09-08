@@ -8,6 +8,7 @@ type Props = {
   /** Permite «Nova receita» com estabelecimento ou só com cliente PJ (catálogo). */
   canCreateRecipe: boolean;
   templatesHref?: string;
+  novaHref?: string;
 };
 
 /**
@@ -19,6 +20,7 @@ type Props = {
 export function FichaTecnicaToolbar({
   canCreateRecipe,
   templatesHref = "/ficha-tecnica/templates",
+  novaHref = "/ficha-tecnica/nova",
 }: Props) {
   return (
     <div
@@ -45,7 +47,7 @@ export function FichaTecnicaToolbar({
       />
 
       <Link
-        href="/ficha-tecnica/nova"
+        href={novaHref}
         className={cn(
           buttonVariants({ variant: "default", size: "default" }),
           !canCreateRecipe && "pointer-events-none opacity-50",

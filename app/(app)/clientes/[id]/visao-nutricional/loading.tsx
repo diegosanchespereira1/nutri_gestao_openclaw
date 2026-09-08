@@ -10,7 +10,7 @@ export default function SchoolNutritionOverviewLoading() {
         aria-label="A carregar visão nutricional"
       >
         <div className="space-y-2">
-          <div className="h-4 w-28 animate-pulse rounded bg-muted" />
+          <div className="mb-2 h-8 w-28 animate-pulse rounded bg-muted" />
           <div className="h-8 w-72 max-w-full animate-pulse rounded bg-muted" />
           <div className="h-4 w-64 max-w-full animate-pulse rounded bg-muted" />
         </div>

@@ -23,6 +23,9 @@ import {
 import { loadTechnicalRecipesForOwner } from "@/lib/actions/technical-recipes";
 import {
   buildCurrentUrl,
+  getReturnToParam,
+  resolveBackNavigation,
+  trySafeReturnPath,
   withReturnTo,
 } from "@/lib/navigation/return-to";
 import { cn } from "@/lib/utils";
@@ -91,16 +94,35 @@ export default async function FichaTecnicaPage({
   const canCreateRecipe = hasEstablishments || pjClients.length > 0;
   const returnToOrigin = buildCurrentUrl("/ficha-tecnica", params);
   const templatesHref = withReturnTo("/ficha-tecnica/templates", returnToOrigin);
+  const novaHref = withReturnTo("/ficha-tecnica/nova", returnToOrigin);
+  const selectedClient = clienteId
+    ? pjClients.find((client) => client.id === clienteId)
+    : undefined;
+  const clientBackLabel =
+    selectedClient?.trade_name?.trim() || selectedClient?.legal_name || "Cliente";
+  const safeReturnTo = trySafeReturnPath(getReturnToParam(params));
+  const back = clienteId
+    ? resolveBackNavigation({
+        returnTo: getReturnToParam(params),
+        fallbackHref: `/clientes/${clienteId}/editar`,
+        fallbackLabel: clientBackLabel,
+        currentPath: "/ficha-tecnica",
+      })
+    : safeReturnTo
+      ? { href: safeReturnTo, label: "Voltar" }
+      : undefined;
 
   return (
     <PageLayout>
       <PageHeader
         title="Ficha técnica"
         description="Receitas com ingredientes, TACO e custo por matéria-prima. Exporte PDF a partir de cada linha ou na edição da receita."
+        back={back}
         actions={
           <FichaTecnicaToolbar
             canCreateRecipe={canCreateRecipe}
             templatesHref={templatesHref}
+            novaHref={novaHref}
           />
         }
       />
@@ -154,7 +176,7 @@ export default async function FichaTecnicaPage({
                   Ver templates
                 </Link>
                 <Link
-                  href="/ficha-tecnica/nova"
+                  href={novaHref}
                   className={cn(
                     buttonVariants({ size: "default" }),
                     !canCreateRecipe && "pointer-events-none opacity-50",

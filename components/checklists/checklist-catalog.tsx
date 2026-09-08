@@ -1106,7 +1106,15 @@ export function ChecklistCatalog({
                 Necessário para filtrar templates aplicáveis e iniciar o preenchimento
               </p>
             </div>
-            <div className="w-full min-w-0 max-w-xl">
+            <div
+              className={cn(
+                "w-full min-w-0",
+                hasNoEstablishments
+                  ? "grid grid-cols-1 items-start gap-3 md:grid-cols-2"
+                  : "max-w-xl",
+              )}
+            >
+              <div className="min-w-0">
               <div className="flex w-full min-w-0 items-center gap-2">
                 <select
                   value={establishmentId}
@@ -1309,8 +1317,33 @@ export function ChecklistCatalog({
                   </DropdownMenuScroll>
                 </DialogContent>
               </Dialog>
+              {!hasNoEstablishments ? (
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <p className="min-w-0 text-[11px] text-muted-foreground">
+                    {isLoadingDropdownOptions
+                      ? "Carregando empresas..."
+                      : `${alphabeticalDropdownOptions.length} de ${dropdownTotal || alphabeticalDropdownOptions.length} empresas carregadas (A-Z)`}
+                  </p>
+                  {hasMoreDropdownOptions ? (
+                    <button
+                      type="button"
+                      onClick={() => void loadDropdownOptions(false)}
+                      className="text-[11px] font-medium text-primary transition-colors hover:underline disabled:cursor-not-allowed disabled:no-underline"
+                      disabled={isLoadingDropdownOptions}
+                    >
+                      Carregar mais
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {dropdownLoadError ? (
+                <p className="mt-1 text-xs text-destructive" role="alert">
+                  {dropdownLoadError}
+                </p>
+              ) : null}
+              </div>
               {hasNoEstablishments ? (
-                <div className="mt-2 rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 md:ml-5">
                   <p className="text-sm font-medium text-foreground">
                     Você ainda não tem clientes cadastrados
                   </p>
@@ -1329,29 +1362,6 @@ export function ChecklistCatalog({
                     Cadastrar novo cliente
                   </Link>
                 </div>
-              ) : (
-                <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <p className="min-w-0 text-[11px] text-muted-foreground">
-                    {isLoadingDropdownOptions
-                      ? "Carregando empresas..."
-                      : `${alphabeticalDropdownOptions.length} de ${dropdownTotal || alphabeticalDropdownOptions.length} empresas carregadas (A-Z)`}
-                  </p>
-                  {hasMoreDropdownOptions ? (
-                    <button
-                      type="button"
-                      onClick={() => void loadDropdownOptions(false)}
-                      className="text-[11px] font-medium text-primary transition-colors hover:underline disabled:cursor-not-allowed disabled:no-underline"
-                      disabled={isLoadingDropdownOptions}
-                    >
-                      Carregar mais
-                    </button>
-                  ) : null}
-                </div>
-              )}
-              {dropdownLoadError ? (
-                <p className="mt-1 text-xs text-destructive" role="alert">
-                  {dropdownLoadError}
-                </p>
               ) : null}
             </div>
             {step1Done && (

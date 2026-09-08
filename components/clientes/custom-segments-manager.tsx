@@ -24,10 +24,12 @@ export function CustomSegmentsManager({
   initial,
   builtIn,
   canEdit = false,
+  canRenameSystem = false,
 }: {
   initial: ClientCustomSegment[];
   builtIn: BuiltInSegment[];
   canEdit?: boolean;
+  canRenameSystem?: boolean;
 }) {
   const [segments, setSegments] = useState(initial);
   const [builtIns, setBuiltIns] = useState(builtIn);
@@ -114,6 +116,7 @@ export function CustomSegmentsManager({
 
   /* ── Built-in: edit ── */
   function startBuiltInEdit(seg: BuiltInSegment) {
+    if (!canRenameSystem) return;
     setEditingId(null);
     setCreating(false);
     setEditingBuiltInKey(seg.key);
@@ -126,6 +129,7 @@ export function CustomSegmentsManager({
     setError(null);
   }
   function handleBuiltInSave(key: string) {
+    if (!canRenameSystem) return;
     setError(null);
     startTransition(async () => {
       const result = await upsertBuiltInSegmentOverrideAction(key, editBuiltInLabel);
@@ -141,6 +145,7 @@ export function CustomSegmentsManager({
     });
   }
   function handleBuiltInRestore(key: string, defaultLabel: string) {
+    if (!canRenameSystem) return;
     if (!window.confirm(`Restaurar o nome original "${defaultLabel}"?`)) return;
     setError(null);
     startTransition(async () => {
@@ -245,15 +250,19 @@ export function CustomSegmentsManager({
       {/* ── Sistema ── */}
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-foreground">Sistema</h2>
-        {canEdit && (
+        {canRenameSystem ? (
           <p className="text-xs text-muted-foreground">
             Pode renomear as categorias do sistema. O nome original fica guardado e pode ser restaurado a qualquer momento.
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            As categorias do sistema não podem ser alteradas.
           </p>
         )}
         <div className="overflow-hidden rounded-xl border border-border bg-card">
           {builtIns.map((seg) => (
             <div key={seg.key} className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-0">
-              {canEdit && editingBuiltInKey === seg.key ? (
+              {canRenameSystem && editingBuiltInKey === seg.key ? (
                 <>
                   <Input value={editBuiltInLabel} onChange={(e) => setEditBuiltInLabel(e.target.value)} className="flex-1" autoFocus maxLength={80} disabled={pending}
                     onKeyDown={(e) => { if (e.key === "Enter") handleBuiltInSave(seg.key); if (e.key === "Escape") cancelBuiltInEdit(); }} />
@@ -274,7 +283,7 @@ export function CustomSegmentsManager({
                       </span>
                     )}
                   </div>
-                  {canEdit && (
+                  {canRenameSystem && (
                     <div className="flex items-center gap-1">
                       <Button type="button" size="icon" variant="ghost" aria-label={`Editar "${seg.currentLabel}"`} onClick={() => startBuiltInEdit(seg)}>
                         <Pencil className="size-4 text-muted-foreground" />

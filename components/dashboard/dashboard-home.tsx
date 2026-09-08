@@ -220,7 +220,7 @@ export async function DashboardHome() {
           href={CHECKLISTS_VENCIDOS_PATH}
         />
         <DashboardKpiButton
-          label="A vencer"
+          label="Checklists a vencer"
           value={String(validityCounts.proximos)}
           hint="próximos 90 dias · ver todos"
           tone={validityCounts.proximos > 0 ? "warning" : "default"}
@@ -304,7 +304,7 @@ export async function DashboardHome() {
         <div className="xl:col-span-5">
           <DashboardSectionCard
             id="dashboard-atencao"
-            title="Atenção agora"
+            title="Checklists em alerta"
             description="O que já passou do ponto ou vence nesta semana."
             tone={overdueCount > 0 ? "urgent" : "default"}
             actions={

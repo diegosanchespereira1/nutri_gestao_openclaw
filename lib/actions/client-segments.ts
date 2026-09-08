@@ -2,8 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isClientBusinessSegment } from "@/lib/constants/client-business-segment";
+import { canAccessAdminArea } from "@/lib/roles";
+import { fetchProfileRole } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
+
+const SYSTEM_SEGMENT_DENIED =
+  "Apenas administradores da plataforma podem alterar categorias do sistema.";
+
+async function requirePlatformAdmin(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const role = await fetchProfileRole(supabase, userId);
+  if (!canAccessAdminArea(role)) {
+    return { ok: false, error: SYSTEM_SEGMENT_DENIED };
+  }
+  return { ok: true };
+}
 
 export type ClientCustomSegment = {
   id: string;
@@ -84,11 +101,18 @@ export async function upsertBuiltInSegmentOverrideAction(
     return { ok: false, error: "O nome da categoria deve ter no máximo 80 caracteres." };
   }
 
+  if (!isClientBusinessSegment(builtInKey)) {
+    return { ok: false, error: "Categoria do sistema inválida." };
+  }
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { ok: false, error: "Sessão expirada. Faça login novamente." };
+
+  const admin = await requirePlatformAdmin(supabase, user.id);
+  if (!admin.ok) return admin;
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
@@ -133,6 +157,7 @@ export async function updateCustomSegmentAction(
     .update({ label: trimmed })
     .eq("id", id)
     .eq("owner_user_id", workspaceOwnerId)
+    .is("built_in_key", null)
     .select("id, label")
     .single();
 
@@ -156,11 +181,23 @@ export async function deleteCustomSegmentAction(
 
   const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
 
+  const { data: existing } = await supabase
+    .from("client_custom_segments")
+    .select("built_in_key")
+    .eq("id", id)
+    .eq("owner_user_id", workspaceOwnerId)
+    .maybeSingle();
+
+  if (existing?.built_in_key) {
+    return { ok: false, error: SYSTEM_SEGMENT_DENIED };
+  }
+
   const { error } = await supabase
     .from("client_custom_segments")
     .delete()
     .eq("id", id)
-    .eq("owner_user_id", workspaceOwnerId);
+    .eq("owner_user_id", workspaceOwnerId)
+    .is("built_in_key", null);
 
   if (error) {
     return { ok: false, error: "Erro ao eliminar categoria. Tente novamente." };

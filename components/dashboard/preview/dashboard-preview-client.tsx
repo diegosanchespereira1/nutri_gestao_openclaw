@@ -556,7 +556,7 @@ export function DashboardPreviewClient({
           href="/checklists/vencidos"
         />
         <KpiButton
-          label="A vencer"
+          label="Checklists a vencer"
           value={isGestor ? "4" : "2"}
           hint="nos próximos 90 dias"
           tone="warning"
@@ -651,7 +651,7 @@ export function DashboardPreviewClient({
         <div className="xl:col-span-5">
           <SectionCard
             id="preview-atencao"
-            title="Atenção agora"
+            title="Checklists em alerta"
             description="Só o que já passou do ponto ou vence nesta semana."
             tone="urgent"
           >

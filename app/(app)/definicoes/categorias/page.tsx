@@ -11,7 +11,9 @@ import {
   getReturnToParam,
   resolveBackNavigation,
 } from "@/lib/navigation/return-to";
+import { canAccessAdminArea } from "@/lib/roles";
 import { getServerContext } from "@/lib/supabase/get-server-user";
+import { fetchProfileRole } from "@/lib/supabase/profile";
 import { canManageTenantFully } from "@/lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -25,14 +27,16 @@ export default async function DefinicoesCategoriasPage({
   const { supabase, user, workspaceOwnerId } = await getServerContext();
   if (!user || !workspaceOwnerId) redirect("/login");
 
-  const [{ data: allSegments }, canEdit] = await Promise.all([
+  const [{ data: allSegments }, canEdit, role] = await Promise.all([
     supabase
       .from("client_custom_segments")
       .select("id, label, built_in_key")
       .eq("owner_user_id", workspaceOwnerId)
       .order("label", { ascending: true }),
     canManageTenantFully(supabase, user.id, workspaceOwnerId),
+    fetchProfileRole(supabase, user.id),
   ]);
+  const canRenameSystem = canAccessAdminArea(role);
 
   // Split into custom (no built_in_key) and built-in overrides
   const customSegments = (allSegments ?? [])
@@ -63,13 +67,14 @@ export default async function DefinicoesCategoriasPage({
     <PageLayout variant="form">
       <PageHeader
         title="Categorias de negócio"
-        description="Gerencie as categorias usadas para classificar os seus clientes."
+        description="Gerencie categorias personalizadas. As do sistema só podem ser alteradas por administradores da plataforma."
         back={back}
       />
       <CustomSegmentsManager
         initial={customSegments}
         builtIn={builtIn}
         canEdit={canEdit}
+        canRenameSystem={canRenameSystem}
       />
     </PageLayout>
   );

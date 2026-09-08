@@ -22,13 +22,16 @@ export function ChecklistModelsNav({
   return (
     <nav
       aria-label="Navegação de modelos de checklist"
-      className={cn("flex flex-wrap gap-2", className)}
+      className={cn("flex flex-col gap-2 sm:flex-row sm:flex-wrap", className)}
     >
       {current !== "catalog" ? (
         <Link
           href={href("/checklists")}
           prefetch
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "w-full justify-center sm:w-auto",
+          )}
         >
           Catálogo
         </Link>
@@ -37,7 +40,10 @@ export function ChecklistModelsNav({
         <Link
           href={href("/checklists/equipe")}
           prefetch
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "w-full justify-center sm:w-auto",
+          )}
         >
           Modelos da equipe
         </Link>
@@ -46,7 +52,10 @@ export function ChecklistModelsNav({
         <Link
           href={href("/checklists/personalizados")}
           prefetch
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "w-full justify-center sm:w-auto",
+          )}
         >
           Modelos personalizados
         </Link>

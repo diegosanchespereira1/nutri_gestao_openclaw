@@ -43,7 +43,7 @@ export default async function ChecklistsPersonalizadosPage({
         description="Cópias do catálogo oficial com itens extra por estabelecimento. Modelos já usados podem ser arquivados para sair do catálogo sem perder o histórico."
         back={back}
         actions={
-          <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <ChecklistModelsNav
               current="personalizados"
               returnToOrigin={returnToOrigin}

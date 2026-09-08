@@ -225,7 +225,7 @@ export function AppShell({
 
         <main
           id="conteudo-principal"
-          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden px-[max(1.25rem,var(--safe-area-left))] pt-4 pb-[calc(5.5rem+var(--safe-area-bottom))] pr-[max(1.25rem,var(--safe-area-right))] print:p-0 print:pb-0 md:min-h-0 md:overflow-hidden md:px-6 md:pt-6 md:pb-[calc(7rem+var(--safe-area-bottom))] lg:pb-6"
+          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden px-[max(1.25rem,var(--safe-area-left))] pt-4 pb-[calc(5.5rem+var(--safe-area-bottom))] pr-[max(1.25rem,var(--safe-area-right))] print:p-0 print:pb-0 md:min-h-0 md:overflow-hidden md:pl-6 md:pr-[max(0.125rem,var(--safe-area-right))] md:pt-6 md:pb-[calc(7rem+var(--safe-area-bottom))] lg:pb-6"
           tabIndex={-1}
         >
           <AppPageScroll>

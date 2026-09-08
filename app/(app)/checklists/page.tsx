@@ -38,7 +38,7 @@ export default async function ChecklistsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-foreground text-2xl font-semibold tracking-tight">
@@ -46,14 +46,15 @@ export default async function ChecklistsPage({
             </h1>
             <PageHelpHint ariaLabel="Como funciona a página de checklists">
               <p>
-                Catálogo oficial (Sistema), modelos da Equipe e personalizados por
+                O catálogo oficial tem a identificação <strong>Sistema</strong>.
+                Crie também modelos da Equipe e personalizados por
                 estabelecimento. Use um template global, duplique-o, ou crie um
-                checklist 100% customizável (FR14).
+                checklist 100% customizável.
               </p>
             </PageHelpHint>
           </div>
         </div>
-        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+        <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <ChecklistModelsNav current="catalog" returnToOrigin={returnToOrigin} />
           <Link
             href="/checklists/novo"

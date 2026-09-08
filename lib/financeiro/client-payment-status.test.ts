@@ -18,6 +18,7 @@ function ch(
 ): FinancialChargeListRow {
   return {
     description: "",
+    category: null,
     amount_cents: 10000,
     paid_at: null,
     created_at: "2026-01-10T12:00:00.000Z",

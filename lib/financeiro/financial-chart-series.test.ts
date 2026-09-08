@@ -28,6 +28,7 @@ function ch(
 ): FinancialChargeListRow {
   return {
     description: "",
+    category: null,
     clients: {
       legal_name: "Cliente X",
       trade_name: null,

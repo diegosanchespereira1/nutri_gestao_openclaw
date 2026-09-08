@@ -4,6 +4,7 @@ export type FinancialChargeListRow = {
   id: string;
   client_id: string;
   description: string;
+  category: string | null;
   amount_cents: number;
   due_date: string;
   status: FinancialChargeStatus;

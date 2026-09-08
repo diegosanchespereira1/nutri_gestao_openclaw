@@ -6,6 +6,7 @@ import { ClientExamDocumentList } from "@/components/clientes/client-exam-docume
 import { ClientEditHeaderAvatar } from "@/components/clientes/client-edit-header-avatar";
 import { ClientEditTabShell } from "@/components/clientes/client-edit-tab-shell";
 import { ClientContractsSection } from "@/components/clientes/client-contracts-section";
+import { FinancialChargeCreateDialog } from "@/components/financeiro/financial-charge-create-dialog";
 import { ClientFormLazy } from "@/components/clientes/client-form-lazy";
 import { ChecklistEvolutionExportDialog } from "@/components/checklists/checklist-evolution-export-dialog";
 import { ChecklistScoreEvolutionChart } from "@/components/checklists/checklist-score-evolution-chart";
@@ -27,6 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/layout/page-header";
 import { PageLayout } from "@/components/layout/page-layout";
+import { loadFinancialChargeCategoriesAction } from "@/lib/actions/financial-charge-categories";
 import { loadFinancialChargesForClient } from "@/lib/actions/financial-charges";
 import { loadContractsByClient } from "@/lib/actions/client-contracts";
 import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
@@ -43,6 +45,7 @@ import {
 import { resolveClientEditTab, type ClientEditTabValue } from "@/lib/clientes/client-edit-tab";
 import { todayKey } from "@/lib/datetime/calendar-tz";
 import { formatBRLFromCents } from "@/lib/dashboard/financial-pending";
+import { chargeFormErrorMessage } from "@/lib/financeiro/charge-form";
 import { metricsFromClientCharges } from "@/lib/financeiro/client-payment-status";
 import {
   buildCurrentUrl,
@@ -209,6 +212,7 @@ async function ClientEditLoadedPanels({
   canDelete,
   canEdit,
   contractErr,
+  chargeErr,
   activeTab,
   returnToOrigin,
 }: {
@@ -220,13 +224,14 @@ async function ClientEditLoadedPanels({
   canDelete: boolean;
   canEdit: boolean;
   contractErr?: string;
+  chargeErr?: string;
   activeTab: ClientEditTabValue;
   returnToOrigin: string;
 }) {
   const shell = shellFromClientRow(row);
   const needEstablishment = row.kind === "pj";
 
-  const [estRes, customSegments, customEstTypes, teamMembersForSelect, tz, chargesResult, contractsResult] =
+  const [estRes, customSegments, customEstTypes, teamMembersForSelect, tz, chargesResult, contractsResult, chargeCategories] =
     await Promise.all([
       needEstablishment
         ? supabase
@@ -241,6 +246,7 @@ async function ClientEditLoadedPanels({
       fetchProfileTimeZone(supabase, user?.id ?? ""),
       loadFinancialChargesForClient(row.id),
       loadContractsByClient(row.id),
+      loadFinancialChargeCategoriesAction(),
     ]);
 
   const estRow = (estRes.data as EstablishmentRow | null) ?? null;
@@ -259,6 +265,11 @@ async function ClientEditLoadedPanels({
   const social = row.social_links ?? {};
   const tKey = todayKey(new Date(), tz);
   const payMetrics = metricsFromClientCharges(chargesResult.rows, tKey);
+  const chargeErrMsg = chargeFormErrorMessage(chargeErr);
+  const clientChargeLabel = (() => {
+    const trade = row.trade_name?.trim();
+    return trade && trade.length > 0 ? trade : row.legal_name;
+  })();
 
   const dadosPanel = (
     <>
@@ -387,13 +398,24 @@ async function ClientEditLoadedPanels({
       <section aria-labelledby="pagamentos-cliente-heading">
         <Card className="border-border shadow-xs ring-1 ring-border">
           <CardHeader className="pb-2">
-            <CardTitle id="pagamentos-cliente-heading" className="text-base font-semibold">
-              Pagamentos e inadimplência
-            </CardTitle>
-            <CardDescription>
-              Resumo do estado de cobranças deste cliente; filtre e registe lançamentos no módulo
-              financeiro.
-            </CardDescription>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1.5">
+                <CardTitle id="pagamentos-cliente-heading" className="text-base font-semibold">
+                  Pagamentos e inadimplência
+                </CardTitle>
+                <CardDescription>
+                  Resumo das cobranças deste cliente. Novas cobranças ficam
+                  automaticamente associadas a este cadastro.
+                </CardDescription>
+              </div>
+              <FinancialChargeCreateDialog
+                source="client"
+                lockedClient={{ id: row.id, label: clientChargeLabel }}
+                description="Informe categoria, valor e vencimento. O cliente já está definido por este cadastro."
+                errorMessage={chargeErrMsg}
+                customCategories={chargeCategories}
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             {payMetrics.hasDelinquency ? (
@@ -437,7 +459,7 @@ async function ClientEditLoadedPanels({
                 "inline-flex w-full justify-center sm:w-auto",
               )}
             >
-              Abrir no financeiro
+              Ver todas no financeiro
             </Link>
           </CardContent>
         </Card>
@@ -499,6 +521,7 @@ export default async function EditarClientePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     contractErr?: string;
+    chargeErr?: string;
     tab?: string;
     formTab?: string;
     est?: string;
@@ -527,6 +550,7 @@ export default async function EditarClientePage({
   if (sp.tab === "estabelecimento" && shell.kind === "pj") {
     const q = new URLSearchParams();
     if (sp.contractErr) q.set("contractErr", sp.contractErr);
+    if (sp.chargeErr) q.set("chargeErr", sp.chargeErr);
     q.set("tab", "dados");
     q.set("formTab", "pj-estabelecimento");
     redirect(`/clientes/${id}/editar?${q.toString()}`);
@@ -585,6 +609,7 @@ export default async function EditarClientePage({
           canDelete={canDelete}
           canEdit={canEdit}
           contractErr={sp.contractErr}
+          chargeErr={sp.chargeErr}
           activeTab={activeTab}
           returnToOrigin={returnToOrigin}
         />

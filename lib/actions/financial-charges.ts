@@ -16,6 +16,11 @@ import type {
   FinancialChargeListRow,
   FinancialChargeStatus,
 } from "@/lib/types/financial-charges";
+import { isAllowedChargeCategory } from "@/lib/constants/financial-charge-category";
+import {
+  chargeMutationPath,
+  parseChargeMutationSource,
+} from "@/lib/financeiro/charge-form";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 
 function parseDueDate(raw: string): string | null {
@@ -95,6 +100,7 @@ export async function loadFinancialChargesForOwner(): Promise<{
       id,
       client_id,
       description,
+      category,
       amount_cents,
       due_date,
       status,
@@ -136,6 +142,7 @@ export async function loadFinancialChargesForClient(
       id,
       client_id,
       description,
+      category,
       amount_cents,
       due_date,
       status,
@@ -164,12 +171,16 @@ export async function createFinancialChargeAction(
 
   const clientId = String(formData.get("client_id") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
+  const category = String(formData.get("category") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "");
   const due = parseDueDate(String(formData.get("due_date") ?? ""));
   const cents = parseMoneyToCents(amountRaw);
+  const source = parseChargeMutationSource(
+    String(formData.get("source") ?? ""),
+  );
 
-  if (!clientId || !due || cents === null) {
-    redirect("/financeiro?err=invalid&tab=operacoes");
+  if (!clientId || !category || !due || cents === null) {
+    redirect(chargeMutationPath(source, clientId || null, "invalid"));
   }
 
   const { data: clientOk, error: clientErr } = await supabase
@@ -180,26 +191,39 @@ export async function createFinancialChargeAction(
     .maybeSingle();
 
   if (clientErr || !clientOk) {
-    redirect("/financeiro?err=client&tab=operacoes");
+    redirect(chargeMutationPath(source, clientId, "client"));
+  }
+
+  const { data: customCategoryRows } = await supabase
+    .from("financial_charge_categories")
+    .select("label")
+    .eq("owner_user_id", workspaceOwnerId);
+
+  const customLabels = (customCategoryRows ?? []).map((row) =>
+    String(row.label),
+  );
+  if (!isAllowedChargeCategory(category, customLabels)) {
+    redirect(chargeMutationPath(source, clientId, "invalid"));
   }
 
   const { error } = await supabase.from("financial_charges").insert({
     owner_user_id: workspaceOwnerId,
     client_id: clientId,
     description: description.length > 0 ? description : "",
+    category,
     amount_cents: cents,
     due_date: due,
     status: "open",
   });
 
   if (error) {
-    redirect("/financeiro?err=save&tab=operacoes");
+    redirect(chargeMutationPath(source, clientId, "save"));
   }
 
   revalidatePath("/financeiro");
   revalidatePath(APP_DASHBOARD_PATH);
   revalidatePath(`/clientes/${clientId}/editar`);
-  redirect("/financeiro?tab=operacoes");
+  redirect(chargeMutationPath(source, clientId));
 }
 
 export async function markFinancialChargePaidAction(

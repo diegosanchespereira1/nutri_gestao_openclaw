@@ -5,32 +5,27 @@ import { Suspense } from "react";
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
 
 import {
-  createFinancialChargeAction,
   loadFinancialChargesForOwner,
   markFinancialChargePaidAction,
 } from "@/lib/actions/financial-charges";
+import { loadFinancialChargeCategoriesAction } from "@/lib/actions/financial-charge-categories";
 import { loadClientsForOwner } from "@/lib/actions/clients";
-import { loadCustomSegmentsAction } from "@/lib/actions/client-segments";
 import { FinancialIssuedPaidBarChart } from "@/components/financeiro/financial-issued-paid-bar-chart";
 import { FinancialReceivedBarChart } from "@/components/financeiro/financial-received-bar-chart";
 import { FinancialTopOverdueBarChart } from "@/components/financeiro/financial-top-overdue-bar-chart";
 import { FinancialChartCardTools } from "@/components/financeiro/financial-chart-card-tools";
 import { FinanceiroPageTabs } from "@/components/financeiro/financeiro-page-tabs";
-import { FinancialChargeAmountInput } from "@/components/financeiro/financial-charge-amount-input";
-import { FinancialChargeClientPicker } from "@/components/financeiro/financial-charge-client-picker";
+import { FinancialChargeCreateDialog } from "@/components/financeiro/financial-charge-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { todayKey } from "@/lib/datetime/calendar-tz";
 import {
   applyFinancialChargeFilters,
@@ -54,6 +49,8 @@ import {
   oldestMonthFirstDayKeyInWindow,
   topOverdueDateBounds,
 } from "@/lib/financeiro/financial-chart-series";
+import { chargeCategoryDisplayLabel } from "@/lib/constants/financial-charge-category";
+import { chargeFormErrorMessage } from "@/lib/financeiro/charge-form";
 import { resolveFinanceiroInitialTab } from "@/lib/financeiro/financeiro-tab";
 import {
   formatBRLFromCents,
@@ -63,12 +60,6 @@ import { getServerContext } from "@/lib/supabase/get-server-user";
 import { fetchProfileTimeZone } from "@/lib/supabase/profile";
 import type { FinancialChargeListRow } from "@/lib/types/financial-charges";
 import { cn } from "@/lib/utils";
-
-const errMessages: Record<string, string> = {
-  invalid: "Preencha cliente, valor válido e data de vencimento.",
-  client: "Cliente inválido ou sem permissão.",
-  save: "Não foi possível salvar. Tente novamente.",
-};
 
 function chargeClientName(row: FinancialChargeListRow): string {
   const c = row.clients;
@@ -137,15 +128,16 @@ export default async function FinanceiroPage({ searchParams }: Props) {
   const tz = await fetchProfileTimeZone(supabase, user.id);
   const tKey = todayKey(new Date(), tz);
   const sp = await searchParams;
-  const errMsg = sp.err && errMessages[sp.err] ? errMessages[sp.err] : null;
+  const errMsg = chargeFormErrorMessage(sp.err);
   const filterStatus = parseChargeFilterStatus(sp.status);
   const filterClientId = parseChargeFilterClientId(sp.client);
 
-  const [{ rows: charges }, { rows: clients }, customSegments] = await Promise.all([
-    loadFinancialChargesForOwner(),
-    loadClientsForOwner({}),
-    loadCustomSegmentsAction(),
-  ]);
+  const [{ rows: charges }, { rows: clients }, customCategories] =
+    await Promise.all([
+      loadFinancialChargesForOwner(),
+      loadClientsForOwner({}),
+      loadFinancialChargeCategoriesAction(),
+    ]);
 
   const filteredCharges = applyFinancialChargeFilters(
     charges,
@@ -531,162 +523,45 @@ export default async function FinanceiroPage({ searchParams }: Props) {
         }
         operacoes={
           <div className="space-y-8">
-            <section aria-labelledby="nova-cobranca-heading">
-              <Card className="border-border bg-white shadow-xs ring-1 ring-border">
-                <CardHeader className="border-border border-b pb-4">
-                  <CardTitle id="nova-cobranca-heading" className="text-lg">
-                    Nova cobrança
-                  </CardTitle>
-                  <CardDescription className="text-pretty">
-                    Associe a cobrança a um cliente, defina o valor em reais e a
-                    data de vencimento. A descrição ajuda a identificar o
-                    lançamento na lista.
-                  </CardDescription>
-                </CardHeader>
-                {clients.length === 0 ? (
-                  <CardContent className="pt-6">
-                    <p className="text-muted-foreground text-sm">
-                      Crie um{" "}
-                      <Link
-                        href="/clientes/novo"
-                        className="text-primary font-medium underline-offset-4 hover:underline"
-                      >
-                        cliente
-                      </Link>{" "}
-                      antes de registar cobranças.
-                    </p>
-                  </CardContent>
-                ) : (
-                  <form action={createFinancialChargeAction}>
-                    <CardContent className="space-y-0 pt-6">
-                      <div
-                        className="space-y-3"
-                        aria-labelledby="nova-cob-sec-cliente"
-                      >
-                        <div className="space-y-1">
-                          <h3
-                            id="nova-cob-sec-cliente"
-                            className="text-foreground text-sm font-semibold tracking-tight"
-                          >
-                            Cliente
-                          </h3>
-                          <p className="text-muted-foreground max-w-2xl text-xs leading-relaxed">
-                            Primeiro filtre por segmento (chips abaixo). Depois
-                            abra a seleção, pesquise pelo nome e escolha o
-                            cliente.
-                          </p>
-                        </div>
-                        <FinancialChargeClientPicker
-                          id="fc-client"
-                          required
-                          clients={clients.map((c) => ({
-                            id: c.id,
-                            legal_name: c.legal_name,
-                            trade_name: c.trade_name,
-                            business_segment: c.business_segment,
-                            kind: c.kind,
-                          }))}
-                          customSegments={customSegments}
-                        />
-                      </div>
-
-                      <Separator className="my-8" />
-
-                      <div
-                        className="space-y-3"
-                        aria-labelledby="nova-cob-sec-detalhe"
-                      >
-                        <h3
-                          id="nova-cob-sec-detalhe"
-                          className="text-foreground text-sm font-semibold tracking-tight"
-                        >
-                          Detalhe da cobrança
-                        </h3>
-                        <div className="space-y-2">
-                          <Label
-                            htmlFor="fc-desc"
-                            className="text-sm font-medium"
-                          >
-                            Descrição{" "}
-                            <span className="text-muted-foreground font-normal">
-                              (opcional)
-                            </span>
-                          </Label>
-                          <Input
-                            id="fc-desc"
-                            name="description"
-                            maxLength={500}
-                            placeholder="Ex.: Mensalidade consultoria — abril"
-                            className="max-w-xl"
-                          />
-                        </div>
-                      </div>
-
-                      <Separator className="my-8" />
-
-                      <div
-                        className="space-y-4"
-                        aria-labelledby="nova-cob-sec-valor"
-                      >
-                        <h3
-                          id="nova-cob-sec-valor"
-                          className="text-foreground text-sm font-semibold tracking-tight"
-                        >
-                          Valor e vencimento
-                        </h3>
-                        <div className="grid max-w-2xl gap-6 sm:grid-cols-2 sm:gap-8">
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="fc-amount"
-                              className="text-sm font-medium"
-                            >
-                              Valor (R$)
-                            </Label>
-                            <FinancialChargeAmountInput
-                              id="fc-amount"
-                              name="amount"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label
-                              htmlFor="fc-due"
-                              className="text-sm font-medium"
-                            >
-                              Data de vencimento
-                            </Label>
-                            <Input
-                              id="fc-due"
-                              name="due_date"
-                              type="date"
-                              required
-                              className="w-full max-w-[11rem]"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="border-border flex flex-col items-stretch gap-2 border-t bg-muted/30 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-muted-foreground text-xs">
-                        Ao salvar, a cobrança fica em aberto até marcar como
-                        paga.
-                      </p>
-                      <Button type="submit" className="sm:w-auto">
-                        Registar cobrança
-                      </Button>
-                    </CardFooter>
-                  </form>
-                )}
-              </Card>
-            </section>
-
             <section aria-labelledby="lista-cobrancas-heading">
-              <h2
-                id="lista-cobrancas-heading"
-                className="text-foreground mb-3 text-base font-semibold"
-              >
-                Cobranças
-              </h2>
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2
+                  id="lista-cobrancas-heading"
+                  className="text-foreground text-base font-semibold"
+                >
+                  Cobranças
+                </h2>
+                {clients.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    Crie um{" "}
+                    <Link
+                      href="/clientes/novo"
+                      className="text-primary font-medium underline-offset-4 hover:underline"
+                    >
+                      cliente
+                    </Link>{" "}
+                    antes de registar cobranças.
+                  </p>
+                ) : (
+                  <FinancialChargeCreateDialog
+                    source="financeiro"
+                    defaultClientId={filterClientId ?? undefined}
+                    description={
+                      filterClientId
+                        ? "Cliente pré-selecionado. Pode alterar se precisar. Informe valor e vencimento."
+                        : "O cliente é obrigatório. Defina o valor em reais e a data de vencimento."
+                    }
+                    errorMessage={errMsg}
+                    customCategories={customCategories}
+                    clients={clients.map((c) => ({
+                      id: c.id,
+                      legal_name: c.legal_name,
+                      trade_name: c.trade_name,
+                      kind: c.kind,
+                    }))}
+                  />
+                )}
+              </div>
 
               {charges.length > 0 ? (
                 <div className="mb-4 flex flex-col gap-4 rounded-lg border border-border bg-muted/20 p-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
@@ -807,6 +682,9 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                           Cliente
                         </th>
                         <th className="text-foreground px-3 py-2 text-left font-bold">
+                          Categoria
+                        </th>
+                        <th className="text-foreground px-3 py-2 text-left font-bold">
                           Descrição
                         </th>
                         <th className="text-foreground px-3 py-2 text-left font-bold">
@@ -835,6 +713,9 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                           >
                             <td className="px-3 py-2">
                               {chargeClientName(row)}
+                            </td>
+                            <td className="px-3 py-2">
+                              {chargeCategoryDisplayLabel(row.category)}
                             </td>
                             <td className="text-muted-foreground max-w-[200px] truncate px-3 py-2">
                               {row.description || "—"}

@@ -17,6 +17,7 @@ function row(
 ): FinancialChargeListRow {
   return {
     description: "",
+    category: "mensalidade",
     amount_cents: 1000,
     paid_at: null,
     created_at: "2026-01-10T12:00:00.000Z",

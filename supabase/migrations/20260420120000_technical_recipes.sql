@@ -16,6 +16,26 @@ create table if not exists public.technical_recipes (
 create index if not exists technical_recipes_establishment_created_idx
   on public.technical_recipes (establishment_id, created_at desc);
 
+-- Colunas das migrations 20260410150500 / 20260410160000 (corriam antes desta
+-- tabela existir em db reset fresh; aqui garantimos o schema completo).
+alter table public.technical_recipes
+  add column if not exists is_template boolean not null default false;
+
+create index if not exists technical_recipes_is_template_idx
+  on public.technical_recipes (is_template, establishment_id, created_at desc);
+
+alter table public.technical_recipes
+  add column if not exists classification varchar(50),
+  add column if not exists sector varchar(100),
+  add column if not exists cmv_percent numeric(10, 4) not null default 25;
+
+alter table public.technical_recipes
+  drop constraint if exists technical_recipes_cmv_percent_check;
+
+alter table public.technical_recipes
+  add constraint technical_recipes_cmv_percent_check
+    check (cmv_percent > 0 and cmv_percent <= 100);
+
 alter table public.technical_recipes enable row level security;
 
 drop policy if exists "technical_recipes_select_own" on public.technical_recipes;

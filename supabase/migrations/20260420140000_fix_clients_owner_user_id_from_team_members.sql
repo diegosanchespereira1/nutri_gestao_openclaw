@@ -8,17 +8,26 @@
 -- tanto para o titular quanto para os membros da equipe.
 --
 -- Correção: reatribui esses clientes ao owner_user_id correto do workspace.
+-- Guard: member_user_id só existe a partir de 20260617100000.
 
--- Diagnóstico (execute antes para ver quais serão afetados):
--- SELECT c.id, c.legal_name, c.owner_user_id, tm.owner_user_id AS correct_owner
--- FROM public.clients c
--- JOIN public.team_members tm ON tm.member_user_id = c.owner_user_id
--- WHERE tm.member_user_id IS NOT NULL;
+do $$
+begin
+  if not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'team_members'
+      and column_name = 'member_user_id'
+  ) then
+    raise notice 'team_members.member_user_id ainda não existe — skip backfill';
+    return;
+  end if;
 
-update public.clients c
-set
-  owner_user_id = tm.owner_user_id,
-  updated_at    = now()
-from public.team_members tm
-where tm.member_user_id = c.owner_user_id
-  and tm.member_user_id is not null;
+  update public.clients c
+  set
+    owner_user_id = tm.owner_user_id,
+    updated_at    = now()
+  from public.team_members tm
+  where tm.member_user_id = c.owner_user_id
+    and tm.member_user_id is not null;
+end $$;

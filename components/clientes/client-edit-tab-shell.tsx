@@ -6,6 +6,8 @@ import { ClipboardList, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
+  clientEditTabActiveClassName,
+  clientEditTabButtonClassName,
   clientEditTabHref,
   type ClientEditTabValue,
 } from "@/lib/clientes/client-edit-tab";
@@ -26,11 +28,10 @@ type Props = {
    *  PJ ainda não tem estabelecimento cadastrado, ou o cliente é PF (nesse caso
    *  os pacientes ficam na própria aba "Dados do cliente"). */
   pacientesHref?: string | null;
+  /** Escola: atalho para o consolidado nutricional no mesmo trilho de abas. */
+  showNutritionOverview?: boolean;
   panels: ClientEditTabShellPanels;
 };
-
-const TAB_BTN =
-  "ring-offset-background focus-visible:ring-ring inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-center text-sm font-medium whitespace-nowrap transition-[color,background-color,border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none sm:flex-none border-border/80 bg-card text-foreground/80 shadow-xs touch-manipulation hover:border-primary/45 hover:bg-primary/18 hover:text-foreground";
 
 function panelVisibleClass(active: ClientEditTabValue, panel: ClientEditTabValue) {
   return active === panel ? "block" : "hidden";
@@ -43,6 +44,7 @@ export function ClientEditTabShell({
   contractErr,
   checklistQuery,
   pacientesHref,
+  showNutritionOverview = false,
   panels,
 }: Props) {
   const [tab, setTab] = useState<ClientEditTabValue>(initialTab);
@@ -121,27 +123,33 @@ export function ClientEditTabShell({
               type="button"
               onClick={() => goTab(value)}
               className={cn(
-                TAB_BTN,
-                isActive
-                  ? "border-primary bg-primary text-primary-foreground shadow-sm hover:border-primary hover:bg-primary hover:text-primary-foreground"
-                  : "",
+                clientEditTabButtonClassName,
+                isActive ? clientEditTabActiveClassName : "",
               )}
             >
               {label}
             </button>
           );
         })}
+        {showNutritionOverview ? (
+          <Link
+            href={`/clientes/${clientId}/visao-nutricional`}
+            className={cn(clientEditTabButtonClassName, "gap-1.5")}
+          >
+            Visão nutricional
+          </Link>
+        ) : null}
         {kind === "pj" ? (
           <Link
             href={`/ficha-tecnica?cliente=${encodeURIComponent(clientId)}`}
-            className={cn(TAB_BTN, "gap-1.5")}
+            className={cn(clientEditTabButtonClassName, "gap-1.5")}
           >
             <ClipboardList className="size-3.5" aria-hidden />
             Ficha técnica
           </Link>
         ) : null}
         {pacientesHref ? (
-          <Link href={pacientesHref} className={cn(TAB_BTN, "gap-1.5")}>
+          <Link href={pacientesHref} className={cn(clientEditTabButtonClassName, "gap-1.5")}>
             <Users className="size-3.5" aria-hidden />
             Pacientes
           </Link>

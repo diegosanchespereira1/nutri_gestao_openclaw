@@ -480,6 +480,7 @@ async function ClientEditLoadedPanels({
       contractErr={contractErr}
       checklistQuery={{ est: sp.est, status: sp.status, page: sp.page }}
       pacientesHref={pacientesHref}
+      showNutritionOverview={isSchoolClient}
       panels={{
         dados: dadosPanel,
         financeiro: financeiroPanel,

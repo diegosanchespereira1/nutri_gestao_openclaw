@@ -141,7 +141,7 @@ export function AppShell({
 
       {/* Sidebar fixa — ≥ lg (1024px) */}
       <aside
-        className="bg-sidebar border-sidebar-border fixed inset-y-0 left-0 z-40 hidden w-60 max-w-60 flex-col overflow-x-hidden overflow-y-hidden overscroll-x-none border-r shadow-lg lg:flex"
+        className="bg-sidebar border-sidebar-border fixed inset-y-0 left-0 z-40 hidden w-60 max-w-60 flex-col overflow-x-hidden overflow-y-hidden overscroll-x-none border-r shadow-lg print:hidden lg:flex"
         aria-label="Barra lateral"
       >
         {/* Logo */}
@@ -182,11 +182,11 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden md:min-h-0 md:h-screen lg:pl-60">
-        <AndroidTopInset className="shrink-0 lg:hidden" />
+      <div className="flex min-h-screen min-w-0 w-full max-w-full flex-1 flex-col overflow-x-hidden print:pl-0 md:min-h-0 md:h-screen lg:pl-60">
+        <AndroidTopInset className="shrink-0 print:hidden lg:hidden" />
         {/* Header mobile / tablet */}
         <header
-          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex min-h-14 shrink-0 items-center justify-center border-b px-[max(1.25rem,var(--safe-area-left))] pr-[max(1.25rem,var(--safe-area-right))] backdrop-blur lg:hidden"
+          className="border-border bg-background/95 supports-backdrop-filter:bg-background/80 flex min-h-14 shrink-0 items-center justify-center border-b px-[max(1.25rem,var(--safe-area-left))] pr-[max(1.25rem,var(--safe-area-right))] backdrop-blur print:hidden lg:hidden"
           role="banner"
         >
           <Link
@@ -201,7 +201,7 @@ export function AppShell({
 
         <main
           id="conteudo-principal"
-          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden px-[max(1.25rem,var(--safe-area-left))] pt-4 pb-[calc(5.5rem+var(--safe-area-bottom))] pr-[max(1.25rem,var(--safe-area-right))] md:min-h-0 md:overflow-hidden md:px-6 md:pt-6 md:pb-[calc(7rem+var(--safe-area-bottom))] lg:pb-6"
+          className="flex min-w-0 max-w-full flex-1 flex-col overflow-x-hidden px-[max(1.25rem,var(--safe-area-left))] pt-4 pb-[calc(5.5rem+var(--safe-area-bottom))] pr-[max(1.25rem,var(--safe-area-right))] print:p-0 print:pb-0 md:min-h-0 md:overflow-hidden md:px-6 md:pt-6 md:pb-[calc(7rem+var(--safe-area-bottom))] lg:pb-6"
           tabIndex={-1}
         >
           <AppPageScroll>
@@ -209,7 +209,9 @@ export function AppShell({
           </AppPageScroll>
         </main>
 
-        <MobileBottomNav showAdminNav={showAdminNav} />
+        <div className="print:hidden">
+          <MobileBottomNav showAdminNav={showAdminNav} />
+        </div>
       </div>
     </div>
   );

@@ -26,6 +26,8 @@ export type AppNavItem = {
   icon: LucideIcon;
   /** Item só aparece quando a chave em `enabled_modules` estiver ativa. */
   moduleItemGate?: EnabledModuleKey;
+  /** Item permanece no menu, mas o clique fica bloqueado (exceto preview interno). */
+  comingSoon?: boolean;
 };
 
 export type AppNavGroup = {
@@ -70,9 +72,9 @@ export const appNavGroups: AppNavGroup[] = [
     moduleGate: "assessoria_alimentacao",
     items: [
       { href: "/checklists",      label: "Checklists",      icon: ClipboardCheck },
-      { href: "/pops",            label: "POPs",             icon: Soup },
-      { href: "/ficha-tecnica",   label: "Ficha técnica",   icon: UtensilsCrossed },
-      { href: "/materias-primas", label: "Matérias-primas", icon: Package },
+      { href: "/pops",            label: "POPs",             icon: Soup, comingSoon: true },
+      { href: "/ficha-tecnica",   label: "Ficha técnica",   icon: UtensilsCrossed, comingSoon: true },
+      { href: "/materias-primas", label: "Matérias-primas", icon: Package, comingSoon: true },
     ],
   },
   {

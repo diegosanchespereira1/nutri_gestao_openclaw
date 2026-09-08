@@ -14,6 +14,7 @@ import {
 } from "react";
 
 import { useModuleGate } from "@/components/modules/module-gate-provider";
+import { ComingSoonBadge } from "@/components/nav/coming-soon-badge";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Separator } from "@/components/ui/separator";
@@ -137,20 +138,36 @@ function MoreSheetNavItem({
 }) {
   const { item, group } = entry;
   const Icon = item.icon;
-  const { isModuleEnabled, openDisabledModule } = useModuleGate();
+  const { isModuleEnabled, openDisabledModule, canAccessComingSoonModules } =
+    useModuleGate();
   const moduleGate = resolveNavItemModuleGate(item, group);
+  const isComingSoonLocked =
+    Boolean(item.comingSoon) && !canAccessComingSoonModules;
   const isLocked = moduleGate !== null && !isModuleEnabled(moduleGate);
-  const active = !isLocked && isNavItemActive(pathname, item.href);
+  const active =
+    !isComingSoonLocked && !isLocked && isNavItemActive(pathname, item.href);
 
   const itemClassName = cn(
     "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-    isLocked
-      ? "text-muted-foreground/70 hover:bg-muted/60 cursor-pointer"
-      : active
-        ? "bg-primary/10 text-primary font-semibold"
-        : "text-foreground hover:bg-muted/60",
+    isComingSoonLocked
+      ? "text-muted-foreground/70 cursor-not-allowed"
+      : isLocked
+        ? "text-muted-foreground/70 hover:bg-muted/60 cursor-pointer"
+        : active
+          ? "bg-primary/10 text-primary font-semibold"
+          : "text-foreground hover:bg-muted/60",
   );
+
+  if (isComingSoonLocked) {
+    return (
+      <span className={itemClassName} aria-disabled="true">
+        <Icon className="size-4 shrink-0 opacity-50" aria-hidden />
+        <span className="min-w-0 truncate">{item.label}</span>
+        <ComingSoonBadge className="bg-muted text-muted-foreground" />
+      </span>
+    );
+  }
 
   if (isLocked && moduleGate) {
     return (

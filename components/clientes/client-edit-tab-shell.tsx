@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ClipboardList, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useModuleGate } from "@/components/modules/module-gate-provider";
 import {
   clientEditTabActiveClassName,
   clientEditTabButtonClassName,
@@ -47,6 +48,7 @@ export function ClientEditTabShell({
   showNutritionOverview = false,
   panels,
 }: Props) {
+  const { canAccessComingSoonModules } = useModuleGate();
   const [tab, setTab] = useState<ClientEditTabValue>(initialTab);
 
   useEffect(() => {
@@ -139,7 +141,7 @@ export function ClientEditTabShell({
             Visão nutricional
           </Link>
         ) : null}
-        {kind === "pj" ? (
+        {kind === "pj" && canAccessComingSoonModules ? (
           <Link
             href={`/ficha-tecnica?cliente=${encodeURIComponent(clientId)}`}
             className={cn(clientEditTabButtonClassName, "gap-1.5")}

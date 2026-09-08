@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
 import { ClipboardList, Users } from "lucide-react";
 
+import { useModuleGate } from "@/components/modules/module-gate-provider";
 import {
   clientEditTabActiveClassName,
   clientEditTabButtonClassName,
@@ -21,6 +24,7 @@ export function ClientSchoolSectionTabNav({
   active,
   className,
 }: Props) {
+  const { canAccessComingSoonModules } = useModuleGate();
   const tabs: Array<{ href: string; label: string; isActive: boolean }> = [
     { href: clientEditTabHref(clientId, "dados"), label: "Dados do cliente", isActive: false },
     { href: clientEditTabHref(clientId, "financeiro"), label: "Financeiro", isActive: false },
@@ -52,13 +56,15 @@ export function ClientSchoolSectionTabNav({
           {tab.label}
         </Link>
       ))}
-      <Link
-        href={`/ficha-tecnica?cliente=${encodeURIComponent(clientId)}`}
-        className={cn(clientEditTabButtonClassName, "gap-1.5")}
-      >
-        <ClipboardList className="size-3.5" aria-hidden />
-        Ficha técnica
-      </Link>
+      {canAccessComingSoonModules ? (
+        <Link
+          href={`/ficha-tecnica?cliente=${encodeURIComponent(clientId)}`}
+          className={cn(clientEditTabButtonClassName, "gap-1.5")}
+        >
+          <ClipboardList className="size-3.5" aria-hidden />
+          Ficha técnica
+        </Link>
+      ) : null}
       {pacientesHref ? (
         <Link href={pacientesHref} className={cn(clientEditTabButtonClassName, "gap-1.5")}>
           <Users className="size-3.5" aria-hidden />

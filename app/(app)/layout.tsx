@@ -13,6 +13,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { resolveAppShellContext } from "@/lib/auth/resolve-app-shell-context";
 import { buildLoginRedirectPath } from "@/lib/auth/safe-next-path";
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
+import { canAccessComingSoonModules } from "@/lib/modules/coming-soon-modules";
 import { canAccessAdminArea } from "@/lib/roles";
 import { DEFAULT_PROFILE_TIME_ZONE } from "@/lib/timezones";
 import { DEFAULT_ENABLED_MODULES } from "@/lib/types/modules";
@@ -35,13 +36,20 @@ export default async function AppAreaLayout({
   const timeZone = profileCtx.timeZone || DEFAULT_PROFILE_TIME_ZONE;
   const showAdminNav = canAccessAdminArea(role);
   const enabledModules = profileCtx.enabledModules ?? DEFAULT_ENABLED_MODULES;
+  const comingSoonAccess = canAccessComingSoonModules({
+    userId: profileCtx.userId,
+    fullName: profileCtx.fullName,
+  });
   const onboardingOnly =
     pathname === "/onboarding" || pathname.startsWith("/onboarding/");
 
   return (
     <AppTimeZoneProvider timeZone={timeZone}>
       <EnabledModulesProvider value={enabledModules}>
-        <ModuleGateProvider enabledModules={enabledModules}>
+        <ModuleGateProvider
+          enabledModules={enabledModules}
+          canAccessComingSoonModules={comingSoonAccess}
+        >
           <AppVersionGuard />
           <Toaster />
           <Suspense fallback={null}>

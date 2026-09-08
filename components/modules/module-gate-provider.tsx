@@ -17,15 +17,18 @@ type ModuleGateContextValue = {
   enabledModules: EnabledModules;
   isModuleEnabled: (moduleKey: EnabledModuleKey) => boolean;
   openDisabledModule: (moduleKey: EnabledModuleKey) => void;
+  canAccessComingSoonModules: boolean;
 };
 
 const ModuleGateContext = createContext<ModuleGateContextValue | null>(null);
 
 export function ModuleGateProvider({
   enabledModules = DEFAULT_ENABLED_MODULES,
+  canAccessComingSoonModules = false,
   children,
 }: {
   enabledModules?: EnabledModules;
+  canAccessComingSoonModules?: boolean;
   children: ReactNode;
 }) {
   const [blockedModule, setBlockedModule] = useState<EnabledModuleKey | null>(
@@ -43,8 +46,9 @@ export function ModuleGateProvider({
       enabledModules,
       isModuleEnabled: (moduleKey) => enabledModules[moduleKey] === true,
       openDisabledModule,
+      canAccessComingSoonModules,
     }),
-    [enabledModules, openDisabledModule],
+    [enabledModules, openDisabledModule, canAccessComingSoonModules],
   );
 
   return (

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { contentDispositionWithFilename } from "@/lib/checklist-dossier-pdf-filename";
+import { canAccessComingSoonModules } from "@/lib/modules/coming-soon-modules";
 import { buildTechnicalRecipePdfExport } from "@/lib/pdf/technical-recipe-pdf-export";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,6 +18,9 @@ export async function GET(
   } = await supabase.auth.getUser();
   if (!user) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  }
+  if (!canAccessComingSoonModules({ userId: user.id, email: user.email })) {
+    return NextResponse.json({ error: "Não autorizado." }, { status: 403 });
   }
 
   const exportResult = await buildTechnicalRecipePdfExport(id);

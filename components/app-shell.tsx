@@ -20,6 +20,7 @@ import { AppPageScroll } from "@/components/app-page-scroll";
 import { AppRoutePrefetcher } from "@/components/app-route-prefetcher";
 import { AppBuildLabel } from "@/components/app-version-guard";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { ComingSoonBadge } from "@/components/nav/coming-soon-badge";
 import { cn } from "@/lib/utils";
 
 function NavGroups({
@@ -32,7 +33,8 @@ function NavGroups({
   showAdminNav?: boolean;
 }) {
   const pathname = usePathname();
-  const { isModuleEnabled, openDisabledModule } = useModuleGate();
+  const { isModuleEnabled, openDisabledModule, canAccessComingSoonModules } =
+    useModuleGate();
   const groups = buildVisibleNavGroups(showAdminNav ?? false);
 
   return (
@@ -57,9 +59,12 @@ function NavGroups({
             {group.items.map((item) => {
               const Icon = item.icon;
               const moduleGate = resolveNavItemModuleGate(item, group);
+              const isComingSoonLocked =
+                Boolean(item.comingSoon) && !canAccessComingSoonModules;
               const isLocked =
                 moduleGate !== null && !isModuleEnabled(moduleGate);
               const active =
+                !isComingSoonLocked &&
                 !isLocked &&
                 isNavItemActive(pathname, item.href);
 
@@ -67,12 +72,31 @@ function NavGroups({
                 "flex min-h-9 min-w-0 max-w-full items-center gap-3 overflow-hidden rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors duration-150",
                 "max-lg:min-h-10 max-lg:py-2 [@media(pointer:coarse)]:min-h-10 [@media(pointer:coarse)]:py-2",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-inset",
-                isLocked
-                  ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/40 cursor-pointer"
-                  : active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
-                    : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                isComingSoonLocked
+                  ? "text-sidebar-foreground/50 cursor-not-allowed"
+                  : isLocked
+                    ? "text-sidebar-foreground/55 hover:bg-sidebar-accent/40 cursor-pointer"
+                    : active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-semibold"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               );
+
+              if (isComingSoonLocked) {
+                return (
+                  <span
+                    key={item.href}
+                    className={itemClassName}
+                    aria-disabled="true"
+                  >
+                    <Icon
+                      className="size-4 shrink-0 opacity-50"
+                      aria-hidden
+                    />
+                    <span className="min-w-0 truncate">{item.label}</span>
+                    <ComingSoonBadge className="bg-sidebar-foreground/10 text-sidebar-foreground/55" />
+                  </span>
+                );
+              }
 
               if (isLocked && moduleGate) {
                 return (

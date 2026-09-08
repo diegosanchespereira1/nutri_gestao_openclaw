@@ -16,4 +16,13 @@ describe("app-nav", () => {
   it("admin item aponta para /admin", () => {
     expect(adminNavItem.href).toBe("/admin");
   });
+
+  it("marca POP, ficha técnica e matérias-primas como em breve", () => {
+    const assessoria = appNavGroups.find((g) => g.label === "Assessoria Nutricional");
+    expect(assessoria?.items.filter((item) => item.comingSoon).map((item) => item.href)).toEqual([
+      "/pops",
+      "/ficha-tecnica",
+      "/materias-primas",
+    ]);
+  });
 });

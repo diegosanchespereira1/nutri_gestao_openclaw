@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { loadPopWithVersionsAction } from "@/lib/actions/pops";
+import { canAccessComingSoonModules } from "@/lib/modules/coming-soon-modules";
 import { foldTextForPdf } from "@/lib/pdf/dossier-pdf";
 import { buildPopPdfBytes } from "@/lib/pdf/pop-pdf";
 import { createClient } from "@/lib/supabase/server";
@@ -42,6 +43,9 @@ export async function GET(
     return NextResponse.redirect(
       `${origin}/login?next=${encodeURIComponent(`/pops/${popId}/pdf`)}`,
     );
+  }
+  if (!canAccessComingSoonModules({ userId: user.id, email: user.email })) {
+    return NextResponse.redirect(`${origin}/dashboard`);
   }
 
   const res = await loadPopWithVersionsAction(popId);

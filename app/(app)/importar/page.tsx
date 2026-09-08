@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClipboardList, PackagePlus, PiggyBank } from "lucide-react";
 
+import { canAccessComingSoonModules } from "@/lib/modules/coming-soon-modules";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { ImportWizard } from "@/components/importar/import-wizard";
 
@@ -14,6 +15,10 @@ export const metadata = {
 export default async function ImportarPage() {
   const { user } = await getServerContext();
   if (!user) redirect("/login");
+  const showRawMaterialImports = canAccessComingSoonModules({
+    userId: user.id,
+    email: user.email,
+  });
 
   return (
     <main className="container max-w-4xl space-y-6 py-8">
@@ -39,33 +44,36 @@ export default async function ImportarPage() {
         </span>
       </Link>
 
-      <Link
-        href="/importar/materias-primas"
-        className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-muted/30 p-4 text-sm transition-colors hover:border-foreground/20 hover:bg-muted/50"
-      >
-        <PackagePlus className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-        <span>
-          <span className="font-medium">Upload em massa de matérias-primas</span>
-          <span className="text-muted-foreground block text-xs mt-0.5">
-            Cadastra várias matérias-primas de uma vez — se o nome já existir, você
-            escolhe sobrescrever, criar um novo ou ignorar.
-          </span>
-        </span>
-      </Link>
-
-      <Link
-        href="/importar/materias-primas/atualizar-precos"
-        className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-muted/30 p-4 text-sm transition-colors hover:border-foreground/20 hover:bg-muted/50"
-      >
-        <PiggyBank className="size-5 shrink-0 text-muted-foreground" aria-hidden />
-        <span>
-          <span className="font-medium">Atualização de preços em massa</span>
-          <span className="text-muted-foreground block text-xs mt-0.5">
-            Baixa a planilha com todas as suas matérias-primas, você ajusta os
-            preços e reenvia — o casamento é sempre pelo ID, nunca duplica.
-          </span>
-        </span>
-      </Link>
+      {showRawMaterialImports ? (
+        <>
+          <Link
+            href="/importar/materias-primas"
+            className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-muted/30 p-4 text-sm transition-colors hover:border-foreground/20 hover:bg-muted/50"
+          >
+            <PackagePlus className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+            <span>
+              <span className="font-medium">Upload em massa de matérias-primas</span>
+              <span className="text-muted-foreground block text-xs mt-0.5">
+                Cadastra várias matérias-primas de uma vez — se o nome já existir, você
+                escolhe sobrescrever, criar um novo ou ignorar.
+              </span>
+            </span>
+          </Link>
+          <Link
+            href="/importar/materias-primas/atualizar-precos"
+            className="flex items-center gap-3 rounded-lg border border-foreground/10 bg-muted/30 p-4 text-sm transition-colors hover:border-foreground/20 hover:bg-muted/50"
+          >
+            <PiggyBank className="size-5 shrink-0 text-muted-foreground" aria-hidden />
+            <span>
+              <span className="font-medium">Atualização de preços em massa</span>
+              <span className="text-muted-foreground block text-xs mt-0.5">
+                Baixa a planilha com todas as suas matérias-primas, você ajusta os
+                preços e reenvia — o casamento é sempre pelo ID, nunca duplica.
+              </span>
+            </span>
+          </Link>
+        </>
+      ) : null}
 
       <ImportWizard />
     </main>

@@ -39,6 +39,10 @@ import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import {
   DEFAULT_ENABLED_MODULES,
 } from "@/lib/types/modules";
+import {
+  canAccessComingSoonModules,
+  isComingSoonPath,
+} from "@/lib/modules/coming-soon-modules";
 import { isPathAllowedForEnabledModules, buildModuleBlockedDashboardPath, getModuleGateForPath } from "@/lib/modules/module-path-access";
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { loadWorkspaceEnabledModules } from "@/lib/modules/load-workspace-enabled-modules";
@@ -477,6 +481,24 @@ export async function updateSession(request: NextRequest) {
       });
       return redirectRes;
     }
+  }
+
+  if (
+    user &&
+    isComingSoonPath(pathname) &&
+    !canAccessComingSoonModules({
+      userId: user.id,
+      email: user.email,
+      fullName: profileCtx?.fullName,
+    })
+  ) {
+    const redirectRes = NextResponse.redirect(new URL(APP_DASHBOARD_PATH, request.url));
+    copyCookies(supabaseResponse, redirectRes);
+    logAuthMiddleware("info", requestId, "coming_soon_access_denied_redirect", {
+      userId: user.id,
+      pathname,
+    });
+    return redirectRes;
   }
 
   if (

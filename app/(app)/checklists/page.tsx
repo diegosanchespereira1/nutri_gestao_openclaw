@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
 
+import {
+  ChecklistCatalogPulse,
+  ChecklistCatalogPulseSkeleton,
+} from "@/components/checklists/checklist-catalog-pulse";
 import { ChecklistCatalogSection } from "@/components/checklists/checklist-catalog-section";
 import { ChecklistModelsNav } from "@/components/checklists/checklist-models-nav";
 import { ChecklistCatalogSkeleton } from "@/components/checklists/checklist-skeletons";
@@ -65,6 +69,10 @@ export default async function ChecklistsPage({
           </Link>
         </div>
       </div>
+
+      <Suspense fallback={<ChecklistCatalogPulseSkeleton />}>
+        <ChecklistCatalogPulse />
+      </Suspense>
 
       {err === "missing" ? (
         <p className="text-destructive text-sm" role="alert">

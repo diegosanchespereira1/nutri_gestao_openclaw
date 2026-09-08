@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
+import { PageHeader } from "@/components/layout/page-header";
+import { PageLayout } from "@/components/layout/page-layout";
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
 
 import {
@@ -240,29 +242,12 @@ export default async function FinanceiroPage({ searchParams }: Props) {
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <Link
-          href={APP_DASHBOARD_PATH}
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground -ml-2 mb-2",
-          )}
-        >
-          ← Dashboard
-        </Link>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Financeiro
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          <strong className="text-foreground font-medium">Resumo e análise</strong>{" "}
-          com gráficos e estado por cliente;{" "}
-          <strong className="text-foreground font-medium">
-            Cobranças e registos
-          </strong>{" "}
-          para lançamentos, filtros e tabela (FR41).
-        </p>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title="Financeiro"
+        description="Resumo e análise com gráficos e estado por cliente; cobranças e registos para lançamentos, filtros e tabela."
+        back={{ href: APP_DASHBOARD_PATH, label: "Dashboard" }}
+      />
 
       {errMsg ? (
         <div
@@ -790,6 +775,6 @@ export default async function FinanceiroPage({ searchParams }: Props) {
           </div>
         }
       />
-    </div>
+    </PageLayout>
   );
 }

@@ -235,9 +235,6 @@ export function FinancialChargeClientPicker({
                               {c.legal_name}
                             </span>
                           ) : null}
-                          <span className="text-muted-foreground mt-0.5 block text-xs">
-                            {c.kind === "pf" ? "Pessoa física" : "Pessoa jurídica"}
-                          </span>
                         </span>
                       </button>
                     </li>

@@ -3,7 +3,7 @@
 import { visitKindBlockStyle } from "@/lib/constants/visit-kind-style";
 import { formatTimeShort } from "@/lib/datetime/calendar-tz";
 import type { ScheduledVisitWithTargets, VisitKind } from "@/lib/types/visits";
-import { visitDisplayTitle } from "@/lib/visits/display-title";
+import { visitDisplayTitle, visitProfessionalName } from "@/lib/visits/display-title";
 import { cn } from "@/lib/utils";
 
 const WEEKDAY_LABELS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] as const;
@@ -122,7 +122,7 @@ export function VisitMonthGrid({
                               ? "ring-primary ring-1 ring-inset"
                               : "hover:brightness-[0.97] dark:hover:brightness-110",
                           )}
-                          title={`${formatTimeShort(v.scheduled_start, timeZone)} · ${visitDisplayTitle(v)}`}
+                          title={`${formatTimeShort(v.scheduled_start, timeZone)} · ${visitDisplayTitle(v)} · ${visitProfessionalName(v, v.creator_full_name)}`}
                         >
                           <span className="text-muted-foreground font-mono">
                             {formatTimeShort(v.scheduled_start, timeZone)}

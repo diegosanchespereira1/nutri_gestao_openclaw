@@ -48,7 +48,12 @@ export type ScheduledVisitWithTargets = ScheduledVisitRow & {
     client_id: string;
     clients?: { legal_name: string; trade_name: string | null } | null;
   } | null;
-  patients: { id: string; full_name: string } | null;
+  patients: {
+    id: string;
+    full_name: string;
+    client_id?: string | null;
+    clients?: { legal_name: string; trade_name: string | null } | null;
+  } | null;
   team_members: {
     id: string;
     full_name: string;

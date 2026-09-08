@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { APP_DASHBOARD_PATH } from "@/lib/routes";
 import { OnboardingWizard } from "@/components/onboarding/onboarding-wizard";
-import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { buildOnboardingInitialValues } from "@/lib/onboarding/initial-values";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -16,8 +15,7 @@ export default async function OnboardingPage() {
   const needsOnboarding = await profileNeedsOnboarding(supabase, user.id);
   if (!needsOnboarding) redirect(APP_DASHBOARD_PATH);
 
-  const [{ templates }, { data: profile }, workspaceOwnerId] = await Promise.all([
-    loadChecklistCatalog(),
+  const [{ data: profile }, workspaceOwnerId] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -49,6 +47,6 @@ export default async function OnboardingPage() {
   });
 
   return (
-    <OnboardingWizard templates={templates} initialValues={initialValues} />
+    <OnboardingWizard initialValues={initialValues} />
   );
 }

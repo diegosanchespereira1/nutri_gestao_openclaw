@@ -41,11 +41,11 @@ describe("establishment-category-access", () => {
     ).toBe(false);
     expect(
       establishmentCategorySelectLabel("assessoria_alimentacao", onlyAtendimento),
-    ).toBe("Assessoria em Serviços de Alimentação — Não habilitado");
+    ).toBe("Assessoria Nutricional — Não habilitado");
     expect(
       establishmentCategoryDisabledMessage("assessoria_alimentacao"),
     ).toBe(
-      "A categoria Assessoria em Serviços de Alimentação não está habilitada na sua conta.",
+      "A categoria Assessoria Nutricional não está habilitada na sua conta.",
     );
   });
 

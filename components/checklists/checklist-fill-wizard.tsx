@@ -3,6 +3,7 @@
 import { ChevronDown, Eye, MapPin, Pencil, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 
 import { executeWithSessionRecovery } from "@/lib/client/execute-with-session-recovery";
@@ -521,7 +522,7 @@ export function ChecklistFillWizard({
   areaName = null,
   itemResponseSource,
   backHref = "/checklists",
-  backLabel = "Voltar ao catálogo",
+  backLabel = "Catálogo",
   recurringNcSessionCountByItemId = {},
   initialItemPhotos = {},
   initialDossierApprovedAt = null,
@@ -1483,12 +1484,6 @@ export function ChecklistFillWizard({
                 onReopened={handleDossierReopened}
               />
             )}
-            <Link
-              href={backHref}
-              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-            >
-              {backLabel}
-            </Link>
           </div>
         </div>
 
@@ -1690,12 +1685,6 @@ export function ChecklistFillWizard({
               Pré-visualizar dossiê
             </Button>
           ) : null}
-          <Link
-            href={backHref}
-            className={cn(buttonVariants({ variant: "default", size: "sm" }))}
-          >
-            {backLabel}
-          </Link>
         </div>
       </div>
 

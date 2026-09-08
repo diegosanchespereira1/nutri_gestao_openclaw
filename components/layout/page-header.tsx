@@ -1,9 +1,7 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 
+import { PageBackLink } from "@/components/layout/page-back-link";
 import { cn } from "@/lib/utils";
-import { buttonVariants } from "@/components/ui/button-variants";
 
 interface PageHeaderProps {
   /** Título principal da página (h1) */
@@ -37,16 +35,7 @@ export function PageHeader({
   return (
     <div className={cn("space-y-1", className)}>
       {back && (
-        <Link
-          href={back.href}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "mb-2 gap-1.5 self-start",
-          )}
-        >
-          <ArrowLeft className="size-3.5" aria-hidden />
-          {back.label}
-        </Link>
+        <PageBackLink href={back.href} label={back.label} className="mb-2" />
       )}
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">

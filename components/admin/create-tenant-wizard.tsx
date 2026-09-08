@@ -49,7 +49,7 @@ const LAST_STEP: Step = 5;
 const SERVER_ERR_MESSAGES: Record<string, string> = {
   invalid: "Nome da empresa e email são obrigatórios.",
   modules:
-    "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria em Serviços de Alimentação).",
+    "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria Nutricional).",
   exists: "Já existe uma conta com este email.",
   create: "Não foi possível criar a conta. Tente novamente.",
   limits: "Revise os limites informados.",
@@ -104,7 +104,7 @@ function validateStep2(form: HTMLFormElement): string | null {
   )?.checked;
 
   if (!atendimento && !assessoria) {
-    return "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria em Serviços de Alimentação).";
+    return "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria Nutricional).";
   }
   return null;
 }

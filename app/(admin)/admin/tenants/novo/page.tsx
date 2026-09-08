@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const ERR_MESSAGES: Record<string, string> = {
   invalid: "Nome da empresa e email são obrigatórios.",
   modules:
-    "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria em Serviços de Alimentação).",
+    "Selecione pelo menos um módulo de atividade (Atendimento Nutricional ou Assessoria Nutricional).",
   exists: "Já existe uma conta com este email.",
   create: "Não foi possível criar a conta. Tente novamente.",
   server_config:

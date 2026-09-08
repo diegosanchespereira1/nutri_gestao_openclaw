@@ -10,12 +10,8 @@ import {
   type OnboardingWorkContext,
   type SkipOnboardingDetailsResult,
 } from "@/lib/actions/onboarding";
-import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
 import { lookupCepByViaCep } from "@/lib/cep/viacep";
-import {
-  categoryFromType,
-  labelForEstablishmentType,
-} from "@/lib/constants/establishment-types";
+import { categoryFromType } from "@/lib/constants/establishment-types";
 import { EstablishmentCategorySelect } from "@/components/clientes/establishment-category-select";
 import { EstablishmentTypeSelect } from "@/components/clientes/establishment-type-select";
 import { BrazilUfSelect } from "@/components/forms/brazil-uf-select";
@@ -23,7 +19,6 @@ import { cepDigits, formatCepInput } from "@/lib/format/cep";
 import { formatEstablishmentAddressLines } from "@/lib/format/establishment-address";
 import { buildOnboardingSummaryItems } from "@/lib/onboarding/summary";
 import type { OnboardingInitialValues } from "@/lib/onboarding/initial-values";
-import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
 import type { EstablishmentCategory } from "@/lib/types/establishments";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,18 +41,16 @@ import { cn } from "@/lib/utils";
 const sectionLegendClass =
   "text-xs font-semibold uppercase tracking-widest text-muted-foreground";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 
 const STEP_LABELS: Record<Step, string> = {
   1: "Sua empresa",
   2: "Primeiro cliente",
-  3: "Portarias",
-  4: "Revisão",
-  5: "Concluir",
+  3: "Revisão",
+  4: "Concluir",
 };
 
 type Props = {
-  templates: ChecklistTemplateWithSections[];
   initialValues: OnboardingInitialValues;
 };
 
@@ -66,7 +59,7 @@ const workOptionCopy: Record<
   { title: string; description: string }
 > = {
   institutional: {
-    title: "Assessoria Alimentar",
+    title: "Assessoria Nutricional",
     description:
       "Escolas, hospitais, empresas — visitas técnicas, checklists e POP's.",
   },
@@ -76,16 +69,16 @@ const workOptionCopy: Record<
       "Particulares e acompanhamento nutricional; sem foco imediato em inspeções.",
   },
   both: {
-    title: "Ambos (Assessoria Alimentar e Atendimento Nutricional)",
+    title: "Ambos (Assessoria Nutricional e Atendimento Nutricional)",
     description:
-      "Quero gerenciar os dois contextos na mesma conta (começamos pelo lado institucional para portarias).",
+      "Quero gerenciar os dois contextos na mesma conta.",
   },
 };
 
 const institutionalNextSteps = [
   "Explorar o painel inicial",
   "Agendar a primeira visita técnica",
-  "Consultar checklists e portarias sugeridas",
+  "Consultar checklists",
 ] as const;
 
 const clinicalNextSteps = [
@@ -274,7 +267,7 @@ function OnboardingHiddenFields({
   );
 }
 
-export function OnboardingWizard({ templates, initialValues }: Props) {
+export function OnboardingWizard({ initialValues }: Props) {
   const [step, setStep] = useState<Step>(1);
   const [tenantCompanyName, setTenantCompanyName] = useState(
     initialValues.tenantCompanyName,
@@ -352,16 +345,6 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
       cancelled = true;
     };
   }, [postalCode, needsEstablishment]);
-
-  const suggestedTemplates = useMemo(() => {
-    if (!needsEstablishment) return [];
-    const uf = stateUf.trim().toUpperCase();
-    if (uf.length !== 2 || establishmentType === "") return [];
-    return filterTemplatesForEstablishment(templates, {
-      state: uf,
-      establishment_type: establishmentType,
-    });
-  }, [templates, needsEstablishment, stateUf, establishmentType]);
 
   const [actionState, formAction, isPending] = useActionState<
     CompleteOnboardingResult | undefined,
@@ -465,14 +448,14 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
           Bem-vindo ao NutriGestão
         </h1>
         <p className="text-muted-foreground text-sm">
-          Cinco passos rápidos: primeiro os dados da sua empresa, depois o
+          Quatro passos rápidos: primeiro os dados da sua empresa, depois o
           cadastro do seu primeiro cliente na carteira.
         </p>
         <ol
           className="text-muted-foreground flex w-full flex-wrap justify-start gap-2 text-xs"
           aria-label="Progresso"
         >
-          {([1, 2, 3, 4, 5] as const).map((n) => (
+          {([1, 2, 3, 4] as const).map((n) => (
             <li
               key={n}
               className={cn(
@@ -482,7 +465,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
                   : "opacity-70",
               )}
             >
-              {step === n ? `${n}. ${STEP_LABELS[n]}` : `${n}/5`}
+              {step === n ? `${n}. ${STEP_LABELS[n]}` : `${n}/4`}
             </li>
           ))}
         </ol>
@@ -862,83 +845,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
         </div>
       ) : null}
 
-      {step === 3 ? (
-        <div className="w-full min-w-0 space-y-4">
-          <div className="space-y-1">
-            <p className="text-foreground text-sm font-medium">
-              Passo 3 — Portarias sugeridas
-            </p>
-            <p className="text-muted-foreground text-sm">
-              Com base no cliente cadastrado no passo anterior, estas são as
-              portarias do catálogo mais relevantes para você.
-            </p>
-          </div>
-          {needsEstablishment ? (
-            <>
-              <p className="text-foreground text-sm font-medium">
-                Portarias sugeridas para {stateUf.toUpperCase()}
-                {establishmentType
-                  ? ` · ${labelForEstablishmentType(establishmentType)}`
-                  : null}
-              </p>
-              {suggestedTemplates.length === 0 ? (
-                <p className="text-muted-foreground text-sm">
-                  Ainda não há template no catálogo para esta combinação. Você pode
-                  concluir a configuração e revisar os checklists depois em{" "}
-                  <span className="text-foreground font-medium">Checklists</span>.
-                </p>
-              ) : (
-                <ul className="space-y-3" aria-label="Templates sugeridos">
-                  {suggestedTemplates.map((t) => (
-                    <li key={t.id}>
-                      <Card className="w-full">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-base">{t.name}</CardTitle>
-                          <CardDescription>
-                            {t.portaria_ref ? `${t.portaria_ref} · ` : ""}UF {t.uf}
-                          </CardDescription>
-                        </CardHeader>
-                        {t.description ? (
-                          <CardContent>
-                            <p className="text-muted-foreground text-sm">
-                              {t.description}
-                            </p>
-                          </CardContent>
-                        ) : null}
-                      </Card>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          ) : (
-            <Card className="w-full">
-              <CardHeader>
-                <CardTitle className="text-base">Atendimento Nutricional</CardTitle>
-                <CardDescription>
-                  As portarias do catálogo são filtradas por estabelecimento (cliente
-                  PJ). Quando você adicionar uma empresa com unidade e UF, verá as
-                  sugestões em Checklists.
-                </CardDescription>
-              </CardHeader>
-              <CardFooter className="text-muted-foreground text-xs">
-                Nos próximos passos, você revisará os dados e concluirá a
-                configuração da conta.
-              </CardFooter>
-            </Card>
-          )}
-          <div className="flex justify-between gap-2">
-            <Button type="button" variant="outline" onClick={() => setStep(2)}>
-              Voltar
-            </Button>
-            <Button type="button" onClick={() => setStep(4)}>
-              Continuar
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {step === 4 && workContext ? (
+      {step === 3 && workContext ? (
         <div className="w-full min-w-0 space-y-6">
           <Card className="w-full">
             <CardHeader>
@@ -952,10 +859,10 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
               <OnboardingSummaryList items={summaryItems} />
             </CardContent>
             <CardFooter className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-              <Button type="button" variant="outline" onClick={() => setStep(3)}>
+              <Button type="button" variant="outline" onClick={() => setStep(2)}>
                 Voltar
               </Button>
-              <Button type="button" onClick={() => setStep(5)}>
+              <Button type="button" onClick={() => setStep(4)}>
                 Tudo certo, continuar
               </Button>
             </CardFooter>
@@ -963,7 +870,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
         </div>
       ) : null}
 
-      {step === 5 && workContext ? (
+      {step === 4 && workContext ? (
         <form action={formAction} onReset={(e) => e.preventDefault()} className="w-full min-w-0 space-y-6">
           <OnboardingHiddenFields
             workContext={workContext}
@@ -989,7 +896,7 @@ export function OnboardingWizard({ templates, initialValues }: Props) {
             establishmentName={establishmentName}
             nextSteps={nextSteps}
             isPending={isPending}
-            onBack={() => setStep(4)}
+            onBack={() => setStep(3)}
           />
         </form>
       ) : null}

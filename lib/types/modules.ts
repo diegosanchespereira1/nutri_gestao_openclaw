@@ -32,7 +32,7 @@ export const ENABLED_MODULE_KEYS: EnabledModuleKey[] = [
 
 export const ENABLED_MODULE_LABELS: Record<EnabledModuleKey, string> = {
   atendimento_nutricional: "Atendimento Nutricional",
-  assessoria_alimentacao: "Assessoria em Serviços de Alimentação",
+  assessoria_alimentacao: "Assessoria Nutricional",
   visitas: "Visitas",
   financeiro: "Financeiro",
 };
@@ -67,12 +67,12 @@ export const TENANT_MODULE_GROUPS: Array<{
 
 export const MODULE_LABELS: Record<ModuleContext, string> = {
   atendimento_nutricional: "Atendimento Nutricional",
-  assessoria_alimentacao: "Assessoria em Serviços de Alimentação",
+  assessoria_alimentacao: "Assessoria Nutricional",
 };
 
 export const MODULE_SHORT_LABELS: Record<ModuleContext, string> = {
   atendimento_nutricional: "Atendimento Nutricional",
-  assessoria_alimentacao: "Assessoria Alimentar",
+  assessoria_alimentacao: "Assessoria Nutricional",
 };
 
 /** Retorna true se o ModuleContext fornecido é válido (whitelist). */

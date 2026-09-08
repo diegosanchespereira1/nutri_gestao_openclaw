@@ -66,7 +66,7 @@ export const appNavGroups: AppNavGroup[] = [
     ],
   },
   {
-    label: "Assessoria Alimentar",
+    label: "Assessoria Nutricional",
     moduleGate: "assessoria_alimentacao",
     items: [
       { href: "/checklists",      label: "Checklists",      icon: ClipboardCheck },

@@ -3,6 +3,7 @@ import dynamic from "next/dynamic";
 import { notFound, redirect } from "next/navigation";
 
 import { PageHelpHint } from "@/components/help/page-help-hint";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   getChecklistReopenEligibility,
   loadReopenEventsForSession,
@@ -16,13 +17,15 @@ import { safeNextPath } from "@/lib/auth/safe-next-path";
 import {
   APP_DASHBOARD_PATH,
   CHECKLISTS_A_VENCER_PATH,
+  CHECKLISTS_EM_ANDAMENTO_PATH,
   CHECKLISTS_VENCIDOS_PATH,
 } from "@/lib/routes";
 
 function backLabelForReturnTo(href: string | undefined): string | undefined {
-  if (href === CHECKLISTS_VENCIDOS_PATH) return "Voltar aos vencidos";
-  if (href === CHECKLISTS_A_VENCER_PATH) return "Voltar aos a vencer";
-  if (href === APP_DASHBOARD_PATH) return "Voltar ao dashboard";
+  if (href === CHECKLISTS_VENCIDOS_PATH) return "Vencidos";
+  if (href === CHECKLISTS_A_VENCER_PATH) return "A vencer";
+  if (href === CHECKLISTS_EM_ANDAMENTO_PATH) return "Em andamento";
+  if (href === APP_DASHBOARD_PATH) return "Dashboard";
   return undefined;
 }
 
@@ -145,6 +148,11 @@ export default async function ChecklistPreencherPage({
   return (
     <div className="space-y-6">
       <div>
+        <PageBackLink
+          href={backHref ?? "/checklists"}
+          label={backLabel ?? "Catálogo"}
+          className="mb-2"
+        />
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
             {pageTitle}

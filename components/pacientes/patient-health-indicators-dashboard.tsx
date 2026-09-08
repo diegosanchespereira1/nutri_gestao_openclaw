@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ArrowLeft,
   ClipboardList,
   FileDown,
   Info,
@@ -12,6 +11,7 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import { HealthIndicatorKpiCard } from "@/components/pacientes/health-indicator-kpi-card";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Label } from "@/components/ui/label";
@@ -293,18 +293,12 @@ export function PatientHealthIndicatorsDashboard({
       {!embedded ? (
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 space-y-3">
-            <div className="flex flex-wrap gap-2 print:hidden">
-              <Link
-                href={backHref}
-                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
-              >
-                <ArrowLeft className="size-3.5" aria-hidden />
-                {backLabel}
-              </Link>
+            <div className="flex flex-wrap items-center gap-2 print:hidden">
+              <PageBackLink href={backHref} label={backLabel} />
               {editarHref ? (
                 <Link
                   href={editarHref}
-                  className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
                 >
                   <Pencil className="size-3.5" aria-hidden />
                   Editar dados

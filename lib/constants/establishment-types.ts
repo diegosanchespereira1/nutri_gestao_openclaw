@@ -40,7 +40,7 @@ export const ESTABLISHMENT_CATEGORIES: readonly EstablishmentCategory[] = [
 export const establishmentCategoryLabel: Record<EstablishmentCategory, string> =
   {
     atendimento_nutricional: "Atendimento Nutricional",
-    assessoria_alimentacao: "Assessoria em Serviços de Alimentação",
+    assessoria_alimentacao: "Assessoria Nutricional",
   };
 
 export const ESTABLISHMENT_TYPES_BY_CATEGORY: Record<

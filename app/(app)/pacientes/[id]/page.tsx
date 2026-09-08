@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ClipboardList, Pencil } from "lucide-react";
+import { ClipboardList, Pencil } from "lucide-react";
 
 import { ClientAvatar } from "@/components/clientes/client-avatar";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import { PageLayout } from "@/components/layout/page-layout";
 import { PatientAssessmentsBlock } from "@/components/pacientes/patient-assessments-block";
 import { PatientHealthIndicatorsDashboard } from "@/components/pacientes/patient-health-indicators-dashboard";
@@ -181,13 +182,7 @@ export default async function PacientePage({
       {/* Topo no estilo do dashboard de indicadores (modelo novo): nome em destaque */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 space-y-3">
-          <Link
-            href={back.href}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
-          >
-            <ArrowLeft className="size-3.5" aria-hidden />
-            {back.label}
-          </Link>
+          <PageBackLink href={back.href} label={back.label} />
 
           <div className="flex min-w-0 items-center gap-4">
             <ClientAvatar

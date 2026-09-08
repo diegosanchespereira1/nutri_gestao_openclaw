@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { WorkspaceChecklistBuilder } from "@/components/checklists/workspace-checklist-builder";
+import { PageBackLink } from "@/components/layout/page-back-link";
 import {
   ensureWorkspaceTemplateDraftForPage,
   loadBaseTemplateCandidates,
@@ -45,7 +45,8 @@ export default async function NewWorkspaceChecklistPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-2">
+        <PageBackLink href="/checklists" label="Catálogo" />
         <div>
           <h1 className="text-foreground text-2xl font-semibold tracking-tight">
             Criar checklist personalizado
@@ -57,12 +58,6 @@ export default async function NewWorkspaceChecklistPage({
             textos em edição são gravados na publicação.
           </p>
         </div>
-        <Link
-          href="/checklists"
-          className="text-muted-foreground hover:text-foreground text-sm font-medium underline-offset-2 hover:underline"
-        >
-          Voltar ao catálogo
-        </Link>
       </div>
 
       <WorkspaceChecklistBuilder

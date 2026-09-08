@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   AlertTriangle,
   CalendarClock,
@@ -436,12 +436,12 @@ export function DashboardPreviewClient({
   referenceIso: string;
 }) {
   const [role, setRole] = useState<PreviewRole>("gestor");
-  const [chartReady, setChartReady] = useState(false);
+  const chartReady = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const isGestor = role === "gestor";
-
-  useEffect(() => {
-    setChartReady(true);
-  }, []);
 
   const dateLabel = useMemo(
     () => formatPreviewDateLabel(referenceIso),

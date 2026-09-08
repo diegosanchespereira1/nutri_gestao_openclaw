@@ -9,3 +9,9 @@ export const CHECKLISTS_VENCIDOS_PATH = "/checklists/vencidos" as const;
 
 /** Lista completa de checklists com validade nos próximos 90 dias. */
 export const CHECKLISTS_A_VENCER_PATH = "/checklists/a-vencer" as const;
+
+/** Lista de checklists em preenchimento (sem dossiê aprovado). */
+export const CHECKLISTS_EM_ANDAMENTO_PATH = "/checklists/em-andamento" as const;
+
+/** Relatório de visitas realizadas — só gestão para cima. */
+export const VISITS_REPORT_PATH = "/visitas/relatorio" as const;

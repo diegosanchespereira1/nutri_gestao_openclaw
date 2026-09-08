@@ -18,6 +18,8 @@ function row(
   return {
     description: "",
     category: "mensalidade",
+    is_recurring: false,
+    recurrence_ends_on: null,
     amount_cents: 1000,
     paid_at: null,
     created_at: "2026-01-10T12:00:00.000Z",

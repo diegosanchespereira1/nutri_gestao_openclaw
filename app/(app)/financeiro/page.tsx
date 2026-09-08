@@ -52,7 +52,10 @@ import {
   topOverdueDateBounds,
 } from "@/lib/financeiro/financial-chart-series";
 import { chargeCategoryDisplayLabel } from "@/lib/constants/financial-charge-category";
-import { chargeFormErrorMessage } from "@/lib/financeiro/charge-form";
+import {
+  chargeFormErrorMessage,
+  chargeRecurrenceLabel,
+} from "@/lib/financeiro/charge-form";
 import { resolveFinanceiroInitialTab } from "@/lib/financeiro/financeiro-tab";
 import {
   formatBRLFromCents,
@@ -691,6 +694,10 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                         const overdue =
                           row.status === "open" &&
                           isOpenOverdue(row.due_date, tKey, row.status);
+                        const recurrenceLabel = chargeRecurrenceLabel({
+                          isRecurring: row.is_recurring,
+                          endsOn: row.recurrence_ends_on,
+                        });
                         return (
                           <tr
                             key={row.id}
@@ -709,7 +716,12 @@ export default async function FinanceiroPage({ searchParams }: Props) {
                               {formatBRLFromCents(row.amount_cents)}
                             </td>
                             <td className="px-3 py-2 tabular-nums">
-                              {row.due_date}
+                              <span className="block">{row.due_date}</span>
+                              {recurrenceLabel ? (
+                                <span className="text-muted-foreground mt-0.5 block text-xs font-normal">
+                                  {recurrenceLabel}
+                                </span>
+                              ) : null}
                             </td>
                             <td className="px-3 py-2">
                               {row.status === "paid" ? (

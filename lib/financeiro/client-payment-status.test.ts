@@ -19,6 +19,8 @@ function ch(
   return {
     description: "",
     category: null,
+    is_recurring: false,
+    recurrence_ends_on: null,
     amount_cents: 10000,
     paid_at: null,
     created_at: "2026-01-10T12:00:00.000Z",

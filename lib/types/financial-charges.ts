@@ -7,6 +7,8 @@ export type FinancialChargeListRow = {
   category: string | null;
   amount_cents: number;
   due_date: string;
+  is_recurring: boolean;
+  recurrence_ends_on: string | null;
   status: FinancialChargeStatus;
   paid_at: string | null;
   created_at: string;

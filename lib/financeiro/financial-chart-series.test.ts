@@ -29,6 +29,8 @@ function ch(
   return {
     description: "",
     category: null,
+    is_recurring: false,
+    recurrence_ends_on: null,
     clients: {
       legal_name: "Cliente X",
       trade_name: null,

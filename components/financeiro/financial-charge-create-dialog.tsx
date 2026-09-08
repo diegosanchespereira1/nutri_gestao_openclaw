@@ -3,6 +3,8 @@
 import { PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 
+import { cn } from "@/lib/utils";
+
 import { FinancialChargeAmountInput } from "@/components/financeiro/financial-charge-amount-input";
 import { FinancialChargeCategoryField } from "@/components/financeiro/financial-charge-category-field";
 import { FinancialChargeClientPicker } from "@/components/financeiro/financial-charge-client-picker";
@@ -47,14 +49,27 @@ export function FinancialChargeCreateDialog({
   errorMessage = null,
 }: Props) {
   const [open, setOpen] = useState(Boolean(errorMessage));
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [dueDate, setDueDate] = useState("");
   const uid = useId();
   const clientFieldId = `${uid}-client`;
   const descId = `${uid}-desc`;
   const amountId = `${uid}-amount`;
   const dueId = `${uid}-due`;
+  const recurringId = `${uid}-recurring`;
+  const endsOnId = `${uid}-ends-on`;
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) {
+          setIsRecurring(false);
+          setDueDate("");
+        }
+      }}
+    >
       <Button
         type="button"
         size="sm"
@@ -148,9 +163,81 @@ export function FinancialChargeCreateDialog({
               <Label htmlFor={dueId} className="text-sm font-medium">
                 Data de vencimento <span className="text-destructive">*</span>
               </Label>
-              <Input id={dueId} name="due_date" type="date" required />
+              <Input
+                id={dueId}
+                name="due_date"
+                type="date"
+                required
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+              />
             </div>
           </div>
+
+          <div className="space-y-2">
+            <p id={recurringId} className="text-foreground text-sm font-medium">
+              Recorrente <span className="text-destructive">*</span>
+            </p>
+            <input
+              type="hidden"
+              name="is_recurring"
+              value={isRecurring ? "1" : "0"}
+            />
+            <div
+              role="radiogroup"
+              aria-labelledby={recurringId}
+              className="border-border bg-muted/70 inline-flex min-h-10 w-full flex-wrap gap-1 rounded-lg border p-1 shadow-inner"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={!isRecurring}
+                className={cn(
+                  "inline-flex min-h-10 flex-1 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium",
+                  !isRecurring
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/80 bg-card text-foreground/80 shadow-xs hover:border-primary/45 hover:bg-primary/18",
+                )}
+                onClick={() => setIsRecurring(false)}
+              >
+                Não
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={isRecurring}
+                className={cn(
+                  "inline-flex min-h-10 flex-1 items-center justify-center rounded-md border px-3 py-2 text-sm font-medium",
+                  isRecurring
+                    ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                    : "border-border/80 bg-card text-foreground/80 shadow-xs hover:border-primary/45 hover:bg-primary/18",
+                )}
+                onClick={() => setIsRecurring(true)}
+              >
+                Sim
+              </button>
+            </div>
+          </div>
+
+          {isRecurring ? (
+            <div className="space-y-2">
+              <Label htmlFor={endsOnId} className="text-sm font-medium">
+                Data de término{" "}
+                <span className="text-muted-foreground font-normal">
+                  (opcional)
+                </span>
+              </Label>
+              <Input
+                id={endsOnId}
+                name="recurrence_ends_on"
+                type="date"
+                min={dueDate || undefined}
+              />
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Deixe em branco se a cobrança não tiver data final.
+              </p>
+            </div>
+          ) : null}
 
           <DialogFooter className="sm:justify-between">
             <p className="text-muted-foreground text-xs sm:self-center">

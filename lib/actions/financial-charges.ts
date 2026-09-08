@@ -19,17 +19,12 @@ import type {
 import { isAllowedChargeCategory } from "@/lib/constants/financial-charge-category";
 import {
   chargeMutationPath,
+  parseChargeDueDate,
   parseChargeMutationSource,
+  parseChargeRecurring,
+  resolveChargeRecurrence,
 } from "@/lib/financeiro/charge-form";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
-
-function parseDueDate(raw: string): string | null {
-  const s = raw.trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
-  const d = new Date(`${s}T12:00:00Z`);
-  if (Number.isNaN(d.getTime())) return null;
-  return s;
-}
 
 function parseMoneyToCents(raw: string): number | null {
   const t = raw.trim().replace(/\s/g, "").replace(",", ".");
@@ -103,6 +98,8 @@ export async function loadFinancialChargesForOwner(): Promise<{
       category,
       amount_cents,
       due_date,
+      is_recurring,
+      recurrence_ends_on,
       status,
       paid_at,
       created_at,
@@ -145,6 +142,8 @@ export async function loadFinancialChargesForClient(
       category,
       amount_cents,
       due_date,
+      is_recurring,
+      recurrence_ends_on,
       status,
       paid_at,
       created_at,
@@ -173,14 +172,26 @@ export async function createFinancialChargeAction(
   const description = String(formData.get("description") ?? "").trim();
   const category = String(formData.get("category") ?? "").trim();
   const amountRaw = String(formData.get("amount") ?? "");
-  const due = parseDueDate(String(formData.get("due_date") ?? ""));
+  const due = parseChargeDueDate(String(formData.get("due_date") ?? ""));
   const cents = parseMoneyToCents(amountRaw);
   const source = parseChargeMutationSource(
     String(formData.get("source") ?? ""),
   );
+  const recurrence = due
+    ? resolveChargeRecurrence({
+        dueDate: due,
+        isRecurring: parseChargeRecurring(
+          String(formData.get("is_recurring") ?? ""),
+        ),
+        endsOnRaw: String(formData.get("recurrence_ends_on") ?? ""),
+      })
+    : { ok: false as const };
 
   if (!clientId || !category || !due || cents === null) {
     redirect(chargeMutationPath(source, clientId || null, "invalid"));
+  }
+  if (!recurrence.ok) {
+    redirect(chargeMutationPath(source, clientId, "recurrence"));
   }
 
   const { data: clientOk, error: clientErr } = await supabase
@@ -213,6 +224,8 @@ export async function createFinancialChargeAction(
     category,
     amount_cents: cents,
     due_date: due,
+    is_recurring: recurrence.isRecurring,
+    recurrence_ends_on: recurrence.endsOn,
     status: "open",
   });
 

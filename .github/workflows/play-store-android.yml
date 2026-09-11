@@ -43,8 +43,6 @@ jobs:
     environment: play-store
 
     env:
-      ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/nutrigestao-release.keystore
-      KEYSTORE_PATH: ${{ runner.temp }}/nutrigestao-release.keystore
       KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -127,8 +125,13 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
-          test -s "$ANDROID_KEYSTORE_PATH"
+          keystore_path="$RUNNER_TEMP/nutrigestao-release.keystore"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$keystore_path"
+          test -s "$keystore_path"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$keystore_path"
+            echo "KEYSTORE_PATH=$keystore_path"
+          } >> "$GITHUB_ENV"
 
       - name: Capacitor sync (Android)
         run: npx cap sync android && node scripts/mobile/ensure-android-package-id.mjs

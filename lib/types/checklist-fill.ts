@@ -34,6 +34,8 @@ export type ChecklistFillSessionRow = {
   score_points_earned?: number | null;
   /** Pontos aplicáveis (total excluindo NA). */
   score_points_total?: number | null;
+  /** Nome do modelo congelado no INSERT (trigger Postgres). Fallback de linhagem. */
+  template_name_snapshot?: string | null;
   created_at: string;
   updated_at: string;
 };

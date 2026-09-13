@@ -476,6 +476,11 @@ type Props = {
   backHref?: string;
   backLabel?: string;
   /**
+   * Quando o lote multi-área começa numa visita, a próxima sessão usa
+   * `{nextBatchSessionBasePath}?session={id}` em vez de `/checklists/preencher/{id}`.
+   */
+  nextBatchSessionBasePath?: string;
+  /**
    * Por item: em quantas sessões anteriores (mesmo estabelecimento) este item foi NC.
    * Só aplicável no fluxo visita (FR21).
    */
@@ -523,6 +528,7 @@ export function ChecklistFillWizard({
   itemResponseSource,
   backHref = "/checklists",
   backLabel = "Catálogo",
+  nextBatchSessionBasePath,
   recurringNcSessionCountByItemId = {},
   initialItemPhotos = {},
   initialDossierApprovedAt = null,
@@ -1236,14 +1242,18 @@ export function ChecklistFillWizard({
       } catch {
         // Segue navegação mesmo se o bump falhar pontualmente.
       }
-      const params = new URLSearchParams();
-      if (backHref) params.set("returnTo", backHref);
-      const path = `/checklists/preencher/${next.sessionId}${
-        params.size > 0 ? `?${params.toString()}` : ""
-      }`;
+      const path = nextBatchSessionBasePath
+        ? `${nextBatchSessionBasePath}?session=${next.sessionId}`
+        : (() => {
+            const params = new URLSearchParams();
+            if (backHref) params.set("returnTo", backHref);
+            return `/checklists/preencher/${next.sessionId}${
+              params.size > 0 ? `?${params.toString()}` : ""
+            }`;
+          })();
       pushWithLoading(router, path);
     },
-    [backHref, router],
+    [backHref, nextBatchSessionBasePath, router],
   );
 
   const saveProgressBatch = useCallback(

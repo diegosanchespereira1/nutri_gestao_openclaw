@@ -79,6 +79,7 @@ import type {
 
 import { TemplateItemRow } from "./template-item-row";
 import { ArchivedTemplateBadge } from "./archived-template-badge";
+import { EstablishmentAreaMultiSelect } from "./establishment-area-multi-select";
 import { ExpandableTemplateSections } from "./expandable-template-sections";
 import { ChecklistCatalogResultsSkeleton } from "./checklist-skeletons";
 
@@ -320,8 +321,6 @@ export function ChecklistCatalog({
   /* Áreas do estabelecimento selecionado */
   const [availableAreas, setAvailableAreas] = useState<EstablishmentAreaOption[]>([]);
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
-  const [areaDropdownOpen, setAreaDropdownOpen] = useState(false);
-  const areaDropdownRef = useRef<HTMLDivElement>(null);
 
   const [batchError, setBatchError] = useState<string | null>(null);
 
@@ -605,18 +604,6 @@ export function ChecklistCatalog({
     const ct = customTemplates.find((t) => t.id === selectedCustomTemplateId);
     if (ct?.is_archived) setSelectedCustomTemplateId(null);
   }, [selectedCustomTemplateId, customTemplates]);
-
-  // Fechar dropdown de áreas ao clicar fora
-  useEffect(() => {
-    if (!areaDropdownOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (areaDropdownRef.current && !areaDropdownRef.current.contains(e.target as Node)) {
-        setAreaDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [areaDropdownOpen]);
 
   // Fechar dropdown de tipos ao clicar fora (inclui painel em portal)
   useEffect(() => {
@@ -2159,108 +2146,12 @@ export function ChecklistCatalog({
                 </div>
               </div>
 
-              {/* Seletor de área: dropdown multi-select com checkboxes */}
-              {availableAreas.length > 0 && (
-                <div ref={areaDropdownRef} className="relative flex shrink-0 flex-col gap-1">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    📍 Área
-                  </label>
-                  {/* Trigger */}
-                  <button
-                    type="button"
-                    onClick={() => setAreaDropdownOpen((o) => !o)}
-                    className={cn(
-                      "flex h-9 w-48 items-center justify-between gap-2 rounded-lg border px-3 text-sm shadow-xs outline-none transition-colors",
-                      "bg-background text-foreground",
-                      "focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-1",
-                      areaDropdownOpen
-                        ? "border-primary ring-1 ring-primary/30"
-                        : selectedAreaIds.length === 0
-                          ? "border-amber-400"
-                          : "border-input",
-                    )}
-                    aria-haspopup="listbox"
-                    aria-expanded={areaDropdownOpen}
-                  >
-                    <span className="truncate text-left">
-                      {selectedAreaIds.length === 0
-                        ? <span className="text-muted-foreground">Selecione as áreas…</span>
-                        : selectedAreaIds.length === 1
-                          ? (availableAreas.find((a) => a.id === selectedAreaIds[0])?.name ?? "1 área")
-                          : `${selectedAreaIds.length} áreas selecionadas`}
-                    </span>
-                    <ChevronDown
-                      className={cn(
-                        "size-4 shrink-0 text-muted-foreground transition-transform",
-                        areaDropdownOpen && "rotate-180",
-                      )}
-                      aria-hidden
-                    />
-                  </button>
-
-                  {/* Painel */}
-                  {areaDropdownOpen && (
-                    <div
-                      className="absolute bottom-9 left-0 z-50 mb-2 w-56 overflow-hidden rounded-lg border border-border bg-background shadow-lg"
-                      role="listbox"
-                      aria-multiselectable="true"
-                      aria-label="Áreas do estabelecimento"
-                    >
-                      <DropdownMenuScroll className="max-h-52 py-1 pr-0.5">
-                        {availableAreas.map((area) => {
-                          const picked = selectedAreaIds.includes(area.id);
-                          return (
-                            <button
-                              key={area.id}
-                              type="button"
-                              role="option"
-                              aria-selected={picked}
-                              onClick={() =>
-                                setSelectedAreaIds((prev) =>
-                                  picked
-                                    ? prev.filter((id) => id !== area.id)
-                                    : [...prev, area.id],
-                                )
-                              }
-                              className={cn(
-                                "flex w-full items-center gap-2.5 px-3 py-2 text-sm transition-colors hover:bg-muted/60",
-                                picked && "bg-primary/5",
-                              )}
-                            >
-                              <span
-                                className={cn(
-                                  "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                                  picked
-                                    ? "border-primary bg-primary text-primary-foreground"
-                                    : "border-border",
-                                )}
-                              >
-                                {picked && <Check className="size-3" aria-hidden />}
-                              </span>
-                              <span className={cn("truncate", picked && "font-medium text-foreground")}>
-                                {area.name}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </DropdownMenuScroll>
-                      {/* Rodapé informativo */}
-                      <div className="border-t border-border px-3 py-1.5">
-                        {selectedAreaIds.length === 0 ? (
-                          <p className="text-[11px] font-medium text-amber-600">
-                            Selecione ao menos uma área
-                          </p>
-                        ) : (
-                          <p className="text-[11px] text-muted-foreground">
-                            {selectedAreaIds.length} selecionada{selectedAreaIds.length !== 1 ? "s" : ""}
-                            {selectedAreaIds.length > 1 && " · uma sessão por área"}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              <EstablishmentAreaMultiSelect
+                areas={availableAreas}
+                selectedAreaIds={selectedAreaIds}
+                onChange={setSelectedAreaIds}
+                panelPlacement="above"
+              />
 
               {/* Ações */}
               <div className="flex shrink-0 flex-col items-end gap-2">

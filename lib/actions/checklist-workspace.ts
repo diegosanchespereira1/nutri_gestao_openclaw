@@ -1166,6 +1166,45 @@ export async function updateWorkspaceTemplateAction(
   return { ok: true, id: templateId };
 }
 
+export async function deleteWorkspaceTemplateAction(
+  templateId: string,
+): Promise<WorkspaceActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Sessão expirada." };
+
+  const workspaceOwnerId = await getWorkspaceAccountOwnerId(supabase, user.id);
+
+  const { data: existing } = await supabase
+    .from("checklist_workspace_templates")
+    .select("id, owner_user_id")
+    .eq("id", templateId)
+    .maybeSingle();
+
+  if (!existing || existing.owner_user_id !== workspaceOwnerId) {
+    return { ok: false, error: "Modelo não encontrado." };
+  }
+
+  // Snapshot por sessão preserva o histórico; FK da sessão fica SET NULL.
+  const { error } = await supabase
+    .from("checklist_workspace_templates")
+    .delete()
+    .eq("id", templateId)
+    .eq("owner_user_id", workspaceOwnerId);
+
+  if (error) {
+    return { ok: false, error: "Não foi possível excluir o modelo." };
+  }
+
+  revalidatePath("/checklists");
+  revalidatePath("/checklists/equipe");
+  invalidateWorkspaceCatalogCache(workspaceOwnerId);
+
+  return { ok: true, id: templateId };
+}
+
 export async function archiveWorkspaceTemplateAction(
   templateId: string,
 ): Promise<WorkspaceActionResult> {
@@ -1267,6 +1306,7 @@ async function assertWorkspaceTemplateFillAccess(
   workspaceOwnerId: string,
   workspaceTemplateId: string,
   establishmentId: string,
+  options?: { allowOtherClient?: boolean },
 ): Promise<WorkspaceFillAccessResult> {
   if (!workspaceTemplateId || !establishmentId) {
     return { ok: false, error: "missing_fields" };
@@ -1306,6 +1346,7 @@ async function assertWorkspaceTemplateFillAccess(
   const templateClientId =
     tpl.client_id != null ? String(tpl.client_id) : null;
   if (
+    !options?.allowOtherClient &&
     !workspaceTemplateAllowedForFill(templateClientId, establishmentClientId)
   ) {
     return { ok: false, error: "client_mismatch" };
@@ -1366,10 +1407,20 @@ export async function startWorkspaceTemplateFill(formData: FormData): Promise<vo
       workspace_template_id: workspaceTemplateId,
       area_id: resolvedAreaId,
     })
-    .select("id")
+    .select("*")
     .single();
 
   if (error || !session) redirect("/checklists?err=session");
+
+  const templateBundle = await loadWorkspaceTemplateBundle(workspaceTemplateId);
+  if (templateBundle) {
+    await seedInheritedValidResponsesForSession(
+      supabase,
+      session as ChecklistFillSessionRow,
+      templateBundle,
+      user.id,
+    );
+  }
 
   redirect(`/checklists/preencher/${session.id}`);
 }
@@ -1382,6 +1433,7 @@ export async function startWorkspaceTemplateFillBatch(input: {
   workspaceTemplateId: string;
   establishmentId: string;
   areaIds: string[];
+  scheduledVisitId?: string | null;
 }): Promise<StartWorkspaceFillBatchResult> {
   const supabase = await createClient();
   const {
@@ -1397,6 +1449,7 @@ export async function startWorkspaceTemplateFillBatch(input: {
     workspaceOwnerId,
     workspaceTemplateId,
     establishmentId,
+    { allowOtherClient: Boolean(input.scheduledVisitId) },
   );
   if (!access.ok) {
     return { ok: false, error: access.error };
@@ -1429,6 +1482,7 @@ export async function startWorkspaceTemplateFillBatch(input: {
         custom_template_id: null,
         workspace_template_id: workspaceTemplateId,
         area_id: areaId,
+        scheduled_visit_id: input.scheduledVisitId ?? null,
       })
       .select("*")
       .single();

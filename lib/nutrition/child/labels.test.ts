@@ -12,6 +12,12 @@ import {
 describe("child labels", () => {
   it("rótulos completos para todos os indicadores", () => {
     expect(CHILD_INDICATOR_LABELS.bmi_for_age).toContain("IMC");
+    expect(CHILD_INDICATOR_LABELS.triceps_skinfold_for_age).toBe(
+      "Dobra cutânea tricipital para idade",
+    );
+    expect(CHILD_INDICATOR_LABELS.subscapular_skinfold_for_age).toBe(
+      "Dobra subescapular para idade",
+    );
     expect(Object.keys(CHILD_INDICATOR_LABELS)).toHaveLength(8);
   });
 
@@ -25,6 +31,7 @@ describe("child labels", () => {
 
   it("métodos", () => {
     expect(CHILD_METHOD_LABELS.percentile).toBe("Percentil");
+    expect(CHILD_METHOD_LABELS.zscore).toBe("Score-Z");
   });
 
   it("cores semáforo", () => {

@@ -57,12 +57,15 @@ type Props = {
   dossierEmailDeliveryConfigured?: boolean;
   /** Titular ou admin: pode reabrir checklist aprovado a partir do histórico. */
   canReopenDossier?: boolean;
+  /** Volta para esta rota após «Ver dossiê» / continuar (query returnTo). */
+  returnTo?: string | null;
 };
 
 export function ChecklistSessionHistoryCard({
   session,
   dossierEmailDeliveryConfigured = false,
   canReopenDossier = false,
+  returnTo = null,
 }: Props) {
   const router = useRouter();
   const [ncItems, setNcItems] = useState<NcItemDetail[] | null>(null);
@@ -74,6 +77,20 @@ export function ChecklistSessionHistoryCard({
   const totalSafe = session.total_items > 0 ? session.total_items : 1;
   const conformantPct = (session.conformant_count / totalSafe) * 100;
   const ncPct = (session.nc_count / totalSafe) * 100;
+
+  const dossierHref = (() => {
+    const params = new URLSearchParams();
+    params.set("view", "dossie");
+    if (returnTo) params.set("returnTo", returnTo);
+    return `/checklists/preencher/${session.id}?${params.toString()}`;
+  })();
+
+  const continueHref = (() => {
+    if (!returnTo) return `/checklists/preencher/${session.id}`;
+    const params = new URLSearchParams();
+    params.set("returnTo", returnTo);
+    return `/checklists/preencher/${session.id}?${params.toString()}`;
+  })();
 
   async function handleToggleNc() {
     if (session.nc_count === 0) return;
@@ -170,7 +187,7 @@ export function ChecklistSessionHistoryCard({
         {/* ── Rodapé: ações ── */}
         <div className="flex flex-wrap items-center gap-2 border-t border-border/50 px-4 py-2.5">
           <Link
-            href={`/checklists/preencher/${session.id}?view=dossie`}
+            href={dossierHref}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
               "h-7 gap-1 px-2 text-xs",
@@ -190,7 +207,7 @@ export function ChecklistSessionHistoryCard({
           {session.status === "em_andamento" ? (
             <>
               <Link
-                href={`/checklists/preencher/${session.id}`}
+                href={continueHref}
                 className={cn(buttonVariants({ size: "sm" }), "h-7 gap-1 px-2 text-xs")}
               >
                 Continuar preenchimento

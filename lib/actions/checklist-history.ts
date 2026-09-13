@@ -4,6 +4,7 @@ import {
   countVisibleTemplateItemsForSession,
   type SessionVisibilityItem,
 } from "@/lib/checklists/filter-session-template-items";
+import { loadSessionSnapshotSummaries } from "@/lib/checklists/session-snapshot";
 import { createClient } from "@/lib/supabase/server";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import type { ChecklistFillPdfExportRow } from "@/lib/types/checklist-fill-pdf";
@@ -150,6 +151,8 @@ export async function loadChecklistSessionsForClient(input: {
   establishmentId?: string | null;
   /** Filtrar por área específica do estabelecimento. */
   areaId?: string | null;
+  /** Filtrar sessões ligadas a uma visita agendada. */
+  scheduledVisitId?: string | null;
   status?: "em_andamento" | "aprovado" | null;
   limit?: number;
   offset?: number;
@@ -219,6 +222,9 @@ export async function loadChecklistSessionsForClient(input: {
   if (input.areaId) {
     sessionQuery = sessionQuery.eq("area_id", input.areaId);
   }
+  if (input.scheduledVisitId) {
+    sessionQuery = sessionQuery.eq("scheduled_visit_id", input.scheduledVisitId);
+  }
 
   const { data: sessions, count: totalCount } = await sessionQuery;
   if (!sessions || sessions.length === 0) return empty;
@@ -264,6 +270,7 @@ export async function loadChecklistSessionsForClient(input: {
     templateSectionsResult,
     customSectionsResult,
     workspaceSectionsResult,
+    snapshotSummaries,
   ] = await Promise.all([
     // Nomes de quem iniciou a sessão (profiles)
     sessionUserIds.length > 0
@@ -370,6 +377,8 @@ export async function loadChecklistSessionsForClient(input: {
           .select("id, workspace_template_id")
           .in("workspace_template_id", workspaceTemplateIds)
       : Promise.resolve({ data: [] as { id: string; workspace_template_id: unknown }[] }),
+
+    loadSessionSnapshotSummaries(supabase, sessionIds),
   ]);
 
   // Mapas de nomes de quem iniciou
@@ -629,7 +638,13 @@ export async function loadChecklistSessionsForClient(input: {
     const sessWorkspaceTemplateId =
       (sessRowAny.workspace_template_id as string | null) ?? null;
 
-    if (sessWorkspaceTemplateId) {
+    const snap = snapshotSummaries.get(sess.id);
+    if (snap) {
+      templateOrigin = snap.template_origin;
+      templateName = snap.name;
+      portariaRef = snap.portaria_ref;
+      totalItems = snap.total_items;
+    } else if (sessWorkspaceTemplateId) {
       templateOrigin = "workspace";
       templateName =
         workspaceTemplateNameMap.get(sessWorkspaceTemplateId) ?? "Modelo da equipe";
@@ -655,6 +670,8 @@ export async function loadChecklistSessionsForClient(input: {
         customTemplateItemsById.get(sess.custom_template_id) ?? [],
         sess.created_at,
       );
+    } else if (sessRowAny.template_name_snapshot) {
+      templateName = String(sessRowAny.template_name_snapshot);
     }
 
     const answeredCount = counts.conforme + counts.nc + counts.na;
@@ -887,70 +904,109 @@ export async function loadChecklistSessionNcItems(
 
   if (!ncResponses || ncResponses.length === 0) return [];
 
-  const globalItemIds = ncResponses
-    .filter((r) => r.template_item_id)
-    .map((r) => r.template_item_id as string);
+  const sourceItemIds = ncResponses
+    .map((r) =>
+      String(
+        r.template_item_id ??
+          r.custom_item_id ??
+          (r as Record<string, unknown>).workspace_item_id ??
+          "",
+      ),
+    )
+    .filter(Boolean);
 
-  const customItemIds = ncResponses
-    .filter((r) => r.custom_item_id)
-    .map((r) => r.custom_item_id as string);
+  const { data: snap } = await supabase
+    .from("checklist_fill_snapshots")
+    .select("id")
+    .eq("session_id", sessionId)
+    .maybeSingle();
 
-  const workspaceItemIds = ncResponses
-    .filter((r) => (r as Record<string, unknown>).workspace_item_id)
-    .map((r) => (r as Record<string, unknown>).workspace_item_id as string);
+  const itemMap = new Map<string, { description: string; is_required: boolean }>();
 
-  // Buscar detalhes dos itens em paralelo
-  const [globalItemRows, customItemRows, workspaceItemRows] = await Promise.all([
-    globalItemIds.length > 0
-      ? supabase
-          .from("checklist_template_items")
-          .select("id, description, is_required")
-          .in("id", globalItemIds)
-      : Promise.resolve({ data: [] as { id: string; description: string; is_required: boolean }[] }),
-
-    customItemIds.length > 0
-      ? supabase
-          .from("checklist_custom_items")
-          .select("id, description, is_required")
-          .in("id", customItemIds)
-      : Promise.resolve({ data: [] as { id: string; description: string; is_required: boolean }[] }),
-
-    workspaceItemIds.length > 0
-      ? supabase
-          .from("checklist_workspace_items")
-          .select("id, description, is_required")
-          .in("id", workspaceItemIds)
-      : Promise.resolve({ data: [] as { id: string; description: string; is_required: boolean }[] }),
-  ]);
-
-  const globalItemMap = new Map<string, { description: string; is_required: boolean }>();
-  for (const it of globalItemRows.data ?? []) {
-    globalItemMap.set(it.id, { description: it.description, is_required: Boolean(it.is_required) });
+  if (snap && sourceItemIds.length > 0) {
+    const { data: snapItems } = await supabase
+      .from("checklist_fill_snapshot_items")
+      .select("source_item_id, description, is_required")
+      .eq("snapshot_id", snap.id)
+      .in("source_item_id", sourceItemIds);
+    for (const it of snapItems ?? []) {
+      itemMap.set(String(it.source_item_id), {
+        description: String(it.description),
+        is_required: Boolean(it.is_required),
+      });
+    }
   }
 
-  const customItemMap = new Map<string, { description: string; is_required: boolean }>();
-  for (const it of customItemRows.data ?? []) {
-    customItemMap.set(it.id, { description: it.description, is_required: Boolean(it.is_required) });
+  const missingIds = sourceItemIds.filter((id) => !itemMap.has(id));
+  if (missingIds.length > 0) {
+    const globalItemIds = ncResponses
+      .filter((r) => r.template_item_id && missingIds.includes(String(r.template_item_id)))
+      .map((r) => r.template_item_id as string);
+    const customItemIds = ncResponses
+      .filter((r) => r.custom_item_id && missingIds.includes(String(r.custom_item_id)))
+      .map((r) => r.custom_item_id as string);
+    const workspaceItemIds = ncResponses
+      .filter((r) => {
+        const wid = (r as Record<string, unknown>).workspace_item_id as string | null;
+        return Boolean(wid && missingIds.includes(wid));
+      })
+      .map((r) => (r as Record<string, unknown>).workspace_item_id as string);
+
+    const [globalItemRows, customItemRows, workspaceItemRows] = await Promise.all([
+      globalItemIds.length > 0
+        ? supabase
+            .from("checklist_template_items")
+            .select("id, description, is_required")
+            .in("id", globalItemIds)
+        : Promise.resolve({
+            data: [] as { id: string; description: string; is_required: boolean }[],
+          }),
+      customItemIds.length > 0
+        ? supabase
+            .from("checklist_custom_items")
+            .select("id, description, is_required")
+            .in("id", customItemIds)
+        : Promise.resolve({
+            data: [] as { id: string; description: string; is_required: boolean }[],
+          }),
+      workspaceItemIds.length > 0
+        ? supabase
+            .from("checklist_workspace_items")
+            .select("id, description, is_required")
+            .in("id", workspaceItemIds)
+        : Promise.resolve({
+            data: [] as { id: string; description: string; is_required: boolean }[],
+          }),
+    ]);
+
+    for (const it of globalItemRows.data ?? []) {
+      itemMap.set(it.id, {
+        description: it.description,
+        is_required: Boolean(it.is_required),
+      });
+    }
+    for (const it of customItemRows.data ?? []) {
+      itemMap.set(it.id, {
+        description: it.description,
+        is_required: Boolean(it.is_required),
+      });
+    }
+    for (const it of workspaceItemRows.data ?? []) {
+      itemMap.set(it.id, {
+        description: it.description,
+        is_required: Boolean(it.is_required),
+      });
+    }
   }
 
-  const workspaceItemMap = new Map<string, { description: string; is_required: boolean }>();
-  for (const it of workspaceItemRows.data ?? []) {
-    workspaceItemMap.set(it.id, { description: it.description, is_required: Boolean(it.is_required) });
-  }
-
-  // Montar resultado
   const result: NcItemDetail[] = [];
   for (const r of ncResponses) {
     const rowAny = r as Record<string, unknown>;
     const workspaceItemId = rowAny.workspace_item_id as string | null;
-    const itemInfo = r.template_item_id
-      ? globalItemMap.get(r.template_item_id)
-      : r.custom_item_id
-        ? customItemMap.get(r.custom_item_id)
-        : workspaceItemId
-          ? workspaceItemMap.get(workspaceItemId)
-          : null;
-
+    const itemKey = String(
+      r.template_item_id ?? r.custom_item_id ?? workspaceItemId ?? "",
+    );
+    const itemInfo = itemKey ? itemMap.get(itemKey) : undefined;
     if (!itemInfo) continue;
 
     result.push({

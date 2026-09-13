@@ -203,9 +203,7 @@ export async function resolveVisitChecklistEstablishmentId(input: {
   return { ok: false, reason: "pick", options: opts };
 }
 
-export async function buildVisitChecklistOptions(_input?: {
-  establishmentId?: string;
-}): Promise<VisitChecklistOption[]> {
+export async function buildVisitChecklistOptions(): Promise<VisitChecklistOption[]> {
   const [
     { templates: official },
     { rows: workspaceRows },

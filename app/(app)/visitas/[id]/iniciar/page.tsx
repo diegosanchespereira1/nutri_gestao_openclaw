@@ -238,9 +238,7 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
   }
 
   const [options, areas] = await Promise.all([
-    buildVisitChecklistOptions({
-      establishmentId,
-    }),
+    buildVisitChecklistOptions(),
     loadAreasForEstablishment(establishmentId),
   ]);
 

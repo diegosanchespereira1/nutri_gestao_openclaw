@@ -23,6 +23,7 @@ describe("isPathAllowedForEnabledModules", () => {
     const modules = { ...DEFAULT_ENABLED_MODULES, visitas: false };
     expect(isPathAllowedForEnabledModules("/visitas", modules)).toBe(false);
     expect(isPathAllowedForEnabledModules("/visitas/nova", modules)).toBe(false);
+    expect(isPathAllowedForEnabledModules("/visitas/relatorio", modules)).toBe(false);
   });
 
   it("bloqueia financeiro quando o módulo está desligado", () => {
@@ -44,12 +45,27 @@ describe("isPathAllowedForEnabledModules", () => {
       assessoria_alimentacao: false,
     };
     expect(isPathAllowedForEnabledModules("/checklists", modules)).toBe(false);
+    expect(isPathAllowedForEnabledModules("/checklists/em-andamento", modules)).toBe(
+      false,
+    );
     expect(isPathAllowedForEnabledModules("/pops", modules)).toBe(false);
+  });
+
+  it("permite a lista de checklists em andamento quando assessoria está ligada", () => {
+    expect(
+      isPathAllowedForEnabledModules(
+        "/checklists/em-andamento",
+        DEFAULT_ENABLED_MODULES,
+      ),
+    ).toBe(true);
   });
 
   it("resolve gate por pathname", () => {
     expect(getModuleGateForPath("/financeiro")).toBe("financeiro");
     expect(getModuleGateForPath("/financeiro/operacoes")).toBe("financeiro");
+    expect(getModuleGateForPath("/checklists/em-andamento")).toBe(
+      "assessoria_alimentacao",
+    );
     expect(getModuleGateForPath(APP_DASHBOARD_PATH)).toBeNull();
   });
 

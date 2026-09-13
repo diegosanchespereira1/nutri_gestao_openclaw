@@ -293,7 +293,7 @@ function KpiButton({
   label: string;
   value: string;
   hint: string;
-  tone: "default" | "danger" | "warning" | "money";
+  tone: "default" | "danger" | "warning" | "money" | "live";
   targetId?: string;
   href?: string;
 }) {
@@ -540,13 +540,20 @@ export function DashboardPreviewClient({
         </button>
       </nav>
 
-      <section aria-label="Pulso do dia" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section aria-label="Pulso do dia" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KpiButton
           label={isGestor ? "Visitas hoje" : "Minhas visitas"}
           value={isGestor ? "5" : "2"}
           hint={isGestor ? "3 profissionais em campo" : "próxima às 09:00"}
           tone="default"
           targetId="preview-agenda"
+        />
+        <KpiButton
+          label="Em andamento"
+          value={isGestor ? "3" : "1"}
+          hint={isGestor ? "2 com movimento hoje · ver lista" : "1 com movimento hoje · ver lista"}
+          tone="live"
+          href="/checklists/em-andamento"
         />
         <KpiButton
           label="Em atraso"
@@ -580,6 +587,103 @@ export function DashboardPreviewClient({
           />
         )}
       </section>
+
+      <SectionCard
+        id="preview-checklists-andamento"
+        title="Checklists em andamento"
+        description={
+          isGestor
+            ? "Trabalho aberto da equipe — o que ainda não tem dossiê."
+            : "O que você ainda não fechou. Continue de onde parou."
+        }
+        actions={
+          <Link
+            href="/checklists/em-andamento"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "min-h-11 w-full justify-center sm:w-auto",
+            )}
+          >
+            Ver todos
+          </Link>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="border-border rounded-lg border bg-background/70 px-3 py-2">
+              <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                Ao vivo
+              </p>
+              <p className="text-foreground mt-0.5 text-2xl font-bold tabular-nums">
+                {isGestor ? "3" : "1"}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {isGestor ? "checklists abertos" : "checklist aberto"}
+              </p>
+            </div>
+            <div className="border-border rounded-lg border bg-background/70 px-3 py-2">
+              <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
+                Hoje
+              </p>
+              <p className="text-foreground mt-0.5 text-2xl font-bold tabular-nums">
+                {isGestor ? "2" : "1"}
+              </p>
+              <p className="text-muted-foreground text-xs">com movimento neste dia</p>
+            </div>
+          </div>
+          <ul className="space-y-2" aria-label="Checklists em andamento">
+            {(isGestor
+              ? [
+                  {
+                    client: "Colégio Jardim das Flores",
+                    checklist: "POP Cozinha",
+                    meta: "Refeitório · Ana Souza · 10:42",
+                  },
+                  {
+                    client: "Lar São José",
+                    checklist: "RDC 216",
+                    meta: "Cozinha · Você · 09:18",
+                  },
+                  {
+                    client: "Clínica Vida Plena",
+                    checklist: "Boas práticas",
+                    meta: "Nutrição · Pedro Lima · 08:05",
+                  },
+                ]
+              : [
+                  {
+                    client: "Lar São José",
+                    checklist: "RDC 216",
+                    meta: "Cozinha · 09:18",
+                  },
+                ]
+            ).map((row) => (
+              <li key={row.checklist + row.client}>
+                <Link
+                  href="/checklists/em-andamento"
+                  className="border-border flex min-h-11 items-start gap-3 rounded-lg border border-l-[3px] border-l-primary bg-primary/5 px-3 py-2.5"
+                >
+                  <span className="bg-primary mt-1.5 size-2 shrink-0 animate-pulse rounded-full" aria-hidden />
+                  <span className="min-w-0 flex-1">
+                    <span className="text-foreground block truncate text-sm font-medium">
+                      {row.client}
+                    </span>
+                    <span className="text-foreground/90 block truncate text-xs font-medium">
+                      {row.checklist}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-xs">
+                      {row.meta}
+                    </span>
+                  </span>
+                  <span className="text-primary mt-0.5 shrink-0 text-xs font-semibold">
+                    Continuar
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </SectionCard>
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-7">
@@ -777,6 +881,16 @@ export function DashboardPreviewClient({
               description="O que o profissional precisa sem sair do início."
             >
               <div className="grid grid-cols-1 gap-2">
+                <Link
+                  href="/checklists/em-andamento"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "min-h-11 justify-start",
+                  )}
+                >
+                  <ClipboardList className="size-4" aria-hidden />
+                  Checklists em andamento
+                </Link>
                 <Link
                   href="/checklists"
                   className={cn(

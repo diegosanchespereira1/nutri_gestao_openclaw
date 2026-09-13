@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
-export type DashboardKpiTone = "default" | "danger" | "warning" | "money";
+export type DashboardKpiTone = "default" | "danger" | "warning" | "money" | "live";
 
 type Props = {
   label: string;
@@ -10,9 +10,17 @@ type Props = {
   hint: string;
   tone: DashboardKpiTone;
   href: string;
+  ariaLabel?: string;
 };
 
-export function DashboardKpiButton({ label, value, hint, tone, href }: Props) {
+export function DashboardKpiButton({
+  label,
+  value,
+  hint,
+  tone,
+  href,
+  ariaLabel,
+}: Props) {
   const toneClass =
     tone === "danger"
       ? "border-l-4 border-l-destructive"
@@ -20,11 +28,14 @@ export function DashboardKpiButton({ label, value, hint, tone, href }: Props) {
         ? "border-l-4 border-l-warning"
         : tone === "money"
           ? "border-l-4 border-l-amber-600/80"
-          : "border-l-4 border-l-primary";
+          : tone === "live"
+            ? "border-l-4 border-l-primary bg-primary/[0.04]"
+            : "border-l-4 border-l-primary";
 
   return (
     <Link
       href={href}
+      aria-label={ariaLabel ?? `${label}: ${value}. ${hint}`}
       className={cn(
         "border-border min-h-11 rounded-xl border bg-white p-3 text-left shadow-xs transition-colors dark:bg-card",
         "hover:border-primary/35 hover:bg-background/80",

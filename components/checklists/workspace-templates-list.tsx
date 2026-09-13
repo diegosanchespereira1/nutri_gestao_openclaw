@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Loader2, Pencil, Archive, ArchiveRestore, Play, FilePenLine } from "lucide-react";
+import { Loader2, Pencil, ArchiveRestore, Play, FilePenLine, Trash2 } from "lucide-react";
 
 import { ArchivedTemplateBadge } from "@/components/checklists/archived-template-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  archiveWorkspaceTemplateAction,
+  deleteWorkspaceTemplateAction,
   discardWorkspaceTemplateDraftAction,
   loadWorkspaceTemplatePreviewAction,
   unarchiveWorkspaceTemplateAction,
@@ -48,7 +48,7 @@ function formatDate(iso: string): string {
 
 export function WorkspaceTemplatesList({ templates, highlightId = null }: Props) {
   const router = useRouter();
-  const [archivingTpl, setArchivingTpl] =
+  const [deletingTpl, setDeletingTpl] =
     useState<WorkspaceTemplateListRow | null>(null);
   const [reactivatingTpl, setReactivatingTpl] =
     useState<WorkspaceTemplateListRow | null>(null);
@@ -57,16 +57,16 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function confirmArchive() {
-    if (!archivingTpl) return;
+  function confirmDelete() {
+    if (!deletingTpl) return;
     setError(null);
     startTransition(async () => {
-      const result = await archiveWorkspaceTemplateAction(archivingTpl.id);
+      const result = await deleteWorkspaceTemplateAction(deletingTpl.id);
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      setArchivingTpl(null);
+      setDeletingTpl(null);
       router.refresh();
     });
   }
@@ -197,14 +197,16 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                 </p>
               ) : tpl.is_archived ? (
                 <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
-                  Modelo arquivado — não pode ser usado em novos preenchimentos. Reative
-                  quando quiser voltar a utilizá-lo.
+                  Modelo arquivado — não pode ser usado em novos preenchimentos.
+                  Reative ou exclua do catálogo; o histórico dos clientes fica
+                  intacto.
                 </p>
               ) : null}
 
               {!tpl.is_draft && !tpl.is_archived && tpl.has_been_used && (
-                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                  Modelo em uso — edições geram nova versão e preservam o histórico.
+                <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
+                  Já usado em preenchimentos. Edições valem para novos; excluir
+                  remove só do catálogo (histórico preservado).
                 </p>
               )}
 
@@ -231,20 +233,32 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                       className="w-full text-destructive hover:text-destructive sm:w-auto"
                       onClick={() => setDiscardingTpl(tpl)}
                     >
-                      <Archive className="size-3.5" />
+                      <Trash2 className="size-3.5" />
                       Descartar
                     </Button>
                   </>
                 ) : tpl.is_archived ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={() => setReactivatingTpl(tpl)}
-                  >
-                    <ArchiveRestore className="size-3.5" />
-                    Reativar
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => setReactivatingTpl(tpl)}
+                    >
+                      <ArchiveRestore className="size-3.5" />
+                      Reativar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-destructive hover:text-destructive sm:w-auto"
+                      onClick={() => setDeletingTpl(tpl)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Excluir
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Link
@@ -266,10 +280,10 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
                       variant="ghost"
                       size="sm"
                       className="w-full text-destructive hover:text-destructive sm:w-auto"
-                      onClick={() => setArchivingTpl(tpl)}
+                      onClick={() => setDeletingTpl(tpl)}
                     >
-                      <Archive className="size-3.5" />
-                      Arquivar
+                      <Trash2 className="size-3.5" />
+                      Excluir
                     </Button>
                   </>
                 )}
@@ -280,22 +294,21 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
       </ul>
 
       <Dialog
-        open={archivingTpl !== null}
+        open={deletingTpl !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setArchivingTpl(null);
+            setDeletingTpl(null);
             setError(null);
           }
         }}
       >
         <DialogContent showCloseButton>
           <DialogHeader>
-            <DialogTitle>Arquivar modelo da equipe?</DialogTitle>
+            <DialogTitle>Excluir modelo da equipe?</DialogTitle>
             <DialogDescription>
-              O modelo &quot;{archivingTpl?.name}&quot; ficará marcado como arquivado e
-              não poderá ser usado em novos checklists. Os preenchimentos já realizados
-              continuam acessíveis no histórico de cada cliente. Pode reativá-lo depois
-              na lista de modelos da equipe.
+              O modelo &quot;{deletingTpl?.name}&quot; será removido do catálogo.
+              Os preenchimentos já feitos continuam no histórico de cada cliente
+              (cópia congelada na sessão). Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
 
@@ -310,7 +323,7 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setArchivingTpl(null)}
+              onClick={() => setDeletingTpl(null)}
               disabled={isPending}
             >
               Cancelar
@@ -319,16 +332,16 @@ export function WorkspaceTemplatesList({ templates, highlightId = null }: Props)
               type="button"
               size="sm"
               variant="destructive"
-              onClick={confirmArchive}
+              onClick={confirmDelete}
               disabled={isPending}
             >
               {isPending ? (
                 <>
                   <Loader2 className="size-3.5 animate-spin" />
-                  Arquivando…
+                  Excluindo…
                 </>
               ) : (
-                "Arquivar"
+                "Excluir modelo"
               )}
             </Button>
           </DialogFooter>

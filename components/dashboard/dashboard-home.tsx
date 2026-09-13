@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { CalendarClock, ClipboardList, Clock3, Users } from "lucide-react";
 
+import { ChecklistInProgressStatusCard } from "@/components/dashboard/checklist-in-progress-status-card";
 import { ContractRenewalAlerts } from "@/components/dashboard/contract-renewal-alerts";
 import { DashboardAttentionItem } from "@/components/dashboard/dashboard-attention-item";
 import { DashboardKpiButton } from "@/components/dashboard/dashboard-kpi-button";
@@ -16,8 +17,15 @@ import { loadChecklistValidityAlerts } from "@/lib/actions/checklist-validity-al
 import { VALIDITY_ALERTS_LIST_LIMIT } from "@/lib/checklists/validity-alerts-balance";
 import {
   CHECKLISTS_A_VENCER_PATH,
+  CHECKLISTS_EM_ANDAMENTO_PATH,
   CHECKLISTS_VENCIDOS_PATH,
 } from "@/lib/routes";
+import {
+  buildInProgressAriaLabel,
+  buildInProgressKpiHint,
+  CHECKLISTS_IN_PROGRESS_DASHBOARD_LIMIT,
+} from "@/lib/dashboard/checklists-in-progress";
+import { loadChecklistsInProgress } from "@/lib/dashboard/load-checklists-in-progress";
 import { loadComplianceDashboardAlerts } from "@/lib/actions/compliance-deadlines";
 import { loadFinancialDashboardSummary } from "@/lib/actions/financial-charges";
 import { loadTeamMembersForOwner } from "@/lib/actions/team-members";
@@ -94,6 +102,7 @@ export async function DashboardHome() {
     { rows: teamMembers },
     financialSummary,
     { rows: expiringContracts },
+    inProgressSummary,
   ] = await Promise.all([
     loadScheduledVisitsForAgenda({
       supabase,
@@ -123,6 +132,13 @@ export async function DashboardHome() {
     isGestor && enabledModules.financeiro
       ? loadExpiringContracts(60)
       : Promise.resolve({ rows: [] }),
+    loadChecklistsInProgress({
+      timeZone: tz,
+      role: profileCtx?.role,
+      isGestor,
+      limit: CHECKLISTS_IN_PROGRESS_DASHBOARD_LIMIT,
+      now,
+    }),
   ]);
 
   const today = sortScheduledVisitsForDashboard(
@@ -195,7 +211,7 @@ export async function DashboardHome() {
 
       <section
         aria-label="Pulso do dia"
-        className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+        className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5"
       >
         <DashboardKpiButton
           label={isGestor ? "Visitas hoje" : "Minhas visitas"}
@@ -211,6 +227,17 @@ export async function DashboardHome() {
           }
           tone="default"
           href="#dashboard-agenda"
+        />
+        <DashboardKpiButton
+          label="Em andamento"
+          value={String(inProgressSummary.inProgressCount)}
+          hint={buildInProgressKpiHint(inProgressSummary.todayCount)}
+          tone={inProgressSummary.inProgressCount > 0 ? "live" : "default"}
+          href={CHECKLISTS_EM_ANDAMENTO_PATH}
+          ariaLabel={buildInProgressAriaLabel({
+            inProgressCount: inProgressSummary.inProgressCount,
+            todayCount: inProgressSummary.todayCount,
+          })}
         />
         <DashboardKpiButton
           label="Em atraso"
@@ -254,6 +281,12 @@ export async function DashboardHome() {
           />
         )}
       </section>
+
+      <ChecklistInProgressStatusCard
+        summary={inProgressSummary}
+        timeZone={tz}
+        isGestor={isGestor}
+      />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <div className="xl:col-span-7">
@@ -465,6 +498,13 @@ export async function DashboardHome() {
               description="O que o profissional precisa sem sair do início."
             >
               <div className="grid grid-cols-1 gap-2">
+                <Link
+                  href={CHECKLISTS_EM_ANDAMENTO_PATH}
+                  className={cn(ACTION_LINK, "justify-start")}
+                >
+                  <ClipboardList className="size-4" aria-hidden />
+                  Checklists em andamento
+                </Link>
                 <Link
                   href={CHECKLISTS_VENCIDOS_PATH}
                   className={cn(ACTION_LINK, "justify-start")}

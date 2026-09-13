@@ -53,7 +53,7 @@ export function CustomTemplateDeleteButton({
         onClick={() => setOpen(true)}
       >
         <Trash2 className="size-3.5" />
-        Remover modelo
+        Excluir modelo
       </Button>
 
       <Dialog
@@ -65,10 +65,11 @@ export function CustomTemplateDeleteButton({
       >
         <DialogContent showCloseButton>
           <DialogHeader>
-            <DialogTitle>Remover modelo personalizado?</DialogTitle>
+            <DialogTitle>Excluir modelo personalizado?</DialogTitle>
             <DialogDescription>
-              O modelo &quot;{templateName}&quot; será excluído permanentemente,
-              incluindo secções e itens extra. Esta ação não pode ser desfeita.
+              O modelo &quot;{templateName}&quot; será removido do catálogo. Os
+              preenchimentos já feitos continuam no histórico de cada cliente.
+              Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
 
@@ -98,10 +99,10 @@ export function CustomTemplateDeleteButton({
               {isPending ? (
                 <>
                   <Loader2 className="size-3.5 animate-spin" />
-                  Removendo…
+                  Excluindo…
                 </>
               ) : (
-                "Remover modelo"
+                "Excluir modelo"
               )}
             </Button>
           </DialogFooter>

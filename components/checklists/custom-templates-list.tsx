@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { Archive, ArchiveRestore, Loader2, Pencil, Play, Trash2 } from "lucide-react";
+import { ArchiveRestore, Loader2, Pencil, Play, Trash2 } from "lucide-react";
 
 import { ArchivedTemplateBadge } from "@/components/checklists/archived-template-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  archiveCustomTemplateAction,
   deleteCustomTemplateAction,
   loadCustomTemplatePreviewAction,
   unarchiveCustomTemplateAction,
@@ -51,12 +50,8 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
   const [deletingRow, setDeletingRow] = useState<CustomTemplateListRow | null>(
     null,
   );
-  const [archivingRow, setArchivingRow] = useState<CustomTemplateListRow | null>(
-    null,
-  );
-  const [reactivatingRow, setReactivatingRow] = useState<CustomTemplateListRow | null>(
-    null,
-  );
+  const [reactivatingRow, setReactivatingRow] =
+    useState<CustomTemplateListRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -70,20 +65,6 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
         return;
       }
       setDeletingRow(null);
-      router.refresh();
-    });
-  }
-
-  function confirmArchive() {
-    if (!archivingRow) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await archiveCustomTemplateAction(archivingRow.id);
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setArchivingRow(null);
       router.refresh();
     });
   }
@@ -157,14 +138,14 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
 
               {r.is_archived ? (
                 <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
-                  Modelo arquivado — não pode ser usado em novos preenchimentos. Reative
-                  quando quiser voltar a utilizá-lo.
+                  Modelo arquivado — não pode ser usado em novos preenchimentos.
+                  Reative quando quiser voltar a utilizá-lo, ou exclua se já não
+                  precisar no catálogo.
                 </p>
               ) : r.has_been_used ? (
-                <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                  Modelo em uso — não pode ser editado. Arquive para ocultar do
-                  catálogo; os preenchimentos anteriores permanecem no histórico. Pode
-                  reativar depois nesta lista.
+                <p className="mt-3 text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2 py-1">
+                  Já usado em preenchimentos. Pode editar (vale para novos) ou
+                  excluir do catálogo; o histórico dos clientes permanece intacto.
                 </p>
               ) : null}
             </div>
@@ -176,123 +157,65 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
             <div className="flex flex-col gap-2 border-t border-border/50 p-4 sm:flex-row sm:flex-wrap">
               {r.is_archived ? (
                 canDelete ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="w-full sm:w-auto"
-                    onClick={() => setReactivatingRow(r)}
-                  >
-                    <ArchiveRestore className="size-3.5" />
-                    Reativar
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                      onClick={() => setReactivatingRow(r)}
+                    >
+                      <ArchiveRestore className="size-3.5" />
+                      Reativar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-destructive hover:text-destructive sm:w-auto"
+                      onClick={() => setDeletingRow(r)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Excluir
+                    </Button>
+                  </>
                 ) : null
               ) : (
                 <>
-              <form action={startChecklistCustomFill}>
-                <input type="hidden" name="custom_template_id" value={r.id} />
-                <Button type="submit" size="sm" className="w-full sm:w-auto">
-                  <Play className="size-3.5" />
-                  Preencher
-                </Button>
-              </form>
-              {!r.has_been_used && (
-                <Link
-                  href={`/checklists/personalizados/${r.id}/editar`}
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "w-full sm:w-auto",
-                  )}
-                >
-                  <Pencil className="size-3.5" />
-                  Editar
-                </Link>
-              )}
-              {canDelete && r.has_been_used && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-destructive hover:text-destructive sm:w-auto"
-                  onClick={() => setArchivingRow(r)}
-                >
-                  <Archive className="size-3.5" />
-                  Arquivar
-                </Button>
-              )}
-              {canDelete && !r.has_been_used && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-destructive hover:text-destructive sm:w-auto"
-                  onClick={() => setDeletingRow(r)}
-                >
-                  <Trash2 className="size-3.5" />
-                  Remover
-                </Button>
-              )}
+                  <form action={startChecklistCustomFill}>
+                    <input type="hidden" name="custom_template_id" value={r.id} />
+                    <Button type="submit" size="sm" className="w-full sm:w-auto">
+                      <Play className="size-3.5" />
+                      Preencher
+                    </Button>
+                  </form>
+                  <Link
+                    href={`/checklists/personalizados/${r.id}/editar`}
+                    className={cn(
+                      buttonVariants({ variant: "outline", size: "sm" }),
+                      "w-full sm:w-auto",
+                    )}
+                  >
+                    <Pencil className="size-3.5" />
+                    Editar
+                  </Link>
+                  {canDelete ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-destructive hover:text-destructive sm:w-auto"
+                      onClick={() => setDeletingRow(r)}
+                    >
+                      <Trash2 className="size-3.5" />
+                      Excluir
+                    </Button>
+                  ) : null}
                 </>
               )}
             </div>
           </li>
         ))}
       </ul>
-
-      <Dialog
-        open={archivingRow !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setArchivingRow(null);
-            setError(null);
-          }
-        }}
-      >
-        <DialogContent showCloseButton>
-          <DialogHeader>
-            <DialogTitle>Arquivar modelo personalizado?</DialogTitle>
-            <DialogDescription>
-              O modelo &quot;{archivingRow?.name}&quot; ficará marcado como arquivado e
-              não poderá ser usado em novos checklists. Os preenchimentos já realizados
-              continuam acessíveis no histórico de cada cliente. Pode reativá-lo depois
-              na lista de modelos personalizados.
-            </DialogDescription>
-          </DialogHeader>
-
-          {error ? (
-            <p className="text-destructive text-sm" role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setArchivingRow(null)}
-              disabled={isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="destructive"
-              onClick={confirmArchive}
-              disabled={isPending}
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="size-3.5 animate-spin" />
-                  Arquivando…
-                </>
-              ) : (
-                "Arquivar"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={reactivatingRow !== null}
@@ -307,8 +230,8 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
           <DialogHeader>
             <DialogTitle>Reativar modelo personalizado?</DialogTitle>
             <DialogDescription>
-              O modelo &quot;{reactivatingRow?.name}&quot; voltará a aparecer no catálogo
-              e poderá ser usado em novos preenchimentos.
+              O modelo &quot;{reactivatingRow?.name}&quot; voltará a aparecer no
+              catálogo e poderá ser usado em novos preenchimentos.
             </DialogDescription>
           </DialogHeader>
 
@@ -358,11 +281,11 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
       >
         <DialogContent showCloseButton>
           <DialogHeader>
-            <DialogTitle>Remover modelo personalizado?</DialogTitle>
+            <DialogTitle>Excluir modelo personalizado?</DialogTitle>
             <DialogDescription>
-              O modelo &quot;{deletingRow?.name}&quot; será excluído
-              permanentemente, incluindo secções e itens extra. Esta ação não
-              pode ser desfeita.
+              O modelo &quot;{deletingRow?.name}&quot; será removido do catálogo.
+              Os preenchimentos já feitos continuam no histórico de cada cliente
+              (cópia congelada na sessão). Esta ação não pode ser desfeita.
             </DialogDescription>
           </DialogHeader>
 
@@ -392,10 +315,10 @@ export function CustomTemplatesList({ rows, canDelete }: Props) {
               {isPending ? (
                 <>
                   <Loader2 className="size-3.5 animate-spin" />
-                  Removendo…
+                  Excluindo…
                 </>
               ) : (
-                "Remover modelo"
+                "Excluir modelo"
               )}
             </Button>
           </DialogFooter>

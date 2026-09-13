@@ -860,26 +860,14 @@ export async function deleteCustomTemplateAction(
   );
   if (!hasAccess) return { ok: false, error: "Modelo não encontrado." };
 
-  const { count: sessionCount } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("custom_template_id", trimmedId);
-
-  if ((sessionCount ?? 0) > 0) {
-    return {
-      ok: false,
-      error:
-        "Este modelo já foi usado em preenchimentos e não pode ser removido.",
-    };
-  }
-
+  // Snapshot por sessão já congela o modelo; FK da sessão fica SET NULL.
   const { error } = await supabase
     .from("checklist_custom_templates")
     .delete()
     .eq("id", trimmedId);
 
   if (error) {
-    return { ok: false, error: "Não foi possível remover o modelo." };
+    return { ok: false, error: "Não foi possível excluir o modelo." };
   }
 
   revalidatePath("/checklists");

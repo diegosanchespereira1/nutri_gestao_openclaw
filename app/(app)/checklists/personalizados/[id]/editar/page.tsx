@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { CustomChecklistEditor } from "@/components/checklists/custom-checklist-editor";
 import { CustomTemplateDeleteButton } from "@/components/checklists/custom-template-delete-button";
@@ -8,7 +8,6 @@ import {
   canCurrentUserDeleteCustomChecklists,
   loadCustomTemplateEditData,
 } from "@/lib/actions/checklist-custom";
-import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
 export default async function EditarCustomChecklistPage({
@@ -25,16 +24,6 @@ export default async function EditarCustomChecklistPage({
     notFound();
   }
 
-  const supabase = await createClient();
-  const { count: sessionCount } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("custom_template_id", id);
-
-  if ((sessionCount ?? 0) > 0) {
-    redirect("/checklists/personalizados");
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -43,8 +32,8 @@ export default async function EditarCustomChecklistPage({
             Editar modelo personalizado
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Adicione secções ou itens extra. Os itens copiados do catálogo mantêm o
-            texto original; apenas os marcados como extra são criados por si.
+            Alterações valem só para novos preenchimentos. O histórico do cliente
+            mantém a versão congelada de cada sessão.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

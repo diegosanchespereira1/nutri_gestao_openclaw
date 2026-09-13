@@ -13,6 +13,7 @@ import {
   extensionForCanonicalImageMime,
   normalizeImageMime,
 } from "@/lib/images/image-mime";
+import { getSnapshotItemMeta } from "@/lib/checklists/session-snapshot";
 import { logBudgetEvent } from "@/lib/observability/request-budget";
 import { createClient } from "@/lib/supabase/server";
 import type { ChecklistFillPhotoView } from "@/lib/types/checklist-fill-photos";
@@ -153,9 +154,19 @@ async function assertSessionItem(
 
   if (itemResponseSource === "global") {
     const tid = sess.template_id as string | null;
-    if (!tid) return { ok: false };
-    const allowed = await verifyGlobalItemInSession(supabase, tid, itemId);
-    if (!allowed) return { ok: false };
+    if (tid) {
+      const allowed = await verifyGlobalItemInSession(supabase, tid, itemId);
+      if (allowed) {
+        return {
+          ok: true,
+          templateId: tid,
+          customTemplateId: null,
+          workspaceTemplateId: null,
+        };
+      }
+    }
+    const snap = await getSnapshotItemMeta(supabase, sessionId, itemId);
+    if (!snap || snap.is_structure_only) return { ok: false };
     return {
       ok: true,
       templateId: tid,
@@ -166,9 +177,19 @@ async function assertSessionItem(
 
   if (itemResponseSource === "custom") {
     const cid = sess.custom_template_id as string | null;
-    if (!cid) return { ok: false };
-    const allowed = await verifyCustomItemInSession(supabase, cid, itemId);
-    if (!allowed) return { ok: false };
+    if (cid) {
+      const allowed = await verifyCustomItemInSession(supabase, cid, itemId);
+      if (allowed) {
+        return {
+          ok: true,
+          templateId: null,
+          customTemplateId: cid,
+          workspaceTemplateId: null,
+        };
+      }
+    }
+    const snap = await getSnapshotItemMeta(supabase, sessionId, itemId);
+    if (!snap || snap.is_structure_only) return { ok: false };
     return {
       ok: true,
       templateId: null,
@@ -178,9 +199,19 @@ async function assertSessionItem(
   }
 
   const wid = sess.workspace_template_id as string | null;
-  if (!wid) return { ok: false };
-  const allowed = await verifyWorkspaceItemInSession(supabase, wid, itemId);
-  if (!allowed) return { ok: false };
+  if (wid) {
+    const allowed = await verifyWorkspaceItemInSession(supabase, wid, itemId);
+    if (allowed) {
+      return {
+        ok: true,
+        templateId: null,
+        customTemplateId: null,
+        workspaceTemplateId: wid,
+      };
+    }
+  }
+  const snap = await getSnapshotItemMeta(supabase, sessionId, itemId);
+  if (!snap || snap.is_structure_only) return { ok: false };
   return {
     ok: true,
     templateId: null,

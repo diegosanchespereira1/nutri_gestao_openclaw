@@ -14,6 +14,7 @@ import { VALIDITY_ALERTS_LIST_LIMIT } from "@/lib/checklists/validity-alerts-bal
 import {
   APP_DASHBOARD_PATH,
   CHECKLISTS_A_VENCER_PATH,
+  CHECKLISTS_EM_ANDAMENTO_PATH,
   CHECKLISTS_VENCIDOS_PATH,
 } from "@/lib/routes";
 import { DEFAULT_PROFILE_TIME_ZONE, normalizeAppTimeZone } from "@/lib/timezones";
@@ -81,6 +82,15 @@ export async function ChecklistValidityListPage({ variant }: { variant: Variant 
         back={{ href: APP_DASHBOARD_PATH, label: "Dashboard" }}
         actions={
           <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <Link
+              href={CHECKLISTS_EM_ANDAMENTO_PATH}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "min-h-11 w-full justify-center sm:w-auto",
+              )}
+            >
+              Em andamento
+            </Link>
             <Link
               href={copy.otherHref}
               className={cn(

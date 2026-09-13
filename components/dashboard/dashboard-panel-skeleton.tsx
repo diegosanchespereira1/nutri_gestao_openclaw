@@ -18,12 +18,14 @@ export function DashboardHomeSkeleton() {
       aria-label="Carregando dashboard"
     >
       <Block className="h-4 w-64" />
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <Block className="h-24" />
         <Block className="h-24" />
         <Block className="h-24" />
         <Block className="h-24" />
         <Block className="h-24" />
       </div>
+      <Block className="h-40 w-full" />
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         <Block className="h-48 xl:col-span-7" />
         <Block className="h-48 xl:col-span-5" />

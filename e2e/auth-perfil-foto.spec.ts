@@ -40,7 +40,9 @@ test.describe("Autenticação", () => {
     await page.getByLabel("Senha", { exact: true }).fill("senha-errada-123!");
     await page.getByRole("button", { name: "Entrar" }).click();
 
-    await expect(page.getByRole("alert")).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.locator('[role="alert"]:not(#__next-route-announcer__)'),
+    ).toBeVisible({ timeout: 20_000 });
     await expect(page).toHaveURL(/\/login/);
   });
 });
@@ -52,11 +54,15 @@ test.describe("Perfil — upload de foto", () => {
     await login(page);
     await page.goto("/perfil");
 
-    // Simula o cenário do bug: SO reporta "image/jpg" em vez de "image/jpeg".
+    // Layout atual: o botão "Salvar perfil" só aparece após entrar em modo edição
+    // (selecionar ficheiro no input de foto ativa isEditing automaticamente).
     await page.locator("#perfil-photo").setInputFiles({
       name: "foto-teste.jpg",
       mimeType: "image/jpg",
       buffer: TINY_JPEG,
+    });
+    await expect(page.getByRole("button", { name: "Salvar perfil" })).toBeVisible({
+      timeout: 10_000,
     });
     await page.getByRole("button", { name: "Salvar perfil" }).click();
 
@@ -75,6 +81,10 @@ test.describe("Perfil — upload de foto", () => {
       name: "documento.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4 conteudo de teste"),
+    });
+    // Entrar em edição e tentar guardar — a validação acontece no submit.
+    await expect(page.getByRole("button", { name: "Salvar perfil" })).toBeVisible({
+      timeout: 10_000,
     });
     await page.getByRole("button", { name: "Salvar perfil" }).click();
 

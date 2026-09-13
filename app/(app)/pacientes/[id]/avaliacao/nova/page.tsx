@@ -90,7 +90,7 @@ export default async function NovaAvaliacaoPage({
             name={row.full_name}
             imageUrl={photoUrl}
             size="lg"
-            className="rounded-full ring-2 ring-teal-400/50 ring-offset-2 ring-offset-background"
+            framed
           />
         }
         back={back}

@@ -311,7 +311,7 @@ export function PatientHealthIndicatorsDashboard({
                 name={patientName}
                 imageUrl={photoUrl}
                 size="xl"
-                className="rounded-full"
+                framed
               />
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

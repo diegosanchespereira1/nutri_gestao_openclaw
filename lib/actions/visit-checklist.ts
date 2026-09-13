@@ -6,45 +6,35 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
-import { loadFillSessionPageData, seedInheritedValidResponsesForSession } from "@/lib/actions/checklist-fill";
 import {
-  loadChecklistCatalog,
-  loadChecklistTemplateBundleByIdDirect,
-} from "@/lib/actions/checklists";
-import { loadCustomTemplateUnified } from "@/lib/actions/checklist-custom";
+  startChecklistFillBatch,
+  startCustomTemplateFillBatch,
+  loadFillSessionPageData,
+} from "@/lib/actions/checklist-fill";
+import { loadChecklistCatalog } from "@/lib/actions/checklists";
+import { listCustomTemplatesForOwner } from "@/lib/actions/checklist-custom";
+import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
+import {
+  loadWorkspaceTemplatesForCatalogLight,
+  startWorkspaceTemplateFillBatch,
+} from "@/lib/actions/checklist-workspace";
 import { loadScheduledVisitById } from "@/lib/visits/load-scheduled-visits";
-import { filterTemplatesForEstablishment } from "@/lib/checklists/filter-templates";
+import {
+  assembleVisitChecklistOptions,
+  parseVisitChecklistChoice,
+  resolveVisitSelectedAreaIds,
+  type VisitChecklistOption,
+} from "@/lib/visits/visit-checklist-options";
 import { createClient } from "@/lib/supabase/server";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
 import { establishmentClientLabel } from "@/lib/utils/establishment-client-label";
 import type { ChecklistTemplateWithSections } from "@/lib/types/checklists";
-import type {
-  ChecklistFillSessionRow,
-  FillResponsesMap,
-} from "@/lib/types/checklist-fill";
+import type { FillResponsesMap } from "@/lib/types/checklist-fill";
+import type { ChecklistFillBatchItem } from "@/lib/checklist-fill-batch-storage";
 import type { ScheduledVisitWithTargets } from "@/lib/types/visits";
-import type {
-  EstablishmentType,
-  EstablishmentWithClientNames,
-} from "@/lib/types/establishments";
-
-export type VisitChecklistOption =
-  | { kind: "global"; templateId: string; label: string }
-  | { kind: "custom"; customTemplateId: string; label: string };
+import type { EstablishmentWithClientNames } from "@/lib/types/establishments";
 
 type EstPick = { id: string; label: string };
-
-function parseChoice(raw: string):
-  | { kind: "global"; id: string }
-  | { kind: "custom"; id: string }
-  | null {
-  const s = raw.trim();
-  const g = s.match(/^global:([0-9a-f-]{36})$/i);
-  if (g) return { kind: "global", id: g[1] };
-  const c = s.match(/^custom:([0-9a-f-]{36})$/i);
-  if (c) return { kind: "custom", id: c[1] };
-  return null;
-}
 
 async function assertEstablishmentOwned(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -213,70 +203,22 @@ export async function resolveVisitChecklistEstablishmentId(input: {
   return { ok: false, reason: "pick", options: opts };
 }
 
-async function loadCustomTemplateRowsForEstablishment(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  establishmentId: string,
-): Promise<{ id: string; name: string }[]> {
-  const { data, error } = await supabase
-    .from("checklist_custom_templates")
-    .select("id, name")
-    .eq("establishment_id", establishmentId)
-    .is("archived_at", null)
-    .order("updated_at", { ascending: false });
+export async function buildVisitChecklistOptions(): Promise<VisitChecklistOption[]> {
+  const [
+    { templates: official },
+    { rows: workspaceRows },
+    { rows: customRows },
+  ] = await Promise.all([
+    loadChecklistCatalog(),
+    loadWorkspaceTemplatesForCatalogLight(),
+    listCustomTemplatesForOwner(),
+  ]);
 
-  if (error || !data) return [];
-  return data.map((r) => ({
-    id: r.id as string,
-    name: r.name as string,
-  }));
-}
-
-export async function buildVisitChecklistOptions(input: {
-  establishmentId: string;
-}): Promise<VisitChecklistOption[]> {
-  const supabase = await createClient();
-  const { establishmentId } = input;
-
-  const { data: est } = await supabase
-    .from("establishments")
-    .select("id, state, establishment_type")
-    .eq("id", establishmentId)
-    .maybeSingle();
-
-  const { templates: allTemplates } = await loadChecklistCatalog();
-  const filtered = filterTemplatesForEstablishment(
-    allTemplates,
-    est
-      ? {
-          state: est.state as string | null,
-          establishment_type: est.establishment_type as EstablishmentType,
-        }
-      : null,
-  );
-
-  const customs = await loadCustomTemplateRowsForEstablishment(
-    supabase,
-    establishmentId,
-  );
-
-  const options: VisitChecklistOption[] = [];
-
-  for (const c of customs) {
-    options.push({
-      kind: "custom",
-      customTemplateId: c.id,
-      label: `Personalizado: ${c.name}`,
-    });
-  }
-  for (const t of filtered) {
-    options.push({
-      kind: "global",
-      templateId: t.id,
-      label: t.name,
-    });
-  }
-
-  return options;
+  return assembleVisitChecklistOptions({
+    workspace: workspaceRows.filter((row) => !row.is_draft && !row.is_archived),
+    custom: customRows.filter((row) => !row.is_archived),
+    official,
+  });
 }
 
 export async function getLatestFillSessionIdForVisit(
@@ -300,110 +242,99 @@ export async function getLatestFillSessionIdForVisit(
   return data ? (data.id as string) : null;
 }
 
-export async function insertVisitChecklistFillSession(input: {
-  visitId: string;
-  authUserId: string;
-  establishmentId: string;
-  option: VisitChecklistOption;
-}): Promise<{ sessionId: string } | { error: string }> {
-  const supabase = await createClient();
-  const { visitId, authUserId, establishmentId, option } = input;
-
-  const workspaceOwnerId = await getWorkspaceAccountOwnerId(
-    supabase,
-    authUserId,
-  );
-
-  const owned = await assertEstablishmentOwned(
-    supabase,
-    workspaceOwnerId,
-    establishmentId,
-  );
-  if (!owned) return { error: "Estabelecimento inválido." };
-
-  const { data: visit } = await supabase
-    .from("scheduled_visits")
-    .select("id")
-    .eq("id", visitId)
-    .maybeSingle();
-
-  if (!visit) return { error: "Visita não encontrada." };
-
-  if (option.kind === "global") {
-    const { data: template } = await supabase
-      .from("checklist_templates")
-      .select("id")
-      .eq("id", option.templateId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!template) return { error: "Modelo indisponível." };
-
-    const { data: session, error } = await supabase
-      .from("checklist_fill_sessions")
-      .insert({
-        user_id: authUserId,
-        establishment_id: establishmentId,
-        template_id: option.templateId,
-        custom_template_id: null,
-        scheduled_visit_id: visitId,
-      })
-      .select("*")
-      .single();
-
-    if (error || !session) return { error: "Não foi possível iniciar o checklist." };
-
-    const templateBundle = await loadChecklistTemplateBundleByIdDirect(
-      supabase,
-      option.templateId,
-    );
-    if (templateBundle) {
-      await seedInheritedValidResponsesForSession(
-        supabase,
-        session as ChecklistFillSessionRow,
-        templateBundle,
-        authUserId,
-      );
+type StartVisitChecklistFillResult =
+  | {
+      ok: true;
+      firstSessionId: string;
+      sessionIds: string[];
+      items: ChecklistFillBatchItem[];
     }
+  | {
+      ok: false;
+      error: "missing" | "context" | "session" | "area_required" | "area_invalid";
+    };
 
-    return { sessionId: session.id as string };
-  }
+export async function startVisitChecklistFillAction(input: {
+  visitId: string;
+  choice: string;
+  ctxEstablishmentId: string | null;
+  areaIds: string[];
+}): Promise<StartVisitChecklistFillResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "session" };
 
-  const { data: ct } = await supabase
-    .from("checklist_custom_templates")
-    .select("id, establishment_id, archived_at")
-    .eq("id", option.customTemplateId)
-    .maybeSingle();
+  const visitId = input.visitId.trim();
+  const choice = parseVisitChecklistChoice(input.choice);
+  if (!visitId || !choice) return { ok: false, error: "missing" };
 
-  if (!ct || ct.establishment_id !== establishmentId || ct.archived_at) {
-    return { error: "Modelo personalizado inválido." };
-  }
+  const { row } = await loadScheduledVisitById(visitId);
+  if (!row) return { ok: false, error: "context" };
 
-  const { data: session, error } = await supabase
-    .from("checklist_fill_sessions")
-    .insert({
-      user_id: authUserId,
-      establishment_id: establishmentId,
-      template_id: null,
-      custom_template_id: option.customTemplateId,
-      scheduled_visit_id: visitId,
-    })
-    .select("*")
-    .single();
+  const resolved = await resolveVisitChecklistEstablishmentId({
+    visit: row,
+    authUserId: user.id,
+    ctxEstablishmentId: input.ctxEstablishmentId,
+  });
+  if (!resolved.ok) return { ok: false, error: "context" };
 
-  if (error || !session) return { error: "Não foi possível iniciar o checklist." };
+  const availableAreas = await loadAreasForEstablishment(resolved.establishmentId);
+  const areaSelection = resolveVisitSelectedAreaIds({
+    availableAreaIds: availableAreas.map((a) => a.id),
+    selectedAreaIds: input.areaIds,
+  });
+  if (!areaSelection.ok) return { ok: false, error: areaSelection.error };
 
-  const templateBundle = await loadCustomTemplateUnified(option.customTemplateId);
-  if (templateBundle) {
-    await seedInheritedValidResponsesForSession(
-      supabase,
-      session as ChecklistFillSessionRow,
-      templateBundle,
-      authUserId,
-    );
-  }
+  const batchInput = {
+    areaIds: areaSelection.areaIds,
+    scheduledVisitId: visitId,
+  };
 
-  return { sessionId: session.id as string };
+  const started =
+    choice.kind === "workspace"
+      ? await startWorkspaceTemplateFillBatch({
+          workspaceTemplateId: choice.id,
+          establishmentId: resolved.establishmentId,
+          ...batchInput,
+        })
+      : choice.kind === "custom"
+        ? await startCustomTemplateFillBatch({
+            customTemplateId: choice.id,
+            establishmentId: resolved.establishmentId,
+            ...batchInput,
+          })
+        : await startChecklistFillBatch({
+            templateId: choice.id,
+            establishmentId: resolved.establishmentId,
+            ...batchInput,
+          });
+
+  if (!started.ok) return { ok: false, error: "session" };
+
+  const items: ChecklistFillBatchItem[] = started.sessionIds.map((sessionId, i) => {
+    const areaId =
+      i < areaSelection.areaIds.length ? (areaSelection.areaIds[i] ?? null) : null;
+    const area = areaId
+      ? availableAreas.find((a) => a.id === areaId)
+      : null;
+    return {
+      sessionId,
+      areaId,
+      areaName: area?.name ?? null,
+    };
+  });
+
+  revalidatePath(`/visitas/${visitId}/iniciar`);
+  revalidatePath(`/visitas/${visitId}`);
+
+  return {
+    ok: true,
+    firstSessionId: started.firstSessionId,
+    sessionIds: started.sessionIds,
+    items,
+  };
 }
 
 export async function chooseVisitEstablishmentContextAction(
@@ -450,62 +381,26 @@ export async function chooseVisitEstablishmentContextAction(
 export async function createVisitChecklistSessionAction(
   formData: FormData,
 ): Promise<void> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
   const visitId = String(formData.get("visit_id") ?? "").trim();
-  const choiceRaw = String(formData.get("choice") ?? "").trim();
   const ctxEst = String(formData.get("ctx_establishment_id") ?? "").trim();
-  const ctxEstablishmentId = ctxEst.length > 0 ? ctxEst : null;
+  const areaIds = formData
+    .getAll("area_id")
+    .map((value) => String(value).trim())
+    .filter((value) => value.length > 0);
 
-  const choice = parseChoice(choiceRaw);
-  if (!visitId || !choice) {
-    redirect(`/visitas/${visitId}/iniciar?err=missing`);
-  }
-
-  const { row } = await loadScheduledVisitById(visitId);
-  if (!row) redirect("/visitas");
-
-  const resolved = await resolveVisitChecklistEstablishmentId({
-    visit: row,
-    authUserId: user.id,
-    ctxEstablishmentId,
-  });
-
-  if (!resolved.ok) {
-    redirect(`/visitas/${visitId}/iniciar?err=context`);
-  }
-
-  const option: VisitChecklistOption =
-    choice.kind === "global"
-      ? {
-          kind: "global",
-          templateId: choice.id,
-          label: "",
-        }
-      : {
-          kind: "custom",
-          customTemplateId: choice.id,
-          label: "",
-        };
-
-  const result = await insertVisitChecklistFillSession({
+  const result = await startVisitChecklistFillAction({
     visitId,
-    authUserId: user.id,
-    establishmentId: resolved.establishmentId,
-    option,
+    choice: String(formData.get("choice") ?? ""),
+    ctxEstablishmentId: ctxEst.length > 0 ? ctxEst : null,
+    areaIds,
   });
 
-  if ("error" in result) {
-    redirect(`/visitas/${visitId}/iniciar?err=session`);
+  if (!result.ok) {
+    if (!visitId) redirect("/visitas");
+    redirect(`/visitas/${visitId}/iniciar?err=${result.error}`);
   }
 
-  revalidatePath(`/visitas/${visitId}/iniciar`);
-  revalidatePath(`/visitas/${visitId}`);
-  redirect(`/visitas/${visitId}/iniciar?session=${result.sessionId}`);
+  redirect(`/visitas/${visitId}/iniciar?session=${result.firstSessionId}`);
 }
 
 function countFillProgress(
@@ -603,7 +498,7 @@ async function loadRecurringNcSessionCountByItem(input: {
   return out;
 }
 
-export type VisitChecklistWizardModel = {
+type VisitChecklistWizardModel = {
   visit: ScheduledVisitWithTargets;
   sessionId: string;
   fill: NonNullable<Awaited<ReturnType<typeof loadFillSessionPageData>>>;

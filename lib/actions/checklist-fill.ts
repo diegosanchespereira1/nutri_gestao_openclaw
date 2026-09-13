@@ -20,6 +20,12 @@ import {
   MAX_SESSION_SIGNATURE_DATA_URL_CHARS,
 } from "@/lib/profile/signature-sync";
 import { loadWorkspaceTemplateBundle } from "@/lib/actions/checklist-workspace";
+import {
+  ensureSessionSnapshot,
+  getSnapshotItemMeta,
+  loadSessionTemplateFromSnapshot,
+  resolveSessionItemResponseSource,
+} from "@/lib/checklists/session-snapshot";
 import { checklistValidityAlertsCacheTag } from "@/lib/cache-tags";
 import { getServerContext } from "@/lib/supabase/get-server-user";
 import { createClient } from "@/lib/supabase/server";
@@ -459,6 +465,41 @@ export async function seedInheritedValidResponsesForSession(
   await inheritValidResponsesIfFreshSession(supabase, session, template, timeZone);
 }
 
+async function loadTemplateForFillSession(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  row: ChecklistFillSessionRow & {
+    custom_template_id?: string | null;
+    workspace_template_id?: string | null;
+  },
+  options?: { includeArchivedItems?: boolean },
+): Promise<ChecklistTemplateWithSections | null> {
+  const fromSnap = await loadSessionTemplateFromSnapshot(supabase, row.id);
+  if (fromSnap) return fromSnap;
+
+  // Sessões antigas sem snapshot (ou falha do trigger): cria e tenta de novo.
+  await ensureSessionSnapshot(supabase, row.id, "backfill");
+  const afterEnsure = await loadSessionTemplateFromSnapshot(supabase, row.id);
+  if (afterEnsure) return afterEnsure;
+
+  const includeArchivedItems = options?.includeArchivedItems === true;
+  if (row.workspace_template_id) {
+    return loadWorkspaceTemplateBundle(row.workspace_template_id, {
+      includeArchivedItems,
+    });
+  }
+  if (row.custom_template_id) {
+    return loadCustomTemplateUnified(row.custom_template_id, {
+      includeArchivedItems,
+    });
+  }
+  if (row.template_id) {
+    return loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
+      includeArchivedItems,
+    });
+  }
+  return null;
+}
+
 export async function loadFillSessionPageData(sessionId: string): Promise<{
   session: ChecklistFillSessionRow;
   template: ChecklistTemplateWithSections;
@@ -495,77 +536,62 @@ export async function loadFillSessionPageData(sessionId: string): Promise<{
     workspace_template_id?: string | null;
   };
 
-  const itemResponseSource: "global" | "custom" | "workspace" = row.workspace_template_id
-    ? "workspace"
-    : row.custom_template_id
-      ? "custom"
-      : "global";
+  const [template, respRowsResult, estResult, pdfResult, itemPhotos, creatorResult, areaResult, snapMeta] =
+    await Promise.all([
+      loadTemplateForFillSession(supabase, row, {
+        includeArchivedItems: row.dossier_approved_at != null,
+      }),
+      supabase
+        .from("checklist_fill_item_responses")
+        .select("*")
+        .eq("session_id", sessionId),
+      supabase
+        .from("establishments")
+        .select("*, clients(legal_name, trade_name, lifecycle_status)")
+        .eq("id", session.establishment_id)
+        .maybeSingle(),
+      supabase
+        .from("checklist_fill_pdf_exports")
+        .select(
+          "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
+        )
+        .eq("session_id", sessionId)
+        .order("version_number", { ascending: false })
+        .order("created_at", { ascending: false }),
+      loadSessionItemPhotosWithUrls(supabase, sessionId),
+      row.user_id !== user.id
+        ? supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("user_id", row.user_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      row.area_id
+        ? supabase
+            .from("establishment_areas")
+            .select("name")
+            .eq("id", row.area_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("checklist_fill_snapshots")
+        .select("template_origin")
+        .eq("session_id", sessionId)
+        .maybeSingle(),
+    ]);
 
-  // Itens arquivados do modelo: só no dossiê já aprovado (histórico/PDF).
-  // Em preenchimento novo/em andamento, carregar apenas itens ativos — senão
-  // «Aplicar» mostra itens que a equipe removeu do checklist.
-  const includeArchivedItems = row.dossier_approved_at != null;
-
-  const templatePromise: Promise<ChecklistTemplateWithSections | null> =
+  const itemResponseSource: "global" | "custom" | "workspace" =
     row.workspace_template_id
-      ? loadWorkspaceTemplateBundle(row.workspace_template_id, {
-          includeArchivedItems,
-        })
+      ? "workspace"
       : row.custom_template_id
-        ? loadCustomTemplateUnified(row.custom_template_id, {
-            includeArchivedItems,
-          })
+        ? "custom"
         : row.template_id
-          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
-              includeArchivedItems,
-            })
-          : Promise.resolve(null);
-
-  const [
-    template,
-    respRowsResult,
-    estResult,
-    pdfResult,
-    itemPhotos,
-    creatorResult,
-    areaResult,
-  ] = await Promise.all([
-    templatePromise,
-    supabase
-      .from("checklist_fill_item_responses")
-      .select("*")
-      .eq("session_id", sessionId),
-    supabase
-      .from("establishments")
-      .select("*, clients(legal_name, trade_name, lifecycle_status)")
-      .eq("id", session.establishment_id)
-      .maybeSingle(),
-    supabase
-      .from("checklist_fill_pdf_exports")
-      .select(
-        "id, user_id, session_id, status, storage_path, error_message, created_at, updated_at, version_number, superseded_at, superseded_by_version",
-      )
-      .eq("session_id", sessionId)
-      .order("version_number", { ascending: false })
-      .order("created_at", { ascending: false }),
-    loadSessionItemPhotosWithUrls(supabase, sessionId),
-    // Creator name — só se o rascunho foi criado por outro utilizador
-    row.user_id !== user.id
-      ? supabase
-          .from("profiles")
-          .select("full_name")
-          .eq("user_id", row.user_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    // Area name — só se a sessão tiver area_id
-    row.area_id
-      ? supabase
-          .from("establishment_areas")
-          .select("name")
-          .eq("id", row.area_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+          ? "global"
+          : snapMeta.data?.template_origin === "workspace"
+            ? "workspace"
+            : snapMeta.data?.template_origin === "custom"
+              ? "custom"
+              : "global";
 
   if (!template) return null;
 
@@ -835,11 +861,12 @@ export async function saveFillItemResponse(input: {
 
   const sessionWasApproved = Boolean(sess.dossier_approved_at);
 
-  const sessionOrigin: "global" | "custom" | "workspace" = sess.workspace_template_id
-    ? "workspace"
-    : sess.custom_template_id
-      ? "custom"
-      : "global";
+  const sessionOrigin = await resolveSessionItemResponseSource(supabase, {
+    id: sessionId,
+    template_id: sess.template_id as string | null,
+    custom_template_id: sess.custom_template_id as string | null,
+    workspace_template_id: sess.workspace_template_id as string | null,
+  });
   if (sessionOrigin !== itemResponseSource) {
     return { ok: false, error: "Tipo de item incompatível com a sessão." };
   }
@@ -850,8 +877,18 @@ export async function saveFillItemResponse(input: {
       .select("id, is_structure_only")
       .eq("id", itemId)
       .maybeSingle();
-    if (!itemMeta) return { ok: false, error: "Item inválido." };
-    if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
+    const snapMeta = itemMeta
+      ? null
+      : await getSnapshotItemMeta(supabase, sessionId, itemId);
+    const resolved = itemMeta
+      ? {
+          is_structure_only: Boolean(
+            (itemMeta as { is_structure_only?: boolean }).is_structure_only,
+          ),
+        }
+      : snapMeta;
+    if (!resolved) return { ok: false, error: "Item inválido." };
+    if (resolved.is_structure_only) {
       return {
         ok: false,
         error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
@@ -863,22 +900,30 @@ export async function saveFillItemResponse(input: {
       .select("id, custom_section_id, is_structure_only")
       .eq("id", itemId)
       .maybeSingle();
-    if (!itemMeta) return { ok: false, error: "Item inválido." };
-    if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
-      return {
-        ok: false,
-        error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
-      };
-    }
-
-    const { data: sec } = await supabase
-      .from("checklist_custom_sections")
-      .select("custom_template_id")
-      .eq("id", itemMeta.custom_section_id as string)
-      .maybeSingle();
-
-    if (!sec || sec.custom_template_id !== sess.custom_template_id) {
-      return { ok: false, error: "Item inválido para este modelo." };
+    if (itemMeta) {
+      if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
+        return {
+          ok: false,
+          error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+        };
+      }
+      const { data: sec } = await supabase
+        .from("checklist_custom_sections")
+        .select("custom_template_id")
+        .eq("id", itemMeta.custom_section_id as string)
+        .maybeSingle();
+      if (!sec || sec.custom_template_id !== sess.custom_template_id) {
+        return { ok: false, error: "Item inválido para este modelo." };
+      }
+    } else {
+      const snapMeta = await getSnapshotItemMeta(supabase, sessionId, itemId);
+      if (!snapMeta) return { ok: false, error: "Item inválido." };
+      if (snapMeta.is_structure_only) {
+        return {
+          ok: false,
+          error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+        };
+      }
     }
   } else {
     const { data: itemMeta } = await supabase
@@ -886,22 +931,30 @@ export async function saveFillItemResponse(input: {
       .select("id, workspace_section_id, is_structure_only")
       .eq("id", itemId)
       .maybeSingle();
-    if (!itemMeta) return { ok: false, error: "Item inválido." };
-    if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
-      return {
-        ok: false,
-        error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
-      };
-    }
-
-    const { data: sec } = await supabase
-      .from("checklist_workspace_sections")
-      .select("workspace_template_id")
-      .eq("id", itemMeta.workspace_section_id as string)
-      .maybeSingle();
-
-    if (!sec || sec.workspace_template_id !== sess.workspace_template_id) {
-      return { ok: false, error: "Item inválido para este modelo." };
+    if (itemMeta) {
+      if (Boolean((itemMeta as { is_structure_only?: boolean }).is_structure_only)) {
+        return {
+          ok: false,
+          error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+        };
+      }
+      const { data: sec } = await supabase
+        .from("checklist_workspace_sections")
+        .select("workspace_template_id")
+        .eq("id", itemMeta.workspace_section_id as string)
+        .maybeSingle();
+      if (!sec || sec.workspace_template_id !== sess.workspace_template_id) {
+        return { ok: false, error: "Item inválido para este modelo." };
+      }
+    } else {
+      const snapMeta = await getSnapshotItemMeta(supabase, sessionId, itemId);
+      if (!snapMeta) return { ok: false, error: "Item inválido." };
+      if (snapMeta.is_structure_only) {
+        return {
+          ok: false,
+          error: "Este tópico é apenas um agrupador da lista e não recebe avaliação.",
+        };
+      }
     }
   }
 
@@ -1332,11 +1385,12 @@ export async function saveFillResponsesBatch(input: {
 
   const sessionWasApproved = Boolean(sess.dossier_approved_at);
 
-  const sessionOrigin: "global" | "custom" | "workspace" = sess.workspace_template_id
-    ? "workspace"
-    : sess.custom_template_id
-      ? "custom"
-      : "global";
+  const sessionOrigin = await resolveSessionItemResponseSource(supabase, {
+    id: sessionId,
+    template_id: sess.template_id as string | null,
+    custom_template_id: sess.custom_template_id as string | null,
+    workspace_template_id: sess.workspace_template_id as string | null,
+  });
   if (sessionOrigin !== itemResponseSource) {
     return { ok: false, error: "Tipo de item incompatível com a sessão." };
   }
@@ -1406,6 +1460,29 @@ export async function saveFillResponsesBatch(input: {
         structureIds.add(id);
       } else {
         validItemIds.add(id);
+      }
+    }
+  }
+
+  const missingForSnap = requestedItemIds.filter(
+    (id) => !structureIds.has(id) && !validItemIds.has(id),
+  );
+  if (missingForSnap.length > 0) {
+    const { data: snap } = await supabase
+      .from("checklist_fill_snapshots")
+      .select("id")
+      .eq("session_id", sessionId)
+      .maybeSingle();
+    if (snap) {
+      const { data: snapItems } = await supabase
+        .from("checklist_fill_snapshot_items")
+        .select("source_item_id, is_structure_only")
+        .eq("snapshot_id", snap.id)
+        .in("source_item_id", missingForSnap);
+      for (const row of snapItems ?? []) {
+        const id = String(row.source_item_id);
+        if (Boolean(row.is_structure_only)) structureIds.add(id);
+        else validItemIds.add(id);
       }
     }
   }
@@ -1708,6 +1785,7 @@ export async function startChecklistFillBatch(input: {
   templateId: string;
   establishmentId: string;
   areaIds: string[]; // [] = sem área
+  scheduledVisitId?: string | null;
 }): Promise<
   | { ok: true; sessionIds: string[]; firstSessionId: string; totalSessions: number }
   | { ok: false; error: string }
@@ -1715,7 +1793,7 @@ export async function startChecklistFillBatch(input: {
   const supabase = await createClient();
   const auth = await requireWorkspaceAuthContext(supabase);
   if (!auth.ok) return { ok: false, error: "not_authenticated" };
-  const { templateId, establishmentId, areaIds } = input;
+  const { templateId, establishmentId, areaIds, scheduledVisitId } = input;
 
   if (!templateId || !establishmentId) {
     return { ok: false, error: "missing_fields" };
@@ -1760,6 +1838,7 @@ export async function startChecklistFillBatch(input: {
         template_id: templateId,
         custom_template_id: null,
         area_id: areaId,
+        scheduled_visit_id: scheduledVisitId ?? null,
       })
       .select("*")
       .single();
@@ -1791,6 +1870,9 @@ export async function startChecklistFillBatch(input: {
 export async function startCustomTemplateFillBatch(input: {
   customTemplateId: string;
   areaIds: string[];
+  scheduledVisitId?: string | null;
+  /** Quando informado (visita), a sessão fica neste estabelecimento. */
+  establishmentId?: string | null;
 }): Promise<
   | { ok: true; sessionIds: string[]; firstSessionId: string; totalSessions: number }
   | { ok: false; error: string }
@@ -1806,9 +1888,23 @@ export async function startCustomTemplateFillBatch(input: {
     .maybeSingle();
   if (!ct || ct.archived_at) return { ok: false, error: "template_not_found" };
 
-  const establishmentId = String(ct.establishment_id);
-  const owned = await assertEstablishmentOwned(supabase, auth.workspaceOwnerId, establishmentId);
-  if (!owned) return { ok: false, error: "forbidden" };
+  const templateEstablishmentId = String(ct.establishment_id);
+  const establishmentId =
+    input.establishmentId?.trim() || templateEstablishmentId;
+  const ownedTemplate = await assertEstablishmentOwned(
+    supabase,
+    auth.workspaceOwnerId,
+    templateEstablishmentId,
+  );
+  if (!ownedTemplate) return { ok: false, error: "forbidden" };
+  if (establishmentId !== templateEstablishmentId) {
+    const ownedSession = await assertEstablishmentOwned(
+      supabase,
+      auth.workspaceOwnerId,
+      establishmentId,
+    );
+    if (!ownedSession) return { ok: false, error: "forbidden" };
+  }
 
   const resolvedAreas: (string | null)[] = input.areaIds.length > 0 ? input.areaIds : [null];
   for (const areaId of resolvedAreas) {
@@ -1835,6 +1931,7 @@ export async function startCustomTemplateFillBatch(input: {
         template_id: null,
         custom_template_id: input.customTemplateId,
         area_id: areaId,
+        scheduled_visit_id: input.scheduledVisitId ?? null,
       })
       .select("*")
       .single();
@@ -2092,23 +2189,8 @@ async function loadFillSessionBundleForApproval(sessionId: string): Promise<{
 
   const includeArchivedItems = row.dossier_approved_at != null;
 
-  const templatePromise: Promise<ChecklistTemplateWithSections | null> =
-    row.workspace_template_id
-      ? loadWorkspaceTemplateBundle(row.workspace_template_id, {
-          includeArchivedItems,
-        })
-      : row.custom_template_id
-        ? loadCustomTemplateUnified(row.custom_template_id, {
-            includeArchivedItems,
-          })
-        : row.template_id
-          ? loadChecklistTemplateBundleByIdDirect(supabase, row.template_id, {
-              includeArchivedItems,
-            })
-          : Promise.resolve(null);
-
   const [template, respResult] = await Promise.all([
-    templatePromise,
+    loadTemplateForFillSession(supabase, row, { includeArchivedItems }),
     supabase
       .from("checklist_fill_item_responses")
       .select(

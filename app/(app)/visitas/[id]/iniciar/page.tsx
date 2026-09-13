@@ -16,11 +16,14 @@ import {
 } from "@/lib/actions/checklist-fill-reopen";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Label } from "@/components/ui/label";
+import { PageBackLink } from "@/components/layout/page-back-link";
+import { PageHeader } from "@/components/layout/page-header";
 import { VisitExecutionHeader } from "@/components/visits/visit-execution-header";
+import { VisitChecklistPicker } from "@/components/visits/visit-checklist-picker";
+import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
 import {
   buildVisitChecklistOptions,
   chooseVisitEstablishmentContextAction,
-  createVisitChecklistSessionAction,
   getLatestFillSessionIdForVisit,
   loadVisitChecklistWizardModel,
   markScheduledVisitInProgress,
@@ -39,6 +42,8 @@ const errMessages: Record<string, string> = {
   missing: "Escolha um checklist para continuar.",
   context: "Não foi possível determinar o contexto do estabelecimento.",
   session: "Não foi possível criar a sessão de preenchimento.",
+  area_required: "Selecione ao menos uma área para aplicar o checklist.",
+  area_invalid: "Área inválida para este estabelecimento.",
 };
 
 type Props = {
@@ -89,21 +94,11 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
   if (!resolvedEst.ok && resolvedEst.reason === "pick") {
     return (
       <div className="space-y-6">
-        <div>
-          <Link
-            href={`/visitas/${id}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground -ml-2 mb-2",
-            )}
-          >
-            ← Detalhe da visita
-          </Link>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Iniciar visita
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">{title}</p>
-        </div>
+        <PageHeader
+          title="Iniciar visita"
+          description={title}
+          back={{ href: `/visitas/${id}`, label: "Detalhe da visita" }}
+        />
         {errMsg ? (
           <p className="text-destructive text-sm" role="alert">
             {errMsg}
@@ -153,33 +148,18 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
   if (!resolvedEst.ok) {
     return (
       <div className="space-y-6">
-        <div>
-          <Link
-            href={`/visitas/${id}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground -ml-2 mb-2",
-            )}
-          >
-            ← Detalhe da visita
-          </Link>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Iniciar visita
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">{title}</p>
-        </div>
+        <PageHeader
+          title="Iniciar visita"
+          description={title}
+          back={{ href: `/visitas/${id}`, label: "Detalhe da visita" }}
+        />
         <div
           role="status"
           className="border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm"
         >
           {resolvedEst.message}
         </div>
-        <Link
-          href={`/visitas/${id}`}
-          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex")}
-        >
-          Voltar ao detalhe
-        </Link>
+        <PageBackLink href={`/visitas/${id}`} label="Voltar ao detalhe" />
       </div>
     );
   }
@@ -207,7 +187,11 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
       <div className="space-y-6">
         <VisitExecutionHeader
           visitTitle={title}
-          contextLine={`${model.establishmentContextLabel} · ${dateLine}`}
+          contextLine={
+            model.fill.session.area_name
+              ? `${model.establishmentContextLabel} · ${model.fill.session.area_name} · ${dateLine}`
+              : `${model.establishmentContextLabel} · ${dateLine}`
+          }
           progressDone={model.progress.done}
           progressTotal={model.progress.total}
           detailHref={`/visitas/${id}`}
@@ -228,10 +212,12 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
           template={model.fill.template}
           initialResponses={model.fill.responses}
           establishmentLabel={model.fill.establishmentLabel}
+          areaName={model.fill.session.area_name ?? null}
           itemResponseSource={model.fill.itemResponseSource}
           initialItemPhotos={model.fill.itemPhotos}
           backHref={`/visitas/${id}`}
           backLabel="Detalhe da visita"
+          nextBatchSessionBasePath={`/visitas/${id}/iniciar`}
           recurringNcSessionCountByItemId={model.recurringNcSessionCountByItemId}
           initialDossierApprovedAt={model.fill.session.dossier_approved_at ?? null}
           initialPdfExport={model.fill.latestPdfExport}
@@ -251,28 +237,19 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
     redirect(`/visitas/${id}/iniciar?session=${latestId}`);
   }
 
-  const options = await buildVisitChecklistOptions({
-    establishmentId,
-  });
+  const [options, areas] = await Promise.all([
+    buildVisitChecklistOptions(),
+    loadAreasForEstablishment(establishmentId),
+  ]);
 
   if (options.length === 0) {
     return (
       <div className="space-y-6">
-        <div>
-          <Link
-            href={`/visitas/${id}`}
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "text-muted-foreground -ml-2 mb-2",
-            )}
-          >
-            ← Detalhe da visita
-          </Link>
-          <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-            Iniciar visita
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">{title}</p>
-        </div>
+        <PageHeader
+          title="Iniciar visita"
+          description={title}
+          back={{ href: `/visitas/${id}`, label: "Detalhe da visita" }}
+        />
         <div
           role="status"
           className="border-border bg-muted/40 rounded-lg border px-4 py-3 text-sm"
@@ -292,71 +269,23 @@ export default async function IniciarVisitaPage({ params, searchParams }: Props)
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link
-          href={`/visitas/${id}`}
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "text-muted-foreground -ml-2 mb-2",
-          )}
-        >
-          ← Detalhe da visita
-        </Link>
-        <h1 className="text-foreground text-2xl font-semibold tracking-tight">
-          Iniciar visita
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">{title}</p>
-      </div>
+      <PageHeader
+        title="Iniciar visita"
+        description={title}
+        back={{ href: `/visitas/${id}`, label: "Detalhe da visita" }}
+      />
       {errMsg ? (
         <p className="text-destructive text-sm" role="alert">
           {errMsg}
         </p>
       ) : null}
-      <div className="border-border rounded-lg border bg-card/40 p-6 shadow-xs">
-        <p className="text-foreground text-sm font-medium">Escolher checklist</p>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Selecione o modelo regulatório ou personalizado para esta visita.
-        </p>
-        <form action={createVisitChecklistSessionAction} className="mt-4 space-y-4">
-          <input type="hidden" name="visit_id" value={id} />
-          {ctxEstablishmentId ? (
-            <input type="hidden" name="ctx_establishment_id" value={ctxEstablishmentId} />
-          ) : null}
-          <fieldset className="space-y-3">
-            <legend className="sr-only">Modelo de checklist</legend>
-            {options.map((opt) => {
-              const value =
-                opt.kind === "global"
-                  ? `global:${opt.templateId}`
-                  : `custom:${opt.customTemplateId}`;
-              return (
-                <label
-                  key={value}
-                  className="border-border flex cursor-pointer items-start gap-3 rounded-lg border p-3"
-                >
-                  <input
-                    type="radio"
-                    name="choice"
-                    value={value}
-                    required
-                    className="border-input text-primary mt-1 h-4 w-4"
-                  />
-                  <span className="text-sm">{opt.label}</span>
-                </label>
-              );
-            })}
-          </fieldset>
-          <button
-            type="submit"
-            className={cn(
-              buttonVariants({ size: "sm" }),
-              "min-h-11 min-w-[44px]",
-            )}
-          >
-            Começar preenchimento
-          </button>
-        </form>
-      </div>
+      <VisitChecklistPicker
+        visitId={id}
+        establishmentId={establishmentId}
+        ctxEstablishmentId={ctxEstablishmentId}
+        options={options}
+        areas={areas}
+      />
     </div>
   );
 }

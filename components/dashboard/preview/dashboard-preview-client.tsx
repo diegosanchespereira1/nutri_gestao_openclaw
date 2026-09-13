@@ -612,7 +612,7 @@ export function DashboardPreviewClient({
           <div className="grid grid-cols-2 gap-2">
             <div className="border-border rounded-lg border bg-background/70 px-3 py-2">
               <p className="text-muted-foreground text-[11px] font-semibold tracking-wide uppercase">
-                Ao vivo
+                Em andamento
               </p>
               <p className="text-foreground mt-0.5 text-2xl font-bold tabular-nums">
                 {isGestor ? "3" : "1"}

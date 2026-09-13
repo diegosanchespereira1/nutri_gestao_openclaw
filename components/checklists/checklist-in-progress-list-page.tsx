@@ -109,7 +109,7 @@ export async function ChecklistInProgressListPage() {
       >
         <div className="border-border rounded-xl border bg-card p-3 shadow-xs">
           <p className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
-            Ao vivo
+            Em andamento
           </p>
           <p className="text-foreground mt-1 text-2xl font-bold tabular-nums">
             {summary.inProgressCount}

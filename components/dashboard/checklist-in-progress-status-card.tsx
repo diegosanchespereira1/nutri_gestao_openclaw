@@ -76,7 +76,7 @@ export function ChecklistInProgressStatusCard({
           aria-atomic="true"
         >
           <Metric
-            label="Ao vivo"
+            label="Em andamento"
             value={live}
             hint={live === 1 ? "checklist aberto" : "checklists abertos"}
           />

@@ -114,7 +114,7 @@ describe("buildInProgressKpiHint", () => {
 });
 
 describe("buildInProgressAriaLabel", () => {
-  it("anuncia o pulso ao vivo e o de hoje", () => {
+  it("anuncia o total em andamento e o de hoje", () => {
     expect(
       buildInProgressAriaLabel({ inProgressCount: 1, todayCount: 1 }),
     ).toBe("Ver 1 checklist em andamento. 1 com movimento hoje.");

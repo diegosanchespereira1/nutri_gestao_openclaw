@@ -556,7 +556,7 @@ export function DashboardPreviewClient({
           href="/checklists/em-andamento"
         />
         <KpiButton
-          label="Em atraso"
+          label="Item vencido"
           value={isGestor ? "3" : "1"}
           hint="prazos e checklists vencidos"
           tone="danger"

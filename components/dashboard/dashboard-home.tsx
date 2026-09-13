@@ -240,7 +240,7 @@ export async function DashboardHome() {
           })}
         />
         <DashboardKpiButton
-          label="Em atraso"
+          label="Item vencido"
           value={String(validityCounts.vencidos)}
           hint="checklists vencidos · ver todos"
           tone={validityCounts.vencidos > 0 ? "danger" : "default"}

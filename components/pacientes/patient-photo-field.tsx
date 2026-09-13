@@ -177,11 +177,13 @@ export function PatientPhotoField({
         disabled={processing}
         aria-label="Alterar foto do paciente"
         className={cn(
-          "group relative shrink-0 rounded-full text-lg font-semibold text-foreground transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 disabled:opacity-70",
-          compact ? "size-20" : "size-24",
+          "group relative shrink-0 overflow-visible rounded-full text-lg font-semibold text-foreground",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          "disabled:opacity-70",
+          compact ? "size-[5.75rem]" : "size-[6.75rem]",
         )}
       >
-        <span className="bg-muted ring-primary/25 ring-offset-background block size-full overflow-hidden rounded-full ring-2 ring-offset-2">
+        <span className="bg-muted absolute inset-1.5 overflow-hidden rounded-full">
           {displayPhotoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -195,13 +197,17 @@ export function PatientPhotoField({
             </span>
           )}
           {processing ? (
-            <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+            <span className="absolute inset-0 flex items-center justify-center bg-black/40">
               <Loader2 className="size-6 animate-spin text-white" aria-hidden />
             </span>
           ) : null}
         </span>
         <span
-          className="bg-primary text-primary-foreground ring-background absolute -right-0.5 -bottom-0.5 flex size-7 items-center justify-center rounded-full shadow-sm ring-2"
+          aria-hidden
+          className="pointer-events-none absolute inset-1.5 rounded-full ring-2 ring-inset ring-primary/35"
+        />
+        <span
+          className="bg-primary text-primary-foreground ring-background absolute right-0 bottom-0 z-10 flex size-7 items-center justify-center rounded-full shadow-sm ring-2"
           aria-hidden
         >
           <Pencil className="size-3.5" />

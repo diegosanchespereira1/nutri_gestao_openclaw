@@ -13,6 +13,10 @@ import {
 } from "@/lib/actions/checklist-fill";
 import { loadChecklistCatalog } from "@/lib/actions/checklists";
 import { listCustomTemplatesForOwner } from "@/lib/actions/checklist-custom";
+import {
+  loadChecklistSessionsForClient,
+  type ChecklistSessionSummary,
+} from "@/lib/actions/checklist-history";
 import { loadAreasForEstablishment } from "@/lib/actions/establishment-areas";
 import {
   loadWorkspaceTemplatesForCatalogLight,
@@ -240,6 +244,83 @@ export async function getLatestFillSessionIdForVisit(
     .maybeSingle();
 
   return data ? (data.id as string) : null;
+}
+
+/** Última sessão com dossiê aprovado ligada à visita (para PDF/email). */
+export async function getLatestApprovedFillSessionIdForVisit(
+  visitId: string,
+): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data } = await supabase
+    .from("checklist_fill_sessions")
+    .select("id")
+    .eq("scheduled_visit_id", visitId)
+    .not("dossier_approved_at", "is", null)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return data ? (data.id as string) : null;
+}
+
+/**
+ * Sessões de checklist da visita (em andamento e aprovadas), no formato do
+ * histórico do cliente — para «Ver dossiê» / PDF na ficha da visita.
+ */
+export async function loadFillSessionsForVisit(
+  visitId: string,
+): Promise<{
+  rows: ChecklistSessionSummary[];
+  latestApprovedSessionId: string | null;
+}> {
+  const empty = { rows: [] as ChecklistSessionSummary[], latestApprovedSessionId: null };
+  const trimmed = visitId.trim();
+  if (!trimmed) return empty;
+
+  const { row } = await loadScheduledVisitById(trimmed);
+  if (!row) return empty;
+
+  let clientId =
+    row.target_type === "establishment"
+      ? (row.establishments?.client_id ?? null)
+      : (row.patients?.client_id ?? null);
+
+  if (!clientId) {
+    const supabase = await createClient();
+    const { data: sess } = await supabase
+      .from("checklist_fill_sessions")
+      .select("establishment_id")
+      .eq("scheduled_visit_id", trimmed)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!sess?.establishment_id) return empty;
+    const { data: est } = await supabase
+      .from("establishments")
+      .select("client_id")
+      .eq("id", sess.establishment_id)
+      .maybeSingle();
+    clientId = (est?.client_id as string | null) ?? null;
+  }
+
+  if (!clientId) return empty;
+
+  const { rows } = await loadChecklistSessionsForClient({
+    clientId,
+    scheduledVisitId: trimmed,
+    limit: 50,
+    offset: 0,
+  });
+
+  const latestApprovedSessionId =
+    rows.find((r) => r.status === "aprovado")?.id ?? null;
+
+  return { rows, latestApprovedSessionId };
 }
 
 type StartVisitChecklistFillResult =

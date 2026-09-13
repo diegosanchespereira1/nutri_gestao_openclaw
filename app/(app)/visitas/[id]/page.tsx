@@ -20,8 +20,11 @@ import { visitDisplayTitle, visitProfessionalLabel } from "@/lib/visits/display-
 import { cn } from "@/lib/utils";
 import { isDossierEmailDeliveryConfigured } from "@/lib/dossier-email-delivery";
 import { VisitDossierEmailPanel } from "@/components/visits/visit-dossier-email-panel";
+import { VisitChecklistsSection } from "@/components/visits/visit-checklists-section";
 import type { DossierEmailSendStatus } from "@/lib/types/visits";
 import { isWorkspaceGestaoMember } from "@/lib/workspace";
+import { getChecklistReopenEligibility } from "@/lib/actions/checklist-fill-reopen";
+import { loadFillSessionsForVisit } from "@/lib/actions/visit-checklist";
 
 const avisoMessages: Record<string, string> = {
   visita_nao_agendada:
@@ -77,17 +80,13 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
     (row.status === "scheduled" || row.status === "in_progress") &&
     isSameCalendarDay(row.scheduled_start, tz);
 
-  const { data: approvedSess } = await supabase
-    .from("checklist_fill_sessions")
-    .select("id")
-    .eq("scheduled_visit_id", id)
-    .eq("user_id", user.id)
-    .not("dossier_approved_at", "is", null)
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ rows: visitSessions, latestApprovedSessionId }, { canReopen: canReopenDossier }] =
+    await Promise.all([
+      loadFillSessionsForVisit(id),
+      getChecklistReopenEligibility(supabase, user.id),
+    ]);
 
-  const hasApprovedDossier = Boolean(approvedSess);
+  const hasApprovedDossier = Boolean(latestApprovedSessionId);
 
   const dossierEmails = row.dossier_recipient_emails ?? [];
   const initialEmailsText = dossierEmails.join(", ");
@@ -101,6 +100,10 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
 
   const sentAtLabel = row.dossier_email_sent_at
     ? formatDateTimeShort(row.dossier_email_sent_at, tz)
+    : null;
+
+  const dossierCtaHref = latestApprovedSessionId
+    ? `/checklists/preencher/${latestApprovedSessionId}?view=dossie&returnTo=${encodeURIComponent(`/visitas/${id}`)}`
     : null;
 
   return (
@@ -143,6 +146,20 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
             )}
           >
             {row.status === "in_progress" ? "Continuar visita" : "Iniciar visita"}
+          </Link>
+        ) : null}
+        {dossierCtaHref ? (
+          <Link
+            href={dossierCtaHref}
+            className={cn(
+              buttonVariants({
+                size: "sm",
+                variant: canStartToday ? "outline" : "default",
+              }),
+              "min-h-11 min-w-[44px] items-center justify-center px-4",
+            )}
+          >
+            Ver dossiê
           </Link>
         ) : null}
         {canCancel ? (
@@ -195,6 +212,14 @@ export default async function VisitaDetalhePage({ params, searchParams }: Props)
           </dd>
         </div>
       </dl>
+
+      <VisitChecklistsSection
+        visitId={id}
+        sessions={visitSessions}
+        latestApprovedSessionId={latestApprovedSessionId}
+        dossierEmailDeliveryConfigured={emailDeliveryConfigured}
+        canReopenDossier={canReopenDossier}
+      />
 
       <VisitDossierEmailPanel
         visitId={id}

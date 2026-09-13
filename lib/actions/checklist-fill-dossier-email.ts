@@ -10,7 +10,7 @@ import { buildApprovedDossierPdfBytes } from "@/lib/pdf/build-approved-dossier-p
 import { sendDossierPdfViaSmtp } from "@/lib/email/send-dossier-email-smtp";
 import { isSmtpConfigured } from "@/lib/email/smtp-config";
 import { createClient } from "@/lib/supabase/server";
-import { getLatestFillSessionIdForVisit } from "@/lib/actions/visit-checklist";
+import { getLatestApprovedFillSessionIdForVisit } from "@/lib/actions/visit-checklist";
 import type { ChecklistFillSessionRow } from "@/lib/types/checklist-fill";
 import { collectValidUniqueEmails } from "@/lib/validators/dossier-email-recipients";
 import { getWorkspaceAccountOwnerId } from "@/lib/workspace";
@@ -163,7 +163,7 @@ export async function resendDossierEmailAction(
   }
 
   const sessionId =
-    (await getLatestFillSessionIdForVisit(visitId)) ??
+    (await getLatestApprovedFillSessionIdForVisit(visitId)) ??
     null;
   if (!sessionId) {
     return { ok: false, error: "Não há checklist associado a esta visita." };

@@ -1,7 +1,7 @@
 import type { PercentileTable } from "../../types";
 
 /**
- * Prega cutânea tricipital (mm). PCT meninas 3–60 meses.
+ * Dobra cutânea tricipital (mm). PCT meninas 3–60 meses.
  * Fonte: WHO Child Growth Standards — Tabela_PCT_meninas_EscoreZ_3meses-5anos.pdf
  * Método: escore-Z. Chave = idade em meses.
  * // -3SD, -2SD, -1SD, 0(mediana), +1SD, +2SD, +3SD

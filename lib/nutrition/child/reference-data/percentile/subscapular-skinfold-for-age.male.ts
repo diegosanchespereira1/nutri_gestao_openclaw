@@ -1,7 +1,7 @@
 import type { PercentileTable } from "../../types";
 
 /**
- * Prega subescapular (mm). SE meninos 3–60 meses.
+ * Dobra subescapular (mm). SE meninos 3–60 meses.
  * Fonte: WHO Child Growth Standards — Tabela_SE_meninos_Perc_3meses-5anos.pdf
  * Método: percentil. Chave = idade em meses.
  * // p1, p3, p5, p15, p25, p50, p75, p85, p95, p97, p99

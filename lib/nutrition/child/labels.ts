@@ -7,8 +7,8 @@ export const CHILD_INDICATOR_LABELS: Record<ChildIndicator, string> = {
   bmi_for_age: "IMC para idade",
   weight_for_height: "Peso para estatura",
   arm_circumference_for_age: "Circunferência do braço para idade",
-  triceps_skinfold_for_age: "Prega cutânea tricipital para idade",
-  subscapular_skinfold_for_age: "Prega subescapular para idade",
+  triceps_skinfold_for_age: "Dobra cutânea tricipital para idade",
+  subscapular_skinfold_for_age: "Dobra subescapular para idade",
   head_circumference_for_age: "Perímetro cefálico para idade",
 };
 
@@ -26,7 +26,7 @@ export const CHILD_INDICATOR_SHORT: Record<ChildIndicator, string> = {
 
 export const CHILD_METHOD_LABELS: Record<ClassificationMethod, string> = {
   percentile: "Percentil",
-  zscore: "Escore-Z",
+  zscore: "Score-Z",
 };
 
 /** Unidade de medida por indicador. */

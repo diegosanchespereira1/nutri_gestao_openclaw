@@ -278,7 +278,7 @@ export function ChildAssessmentForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ca-triceps">Prega tricipital (mm)</Label>
+                <Label htmlFor="ca-triceps">Dobra tricipital (mm)</Label>
                 <Input
                   id="ca-triceps"
                   type="number"
@@ -292,7 +292,7 @@ export function ChildAssessmentForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ca-subscapular">Prega subescapular (mm)</Label>
+                <Label htmlFor="ca-subscapular">Dobra subescapular (mm)</Label>
                 <Input
                   id="ca-subscapular"
                   type="number"

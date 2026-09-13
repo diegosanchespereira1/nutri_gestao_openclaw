@@ -1,5 +1,5 @@
 /**
- * Tabelas de referência por ESCORE-Z — WHO Child Growth Standards.
+ * Tabelas de referência por SCORE-Z — WHO Child Growth Standards.
  *
  * Indicadores existentes (P/I, E/I, IMC/I) continuam indisponíveis em escore-Z
  * até que seus datasets sejam fornecidos.

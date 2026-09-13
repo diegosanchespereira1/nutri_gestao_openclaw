@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 
@@ -81,8 +81,22 @@ export function VisitChecklistPicker({
     () => groupVisitChecklistOptions(filteredOptions),
     [filteredOptions],
   );
-  const selectedOption = options.find(
-    (opt) => visitChecklistChoiceValue(opt) === selectedChoice,
+  const visibleSelectedChoice = useMemo(() => {
+    if (!selectedChoice) return null;
+    const stillVisible = filteredOptions.some(
+      (opt) => visitChecklistChoiceValue(opt) === selectedChoice,
+    );
+    return stillVisible ? selectedChoice : null;
+  }, [filteredOptions, selectedChoice]);
+
+  const selectedOption = useMemo(
+    () =>
+      visibleSelectedChoice
+        ? (options.find(
+            (opt) => visitChecklistChoiceValue(opt) === visibleSelectedChoice,
+          ) ?? null)
+        : null,
+    [options, visibleSelectedChoice],
   );
   const hasActiveFilters =
     filters.search.length > 0 ||
@@ -128,23 +142,15 @@ export function VisitChecklistPicker({
   }
 
   const areaRequired = areas.length > 0 && selectedAreaIds.length === 0;
-  const canStart = Boolean(selectedChoice) && !areaRequired && !pending;
-
-  useEffect(() => {
-    if (!selectedChoice) return;
-    const stillVisible = filteredOptions.some(
-      (opt) => visitChecklistChoiceValue(opt) === selectedChoice,
-    );
-    if (!stillVisible) setSelectedChoice(null);
-  }, [filteredOptions, selectedChoice]);
+  const canStart = Boolean(visibleSelectedChoice) && !areaRequired && !pending;
 
   function startFill() {
-    if (!selectedChoice || areaRequired) return;
+    if (!visibleSelectedChoice || areaRequired) return;
     setError(null);
     startTransition(async () => {
       const result = await startVisitChecklistFillAction({
         visitId,
-        choice: selectedChoice,
+        choice: visibleSelectedChoice,
         ctxEstablishmentId,
         areaIds: selectedAreaIds,
       });
@@ -223,7 +229,7 @@ export function VisitChecklistPicker({
                   : "Nenhum modelo da equipe publicado."
               }
               options={groups.workspace}
-              selectedChoice={selectedChoice}
+              selectedChoice={visibleSelectedChoice}
               onSelect={setSelectedChoice}
             />
           ) : null}
@@ -236,7 +242,7 @@ export function VisitChecklistPicker({
                   : "Nenhum modelo personalizado no workspace."
               }
               options={groups.custom}
-              selectedChoice={selectedChoice}
+              selectedChoice={visibleSelectedChoice}
               onSelect={setSelectedChoice}
             />
           ) : null}
@@ -249,7 +255,7 @@ export function VisitChecklistPicker({
                   : "Nenhum modelo do sistema ativo."
               }
               options={groups.system}
-              selectedChoice={selectedChoice}
+              selectedChoice={visibleSelectedChoice}
               onSelect={setSelectedChoice}
             />
           ) : null}
@@ -290,7 +296,7 @@ export function VisitChecklistPicker({
                 size="sm"
                 disabled={!canStart}
                 title={
-                  !selectedChoice
+                  !visibleSelectedChoice
                     ? "Selecione um checklist"
                     : areaRequired
                       ? "Selecione ao menos uma área"
